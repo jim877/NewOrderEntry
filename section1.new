@@ -1,0 +1,157 @@
+                    <Section id="sec1" title="1. Order & Interview" isOpen={openSections.sec1} onToggle={()=>handleToggleSection('sec1')} badges={<span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{codeSummary}</span>} compact={compactMode}>
+                        <div className={`grid ${compactMode ? 'gap-3' : 'gap-5'}`}>
+                            <LeadInfoFields data={data} update={update} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} />
+                            <SubSection title="Order" open={orderSubOpen} onToggle={() => setOrderSubOpen(!orderSubOpen)} compact={compactMode}>
+                                <Field label={<span>Order Name <span className="font-normal text-slate-400 text-xs ml-1">(Auto-generated)</span></span>}>
+                                  <div className="flex gap-2">
+                                      <Input value={data.orderName} onChange={e=>update("orderName",e.target.value)} disabled={!!data.orderNameLocked} placeholder="e.g. Name-TownST" />
+                                      <button className={`rounded-lg border px-3 text-xs font-bold transition-all ${data.orderNameLocked?"bg-slate-800 text-white":"bg-white hover:bg-slate-50"}`} onClick={()=>update("orderNameLocked",!data.orderNameLocked)}>{data.orderNameLocked?"LOCKED":"LOCK"}</button>
+                                  </div>
+                                </Field>
+                                <Field label="Order Type" missing={data.highlightMissing.orderTypes} smart>
+                                  <div className="flex flex-wrap gap-2">
+                                      {LOSS_TYPES.map(ot=> (
+                                          <ToggleMulti key={ot} label={ot} checked={(data.orderTypes||[]).includes(ot)} onChange={()=>toggleLossType(ot)} />
+                                      ))}
+                                  </div>
+                                </Field>
+                                <Field label="Service Offerings">
+                                  <div className="flex flex-wrap gap-2">
+                                    {SERVICE_OFFERINGS.map(s => (
+                                      <ToggleMulti key={s} label={s} checked={(data.serviceOfferings||[]).includes(s)} onChange={()=>update("serviceOfferings", toggleMulti(data.serviceOfferings||[], s))} />
+                                    ))}
+                                  </div>
+                                </Field>
+
+                                {(data.orderTypes || []).map(type => {
+                                    const details = (data.lossDetails || {})[type] || { causes: [], origins: [] };
+                                    const isMinimized = minimizedLossTypes[type];
+                                    const hasCauses = CAUSES[type] && CAUSES[type].length > 0;
+                                    const hasOrigins = true;
+                                    const severityGroup = type === "Dust/Debris" ? "Dust" : type;
+                                    const hasSeverity = SEVERITY_GROUPS.includes(severityGroup);
+                                    return (
+                                        <div key={type} className="animate-purple-section-fade rounded-xl border border-indigo-100 bg-indigo-50/30 overflow-hidden transition-all shadow-sm">
+                                            <div className="flex items-center justify-between px-4 py-3 bg-indigo-50/50 cursor-pointer hover:bg-indigo-100/50 transition-colors" onClick={() => toggleMinimizeLoss(type)}>
+                                                <div className="flex items-center gap-2"><span className="font-bold text-indigo-700">{type} Details</span>{isMinimized && <span className="text-xs text-slate-500 font-medium truncate max-w-[200px]">({getLossSummary(type)})</span>}</div>
+                                                <div className="text-xs font-bold text-indigo-500">{isMinimized ? "Show" : "Minimize"}</div>
+                                            </div>
+                                            {!isMinimized && (
+                                                <div className="p-4 grid gap-4 border-t border-indigo-100 bg-white">
+                                                    {hasCauses && (<Field label={`${type} Cause`} subtle><div className="flex flex-wrap gap-2">{CAUSES[type].map(c => (<ToggleMulti key={c} label={c} checked={(details.causes || []).includes(c)} onChange={() => updateLossDetail(type, 'causes', c)} />))}</div></Field>)}
+                                                    {hasOrigins && (<Field label="Origin" subtle><div className="flex flex-wrap gap-2">{ORIGINS.map(o => (<ToggleMulti key={o} label={o} checked={(details.origins || []).includes(o)} onChange={() => updateLossDetail(type, 'origins', o)} />))}</div></Field>)}
+                                                    {hasSeverity && (
+                                                        <Field label="Severity" subtle>
+                                                            <div className="flex gap-2">{SEVERITY_LEVELS.map(level => { const code = `${severityGroup}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`h-9 w-9 rounded-lg text-sm font-bold transition-all border ${isActive ? 'bg-indigo-50 border-indigo-600 text-indigo-700 animate-outline-fade-purple' : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-600'}`}>{level}</button>); })}</div>
+                                                        </Field>
+                                                    )}
+                                                    <div className="flex justify-end">
+                                                      <button onClick={() => setMinimizedLossTypes(p => ({ ...p, [type]: true }))} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 hover:border-indigo-300 hover:text-indigo-600">Done</button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </SubSection>
+
+                            <SubSection title="Source" open={sourceSubOpen} onToggle={() => setSourceSubOpen(!sourceSubOpen)} compact={compactMode}>
+                                <Field label="Sales Rep">
+                                  <SearchSelect value={data.salesRep} onChange={(v)=>update("salesRep", v)} options={SALES_REPS} listId="sales-rep-list" placeholder="Select sales rep..." />
+                                </Field>
+                                <Field label="Lead Source">
+                                  <div className="flex flex-wrap gap-2">
+                                    {LEAD_SOURCES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceCategory === s} onChange={() => update("leadSourceCategory", s)} />)}
+                                  </div>
+                                </Field>
+                                {data.leadSourceCategory === "Referral" && (
+                                  <div className="grid gap-4">
+                                    <Field label="Referring Company">
+                                      <div className="flex gap-2">
+                                        <SearchSelect value={data.referringCompany} onChange={(v)=>update("referringCompany",v)} options={DEFAULT_COMPANIES.concat(companies.filter(c=>!DEFAULT_COMPANIES.includes(c)))} listId="referring-company-list" />
+                                        <button className="rounded-lg bg-white px-3 font-bold text-indigo-600 shadow-sm hover:bg-indigo-50" onClick={()=>setModal({type:"company",value:"",onSave:(name)=>update("referringCompany",name)})}>+</button>
+                                      </div>
+                                    </Field>
+                                    <Field label="Referrer Name"><Input className={data.highlightMissing?.referrer ? "audit-missing" : ""} value={data.referrer} onChange={e=>update("referrer",e.target.value)} /></Field>
+                                  </div>
+                                )}
+                                {data.leadSourceCategory === "Marketing" && (
+                                  <Field label="Channel"><div className="flex flex-wrap gap-2">{MARKETING_SOURCES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} />)}</div></Field>
+                                )}
+                                {data.leadSourceCategory === "Internal" && (
+                                  <Field label="Type"><div className="flex flex-wrap gap-2">{INTERNAL_TYPES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} />)}</div></Field>
+                                )}
+                                <Field label="Method">
+                                  <div className="flex flex-wrap gap-2">
+                                       {CONTACT_METHODS.map(m => <ToggleMulti key={m} label={m} checked={data.contactMethod === m} onChange={() => update("contactMethod", m)} />)}
+                                  </div>
+                                </Field>
+                            </SubSection>
+
+                            <SubSection title="Interview" open={interviewSubOpen} onToggle={() => setInterviewSubOpen(!interviewSubOpen)} compact={compactMode}>
+                                <div id="sec1-interview">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200"><Field label="Living Situation"><div className="flex flex-wrap gap-2">{["Staying in home", "Temp - Short Term", "Temp - Long Term", "Moving"].map(s => (<ToggleMulti key={s} label={s} checked={data.livingStatus === s} onChange={()=>update("livingStatus", s)} />))}</div></Field></div>
+                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200"><Field label="Process Goal"><div className="flex flex-wrap gap-2">{["Deliver to Temp", "Deliver to Move", "Long-Term Storage"].map(s => (<ToggleMulti key={s} label={s} checked={data.processType === s} onChange={()=>update("processType", s)} />))}</div></Field></div>
+                                  </div>
+                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4 space-y-4">
+                                      <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">Conditions <span className="text-orange-500">⚡</span></label>
+                                      <div className="flex flex-wrap gap-3">
+                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.damageWasWet ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.damageWasWet} onChange={e => updateSmart('damageWasWet', e.target.checked ? 'Y' : 'N')} /><span className="text-sm">Was anything wet?</span></div>
+                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.damageMoldMildew ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.damageMoldMildew} onChange={e => updateSmart('damageMoldMildew', e.target.checked)} /><span className="text-sm">Mold visible?</span></div>
+                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.structuralElectricDamage === 'Y' ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.structuralElectricDamage === 'Y'} onChange={e => update("structuralElectricDamage", e.target.checked ? 'Y' : 'N')} /><span className="text-sm">Structure/Electric Damage?</span></div>
+                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.noLights ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.noLights} onChange={e => updateSmart('noLights', e.target.checked)} /><span className="text-sm">Has Electricity?</span></div>
+                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.everyoneOk === 'Y' ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.everyoneOk === 'Y'} onChange={e => update("everyoneOk", e.target.checked ? 'Y' : 'N')} /><span className="text-sm">Can stay home?</span></div>
+                                      </div>
+                                  </div>
+                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
+                                      <div className="text-sm font-semibold text-indigo-600 mb-3">Scope of Work</div>
+                                      <div className="grid sm:grid-cols-2 gap-3">
+                                        {["Will Paint", "Sand Floors", "Remove Window Treatments", "Pack Out Furniture"].map(item => (
+                                          <div key={item} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                            <span className="text-sm text-slate-600">{item}?</span>
+                                            <div className="flex gap-2">
+                                              <ToggleMulti label="Y" checked={data[item.replace(/\s/g, '')] === 'Y'} onChange={() => update(item.replace(/\s/g, ''), data[item.replace(/\s/g, '')] === 'Y' ? 'N' : 'Y')} />
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                  </div>
+                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                    <div className="text-sm font-semibold text-indigo-600 mb-3">Preferences & Care</div>
+                                    <div className="space-y-4">
+                                      <div className="flex items-center justify-between"><Field label="Medical Issues?" /><ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => update("familyMedicalIssues", v)} /></div>
+                                      <div className="flex items-center justify-between"><Field label="Soap Allergies?" smart /><ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => update("soapFragAllergies", v)} /></div>
+                                      <div className="flex items-center justify-between"><Field label="Self Cleaning?" /><ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} /></div>
+                                      <div className="flex items-center justify-between"><Field label="Donate Items?" /><ToggleGroup options={["Y","N"]} value={data.donateSalvation || ""} onChange={v => update("donateSalvation", v)} /></div>
+                                      <div className="flex items-center justify-between"><Field label="Use Dry Cleaner?" /><ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => update("useDryCleaner", v)} /></div>
+                                      <div className="flex items-center justify-between"><Field label="How do you dry laundry?" smart /><ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => update("howDryLaundry", v)} /></div>
+                                      <div className="flex items-center justify-between"><Field label="Need Storage?" /><ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => update("storageNeeded", v)} /></div>
+                                      <label className="flex items-center gap-2 text-sm text-slate-500"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={data.addCRMlog} onChange={e => update("addCRMlog", e.target.checked)} /> Add CRM Log</label>
+                                    </div>
+                                  </div>
+                                  <Field label="Repairs Summary"><div className="flex flex-wrap gap-2">{["Just Cleaning", "Clean & Paint", "Clean, Paint, Floors", "Structural Damage", "Major Repairs"].map(s => (<ToggleMulti key={s} label={s} checked={data.repairsSummary === s} onChange={()=>update("repairsSummary", s)} />))}</div></Field>
+                                </div>
+                            </SubSection>
+
+                            <SubSection title="Codes" open={codesSubOpen} onToggle={() => setCodesSubOpen(!codesSubOpen)} compact={compactMode}>
+                                <div id="sec1-codes">
+                                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:border-indigo-300">
+                                      <button className="flex w-full justify-between bg-slate-50/50 px-4 py-3 text-left transition-colors hover:bg-slate-50" onClick={()=>setOpenCodes(!openCodes)}>
+                                          <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-700">HANDLING CODES (Order-level)</span></div>
+                                          <div className="flex items-center gap-2">{!openCodes && codeSummary !== "None" && <span className="rounded bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700 fade-in">{codeSummary}</span>}<Chevron open={openCodes} /></div>
+                                      </button>
+                                      {openCodes && (
+                                          <div className="p-4 grid gap-6 bg-white border-t border-slate-100 fade-in">
+                                            <div><div className="mb-2 text-xs font-bold text-slate-400">SEVERITY</div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">{SEVERITY_GROUPS.map(type => (<div key={type} className="rounded-lg border border-slate-200 p-2"><div className="text-xs font-bold text-slate-600 mb-1.5">{type}</div><div className="flex gap-1">{SEVERITY_LEVELS.map(level => { const code = `${type}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`flex-1 rounded py-1 text-xs font-bold transition-all ${isActive ? 'bg-indigo-50 border-indigo-600 text-indigo-700 animate-outline-fade-purple' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{level}</button>); })}</div></div>))}</div></div>
+                                            <div className="border-t border-slate-100 my-1"></div>
+                                            <div><div className="mb-2 text-xs font-bold text-slate-400">QUALITY</div><div className="flex flex-wrap gap-2">{QUALITY_CODES.map(q => (<ToggleMulti key={q} label={q} checked={data.qualityCode === q} onChange={() => update("qualityCode", q)} />))}</div></div>
+                                            <div className="border-t border-slate-100 my-1"></div>
+                                            <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div><div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} className="!px-3 !py-2 !text-sm" checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
+                                          </div>
+                                      )}
+                                  </div>
+                                </div>
+                            </SubSection>
+                        </div>
+*** End Patch
