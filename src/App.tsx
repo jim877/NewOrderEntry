@@ -252,7 +252,7 @@ const DEFAULT_CONTACTS=["Alex Morgan", "Jamie Lee", "Pat Adjuster", "Ronzel Simm
 const WELCOME_CAMPAIGNS=["Brochure", "Rush Guide", "Vcard"];
 const VENDOR_TYPES=["Art","Contents","Moving","Mitigation","Contractor","Consultant","Agent","Broker","Decorator","Building Management","Superintendent","Other"];
 const SALES_REPS=["Dave Fenyo, Sales Rep","Jim Fenyo","Josh Cintron, Sales Rep"];
-const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Pack-out","Rugs","Storage Only","Textiles","TLI"];
+const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Textiles","TLI"];
 const SERVICE_OFFERING_HELP = {
   Appliance: "Large items requiring specialized handling (refrigerators, ranges, etc.).",
   Art: "Items valued for artistic/aesthetic merit.",
