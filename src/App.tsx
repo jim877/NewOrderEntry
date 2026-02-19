@@ -135,8 +135,10 @@ function safeUid(){
 const getInitials = (name = "") => {
   const parts = name.replace(/[^a-zA-Z\s]/g, "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "SR";
-  const first = parts[0][0] || "";
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  const filtered = parts.filter(p => !["SALES", "REP", "REPRESENTATIVE"].includes(p.toUpperCase()));
+  const useParts = filtered.length ? filtered : parts;
+  const first = useParts[0][0] || "";
+  const last = useParts.length > 1 ? useParts[useParts.length - 1][0] : "";
   return (first + last).toUpperCase();
 };
 
@@ -633,18 +635,73 @@ const formatDateLabel = (value) => {
   return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
-const DatePicker = ({ value, onChange }) => {
+const getNowDateIso = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const getNowTimeLabel = () => {
+  const d = new Date();
+  const hours24 = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours24 >= 12 ? "PM" : "AM";
+  const hr = hours24 % 12 || 12;
+  return `${hr}:${minutes} ${ampm}`;
+};
+
+const getNextHalfHourLabel = () => {
+  const d = new Date();
+  let hours24 = d.getHours();
+  const mins = d.getMinutes();
+  let nextMinutes = 30;
+  if (mins >= 30) {
+    nextMinutes = 0;
+    hours24 = (hours24 + 1) % 24;
+  }
+  const ampm = hours24 >= 12 ? "PM" : "AM";
+  const hr = hours24 % 12 || 12;
+  const mm = String(nextMinutes).padStart(2, "0");
+  return `${hr}:${mm} ${ampm}`;
+};
+
+const DatePicker = ({ value, onChange, closeSignal }) => {
   const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
   const [view, setView] = useState(() => {
     const base = value ? new Date(normalizeDateInput(value)) : new Date();
     return new Date(base.getFullYear(), base.getMonth(), 1);
   });
+  useEffect(() => {
+    if (closeSignal !== undefined) setOpen(false);
+  }, [closeSignal]);
 
   useEffect(() => {
     if (!value) return;
     const d = new Date(normalizeDateInput(value));
     if (!isNaN(d.getTime())) setView(new Date(d.getFullYear(), d.getMonth(), 1));
   }, [value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Enter") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
 
   const days = [];
   const year = view.getFullYear();
@@ -662,7 +719,7 @@ const DatePicker = ({ value, onChange }) => {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapperRef}>
       <Input
         value={value || ""}
         onChange={(e) => { onChange(e.target.value); }}
@@ -696,7 +753,7 @@ const DatePicker = ({ value, onChange }) => {
         📅
       </button>
       {open && (
-        <div className="absolute z-[120] mt-2 w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+        <div className="absolute z-[120] mt-2 w-[380px] rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
           <div className="flex items-center justify-between mb-3">
             <button
               onClick={() => setView(new Date(year, month - 1, 1))}
@@ -724,7 +781,7 @@ const DatePicker = ({ value, onChange }) => {
                 <button
                   key={`${d}-${idx}`}
                   onClick={() => pick(d)}
-                  className={`h-9 w-9 rounded-full text-sm ${!d ? "text-transparent" : isSelected ? "bg-sky-500 text-white" : "text-slate-700 hover:bg-sky-50"}`}
+                  className={`h-10 w-10 rounded-full text-sm ${!d ? "text-transparent" : isSelected ? "bg-sky-500 text-white" : "text-slate-700 hover:bg-sky-50"}`}
                   disabled={!d}
                 >
                   {d || "."}
@@ -741,10 +798,32 @@ const DatePicker = ({ value, onChange }) => {
   );
 };
 
-const TimePicker = ({ value, onChange }) => {
+const TimePicker = ({ value, onChange, closeSignal }) => {
   const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
+  useEffect(() => {
+    if (closeSignal !== undefined) setOpen(false);
+  }, [closeSignal]);
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Enter") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapperRef}>
       <Input
         value={value || ""}
         onChange={(e) => { onChange(e.target.value); }}
@@ -770,8 +849,8 @@ const TimePicker = ({ value, onChange }) => {
         🕒
       </button>
       {open && (
-        <div className="absolute z-[120] mt-2 w-[260px] rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
-          <div className="max-h-[240px] overflow-y-auto custom-scroll">
+        <div className="absolute z-[120] mt-2 w-[300px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+          <div className="max-h-[300px] overflow-y-auto custom-scroll">
             {TIME_SLOTS.map(t => (
               <button
                 key={t}
@@ -1349,7 +1428,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                    ) : null
                  }
                >
-                 <div className="max-w-md">
+               <div className="max-w-sm">
                    <SearchSelect
                      data-audit-key="referrer"
                      className={auditOn && data.highlightMissing?.referrer ? "audit-missing" : ""}
@@ -1399,7 +1478,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
           </div>
       </Field>
 
-      <Field label="Sales Rep" className="max-w-xs">
+      <Field label="Sales Rep" className="max-w-[140px]">
         <div className="relative inline-flex items-center gap-2">
           <button
             type="button"
@@ -1601,13 +1680,12 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec4', sub: 'finance', label: 'Price List', keywords: 'price list' },
     { id: 'sec4', sub: 'finance', label: 'Price Multiplier', keywords: 'price multiplier' },
     { id: 'sec4', sub: 'finance', label: 'Estimate Requested', keywords: 'estimate requested' },
-    { id: 'sec4', sub: 'companies', label: 'Companies', keywords: 'companies add company contact vendor' },
+    { id: 'sec4', sub: 'companies', label: 'Companies & Contacts', keywords: 'companies contacts add company contact vendor' },
 
     { id: 'sec5', label: 'Schedule Section', keywords: 'schedule section' },
     { id: 'sec5', label: 'Schedule Type', keywords: 'scope pickup in-home' },
     { id: 'sec5', label: 'Date', keywords: 'schedule date' },
     { id: 'sec5', label: 'Time', keywords: 'schedule time' },
-    { id: 'sec5', label: 'Order Lead', keywords: 'order lead tech' },
     { id: 'sec5', label: 'Event Instructions', keywords: 'instructions notes load list' },
     { id: 'sec5', label: 'Estimate Requested', keywords: 'estimate requested type' },
     { id: 'sec5', label: 'Requested By', keywords: 'estimate requested by' },
@@ -2149,7 +2227,7 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
 });
 
 // --- QUICK ENTRY COMPONENT ---
-const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, updateSmart, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople }) => {
+const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, updateSmart, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal }) => {
     const [eventNoteDraft, setEventNoteDraft] = useState("");
     const [showQuickInstructions, setShowQuickInstructions] = useState(false);
     const [showLoadListPanel, setShowLoadListPanel] = useState(false);
@@ -2304,11 +2382,35 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                      <button onClick={() => update('scheduleType', 'Meeting')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Meeting' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🗓️</span><span className="font-bold text-xs">Meeting</span></button>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 mb-4">
-                    <Field label="Date">
-                      <DatePicker value={data.pickupDate} onChange={(v)=>update("pickupDate", v)} />
+                    <Field
+                      label="Date"
+                      action={
+                        <button
+                          type="button"
+                          onClick={() => onSetNowDate?.()}
+                          className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                          title="Set to today"
+                        >
+                          📅 Now
+                        </button>
+                      }
+                    >
+                      <DatePicker value={data.pickupDate} onChange={(v)=>update("pickupDate", v)} closeSignal={dateCloseSignal} />
                     </Field>
-                    <Field label="Time">
-                      <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} />
+                    <Field
+                      label="Time"
+                      action={
+                        <button
+                          type="button"
+                          onClick={() => onSetNowTime?.()}
+                          className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                          title="Set to now"
+                        >
+                          🕒 Now
+                        </button>
+                      }
+                    >
+                      <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseSignal} />
                     </Field>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
@@ -2346,11 +2448,6 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     <div className="text-[11px] text-slate-400">Use when the event is not firm and the customer has not been contacted.</div>
                   </div>
                 </Field>
-                <Field label="Order Lead">
-                  <div className="max-w-sm">
-                    <SearchSelect value={data.assignedTech} onChange={(v)=>update("assignedTech",v)} options={TECHS} listId="tech-list-quick" placeholder="Select tech..." />
-                  </div>
-                </Field>
                 <Field label="Who are we meeting?">
                   <div className="flex flex-wrap gap-2">
                     {(knownPeople && knownPeople.length > 0) ? knownPeople.map(p => (
@@ -2361,6 +2458,14 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
                     <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">✅ Send Confirmation</button>
                     <button onClick={onOpenReminder} className={`rounded-lg border px-4 py-3 text-sm font-semibold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600"}`}>⏰ {data.reminderEnabled ? "Edit Reminder" : "Schedule Reminder"}</button>
+                </div>
+                <div className="flex items-center justify-start border-t border-slate-100 pt-3">
+                  <button
+                    onClick={() => { update("addCRMlog", true); onOpenCrmLog?.(); }}
+                    className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                  >
+                    + Add CRM Log
+                  </button>
                 </div>
                 <Field label="Event Instructions">
                   <div className="relative rounded-lg border border-slate-200 bg-white p-3 space-y-3">
@@ -2551,6 +2656,8 @@ export default function App(){
   const [confirmContextOpen, setConfirmContextOpen] = useState(false);
   const [reminderModalOpen, setReminderModalOpen] = useState(false);
   const [reminderDraft, setReminderDraft] = useState({ date: "", time: "" });
+  const [dateCloseTick, setDateCloseTick] = useState(0);
+  const [timeCloseTick, setTimeCloseTick] = useState(0);
   const [welcomeModal, setWelcomeModal] = useState({ isOpen: false, customerId: null, note: "" });
   const [showWelcomeQuickNotes, setShowWelcomeQuickNotes] = useState(false);
   const [crmModal, setCrmModal] = useState({ isOpen: false, method: "", owner: "", subject: "", orderLink: "", notes: "" });
@@ -2570,6 +2677,7 @@ export default function App(){
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [companyModalCloseArmed, setCompanyModalCloseArmed] = useState(false);
   const [newCompanyDraft, setNewCompanyDraft] = useState({ contact: "", company: "" });
+  const [addContactExisting, setAddContactExisting] = useState({ contact: "", company: "" });
   const [addCompanyQuery, setAddCompanyQuery] = useState("");
   const [companyEdit, setCompanyEdit] = useState({});
   const [sampleContacts, setSampleContacts] = useState(() => {
@@ -2700,6 +2808,17 @@ export default function App(){
   const [sourceSubOpen, setSourceSubOpen] = useState(false);
   const [interviewSubOpen, setInterviewSubOpen] = useState(false);
   const [codesSubOpen, setCodesSubOpen] = useState(false);
+
+  useEffect(() => {
+    if (entryMode !== "detailed") return;
+    setOrderSubOpen(true);
+    setSourceSubOpen(false);
+    setInterviewSubOpen(false);
+    setCodesSubOpen(false);
+    setBillingSubOpen(false);
+    setInsuranceSubOpen(false);
+    setCompaniesSubOpen(false);
+  }, [entryMode]);
   
   const [minimizedLossTypes, setMinimizedLossTypes] = useState({});
   const [manualEditLossTypes, setManualEditLossTypes] = useState({});
@@ -3077,6 +3196,16 @@ export default function App(){
     setReminderModalOpen(true);
   }, [data.reminderDate, data.reminderTime, data.pickupDate, data.pickupTime]);
 
+  const setNowDate = useCallback(() => {
+    update("pickupDate", getNowDateIso());
+    setDateCloseTick(t => t + 1);
+  }, [update]);
+
+  const setNowTime = useCallback(() => {
+    update("pickupTime", getNextHalfHourLabel());
+    setTimeCloseTick(t => t + 1);
+  }, [update]);
+
   const handleSendWelcome = (customerId) => {
     setWelcomeModal({ isOpen: true, customerId, note: "" });
     setShowWelcomeQuickNotes(false);
@@ -3152,6 +3281,7 @@ export default function App(){
   }, []);
 
   const focusAuditItem = useCallback((item) => {
+    setAuditOn(true);
     setOpenSections(p => ({ ...p, [item.section]: true }));
     if (item.section === "sec1") {
       setOrderSubOpen(true);
@@ -3172,14 +3302,16 @@ export default function App(){
       if (sectionEl) {
         sectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
       }
-      const el = document.querySelector(`[data-audit-key="${item.key}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.classList.add("audit-pulse");
-        setTimeout(() => el.classList.remove("audit-pulse"), 2400);
-        if (el.focus) el.focus();
-      }
-    }, 200);
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-audit-key="${item.key}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("audit-pulse");
+          setTimeout(() => el.classList.remove("audit-pulse"), 2400);
+          if (el.focus) el.focus();
+        }
+      });
+    }, 260);
   }, []);
 
   useEffect(() => {
@@ -3271,7 +3403,6 @@ export default function App(){
     push("Schedule Type", data.scheduleType);
     push("Schedule Date", data.pickupDate);
     push("Schedule Time", data.pickupTime);
-    push("Order Lead", data.assignedTech);
     return lines;
   };
 
@@ -3533,6 +3664,15 @@ export default function App(){
     });
     return map;
   }, [data.additionalCompanies, data.billingContact, data.billingCompany, sampleContacts]);
+
+  const existingCompanyOptions = useMemo(() => {
+    const set = new Set();
+    (companies || []).forEach(c => c && set.add(c));
+    Object.values(data.additionalCompanies || {}).forEach(entry => {
+      if (entry?.company) set.add(entry.company);
+    });
+    return Array.from(set);
+  }, [companies, data.additionalCompanies]);
 
   const globalDirectoryByCompany = useMemo(() => {
     const map = new Map();
@@ -3835,6 +3975,15 @@ export default function App(){
       if (comp && normalizeCompany(comp) === normalizeCompany(company)) add(c);
     });
     return opts;
+  };
+
+  const resolveCompanyTypeForName = (companyName) => {
+    if (!companyName) return "";
+    const match = Object.entries(data.additionalCompanies || {}).find(([, entry]) => normalizeCompany(entry?.company) === normalizeCompany(companyName));
+    if (match) return match[0];
+    const sample = sampleContacts.find(c => normalizeCompany(c.company) === normalizeCompany(companyName));
+    if (sample?.companyType) return sample.companyType;
+    return autoTypeForCompany(companyName);
   };
 
   const addContactToCompany = (type, contactName, companyName) => {
@@ -4156,6 +4305,23 @@ export default function App(){
     }
   }, [data.orderTypes, data.handlingCodes]);
 
+  const prevMoldCoverageRef = useRef(data.moldCoverageConfirm);
+  const prevRentCoverageRef = useRef(data.rentCoverageLimit);
+
+  useEffect(() => {
+    if (data.moldCoverageConfirm && (!data.moldLimit || data.moldLimit === prevMoldCoverageRef.current)) {
+      setData(prev => ({ ...prev, moldLimit: data.moldCoverageConfirm }));
+    }
+    prevMoldCoverageRef.current = data.moldCoverageConfirm;
+  }, [data.moldCoverageConfirm, data.moldLimit]);
+
+  useEffect(() => {
+    if (data.rentCoverageLimit && (!data.contentsCoverageLimit || data.contentsCoverageLimit === prevRentCoverageRef.current)) {
+      setData(prev => ({ ...prev, contentsCoverageLimit: data.rentCoverageLimit }));
+    }
+    prevRentCoverageRef.current = data.rentCoverageLimit;
+  }, [data.rentCoverageLimit, data.contentsCoverageLimit]);
+
   const quickQuestionsComplete =
     !!data.restorationType &&
     (data.restorationType !== "Restoration Project" || !!data.involvesInsurance) &&
@@ -4183,9 +4349,9 @@ export default function App(){
     const isReferrerCompany = !data.referrer && !!data.referringCompany && data.referringCompany === company;
     const isBillToCompany = !data.billingContact && !!data.billingCompany && data.billingCompany === company;
     const isAdjusterCompany = !data.insuranceAdjuster && false;
-    if (isReferrerCompany) roles.push({ icon: "🏷️", title: "Referrer" });
-    if (isBillToCompany) roles.push({ icon: "💳", title: "Bill To" });
-    if (isAdjusterCompany) roles.push({ icon: "🧑‍💼", title: "Adjuster" });
+    if (isReferrerCompany) roles.push({ id: "referrer", icon: "🏷️", title: "Referrer" });
+    if (isBillToCompany) roles.push({ id: "billto", icon: "💳", title: "Bill To" });
+    if (isAdjusterCompany) roles.push({ id: "adjuster", icon: "🧑‍💼", title: "Adjuster" });
     return roles;
   };
 
@@ -4517,7 +4683,6 @@ export default function App(){
                                           {suggestStorageMonths && <span className="text-[10px] font-bold suggested-pill rounded-full px-2 py-0.5">Suggested</span>}
                                         </div>
                                       )}
-                                      <label className="flex items-center gap-2 text-sm text-slate-500"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={data.addCRMlog} onChange={e => update("addCRMlog", e.target.checked)} /> Add CRM Log</label>
                                     </div>
                                   </div>
                                   {/* Repairs Summary moved into section above */}
@@ -4723,7 +4888,7 @@ export default function App(){
                         </SubSection>
 
                         <SubSection
-                          title="Companies"
+                          title="Companies & Contacts"
                           open={companiesSubOpen}
                           onToggle={() => setCompaniesSubOpen(!companiesSubOpen)}
                           compact={compactMode}
@@ -4733,7 +4898,7 @@ export default function App(){
                               onClick={() => { setCompaniesSubOpen(true); setAddCompanyModalOpen(true); }}
                               className="rounded-full bg-sky-500 px-4 py-1.5 text-xs font-bold text-white shadow hover:bg-sky-600"
                             >
-                              + Add Company
+                              + Quick add
                             </button>
                           }
                         >
@@ -4750,10 +4915,11 @@ export default function App(){
                                   onClick={() => setCompanyRolesExpanded(v => !v)}
                                   className="rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
                                 >
-                                  {companyRolesExpanded ? "Hide extra roles" : "Show extra roles"}
+                                  {companyRolesExpanded ? "Hide additional vendors" : "Show additional vendors"}
                                 </button>
                               </div>
                             </div>
+                            <div className="mt-1 text-[11px] text-slate-500">Click a company type to add this company type.</div>
                             <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
                               <div className="hidden md:grid grid-cols-12 bg-slate-50 px-4 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 <div className="col-span-3">Company Type</div>
@@ -4767,10 +4933,10 @@ export default function App(){
                                     contact: role.contactName,
                                     contacts: role.contactName ? [{ name: role.contactName }] : []
                                   };
-                                  const roleBadges = companyRolesFor(entryForBadges);
                                   const contacts = role.contacts && role.contacts.length
                                     ? role.contacts
                                     : (role.contactName ? [{ name: role.contactName }] : []);
+                                  const anyContactRoles = !!(getRolesForContact && contacts.some(c => (getRolesForContact(role.companyName, c.name) || []).length));
                                   const rows = contacts.length ? contacts : [{ name: "" }];
                                   return rows.map((c, idx) => (
                                     <div key={`${role.id}-${c.name || idx}`} className={`grid grid-cols-1 md:grid-cols-12 gap-2 px-4 py-2 ${role.pending ? 'bg-emerald-50/40' : ''}`}>
@@ -4782,7 +4948,7 @@ export default function App(){
                                       >
                                         {idx === 0 && (
                                           <div className="flex flex-col gap-1">
-                                            <span className="text-sm font-semibold text-slate-700">{role.label}</span>
+                                            <span className="text-sm font-semibold text-sky-700">{role.label}</span>
                                           </div>
                                         )}
                                       </button>
@@ -4794,16 +4960,32 @@ export default function App(){
                                       >
                                         {idx === 0 && (
                                           <div className="flex flex-col gap-1">
-                                            <span className={`font-medium ${role.companyName ? 'text-slate-700' : 'text-slate-300'}`}>
-                                              {role.companyName || ""}
+                                            <span className={`font-medium ${role.companyName ? 'text-slate-700' : 'text-sky-600'}`}>
+                                              {role.companyName || "Add company"}
                                             </span>
-                                            {roleBadges.length > 0 && (
-                                              <div className="flex flex-wrap gap-1">
+                                            {(() => {
+                                              const contactRoles = c?.name && getRolesForContact ? getRolesForContact(role.companyName, c.name) : [];
+                                              const roleBadges = anyContactRoles ? [] : companyRolesFor(entryForBadges);
+                                              return roleBadges.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
                                                 {roleBadges.map(r => (
-                                                  <RoleBadge key={`${role.id}-${r.title}`} icon={r.icon} title={r.title} />
+                                                  toggleRoleForContact ? (
+                                                    <button
+                                                      key={`${role.id}-${r.title}`}
+                                                      type="button"
+                                                      onClick={() => toggleRoleForContact(role.companyName, "", r.id || r.title?.toLowerCase())}
+                                                      className="rounded-full"
+                                                      title="Click to toggle role"
+                                                    >
+                                                      <RoleBadge icon={r.icon} title={r.title} />
+                                                    </button>
+                                                  ) : (
+                                                    <RoleBadge key={`${role.id}-${r.title}`} icon={r.icon} title={r.title} />
+                                                  )
                                                 ))}
                                               </div>
-                                            )}
+                                            ) : null;
+                                            })()}
                                           </div>
                                         )}
                                       </button>
@@ -4820,13 +5002,27 @@ export default function App(){
                                             {getRolesForContact && (
                                               <div className="mt-1 flex flex-wrap gap-1">
                                                 {getRolesForContact(role.companyName, c.name).map(r => (
-                                                  <RoleBadge key={`${role.id}-${c.name}-${r.title}`} icon={r.icon} title={r.title} />
+                                                  toggleRoleForContact ? (
+                                                    <button
+                                                      key={`${role.id}-${c.name}-${r.title}`}
+                                                      type="button"
+                                                      onClick={() => toggleRoleForContact(role.companyName, c.name, r.id || r.title?.toLowerCase())}
+                                                      className="rounded-full"
+                                                      title="Click to toggle role"
+                                                    >
+                                                      <RoleBadge icon={r.icon} title={r.title} />
+                                                    </button>
+                                                  ) : (
+                                                    <RoleBadge key={`${role.id}-${c.name}-${r.title}`} icon={r.icon} title={r.title} />
+                                                  )
                                                 ))}
                                               </div>
                                             )}
                                           </div>
                                         ) : (
-                                          <span className="text-slate-300">Add contact</span>
+                                          <span className={role.companyName ? "text-sky-600" : "text-slate-300"}>
+                                            {role.companyName ? "Add contact" : "—"}
+                                          </span>
                                         )}
                                       </button>
                                     </div>
@@ -4834,121 +5030,6 @@ export default function App(){
                                 })}
                               </div>
                             </div>
-                          </div>
-                          <div className="grid md:grid-cols-2 gap-4">
-                            {(() => {
-                              const types = [...(data.additionalCompanyTypes || [])].filter(t => t !== "Referring Company");
-                              const refType = data.referringCompany ? autoTypeForCompany(data.referringCompany) : "";
-                              if (refType && types.includes(refType)) {
-                                return [refType, ...types.filter(t => t !== refType)];
-                              }
-                              return types;
-                            })().map((type) => {
-                              const entry = (data.additionalCompanies||{})[type] || { contact: "", company: "", inactive: false, contacts: [] };
-                              const hasContacts = (entry.contacts && entry.contacts.length) || entry.contact;
-                              const isEditing = companyEdit[type] || (!entry.contact && !entry.company);
-                              const placeholder = type === "Insurance" && data.insuranceClaim === "Yes" && !entry.company;
-                              const isReferrerEntry = companyRolesFor(entry).some(r => r.title === "Referrer");
-                              const companyLevelRoles = !hasContacts ? [
-                                (!data.referrer && data.referringCompany === entry.company) ? { icon: "🏷️", title: "Referrer" } : null,
-                                (!data.billingContact && data.billingCompany === entry.company) ? { icon: "💳", title: "Bill To" } : null
-                              ].filter(Boolean) : [];
-                              return (
-                                <div key={type} className={`rounded-2xl border border-slate-200 bg-white p-5 ${getFlashClass(`company-${type}`)} ${placeholder ? "company-placeholder" : ""} ${entry.inactive ? "opacity-70" : ""}`}>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-50 text-sky-700 text-xs font-bold">
-                                        {COMPANY_LOGO_TEXT[entry.company] || getInitials(entry.company || type)}
-                                      </span>
-                                      <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-slate-800">{entry.company || "Company"}</span>
-                                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{type}</span>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        onClick={() => {
-                                          if (isEditing && entry.contact && !entry.company) {
-                                            setToast("Company required for contact.");
-                                            return;
-                                          }
-                                          setCompanyEdit(prev => ({ ...prev, [type]: !isEditing }));
-                                        }}
-                                        className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                                      >
-                                        {isEditing ? "Close" : "Edit"}
-                                      </button>
-                                    </div>
-                                  </div>
-                                  {companyLevelRoles.length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                      {companyLevelRoles.map(r => <RoleBadge key={r.title} icon={r.icon} title={r.title} />)}
-                                    </div>
-                                  )}
-                                  <div className="mt-3">
-                                    <CompanyRecord
-                                      company={entry.company}
-                                      contact={entry.contact}
-                                      contacts={entry.contacts}
-                                      roles={hasContacts ? [] : companyRolesFor(entry)}
-                                      editable={isEditing}
-                                      inactive={entry.inactive}
-                                      rep={getSalesRepForContact(entry.contact)}
-                                      onChangeContact={(v)=>{
-                                        updateAdditionalCompanyEntry(type, { contact: v, contacts: v ? [{ name: v, inactive: false }] : [] });
-                                        if (isReferrerEntry) updateMany({ referrer: v });
-                                      }}
-                                      onChangeContacts={(list) => {
-                                        updateAdditionalCompanyEntry(type, { contacts: list, contact: list?.[0]?.name || "" });
-                                        if (isReferrerEntry && list?.[0]?.name) updateMany({ referrer: list[0].name });
-                                      }}
-                                      onChangeCompany={(v)=>{
-                                        updateAdditionalCompanyEntry(type, { company: v });
-                                        if (isReferrerEntry) updateMany({ referringCompany: v });
-                                      }}
-                                      onFindCompany={() => {
-                                        const demoName = entry.contact ? `${entry.contact} Co.` : "New Company";
-                                        updateAdditionalCompanyEntry(type, { company: demoName });
-                                        registerContactCompany(entry.contact, demoName);
-                                        if (isReferrerEntry) updateMany({ referringCompany: demoName });
-                                        triggerAutoFlash(`company-${type}`);
-                                      }}
-                                      roleOptions={null}
-                                      onToggleRole={null}
-                                      getRolesForContact={getRolesForContact}
-                                      getRoleOptionsForContact={getRoleOptionsForContact}
-                                      onToggleRoleForContact={toggleRoleForContact}
-                                      contactOptions={getContactOptionsForCompany(entry.company)}
-                                      onAddContact={(name) => addContactToCompany(type, name, entry.company)}
-                                      getSalesRepForContact={getSalesRepForContact}
-                                      getTitleForContact={getTitleForContact}
-                                    />
-                                    {isEditing && (
-                                      <div className="mt-3 flex flex-wrap gap-2">
-                                        <button
-                                          onClick={() => updateAdditionalCompanyEntry(type, { inactive: !entry.inactive })}
-                                          className="rounded-full border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-600 hover:border-amber-300"
-                                        >
-                                          {entry.inactive ? "Activate" : "Deactivate"}
-                                        </button>
-                                        <button
-                                          onClick={() => removeAdditionalCompany(type)}
-                                          className="rounded-full border border-rose-200 px-3 py-1 text-[10px] font-bold text-rose-600 hover:border-rose-300"
-                                        >
-                                          Delete
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                            <button
-                              onClick={() => { setCompaniesSubOpen(true); setAddCompanyModalOpen(true); }}
-                              className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white p-6 text-sm font-bold text-slate-400 hover:border-sky-300 hover:text-sky-700"
-                            >
-                              + Add company
-                            </button>
                           </div>
                         </SubSection>
 
@@ -4968,11 +5049,35 @@ export default function App(){
                           <button onClick={() => update('scheduleType', 'Meeting')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Meeting' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🗓️</span><span className="font-bold text-xs">Meeting</span></button>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
-                          <Field label="Date">
-                            <DatePicker value={data.pickupDate} onChange={(v)=>update("pickupDate", v)} />
+                          <Field
+                            label="Date"
+                            action={
+                              <button
+                                type="button"
+                                onClick={() => setNowDate()}
+                                className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                                title="Set to today"
+                              >
+                                📅 Now
+                              </button>
+                            }
+                          >
+                            <DatePicker value={data.pickupDate} onChange={(v)=>update("pickupDate", v)} closeSignal={dateCloseTick} />
                           </Field>
-                          <Field label="Time">
-                            <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} />
+                          <Field
+                            label="Time"
+                            action={
+                              <button
+                                type="button"
+                                onClick={() => setNowTime()}
+                                className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                                title="Set to now"
+                              >
+                                🕒 Now
+                              </button>
+                            }
+                          >
+                            <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseTick} />
                           </Field>
                         </div>
                         <div className="grid sm:grid-cols-2 gap-4">
@@ -5004,11 +5109,6 @@ export default function App(){
                               <ToggleGroup options={["Schedule ASAP","Rep will Schedule"]} value={data.scheduleStatus} onChange={(v)=>updateMany({ scheduleStatus: v, eventFirm: false, pickupTimeTentative: false })} />
                             </div>
                             <div className="text-[11px] text-slate-400">Use when the event is not firm and the customer has not been contacted.</div>
-                          </div>
-                        </Field>
-                        <Field label="Order Lead">
-                          <div className="max-w-sm">
-                            <SearchSelect value={data.assignedTech} onChange={(v)=>update("assignedTech",v)} options={TECHS} listId="tech-list" placeholder="Select tech..." />
                           </div>
                         </Field>
                         <Field label="Event Instructions">
@@ -5139,8 +5239,16 @@ export default function App(){
                           <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">✅ Send Confirmation</button>
                           <button onClick={openReminderModal} className={`rounded-lg border px-4 py-3 text-sm font-semibold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600"}`}>⏰ {data.reminderEnabled ? "Edit Reminder" : "Schedule Reminder"}</button>
                         </div>
+                        <div className="flex items-center justify-start border-t border-slate-100 pt-3">
+                          <button
+                            onClick={() => { update("addCRMlog", true); openCrmModal(); }}
+                            className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                          >
+                            + Add CRM Log
+                          </button>
+                        </div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                          <button onClick={() => handleToggleSection('sec5')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
+                          <button onClick={() => handleToggleSection('sec5')} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">Done</button>
                         </div>
                       </div>
                     </Section>
@@ -5176,6 +5284,10 @@ export default function App(){
                     onOpenCrmLog={openCrmModal}
                     onOpenReminder={openReminderModal}
                     knownPeople={knownPeople}
+                    onSetNowDate={setNowDate}
+                    onSetNowTime={setNowTime}
+                    dateCloseSignal={dateCloseTick}
+                    timeCloseSignal={timeCloseTick}
                 />
               )}
 
@@ -5200,7 +5312,7 @@ export default function App(){
         />
 
         {(auditOpen || auditOn) && (
-          <div className="fixed right-4 top-28 z-[80] w-[220px] rounded-2xl border border-slate-200 bg-white shadow-2xl">
+          <div className="fixed right-4 top-28 z-[80] w-[190px] rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
               <div className="text-sm font-bold text-slate-800">Audit</div>
               <div className="flex items-center gap-2">
@@ -5400,7 +5512,7 @@ export default function App(){
       {addCompanyModalOpen && (
           <div
             className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4"
-            onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); }}
+            onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); }}
           >
           <div
             className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden fade-in"
@@ -5413,6 +5525,7 @@ export default function App(){
                 setShowTypePicker(false);
                 setAddCompanyType("");
                 setNewCompanyDraft({ contact: "", company: "" });
+                setAddContactExisting({ contact: "", company: "" });
                 setCompanyModalCloseArmed(false);
                 setAddCompanyQuery("");
               }
@@ -5420,11 +5533,10 @@ export default function App(){
           >
             <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
               <div>
-                <div className="text-lg font-bold text-white">Quick Add Existing Companies and Contacts</div>
-                <div className="text-xs text-sky-100">start typing a contact or company...</div>
+                <div className="text-lg font-bold text-white">Add Existing Companies and Contacts</div>
               </div>
               <button
-                onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); }}
+                onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); }}
                 className="rounded-full border border-sky-200 px-3 py-1 text-[10px] font-bold text-white/90 hover:bg-sky-600"
               >
                 Close
@@ -5448,6 +5560,7 @@ export default function App(){
                       setShowTypePicker(false);
                       setAddCompanyType("");
                       setNewCompanyDraft({ contact: "", company: "" });
+                      setAddContactExisting({ contact: "", company: "" });
                       setCompanyModalCloseArmed(false);
                       setAddCompanyQuery("");
                     }
@@ -5458,6 +5571,7 @@ export default function App(){
                       setShowTypePicker(false);
                       setAddCompanyType("");
                       setNewCompanyDraft({ contact: "", company: "" });
+                      setAddContactExisting({ contact: "", company: "" });
                       setAddCompanyQuery("");
                     }
                   }}
@@ -5467,68 +5581,112 @@ export default function App(){
                   placeholder="Start typing a contact or company..."
                 />
               </Field>
-              {(() => {
-                const q = (addCompanyQuery || "").trim().toLowerCase();
-                const matches = q
-                  ? combinedContactOptions.filter(o => getOptionText(o).toLowerCase().includes(q))
-                  : [];
-                if (!q || matches.length) return null;
-                return (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs text-slate-500 mb-2">No matches found. Add a new company/contact below.</div>
-                    <div className="grid sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase">Contact (optional)</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Input
-                            value={splitName(newCompanyDraft.contact || "").first}
-                            onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, contact: [e.target.value, splitName(prev.contact || "").last].filter(Boolean).join(" ") })); }}
-                            placeholder="First name"
-                          />
-                          <Input
-                            value={splitName(newCompanyDraft.contact || "").last}
-                            onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, contact: [splitName(prev.contact || "").first, e.target.value].filter(Boolean).join(" ") })); }}
-                            placeholder="Last name"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase">Company</label>
-                        <Input
-                          value={newCompanyDraft.company}
-                          onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, company: e.target.value })); }}
-                          placeholder="Company name"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-2 text-[10px] text-slate-400">Contacts must be added to a company.</div>
-                    <div className="mt-3 flex items-center justify-between">
-                      <button
-                        onClick={() => {
-                          const demo = newCompanyDraft.company || "New Company";
-                          setNewCompanyDraft(prev => ({ ...prev, company: demo }));
-                        }}
-                        className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                      >
-                        Find on Google (demo)
-                      </button>
-                      <button
-                        onClick={() => {
-                          const type = addCompanyType || autoTypeForCompany(newCompanyDraft.company);
-                          addCompanyDirect(type, newCompanyDraft.contact.trim(), newCompanyDraft.company.trim());
-                          setNewCompanyDraft({ contact: "", company: "" });
-                        }}
-                        className="rounded-full bg-sky-500 px-3 py-1 text-[10px] font-bold text-white hover:bg-sky-600"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    {newCompanyDraft.contact && !newCompanyDraft.company && (
-                      <div className="mt-2 text-[10px] font-semibold text-orange-600">Contacts must be added to a company.</div>
-                    )}
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-bold text-slate-700 mb-3">Add Contact to an Existing Company</div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Company</label>
+                    <SearchSelect
+                      value={addContactExisting.company}
+                      onChange={(v) => setAddContactExisting(prev => ({ ...prev, company: v }))}
+                      options={existingCompanyOptions}
+                      placeholder="Select company..."
+                      clearOnCommit={false}
+                    />
                   </div>
-                );
-              })()}
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Contact</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={splitName(addContactExisting.contact || "").first}
+                        onChange={(e)=>setAddContactExisting(prev => ({ ...prev, contact: [e.target.value, splitName(prev.contact || "").last].filter(Boolean).join(" ") }))}
+                        placeholder="First name"
+                      />
+                      <Input
+                        value={splitName(addContactExisting.contact || "").last}
+                        onChange={(e)=>setAddContactExisting(prev => ({ ...prev, contact: [splitName(prev.contact || "").first, e.target.value].filter(Boolean).join(" ") }))}
+                        placeholder="Last name"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <button
+                    onClick={() => {
+                      const companyName = (addContactExisting.company || "").trim();
+                      const contactName = (addContactExisting.contact || "").trim();
+                      if (!companyName) {
+                        setToast("Select a company.");
+                        return;
+                      }
+                      if (!contactName) {
+                        setToast("Contact required.");
+                        return;
+                      }
+                      const type = resolveCompanyTypeForName(companyName);
+                      addContactToCompany(type, contactName, companyName);
+                      setAddContactExisting({ contact: "", company: "" });
+                    }}
+                    className="rounded-full bg-sky-500 px-3 py-1 text-[10px] font-bold text-white hover:bg-sky-600"
+                  >
+                    Add Contact
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs text-slate-500 mb-2">Can't find your contact or company?</div>
+                <div className="text-sm font-bold text-slate-700 mb-3">Add New Company and Contact Here</div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Contact (optional)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={splitName(newCompanyDraft.contact || "").first}
+                        onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, contact: [e.target.value, splitName(prev.contact || "").last].filter(Boolean).join(" ") })); }}
+                        placeholder="First name"
+                      />
+                      <Input
+                        value={splitName(newCompanyDraft.contact || "").last}
+                        onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, contact: [splitName(prev.contact || "").first, e.target.value].filter(Boolean).join(" ") })); }}
+                        placeholder="Last name"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Company</label>
+                    <Input
+                      value={newCompanyDraft.company}
+                      onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, company: e.target.value })); }}
+                      placeholder="Company name"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 text-[10px] text-slate-400">Contacts must be added to a company.</div>
+                <div className="mt-3 flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      const demo = newCompanyDraft.company || "New Company";
+                      setNewCompanyDraft(prev => ({ ...prev, company: demo }));
+                    }}
+                    className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                  >
+                    Find on Google (demo)
+                  </button>
+                  <button
+                    onClick={() => {
+                      const type = addCompanyType || autoTypeForCompany(newCompanyDraft.company);
+                      addCompanyDirect(type, newCompanyDraft.contact.trim(), newCompanyDraft.company.trim());
+                      setNewCompanyDraft({ contact: "", company: "" });
+                    }}
+                    className="rounded-full bg-sky-500 px-3 py-1 text-[10px] font-bold text-white hover:bg-sky-600"
+                  >
+                    Add
+                  </button>
+                </div>
+                {newCompanyDraft.contact && !newCompanyDraft.company && (
+                  <div className="mt-2 text-[10px] font-semibold text-orange-600">Contacts must be added to a company.</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
