@@ -189,6 +189,43 @@ const formatShortTimestamp = (date = new Date()) => {
   }
 };
 
+const isTimeIn12AmHour = (timeStr = "") => /12:\d{2}\s*AM/i.test((timeStr || "").trim());
+const shouldAutoFirm = (timeStr = "") => !!(timeStr || "").trim() && !isTimeIn12AmHour(timeStr);
+
+const toIcsDate = (dateStr = "") => {
+  if (!dateStr) return "";
+  return dateStr.replace(/-/g, "");
+};
+
+const parseTimeTo24h = (timeStr = "") => {
+  const match = (timeStr || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+  if (ampm === "PM" && hour !== 12) hour += 12;
+  if (ampm === "AM" && hour === 12) hour = 0;
+  return { hour, minute };
+};
+
+const formatIcsDateTime = (dateStr = "", timeStr = "") => {
+  if (!dateStr) return "";
+  const time = parseTimeTo24h(timeStr);
+  if (!time) return toIcsDate(dateStr);
+  const hh = String(time.hour).padStart(2, "0");
+  const mm = String(time.minute).padStart(2, "0");
+  return `${toIcsDate(dateStr)}T${hh}${mm}00`;
+};
+
+const addHours = (timeStr = "", hours = 1) => {
+  const time = parseTimeTo24h(timeStr);
+  if (!time) return timeStr;
+  const nextHour = (time.hour + hours) % 24;
+  const hh = String(nextHour).padStart(2, "0");
+  const mm = String(time.minute).padStart(2, "0");
+  return `${hh}:${mm}`;
+};
+
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const EVENT_SYSTEM_PREFIXES = ["Conditions:", "Bring:", "Service Offerings:", "Quick Notes:", "Estimate Required:"];
@@ -199,18 +236,26 @@ const stripEventSystemLines = (text = "") =>
     .join("\n")
     .trimEnd();
 
-const buildEventSystemLines = (data, conditionSummary) => {
-  const lines = [];
-  if (conditionSummary) lines.push(`Conditions: ${conditionSummary}`);
-  if ((data.loadList || []).length) lines.push(`Bring: ${(data.loadList || []).join(", ")}`);
-  if ((data.serviceOfferings || []).length) lines.push(`Service Offerings: ${(data.serviceOfferings || []).join(", ")}`);
-  if ((data.quickInstructionNotes || []).length) lines.push(`Quick Notes: ${(data.quickInstructionNotes || []).join(", ")}`);
+const buildEventSystemEntries = (data, conditionSummary) => {
+  const entries = [];
+  if (conditionSummary) entries.push({ label: "Conditions", value: conditionSummary });
+  if ((data.loadList || []).length) entries.push({ label: "Bring", value: (data.loadList || []).join(", ") });
+  if ((data.serviceOfferings || []).length) entries.push({ label: "Service Offerings", value: (data.serviceOfferings || []).join(", ") });
+  if ((data.quickInstructionNotes || []).length) entries.push({ label: "Quick Notes", value: (data.quickInstructionNotes || []).join(", ") });
   if (data.estimateRequested) {
-    let line = `Estimate Required: ${data.estimateType || "Yes"}`;
-    if (data.estimateRequestedBy) line += ` (Requested By: ${data.estimateRequestedBy})`;
-    lines.push(line);
+    let value = data.estimateType || "Yes";
+    if (data.estimateRequestedBy) value += ` (Requested By: ${data.estimateRequestedBy})`;
+    entries.push({ label: "Estimate Required", value });
   }
-  return lines.join("\n");
+  return entries;
+};
+
+const buildEventSystemLines = (data, conditionSummary) => {
+  const override = (data?.eventSystemOverride || "").trim();
+  if (override) return override;
+  return buildEventSystemEntries(data, conditionSummary)
+    .map(entry => `${entry.label}: ${entry.value}`)
+    .join("\n");
 };
 
 const composeEventInstructions = (base, data, conditionSummary) => {
@@ -332,6 +377,9 @@ const COMPANY_TYPES = [
   "Invoice Auditor",
   "Contents Company",
   "Restoration Company",
+  "Building Consultant",
+  "Engineer",
+  "Hygienist",
   "Art",
   "Moving",
   "Boardup",
@@ -373,13 +421,13 @@ const COMPANY_ROLE_DEFS = [
   { id: "art", label: "Art", isCore: false, type: "Art" },
   { id: "electronics", label: "Electronics", isCore: false, type: "Other" },
   { id: "moving", label: "Moving", isCore: false, type: "Moving" },
-  { id: "hygienist", label: "Hygienist", isCore: false, type: "Consultant" },
-  { id: "building_consultant", label: "Building Consultant", isCore: false, type: "Consultant" },
+  { id: "hygienist", label: "Hygienist", isCore: false, type: "Hygienist" },
+  { id: "building_consultant", label: "Building Consultant", isCore: false, type: "Building Consultant" },
   { id: "floor", label: "Floor", isCore: false, type: "Contractor" },
   { id: "painter", label: "Painter", isCore: false, type: "Contractor" },
   { id: "board_up", label: "Board-up", isCore: false, type: "Boardup" },
   { id: "decorator", label: "Decorator", isCore: false, type: "Decorator" },
-  { id: "engineer", label: "Engineer", isCore: false, type: "Consultant" },
+  { id: "engineer", label: "Engineer", isCore: false, type: "Engineer" },
 ];
 
 const HANDLING_META=[
@@ -489,16 +537,26 @@ const DEFAULT_FORM={
   
   scheduleType: "Scope", 
   eventInstructions: "",
+  eventSystemOverride: "",
+  pickupTimeTentative: false,
   eventNotes: [],
   eventFirm: false,
   eventUrgent: false,
   eventHandledBySalesRep: false,
+  eventCustomerContacted: false,
+  eventBillToContacted: false,
+  scheduleStatus: "",
+  reminderEnabled: false,
+  reminderDate: "",
+  reminderTime: "",
+  eventAssignee: "",
+  eventVehicle: "",
   quickInstructionNotes: [],
   estimateRequested: false, 
   estimateRequestedType: "",
   meetingWith: [],
   pickupDate: new Date().toISOString().split('T')[0],
-  pickupTime: "09:00 AM",
+  pickupTime: "",
   assignedTech: "",
 
   quickScopeNotes: [], 
@@ -549,6 +607,184 @@ const AutoGrowTextarea = ({ value, onChange, className, ...props }) => {
       className={`w-full min-h-[120px] resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 hover:border-slate-300 ${className||""}`}
       {...props}
     />
+  );
+};
+
+const normalizeDateInput = (value) => {
+  const v = (value || "").trim();
+  if (!v) return "";
+  const isoMatch = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) return v;
+  const usMatch = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (usMatch) {
+    const mm = String(usMatch[1]).padStart(2, "0");
+    const dd = String(usMatch[2]).padStart(2, "0");
+    return `${usMatch[3]}-${mm}-${dd}`;
+  }
+  return v;
+};
+
+const formatDateLabel = (value) => {
+  if (!value) return "";
+  const iso = normalizeDateInput(value);
+  const [y, m, d] = iso.split("-").map(n => parseInt(n, 10));
+  if (!y || !m || !d) return value;
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
+
+const DatePicker = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState(() => {
+    const base = value ? new Date(normalizeDateInput(value)) : new Date();
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
+
+  useEffect(() => {
+    if (!value) return;
+    const d = new Date(normalizeDateInput(value));
+    if (!isNaN(d.getTime())) setView(new Date(d.getFullYear(), d.getMonth(), 1));
+  }, [value]);
+
+  const days = [];
+  const year = view.getFullYear();
+  const month = view.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (let i = 0; i < firstDay; i++) days.push(null);
+  for (let d = 1; d <= daysInMonth; d++) days.push(d);
+
+  const pick = (d) => {
+    if (!d) return;
+    const iso = new Date(year, month, d).toISOString().slice(0, 10);
+    onChange(iso);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <Input
+        value={value || ""}
+        onChange={(e) => { onChange(e.target.value); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => {
+          const normalized = normalizeDateInput(value);
+          if (normalized !== value) onChange(normalized);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const normalized = normalizeDateInput(value || "");
+            if (normalized !== value) onChange(normalized);
+            setOpen(false);
+          }
+          if (e.key === "Tab") {
+            const normalized = normalizeDateInput(value || "");
+            if (normalized !== value) onChange(normalized);
+            setOpen(false);
+          }
+        }}
+        placeholder="YYYY-MM-DD"
+        className="!py-3 !text-base pr-10"
+      />
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-sky-600"
+        title="Pick a date"
+      >
+        📅
+      </button>
+      {open && (
+        <div className="absolute z-[120] mt-2 w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => setView(new Date(year, month - 1, 1))}
+              className="rounded-full border border-slate-200 px-2 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+            >
+              ←
+            </button>
+            <div className="text-sm font-bold text-slate-700">
+              {view.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+            </div>
+            <button
+              onClick={() => setView(new Date(year, month + 1, 1))}
+              className="rounded-full border border-slate-200 px-2 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+            >
+              →
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-2 text-[11px] font-semibold text-slate-400 mb-2">
+            {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => <div key={d} className="text-center">{d}</div>)}
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {days.map((d, idx) => {
+              const isSelected = normalizeDateInput(value) === new Date(year, month, d || 1).toISOString().slice(0, 10);
+              return (
+                <button
+                  key={`${d}-${idx}`}
+                  onClick={() => pick(d)}
+                  className={`h-9 w-9 rounded-full text-sm ${!d ? "text-transparent" : isSelected ? "bg-sky-500 text-white" : "text-slate-700 hover:bg-sky-50"}`}
+                  disabled={!d}
+                >
+                  {d || "."}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex justify-end">
+            <button onClick={() => setOpen(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600">Close</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TimePicker = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <Input
+        value={value || ""}
+        onChange={(e) => { onChange(e.target.value); }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            setOpen(false);
+          }
+          if (e.key === "Tab") {
+            setOpen(false);
+          }
+        }}
+        placeholder="Time"
+        className="!py-3 !text-base pr-10"
+      />
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-sky-600"
+        title="Pick a time"
+      >
+        🕒
+      </button>
+      {open && (
+        <div className="absolute z-[120] mt-2 w-[260px] rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
+          <div className="max-h-[240px] overflow-y-auto custom-scroll">
+            {TIME_SLOTS.map(t => (
+              <button
+                key={t}
+                onClick={() => { onChange(t); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-sm rounded-lg ${t === value ? "bg-sky-50 text-sky-700 font-bold" : "text-slate-700 hover:bg-slate-50"}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -1605,12 +1841,15 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, onAudit, auditOn, se
 };
 
 
-const Section = ({ id, title, isOpen, onToggle, children, badges, className, compact }) => (
+const Section = ({ id, title, helpText, isOpen, onToggle, children, badges, className, compact }) => (
   <div id={id} className={`mb-0 overflow-hidden rounded-none border-y border-slate-200 bg-white shadow-sm transition-shadow duration-300 scroll-mt-28 sm:mb-4 sm:rounded-xl sm:border ${isOpen ? 'ring-1 ring-sky-500/20 shadow-md' : ''} ${className||""}`}>
     <button className={`flex w-full cursor-pointer items-center justify-between px-4 py-4 sm:px-6 sm:py-5 text-left font-semibold text-slate-800 transition-colors ${compact ? "section-header-tight" : ""} ${isOpen ? "bg-white" : "bg-slate-50/50 hover:bg-slate-50"}`} onClick={onToggle}>
-      <div className="flex items-center gap-3">
-        <span className={`text-lg ${isOpen ? "text-slate-900" : "text-slate-700"}`}>{title}</span>
-        {badges}
+      <div className="flex flex-col items-start">
+        <div className="flex items-center gap-3">
+          <span className={`text-lg ${isOpen ? "text-slate-900" : "text-slate-700"}`}>{title}</span>
+          {badges}
+        </div>
+        {helpText && <div className="mt-1 text-[11px] text-slate-500">{helpText}</div>}
       </div>
       <Chevron open={isOpen} />
     </button>
@@ -1910,10 +2149,15 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
 });
 
 // --- QUICK ENTRY COMPONENT ---
-const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, updateSmart, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog }) => {
+const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, updateSmart, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople }) => {
     const [eventNoteDraft, setEventNoteDraft] = useState("");
     const [showQuickInstructions, setShowQuickInstructions] = useState(false);
     const [showLoadListPanel, setShowLoadListPanel] = useState(false);
+    const [showAllEventNotes, setShowAllEventNotes] = useState(false);
+    const [editSystemInstructions, setEditSystemInstructions] = useState(false);
+    const dateRef = useRef(null);
+    const timeRef = useRef(null);
+    const noteInputRef = useRef(null);
     const primaryAddr = data.addresses && data.addresses.length > 0 ? data.addresses[0] : {};
     const conditionSummary = [
       (data.damageWasWet === "Y" || data.damageWasWet === true) ? "Still Wet" : "",
@@ -1924,6 +2168,14 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
       data.boardedUp ? "Boarded Up" : ""
     ].filter(Boolean).join(", ");
     const quickNotes = QUICK_INSTRUCTION_NOTES;
+    const eventSystemLines = buildEventSystemLines(data, conditionSummary);
+    const eventSystemEntries = buildEventSystemEntries(data, conditionSummary);
+    const hasEventInstructions = !!(
+      stripEventSystemLines(data.eventInstructions || "").trim() ||
+      (eventSystemLines || "").trim() ||
+      eventSystemEntries.length
+    );
+    const visibleEventNotes = showAllEventNotes ? (data.eventNotes || []) : (data.eventNotes || []).slice(0, 4);
 
     const appendQuickNote = (note) => {
         const nextNotes = toggleMulti(data.quickInstructionNotes || [], note);
@@ -1933,7 +2185,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
     const addEventNote = () => {
       const text = (eventNoteDraft || "").trim();
       if (!text) return;
-      const next = [...(data.eventNotes || []), { id: safeUid(), text, at: formatShortTimestamp(), user: data.currentUser || "Unknown" }];
+      const next = [{ id: safeUid(), text, at: formatShortTimestamp(), user: data.currentUser || "Unknown" }, ...(data.eventNotes || [])];
       update("eventNotes", next);
       setEventNoteDraft("");
     };
@@ -2052,69 +2304,184 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                      <button onClick={() => update('scheduleType', 'Meeting')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Meeting' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🗓️</span><span className="font-bold text-xs">Meeting</span></button>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 mb-4">
-                    <Field label="Date"><Input className="!py-3 !text-base" type="date" value={data.pickupDate} onChange={e=>update("pickupDate",e.target.value)} /></Field>
-                    <Field label="Time"><Select className="!py-3 !text-base" value={data.pickupTime} onChange={e=>update("pickupTime",e.target.value)}>{TIME_SLOTS.map(t=><option key={t} value={t}>{t}</option>)}</Select></Field>
+                    <Field label="Date">
+                      <DatePicker value={data.pickupDate} onChange={(v)=>update("pickupDate", v)} />
+                    </Field>
+                    <Field label="Time">
+                      <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} />
+                    </Field>
                 </div>
-                <Field label="Scheduling Status">
+                <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                  <Field label="Event Assignee">
+                    <Input value={data.eventAssignee} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" />
+                  </Field>
+                  <Field label="Vehicle">
+                    <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle" />
+                  </Field>
+                </div>
+                <Field label="Firm / Tentative">
                   <div className="flex flex-wrap gap-2">
-                    <ToggleMulti label="Firm" checked={!!data.eventFirm} onChange={() => update("eventFirm", !data.eventFirm)} />
-                    <ToggleMulti label="Urgent" checked={!!data.eventUrgent} onChange={() => update("eventUrgent", !data.eventUrgent)} />
-                    <ToggleMulti label="Handled by Sales Rep" checked={!!data.eventHandledBySalesRep} onChange={() => update("eventHandledBySalesRep", !data.eventHandledBySalesRep)} />
+                    <ToggleMulti
+                      label="Firm"
+                      checked={!!data.eventFirm}
+                      onChange={() => updateMany({ eventFirm: !data.eventFirm, pickupTimeTentative: false, scheduleStatus: !data.eventFirm ? "" : data.scheduleStatus })}
+                    />
+                    <ToggleMulti
+                      label="Tentative"
+                      checked={!!data.pickupTimeTentative}
+                      onChange={() => updateMany({ pickupTimeTentative: !data.pickupTimeTentative, eventFirm: false })}
+                      colorClass="!bg-orange-50 !border-orange-400 !text-orange-700"
+                    />
+                  </div>
+                </Field>
+                <Field label="Scheduling Status">
+                  <div className="space-y-2">
+                    <div className={data.eventFirm ? "opacity-50 pointer-events-none" : ""}>
+                      <ToggleGroup
+                        options={["Schedule ASAP","Rep will Schedule"]}
+                        value={data.scheduleStatus}
+                        onChange={(v)=>updateMany({ scheduleStatus: v, eventFirm: false, pickupTimeTentative: false })}
+                      />
+                    </div>
+                    <div className="text-[11px] text-slate-400">Use when the event is not firm and the customer has not been contacted.</div>
+                  </div>
+                </Field>
+                <Field label="Order Lead">
+                  <div className="max-w-sm">
+                    <SearchSelect value={data.assignedTech} onChange={(v)=>update("assignedTech",v)} options={TECHS} listId="tech-list-quick" placeholder="Select tech..." />
+                  </div>
+                </Field>
+                <Field label="Who are we meeting?">
+                  <div className="flex flex-wrap gap-2">
+                    {(knownPeople && knownPeople.length > 0) ? knownPeople.map(p => (
+                      <ToggleMulti key={p} label={p} checked={(data.meetingWith || []).includes(p)} onChange={() => update("meetingWith", toggleMulti(data.meetingWith || [], p))}/>
+                    )) : <span className="text-sm text-slate-400 italic">Add customers or contacts first</span>}
                   </div>
                 </Field>
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                    <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">✅ Confirm Appointment</button>
-                    <button onClick={() => setToast("Reminder Sent") } className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700">✉️ Send Reminder</button>
+                    <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">✅ Send Confirmation</button>
+                    <button onClick={onOpenReminder} className={`rounded-lg border px-4 py-3 text-sm font-semibold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600"}`}>⏰ {data.reminderEnabled ? "Edit Reminder" : "Schedule Reminder"}</button>
                 </div>
                 <Field label="Event Instructions">
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
-                    <AutoGrowTextarea value={data.eventInstructions} onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))} placeholder="Gate codes, parking instructions..." />
-                    <div className="text-[10px] text-slate-400">Auto-added lines stay at the bottom. Add your notes above them.</div>
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                      <span className="text-xs font-bold text-slate-500">Quick Notes</span>
+                  <div className="relative rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                    <div className="flex items-center justify-end gap-2">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setShowQuickInstructions(v=>!v)} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${showQuickInstructions ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}>📝 Add Instructions</button>
-                        <button onClick={() => setShowLoadListPanel(v=>!v)} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${showLoadListPanel ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}>📦 Add To Load</button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowQuickInstructions(v=>!v); setShowLoadListPanel(false); }}
+                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${showQuickInstructions ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
+                          title="Quick instructions"
+                        >
+                          📝 Notes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowLoadListPanel(v=>!v); setShowQuickInstructions(false); }}
+                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${showLoadListPanel ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
+                          title="To Load"
+                        >
+                          📦 Load
+                        </button>
                       </div>
                     </div>
+                    {eventSystemLines && (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-[10px] font-bold text-slate-500">Auto-filled</div>
+                          <button
+                            type="button"
+                            onClick={() => setEditSystemInstructions(v => !v)}
+                            className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
+                            title={editSystemInstructions ? "Lock auto-filled" : "Unlock to edit"}
+                          >
+                            {editSystemInstructions ? "🔓 Edit" : "🔒 Locked"}
+                          </button>
+                        </div>
+                        {editSystemInstructions ? (
+                          <textarea
+                            className="w-full min-h-[72px] rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                            value={data.eventSystemOverride || eventSystemLines}
+                            onChange={(e) => update("eventSystemOverride", e.target.value)}
+                          />
+                        ) : (
+                          <div className="space-y-1">
+                            {data.eventSystemOverride ? (
+                              <div className="whitespace-pre-line">{eventSystemLines}</div>
+                            ) : (
+                              eventSystemEntries.map(entry => (
+                                <div key={entry.label}>
+                                  <span className="font-semibold text-slate-700">{entry.label}:</span>{" "}
+                                  <span>{entry.value}</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <AutoGrowTextarea
+                      value={stripEventSystemLines(data.eventInstructions || "")}
+                      onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
+                      placeholder="please enter instrucitons for this event"
+                      className={hasEventInstructions ? "" : "border-orange-300 focus:border-orange-400 focus:ring-orange-200/40"}
+                    />
                     {showQuickInstructions && (
-                      <div className="flex flex-wrap gap-2">
-                        {quickNotes.map(n => (
-                          <ToggleMulti key={n} label={n} checked={(data.quickInstructionNotes||[]).includes(n)} onChange={()=>appendQuickNote(n)} />
-                        ))}
+                      <div className="absolute right-3 top-12 z-20 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                        <div className="text-xs font-bold text-slate-500 mb-2">📝 Notes</div>
+                        <div className="flex flex-wrap gap-2">
+                          {quickNotes.map(n => (
+                            <ToggleMulti key={n} label={n} checked={(data.quickInstructionNotes||[]).includes(n)} onChange={()=>appendQuickNote(n)} />
+                          ))}
+                        </div>
                       </div>
                     )}
                     {showLoadListPanel && (
-                      <div className="flex flex-wrap gap-2">
-                        {["Heater","Ladder","Lights","Tyvek","Plastic Bags"].map(item => (
-                          <ToggleMulti key={item} label={item} checked={(data.loadList||[]).includes(item)} onChange={() => update("loadList", toggleMulti(data.loadList||[], item))} />
-                        ))}
+                      <div className="absolute right-3 top-12 z-20 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                        <div className="text-xs font-bold text-slate-500 mb-2">📦 Items to load</div>
+                        <div className="flex flex-wrap gap-2">
+                          {["Heater","Ladder","Lights","Tyvek","Plastic Bags"].map(item => (
+                            <ToggleMulti key={item} label={item} checked={(data.loadList||[]).includes(item)} onChange={() => update("loadList", toggleMulti(data.loadList||[], item))} />
+                          ))}
+                        </div>
                       </div>
                     )}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                      <span className="text-xs font-bold text-slate-500">Estimate Required?</span>
-                      <Switch checked={data.estimateRequested} onChange={(val)=>update("estimateRequested", val)} />
-                    </div>
-                  </div>
-                </Field>
-                <Field label="Event Notes">
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Input value={eventNoteDraft} onChange={e=>setEventNoteDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEventNote(); } }} placeholder="Add a scheduling note..." />
-                      <button onClick={addEventNote} className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Add</button>
-                    </div>
-                    {(data.eventNotes || []).length === 0 ? (
-                      <div className="text-xs text-slate-400">No scheduling notes yet.</div>
-                    ) : (
-                      <div className="space-y-2">
-                        {(data.eventNotes || []).map(n => (
-                          <div key={n.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                            <div className="font-semibold">{n.text}</div>
-                            <div className="text-[10px] text-slate-500">{n.at} · {n.user || "Unknown"}</div>
-                          </div>
-                        ))}
+                    <div className="mt-3 border-t border-slate-100 pt-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ToggleMulti label="Customer Contacted" checked={!!data.eventCustomerContacted} onChange={() => update("eventCustomerContacted", !data.eventCustomerContacted)} className="!text-[10px] !px-2 !py-1" />
+                        <ToggleMulti label="Bill To Contacted" checked={!!data.eventBillToContacted} onChange={() => update("eventBillToContacted", !data.eventBillToContacted)} className="!text-[10px] !px-2 !py-1" />
                       </div>
-                    )}
+                      <div className="mt-2 flex items-center gap-2">
+                        <Input
+                          ref={noteInputRef}
+                          value={eventNoteDraft}
+                          onChange={e=>setEventNoteDraft(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEventNote(); } }}
+                          placeholder="enter scheduling notes and attempts here"
+                        />
+                        <button onClick={addEventNote} className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Add</button>
+                      </div>
+                      {(data.eventNotes || []).length === 0 ? (
+                        <div className="text-xs text-slate-400 mt-2">No scheduling notes yet.</div>
+                      ) : (
+                        <div className="space-y-2 mt-2">
+                          {visibleEventNotes.map(n => (
+                            <div key={n.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                              <div className="font-semibold">{n.text}</div>
+                              <div className="text-[10px] text-slate-500">{n.at} · {n.user || "Unknown"}</div>
+                            </div>
+                          ))}
+                          {(data.eventNotes || []).length > 4 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAllEventNotes(v => !v)}
+                              className="text-xs font-bold text-sky-600 hover:text-sky-700"
+                            >
+                              {showAllEventNotes ? "Show less" : `Show all (${data.eventNotes.length})`}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </Field>
             </div>
@@ -2170,6 +2537,8 @@ export default function App(){
   const [showQuickInstructions, setShowQuickInstructions] = useState(false);
   const [showLoadListPanel, setShowLoadListPanel] = useState(false);
   const [eventNoteDraft, setEventNoteDraft] = useState("");
+  const [showAllEventNotes, setShowAllEventNotes] = useState(false);
+  const [editSystemInstructions, setEditSystemInstructions] = useState(false);
   const [companyRolesExpanded, setCompanyRolesExpanded] = useState(false);
   
   const [visitedSections, setVisitedSections] = useState(new Set(['sec1']));
@@ -2177,6 +2546,11 @@ export default function App(){
   const [alertModal, setAlertModal] = useState({ isOpen: false, message: "", onConfirm: null });
   const [smartNotification, setSmartNotification] = useState(null);
   const [confirmDetails, setConfirmDetails] = useState(null);
+  const [confirmTentativeOk, setConfirmTentativeOk] = useState(false);
+  const [confirmMissingOk, setConfirmMissingOk] = useState(false);
+  const [confirmContextOpen, setConfirmContextOpen] = useState(false);
+  const [reminderModalOpen, setReminderModalOpen] = useState(false);
+  const [reminderDraft, setReminderDraft] = useState({ date: "", time: "" });
   const [welcomeModal, setWelcomeModal] = useState({ isOpen: false, customerId: null, note: "" });
   const [showWelcomeQuickNotes, setShowWelcomeQuickNotes] = useState(false);
   const [crmModal, setCrmModal] = useState({ isOpen: false, method: "", owner: "", subject: "", orderLink: "", notes: "" });
@@ -2196,6 +2570,7 @@ export default function App(){
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [companyModalCloseArmed, setCompanyModalCloseArmed] = useState(false);
   const [newCompanyDraft, setNewCompanyDraft] = useState({ contact: "", company: "" });
+  const [addCompanyQuery, setAddCompanyQuery] = useState("");
   const [companyEdit, setCompanyEdit] = useState({});
   const [sampleContacts, setSampleContacts] = useState(() => {
     try {
@@ -2241,6 +2616,36 @@ export default function App(){
   }, [addCompanyModalOpen]);
 
   useEffect(() => {
+    const timeValue = (data.pickupTime || "").trim();
+    const autoFirm = shouldAutoFirm(timeValue);
+    setData(prev => {
+      let next = prev;
+      let changed = false;
+      if (!timeValue && prev.eventFirm) {
+        next = { ...next, eventFirm: false };
+        changed = true;
+      }
+      if (prev.pickupTimeTentative && prev.eventFirm) {
+        next = { ...next, eventFirm: false };
+        changed = true;
+      }
+      if (timeValue && autoFirm && !prev.pickupTimeTentative && !prev.eventFirm) {
+        next = { ...next, eventFirm: true };
+        changed = true;
+      }
+      if (timeValue && !autoFirm && prev.eventFirm) {
+        next = { ...next, eventFirm: false };
+        changed = true;
+      }
+      if (next.eventFirm && next.scheduleStatus) {
+        next = { ...next, scheduleStatus: "" };
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [data.pickupTime, data.pickupTimeTentative]);
+
+  useEffect(() => {
     if (data.insuranceClaim !== "Yes") return;
     setData(prev => {
       const types = new Set(prev.additionalCompanyTypes || []);
@@ -2282,6 +2687,13 @@ export default function App(){
   const [auditOn, setAuditOn] = useState(false);
   const [auditMissing, setAuditMissing] = useState([]);
   const [auditPercent, setAuditPercent] = useState(0);
+  const [saveSummaryOpen, setSaveSummaryOpen] = useState(false);
+  const [saveSummaryLines, setSaveSummaryLines] = useState([]);
+  const [saveSummaryMissing, setSaveSummaryMissing] = useState([]);
+  const [saveExportLines, setSaveExportLines] = useState([]);
+  const scheduleDateRef = useRef(null);
+  const scheduleTimeRef = useRef(null);
+  const eventNoteInputRef = useRef(null);
   const [autoScrollDone, setAutoScrollDone] = useState(false);
   const [lastLossDetailTouched, setLastLossDetailTouched] = useState(null);
   const [orderSubOpen, setOrderSubOpen] = useState(true);
@@ -2336,8 +2748,44 @@ export default function App(){
     const note = (text || "").trim();
     if (!note) return;
     const entry = { id: safeUid(), text: note, at: formatShortTimestamp(), user: data.currentUser || "Unknown" };
-    setData(p => ({ ...p, eventNotes: [...(p.eventNotes || []), entry] }));
+    setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])] }));
   }, [data.currentUser]);
+
+  const downloadIcs = useCallback(() => {
+    if (!data.pickupDate) return;
+    const dtStart = formatIcsDateTime(data.pickupDate, data.pickupTime);
+    const dtEnd = data.pickupTime ? formatIcsDateTime(data.pickupDate, addHours(data.pickupTime, 1)) : "";
+    const summary = `${data.scheduleType || "Event"} - ${data.orderName || "New Order"}`;
+    const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || {};
+    const location = [primaryAddr.street, primaryAddr.city, primaryAddr.state, primaryAddr.zip].filter(Boolean).join(" ");
+    const descriptionLines = [
+      data.eventAssignee ? `Assignee: ${data.eventAssignee}` : null,
+      data.eventVehicle ? `Vehicle: ${data.eventVehicle}` : null
+    ].filter(Boolean).join("\\n");
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//New Order Entry//EN",
+      "BEGIN:VEVENT",
+      `UID:${safeUid()}`,
+      `SUMMARY:${summary}`,
+      descriptionLines ? `DESCRIPTION:${descriptionLines}` : null,
+      location ? `LOCATION:${location}` : null,
+      data.pickupTime ? `DTSTART:${dtStart}` : `DTSTART;VALUE=DATE:${dtStart}`,
+      data.pickupTime && dtEnd ? `DTEND:${dtEnd}` : null,
+      "END:VEVENT",
+      "END:VCALENDAR"
+    ].filter(Boolean).join("\r\n");
+    const blob = new Blob([lines], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(data.orderName || "event").replace(/\s+/g, "_")}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [data]);
 
   const toggleMulti=(list,value)=> list.includes(value)? list.filter(v=>v!==value): [...list,value];
   const toggleHandling=(code)=> update("handlingCodes", toggleMulti(data.handlingCodes, code));
@@ -2607,13 +3055,27 @@ export default function App(){
   };
 
   const handleConfirmClick = () => {
+      const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || {};
+      const addressLine = [primaryAddr.street, primaryAddr.city, primaryAddr.state, primaryAddr.zip].filter(Boolean).join(", ");
       setConfirmDetails({
           type: data.scheduleType,
           date: data.pickupDate,
           time: data.pickupTime,
           tech: data.assignedTech,
+          address: addressLine,
       });
+      setConfirmTentativeOk(false);
+      setConfirmMissingOk(false);
+      setConfirmContextOpen(false);
   };
+
+  const openReminderModal = useCallback(() => {
+    setReminderDraft({
+      date: data.reminderDate || data.pickupDate || "",
+      time: data.reminderTime || data.pickupTime || ""
+    });
+    setReminderModalOpen(true);
+  }, [data.reminderDate, data.reminderTime, data.pickupDate, data.pickupTime]);
 
   const handleSendWelcome = (customerId) => {
     setWelcomeModal({ isOpen: true, customerId, note: "" });
@@ -2760,6 +3222,125 @@ export default function App(){
     }
   }, []);
 
+  const buildSaveSummary = () => {
+    const lines = [];
+    const push = (label, value) => {
+      if (value === undefined || value === null || value === "") return;
+      if (Array.isArray(value) && value.length === 0) return;
+      lines.push(`${label}: ${Array.isArray(value) ? value.join(", ") : value}`);
+    };
+    push("Record Type", data.isLead === true ? "Lead" : data.isLead === false ? "Order" : "");
+    push("Order Status", data.orderStatus);
+    push("Project Type", data.restorationType);
+    push("Order Name", data.orderName);
+    push("Order Type", data.orderTypes);
+    push("Service Offerings", data.serviceOfferings);
+    if (data.leadSourceCategory) {
+      push("Lead Source", data.leadSourceCategory);
+      push("Lead Source Detail", data.leadSourceDetail);
+      push("Referring Company", data.referringCompany);
+      push("Referrer", data.referrer);
+    }
+    if ((data.customers || []).length) {
+      (data.customers || []).forEach((c, idx) => {
+        const name = [c.first, c.last].filter(Boolean).join(" ").trim();
+        if (name) push(`Customer ${idx + 1}`, name);
+        if (c.phone) push(`Customer ${idx + 1} Phone`, c.phone);
+        if (c.email) push(`Customer ${idx + 1} Email`, c.email);
+      });
+    }
+    if ((data.addresses || []).length) {
+      (data.addresses || []).forEach((a, idx) => {
+        const addr = [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ");
+        if (addr) push(`Address ${idx + 1}`, addr);
+      });
+    }
+    push("Bill To", data.billingPayer);
+    push("Billing Company", data.billingCompany);
+    push("Billing Contact", data.billingContact);
+    push("Insurance Claim", data.insuranceClaim);
+    push("Insurance Company", data.insuranceCompany);
+    push("National Carrier", data.nationalCarrier);
+    push("Adjuster", data.insuranceAdjuster);
+    push("Claim #", data.claimNumber);
+    push("Policy #", data.policyNumber);
+    push("Work Order #", data.workOrderNumber);
+    push("Order Specific Email", data.insuranceOrderEmail);
+    push("Contents Limit", data.contentsCoverageLimit);
+    push("Mold Limit", data.moldLimit);
+    push("Schedule Type", data.scheduleType);
+    push("Schedule Date", data.pickupDate);
+    push("Schedule Time", data.pickupTime);
+    push("Order Lead", data.assignedTech);
+    return lines;
+  };
+
+  const buildFullExportLines = () => {
+    const lines = [];
+    const seen = new Set();
+    const walk = (obj, path = "") => {
+      if (obj === null || obj === undefined) return;
+      if (typeof obj !== "object") {
+        const key = path || "value";
+        if (seen.has(key)) return;
+        seen.add(key);
+        lines.push(`${key}: ${obj}`);
+        return;
+      }
+      if (Array.isArray(obj)) {
+        if (obj.length === 0) return;
+        if (obj.every(v => typeof v !== "object")) {
+          const key = path || "value";
+          if (!seen.has(key)) {
+            seen.add(key);
+            lines.push(`${key}: ${obj.join(", ")}`);
+          }
+          return;
+        }
+        obj.forEach((v, idx) => {
+          walk(v, path ? `${path}[${idx}]` : `[${idx}]`);
+        });
+        return;
+      }
+      Object.entries(obj).forEach(([k, v]) => {
+        const nextPath = path ? `${path}.${k}` : k;
+        walk(v, nextPath);
+      });
+    };
+    walk(data);
+    return lines;
+  };
+
+  const copyLines = async (lines) => {
+    const text = (lines || []).join("\n");
+    if (!text) return;
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      setToast("Copied to clipboard");
+      return;
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+    setToast("Copied to clipboard");
+  };
+
+  const downloadLines = (lines, filename) => {
+    const text = (lines || []).join("\n");
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const validateGenerateScope = () => {
     const missing = {};
     if(!(data.orderTypes||[]).length) missing.orderTypes=true;
@@ -2771,6 +3352,14 @@ export default function App(){
     }
     setToast("Order Complete! Submitting...");
     return true;
+  };
+
+  const handleSaveClick = () => {
+    const missing = computeAuditMissing();
+    setSaveSummaryMissing(missing);
+    setSaveSummaryLines(buildSaveSummary());
+    setSaveExportLines(buildFullExportLines());
+    setSaveSummaryOpen(true);
   };
 
   const computeAuditMissing = () => {
@@ -2913,6 +3502,13 @@ export default function App(){
     if (data.boardedUp) items.push("Boarded Up");
     return items.join(", ");
   }, [data.damageWasWet, data.damageMoldMildew, data.structuralElectricDamage, data.noLights, data.noHeat, data.boardedUp]);
+  const eventSystemLines = useMemo(() => buildEventSystemLines(data, conditionSummary), [data, conditionSummary]);
+  const eventSystemEntries = useMemo(() => buildEventSystemEntries(data, conditionSummary), [data, conditionSummary]);
+  const hasEventInstructions = useMemo(() => {
+    const manual = stripEventSystemLines(data.eventInstructions || "").trim();
+    const system = (eventSystemLines || "").trim();
+    return !!(manual || system || eventSystemEntries.length);
+  }, [data.eventInstructions, eventSystemLines, eventSystemEntries]);
   const attentionWater = data.damageWasWet === "Y" || data.damageWasWet === true;
   const attentionMold = !!data.damageMoldMildew;
   const highlightStorageFromProcess = data.processType === "Long-Term Storage";
@@ -3710,6 +4306,7 @@ export default function App(){
                     <Section
                       id="sec1"
                       title="1. Order & Interview"
+                      helpText="Enter job basics + call details (source, scope/needs, internal codes if known)."
                       isOpen={openSections.sec1}
                       onToggle={()=>handleToggleSection('sec1')}
                       badges={
@@ -3974,7 +4571,7 @@ export default function App(){
                         </div>
                     </Section>
 
-                    <Section id="sec2" title="2. Customer" isOpen={openSections.sec2} onToggle={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}>
+                    <Section id="sec2" title="2. Customer" helpText="Add the customer + any key contacts (spouse, tenant, neighbor, PM)." isOpen={openSections.sec2} onToggle={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}>
                       <div className="space-y-4">
                         {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
@@ -3985,7 +4582,7 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec3" title="3. Address" isOpen={openSections.sec3} onToggle={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}>
+                    <Section id="sec3" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onToggle={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}>
                       <div className="space-y-4">
                         {data.addresses.map((a,i)=><AddressItem key={a.id} addr={a} total={data.addresses.length} updateAddr={updateAddr} onRemove={removeAddr} index={i} highlightMissing={data.highlightMissing} auditOn={auditOn} onVerify={verifyAddressDemo} ToggleMulti={ToggleMulti} rentOrOwn={data.rentOrOwn} rentCoverageLimit={data.rentCoverageLimit} onRentOrOwnChange={(v)=>update("rentOrOwn", v)} onRentCoverageChange={(v)=>update("rentCoverageLimit", v)} forceShowCoords={i===0 ? showPrimaryCoords : false} />)}
                         <div className="pt-2"><button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button></div>
@@ -3996,7 +4593,7 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec4" title="4. Billing & Companies" isOpen={openSections.sec4} onToggle={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
+                    <Section id="sec4" title="4. Billing & Companies" helpText="Who pays + who’s involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onToggle={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
                       <div className="grid gap-6">
                         <SubSection title="Billing" open={billingSubOpen} onToggle={() => setBillingSubOpen(!billingSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("billing") ? "audit-outline" : ""}>
                           <Field label="Bill To"><div data-audit-key="billingPayer" className={auditOn && data.highlightMissing?.billingPayer ? "audit-missing rounded-lg p-1" : ""}><ToggleGroup options={["Insurance","Customer","Referrer","Public Adjuster","Building","Contractor","Other"]} value={data.billingPayer} onChange={v=>update("billingPayer",v)} /></div></Field>
@@ -4033,6 +4630,16 @@ export default function App(){
                             <Field label="Estimate Requested">
                               <Switch data-audit-key="estimateRequested" checked={!!data.estimateRequested} onChange={(v)=>update("estimateRequested", v)} />
                             </Field>
+                            {data.estimateRequested && (
+                              <div className="mt-3 space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                  {ESTIMATE_TYPES.map(t => (
+                                    <ToggleMulti key={t} label={t} checked={data.estimateType === t} onChange={()=>update("estimateType", t)} />
+                                  ))}
+                                </div>
+                                <Input value={data.estimateRequestedBy} onChange={e=>update("estimateRequestedBy", e.target.value)} placeholder="Who is requesting?" />
+                              </div>
+                            )}
                           </div>
                         </SubSection>
                         <SubSection title="Insurance" open={insuranceSubOpen} onToggle={() => setInsuranceSubOpen(!insuranceSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
@@ -4352,7 +4959,7 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec5" title="5. Schedule" isOpen={openSections.sec5} onToggle={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}>
+                    <Section id="sec5" title="5. Schedule" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onToggle={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}>
                       <div className="space-y-6">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                           <button onClick={() => update('scheduleType', 'Scope')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Scope' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">📋</span><span className="font-bold text-xs">Scope Only</span></button>
@@ -4361,14 +4968,42 @@ export default function App(){
                           <button onClick={() => update('scheduleType', 'Meeting')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Meeting' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🗓️</span><span className="font-bold text-xs">Meeting</span></button>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
-                          <Field label="Date"><Input className="!py-3 !text-base" type="date" value={data.pickupDate} onChange={e=>update("pickupDate",e.target.value)} /></Field>
-                          <Field label="Time"><Select className="!py-3 !text-base" value={data.pickupTime} onChange={e=>update("pickupTime",e.target.value)}>{TIME_SLOTS.map(t=><option key={t} value={t}>{t}</option>)}</Select></Field>
+                          <Field label="Date">
+                            <DatePicker value={data.pickupDate} onChange={(v)=>update("pickupDate", v)} />
+                          </Field>
+                          <Field label="Time">
+                            <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} />
+                          </Field>
                         </div>
-                        <Field label="Scheduling Status">
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <Field label="Event Assignee">
+                            <Input value={data.eventAssignee} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" />
+                          </Field>
+                          <Field label="Vehicle">
+                            <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle" />
+                          </Field>
+                        </div>
+                        <Field label="Firm / Tentative">
                           <div className="flex flex-wrap gap-2">
-                            <ToggleMulti label="Firm" checked={!!data.eventFirm} onChange={() => update("eventFirm", !data.eventFirm)} />
-                            <ToggleMulti label="Urgent" checked={!!data.eventUrgent} onChange={() => update("eventUrgent", !data.eventUrgent)} />
-                            <ToggleMulti label="Handled by Sales Rep" checked={!!data.eventHandledBySalesRep} onChange={() => update("eventHandledBySalesRep", !data.eventHandledBySalesRep)} />
+                            <ToggleMulti
+                              label="Firm"
+                              checked={!!data.eventFirm}
+                              onChange={() => updateMany({ eventFirm: !data.eventFirm, pickupTimeTentative: false, scheduleStatus: !data.eventFirm ? "" : data.scheduleStatus })}
+                            />
+                            <ToggleMulti
+                              label="Tentative"
+                              checked={!!data.pickupTimeTentative}
+                              onChange={() => updateMany({ pickupTimeTentative: !data.pickupTimeTentative, eventFirm: false })}
+                              colorClass="!bg-orange-50 !border-orange-400 !text-orange-700"
+                            />
+                          </div>
+                        </Field>
+                        <Field label="Scheduling Status">
+                          <div className="space-y-2">
+                            <div className={data.eventFirm ? "opacity-50 pointer-events-none" : ""}>
+                              <ToggleGroup options={["Schedule ASAP","Rep will Schedule"]} value={data.scheduleStatus} onChange={(v)=>updateMany({ scheduleStatus: v, eventFirm: false, pickupTimeTentative: false })} />
+                            </div>
+                            <div className="text-[11px] text-slate-400">Use when the event is not firm and the customer has not been contacted.</div>
                           </div>
                         </Field>
                         <Field label="Order Lead">
@@ -4377,19 +5012,69 @@ export default function App(){
                           </div>
                         </Field>
                         <Field label="Event Instructions">
-                          <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
-                            <AutoGrowTextarea value={data.eventInstructions} onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))} placeholder="Gate codes, parking instructions, special notes..." />
-                            <div className="text-[10px] text-slate-400">Auto-added lines stay at the bottom. Add your notes above them.</div>
-                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                              <span className="text-xs font-bold text-slate-500">Quick Notes</span>
-                              <div className="flex items-center gap-2">
-                                <button onClick={() => setShowQuickInstructions(v=>!v)} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${showQuickInstructions ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}>📝 Add Instructions</button>
-                                <button onClick={() => setShowLoadListPanel(v=>!v)} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${showLoadListPanel ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}>📦 Add To Load</button>
-                              </div>
+                          <div className="relative rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => { setShowQuickInstructions(v=>!v); setShowLoadListPanel(false); }}
+                                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${showQuickInstructions ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
+                                title="Quick instructions"
+                              >
+                                📝 Notes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setShowLoadListPanel(v=>!v); setShowQuickInstructions(false); }}
+                                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${showLoadListPanel ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
+                                title="To Load"
+                              >
+                                📦 Load
+                              </button>
                             </div>
+                            {eventSystemLines && (
+                              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                                <div className="flex items-center justify-between mb-1">
+                                  <div className="text-[10px] font-bold text-slate-500">Auto-filled</div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditSystemInstructions(v => !v)}
+                                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
+                                    title={editSystemInstructions ? "Lock auto-filled" : "Unlock to edit"}
+                                  >
+                                    {editSystemInstructions ? "🔓 Edit" : "🔒 Locked"}
+                                  </button>
+                                </div>
+                                {editSystemInstructions ? (
+                                  <textarea
+                                    className="w-full min-h-[72px] rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                                    value={data.eventSystemOverride || eventSystemLines}
+                                    onChange={(e) => update("eventSystemOverride", e.target.value)}
+                                  />
+                                ) : (
+                                  <div className="space-y-1">
+                                    {data.eventSystemOverride ? (
+                                      <div className="whitespace-pre-line">{eventSystemLines}</div>
+                                    ) : (
+                                      buildEventSystemEntries(data, conditionSummary).map(entry => (
+                                        <div key={entry.label}>
+                                          <span className="font-semibold text-slate-700">{entry.label}:</span>{" "}
+                                          <span>{entry.value}</span>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <AutoGrowTextarea
+                              value={stripEventSystemLines(data.eventInstructions || "")}
+                              onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
+                              placeholder="please enter instrucitons for this event"
+                              className={hasEventInstructions ? "" : "border-orange-300 focus:border-orange-400 focus:ring-orange-200/40"}
+                            />
                             {showQuickInstructions && (
-                              <>
-                                <div className="text-xs font-bold text-slate-500">Quick Instructions</div>
+                              <div className="absolute right-3 top-12 z-20 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                                <div className="text-xs font-bold text-slate-500 mb-2">📝 Notes</div>
                                 <div className="flex flex-wrap gap-2">
                                   {["Everything Affected","Only Certain Items", ...QUICK_INSTRUCTION_NOTES].map(n => (
                                     <ToggleMulti key={n} label={n} checked={(data.quickInstructionNotes||[]).includes(n)} onChange={() => {
@@ -4398,54 +5083,61 @@ export default function App(){
                                     }} />
                                   ))}
                                 </div>
-                              </>
+                              </div>
                             )}
                             {showLoadListPanel && (
-                              <>
-                                <div className="text-xs font-bold text-slate-500">Items to Bring</div>
+                              <div className="absolute right-3 top-12 z-20 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                                <div className="text-xs font-bold text-slate-500 mb-2">📦 Items to load</div>
                                 <div className="flex flex-wrap gap-2">
                                   {["Heater","Ladder","Lights","Tyvek","Plastic Bags"].map(item => (
                                     <ToggleMulti key={item} label={item} checked={(data.loadList||[]).includes(item)} onChange={() => update("loadList", toggleMulti(data.loadList||[], item))} />
                                   ))}
                                 </div>
-                              </>
-                            )}
-                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                              <span className="text-xs font-bold text-slate-500">Estimate Required?</span>
-                              <Switch checked={data.estimateRequested} onChange={(val)=>update("estimateRequested", val)} />
-                            </div>
-                            {data.estimateRequested && (
-                              <div className="space-y-2">
-                                <div className="flex flex-wrap gap-2">{ESTIMATE_TYPES.map(t => (<ToggleMulti key={t} label={t} checked={data.estimateType === t} onChange={()=>update("estimateType", t)} />))}</div>
-                                <Input value={data.estimateRequestedBy} onChange={e=>update("estimateRequestedBy", e.target.value)} placeholder="Who is requesting?" />
                               </div>
                             )}
-                          </div>
-                        </Field>
-                        <Field label="Event Notes">
-                          <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
-                            <div className="flex items-center gap-2">
-                              <Input value={eventNoteDraft} onChange={e=>setEventNoteDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEventNote(eventNoteDraft); setEventNoteDraft(""); } }} placeholder="Add a scheduling note..." />
-                              <button onClick={() => { addEventNote(eventNoteDraft); setEventNoteDraft(""); }} className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Add</button>
-                            </div>
-                            {(data.eventNotes || []).length === 0 ? (
-                              <div className="text-xs text-slate-400">No scheduling notes yet.</div>
-                            ) : (
-                              <div className="space-y-2">
-                                {(data.eventNotes || []).map(n => (
-                                  <div key={n.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                    <div className="font-semibold">{n.text}</div>
-                                    <div className="text-[10px] text-slate-500">{n.at} · {n.user || "Unknown"}</div>
-                                  </div>
-                                ))}
+                            <div className="mt-3 border-t border-slate-100 pt-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <ToggleMulti label="Customer Contacted" checked={!!data.eventCustomerContacted} onChange={() => update("eventCustomerContacted", !data.eventCustomerContacted)} className="!text-[10px] !px-2 !py-1" />
+                                <ToggleMulti label="Bill To Contacted" checked={!!data.eventBillToContacted} onChange={() => update("eventBillToContacted", !data.eventBillToContacted)} className="!text-[10px] !px-2 !py-1" />
                               </div>
-                            )}
+                              <div className="mt-2 flex items-center gap-2">
+                                <Input
+                                  ref={eventNoteInputRef}
+                                  value={eventNoteDraft}
+                                  onChange={e=>setEventNoteDraft(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEventNote(eventNoteDraft); setEventNoteDraft(""); } }}
+                                  placeholder="enter scheduling notes and attempts here"
+                                />
+                                <button onClick={() => { addEventNote(eventNoteDraft); setEventNoteDraft(""); }} className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Add</button>
+                              </div>
+                              {(data.eventNotes || []).length === 0 ? (
+                                <div className="text-xs text-slate-400 mt-2">No scheduling notes yet.</div>
+                              ) : (
+                                <div className="space-y-2 mt-2">
+                                  {(showAllEventNotes ? (data.eventNotes || []) : (data.eventNotes || []).slice(0, 4)).map(n => (
+                                    <div key={n.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                                      <div className="font-semibold">{n.text}</div>
+                                      <div className="text-[10px] text-slate-500">{n.at} · {n.user || "Unknown"}</div>
+                                    </div>
+                                  ))}
+                                  {(data.eventNotes || []).length > 4 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowAllEventNotes(v => !v)}
+                                      className="text-xs font-bold text-sky-600 hover:text-sky-700"
+                                    >
+                                      {showAllEventNotes ? "Show less" : `Show all (${data.eventNotes.length})`}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </Field>
                         <Field label="Who are we meeting?"><div className="flex flex-wrap gap-2">{(knownPeople.length > 0) ? knownPeople.map(p => (<ToggleMulti key={p} label={p} checked={(data.meetingWith || []).includes(p)} onChange={() => update("meetingWith", toggleMulti(data.meetingWith || [], p))}/>)) : <span className="text-sm text-slate-400 italic">Add customers or contacts first</span>}</div></Field>
                         <div className="grid sm:grid-cols-2 gap-4">
-                          <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">✅ Confirm Appointment</button>
-                          <button onClick={() => setToast("Reminder Sent") } className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700">✉️ Send Reminder</button>
+                          <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">✅ Send Confirmation</button>
+                          <button onClick={openReminderModal} className={`rounded-lg border px-4 py-3 text-sm font-semibold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600"}`}>⏰ {data.reminderEnabled ? "Edit Reminder" : "Schedule Reminder"}</button>
                         </div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec5')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
@@ -4482,6 +5174,8 @@ export default function App(){
                     recordTypeLabel={recordTypeLabel}
                     getSalesRepForContact={getSalesRepForContact}
                     onOpenCrmLog={openCrmModal}
+                    onOpenReminder={openReminderModal}
+                    knownPeople={knownPeople}
                 />
               )}
 
@@ -4491,7 +5185,7 @@ export default function App(){
         <FloatingCapsule 
             entryMode={entryMode} 
             setEntryMode={setEntryMode} 
-            onSave={validateGenerateScope} 
+            onSave={handleSaveClick} 
             onPlan={() => setPlanModalOpen(true)}
             onAudit={() => {
               setAuditOn(prev => {
@@ -4553,6 +5247,73 @@ export default function App(){
       
       {toast && <Toast message={toast} onClose={()=>setToast("")} />}
       {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} />}
+
+      {saveSummaryOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+            <div className="bg-sky-500 px-6 py-4">
+              <h3 className="text-xl font-bold text-white">Order Summary</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              {saveSummaryMissing.length > 0 && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <div className="font-bold mb-1">Missing Audit Fields</div>
+                  <ul className="list-disc pl-5">
+                    {saveSummaryMissing.map((m, idx) => (
+                      <li key={`${m.key}-${idx}`}>{m.label}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="text-sm font-bold text-slate-700 mb-2">Entered Fields</div>
+                <div className="max-h-[320px] overflow-y-auto custom-scroll text-xs text-slate-700 space-y-1">
+                  {saveSummaryLines.length === 0 ? (
+                    <div className="text-slate-400">No fields entered yet.</div>
+                  ) : (
+                    saveSummaryLines.map((l, idx) => <div key={`${l}-${idx}`}>{l}</div>)
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                  onClick={() => copyLines(saveSummaryLines)}
+                >
+                  Copy Summary
+                </button>
+                <button
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                  onClick={() => downloadLines(saveSummaryLines, "order-summary.txt")}
+                >
+                  Download Summary
+                </button>
+                <button
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                  onClick={() => copyLines(saveExportLines)}
+                >
+                  Copy All Fields
+                </button>
+                <button
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                  onClick={() => downloadLines(saveExportLines, "order-all-fields.txt")}
+                >
+                  Download All Fields
+                </button>
+              </div>
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setSaveSummaryOpen(false)}>Close</button>
+              <button
+                className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
+                onClick={() => { setSaveSummaryOpen(false); validateGenerateScope(); }}
+              >
+                Continue Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {modal.type && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
@@ -4638,11 +5399,11 @@ export default function App(){
 
       {addCompanyModalOpen && (
           <div
-            className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
-            onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setCompanyModalCloseArmed(false); }}
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4"
+            onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); }}
           >
           <div
-            className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 fade-in"
+            className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden fade-in"
             onClick={(e)=>e.stopPropagation()}
             tabIndex={0}
             onKeyDown={(e) => {
@@ -4653,126 +5414,121 @@ export default function App(){
                 setAddCompanyType("");
                 setNewCompanyDraft({ contact: "", company: "" });
                 setCompanyModalCloseArmed(false);
+                setAddCompanyQuery("");
               }
             }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-base font-bold text-slate-800">Add Company or Contact</div>
+            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
+              <div>
+                <div className="text-lg font-bold text-white">Quick Add Existing Companies and Contacts</div>
+                <div className="text-xs text-sky-100">start typing a contact or company...</div>
+              </div>
               <button
-                onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setCompanyModalCloseArmed(false); }}
-                className="rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); }}
+                className="rounded-full border border-sky-200 px-3 py-1 text-[10px] font-bold text-white/90 hover:bg-sky-600"
               >
                 Close
               </button>
             </div>
-            <Field label="Search contact or company" subtle action={<span className="text-[10px] text-slate-400">Contact before company</span>}>
-              <SearchSelect
-                value=""
-                onChange={(v) => {
-                  const parsed = parseCombinedContact(v);
-                  const inferredType = addCompanyType || autoTypeForCompany(parsed.company);
-                  addCompanyFromSearch(inferredType, v);
-                  setAddCompanyType("");
-                }}
-                onQueryChange={() => setCompanyModalCloseArmed(false)}
-                onEmptyEnter={() => {
-                  if (companyModalCloseArmed) {
-                    setAddCompanyModalOpen(false);
-                    setShowTypePicker(false);
+            <div className="p-6 space-y-4">
+              <Field label="" subtle>
+                <SearchSelect
+                  value=""
+                  onChange={(v) => {
+                    const parsed = parseCombinedContact(v);
+                    const inferredType = addCompanyType || autoTypeForCompany(parsed.company);
+                    addCompanyFromSearch(inferredType, v);
                     setAddCompanyType("");
-                    setNewCompanyDraft({ contact: "", company: "" });
-                    setCompanyModalCloseArmed(false);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Tab") {
-                    setAddCompanyModalOpen(false);
-                    setShowTypePicker(false);
-                    setAddCompanyType("");
-                    setNewCompanyDraft({ contact: "", company: "" });
-                  }
-                }}
-                clearOnCommit
-                inputRef={addCompanyInputRef}
-                options={combinedContactOptions}
-                placeholder="Type contact or company..."
-              />
-            </Field>
-            <div className="mt-2 text-[10px] text-slate-400">
-              Type is inferred automatically. Use placeholder types if needed.
-            </div>
-            <div className="mt-2">
-              <button
-                onClick={() => setShowTypePicker(v => !v)}
-                className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-              >
-                {showTypePicker ? "Hide company types" : "Add placeholder type"}
-              </button>
-              {showTypePicker && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {[...new Set([...COMPANY_TYPES, ...VENDOR_TYPES])].sort().map(t => (
-                    <button
-                      key={t}
-                      onClick={() => { setAddCompanyType(t); addPlaceholderCompanyType(t); }}
-                      className={`rounded-full border px-2 py-1 text-[10px] font-bold ${addCompanyType === t ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700'}`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="text-xs font-bold text-slate-500 mb-2">Add New Company</div>
-              <div className="grid sm:grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Contact (optional)</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      value={splitName(newCompanyDraft.contact || "").first}
-                      onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, contact: [e.target.value, splitName(prev.contact || "").last].filter(Boolean).join(" ") })); }}
-                      placeholder="First name"
-                    />
-                    <Input
-                      value={splitName(newCompanyDraft.contact || "").last}
-                      onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, contact: [splitName(prev.contact || "").first, e.target.value].filter(Boolean).join(" ") })); }}
-                      placeholder="Last name"
-                    />
+                    setAddCompanyQuery("");
+                  }}
+                  onQueryChange={(q) => { setCompanyModalCloseArmed(false); setAddCompanyQuery(q); }}
+                  onEmptyEnter={() => {
+                    if (companyModalCloseArmed) {
+                      setAddCompanyModalOpen(false);
+                      setShowTypePicker(false);
+                      setAddCompanyType("");
+                      setNewCompanyDraft({ contact: "", company: "" });
+                      setCompanyModalCloseArmed(false);
+                      setAddCompanyQuery("");
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Tab") {
+                      setAddCompanyModalOpen(false);
+                      setShowTypePicker(false);
+                      setAddCompanyType("");
+                      setNewCompanyDraft({ contact: "", company: "" });
+                      setAddCompanyQuery("");
+                    }
+                  }}
+                  clearOnCommit
+                  inputRef={addCompanyInputRef}
+                  options={combinedContactOptions}
+                  placeholder="Start typing a contact or company..."
+                />
+              </Field>
+              {(() => {
+                const q = (addCompanyQuery || "").trim().toLowerCase();
+                const matches = q
+                  ? combinedContactOptions.filter(o => getOptionText(o).toLowerCase().includes(q))
+                  : [];
+                if (!q || matches.length) return null;
+                return (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs text-slate-500 mb-2">No matches found. Add a new company/contact below.</div>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Contact (optional)</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            value={splitName(newCompanyDraft.contact || "").first}
+                            onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, contact: [e.target.value, splitName(prev.contact || "").last].filter(Boolean).join(" ") })); }}
+                            placeholder="First name"
+                          />
+                          <Input
+                            value={splitName(newCompanyDraft.contact || "").last}
+                            onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, contact: [splitName(prev.contact || "").first, e.target.value].filter(Boolean).join(" ") })); }}
+                            placeholder="Last name"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Company</label>
+                        <Input
+                          value={newCompanyDraft.company}
+                          onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, company: e.target.value })); }}
+                          placeholder="Company name"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-2 text-[10px] text-slate-400">Contacts must be added to a company.</div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <button
+                        onClick={() => {
+                          const demo = newCompanyDraft.company || "New Company";
+                          setNewCompanyDraft(prev => ({ ...prev, company: demo }));
+                        }}
+                        className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                      >
+                        Find on Google (demo)
+                      </button>
+                      <button
+                        onClick={() => {
+                          const type = addCompanyType || autoTypeForCompany(newCompanyDraft.company);
+                          addCompanyDirect(type, newCompanyDraft.contact.trim(), newCompanyDraft.company.trim());
+                          setNewCompanyDraft({ contact: "", company: "" });
+                        }}
+                        className="rounded-full bg-sky-500 px-3 py-1 text-[10px] font-bold text-white hover:bg-sky-600"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    {newCompanyDraft.contact && !newCompanyDraft.company && (
+                      <div className="mt-2 text-[10px] font-semibold text-orange-600">Contacts must be added to a company.</div>
+                    )}
                   </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Company</label>
-                  <Input
-                    value={newCompanyDraft.company}
-                    onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, company: e.target.value })); }}
-                    placeholder="Company name"
-                  />
-                </div>
-              </div>
-              <div className="mt-2 flex items-center justify-between">
-                <button
-                  onClick={() => {
-                    const demo = newCompanyDraft.company || "New Company";
-                    setNewCompanyDraft(prev => ({ ...prev, company: demo }));
-                  }}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                >
-                  Find on Google (demo)
-                </button>
-                <button
-                  onClick={() => {
-                    const type = addCompanyType || autoTypeForCompany(newCompanyDraft.company);
-                    addCompanyDirect(type, newCompanyDraft.contact.trim(), newCompanyDraft.company.trim());
-                    setNewCompanyDraft({ contact: "", company: "" });
-                  }}
-                  className="rounded-full bg-sky-500 px-3 py-1 text-[10px] font-bold text-white hover:bg-sky-600"
-                >
-                  Add
-                </button>
-              </div>
-              {newCompanyDraft.contact && !newCompanyDraft.company && (
-                <div className="mt-2 text-[10px] font-semibold text-orange-600">Company required for contact.</div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -4780,35 +5536,147 @@ export default function App(){
       
       {confirmDetails && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
-              <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden animate-purple-section-fade">
-                  <div className="bg-sky-500 px-8 py-5">
-                      <h3 className="text-2xl font-bold text-white flex items-center gap-3"><span className="text-2xl">📅</span> Confirm Appointment</h3>
-                      <div className="text-sm text-sky-100 mt-1">Review details before sending confirmation.</div>
+              <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+                  <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="text-xl">📅</span> Confirm Appointment</h3>
+                        <div className="text-sm text-sky-100 mt-1">Review details before sending confirmation.</div>
+                      </div>
+                      <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setConfirmDetails(null)}>×</button>
                   </div>
-              <div className="p-8 space-y-5">
+                  <div className="p-6 space-y-5">
+                    {(() => {
+                      const missing = [];
+                      if (!data.eventVehicle) missing.push("Vehicle");
+                      if (!data.eventAssignee) missing.push("Assignee");
+                      if (!confirmDetails.address) missing.push("Address");
+                      return missing.length ? (
+                        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+                          <div className="font-bold mb-1">Missing Information:</div>
+                          <ul className="space-y-1">
+                            {missing.map(item => (
+                              <li key={item} className="flex items-center gap-2">
+                                <span className="text-orange-600">⚠️</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-orange-700">
+                            <input type="checkbox" checked={confirmMissingOk} onChange={(e)=>setConfirmMissingOk(e.target.checked)} />
+                            Proceed without this information
+                          </label>
+                        </div>
+                      ) : null;
+                    })()}
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-bold text-slate-500 mb-2">Context</div>
-                <div className="text-xs text-slate-600 space-y-1">
-                  <div><span className="font-semibold">Primary Customer:</span> {(data.customers?.[0]?.first || "")} {(data.customers?.[0]?.last || "")}</div>
-                  <div><span className="font-semibold">Referring Company:</span> {data.referringCompany || "—"}</div>
-                  <div><span className="font-semibold">Referrer:</span> {data.referrer || "—"}</div>
-                  <div><span className="font-semibold">Insurance Company:</span> {data.insuranceCompany || "—"}</div>
-                  <div><span className="font-semibold">Adjuster:</span> {data.insuranceAdjuster || "—"}</div>
-                  <div><span className="font-semibold">Additional Companies:</span> {Object.entries(data.additionalCompanies || {}).map(([t, v]) => v?.company || v?.contact ? `${t}: ${v.company || "—"} (${v.contact || "—"})` : null).filter(Boolean).join(" • ") || "—"}</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-500">Context</div>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmContextOpen(v => !v)}
+                    className="text-[10px] font-bold text-sky-600 hover:text-sky-700"
+                  >
+                    {confirmContextOpen ? "Hide" : "Show"}
+                  </button>
                 </div>
+                {confirmContextOpen && (
+                  <div className="mt-2 text-xs text-slate-600 space-y-1">
+                    <div><span className="font-semibold">Primary Customer:</span> {(data.customers?.[0]?.first || "")} {(data.customers?.[0]?.last || "")}</div>
+                    <div><span className="font-semibold">Referring Company:</span> {data.referringCompany || "—"}</div>
+                    <div><span className="font-semibold">Referrer:</span> {data.referrer || "—"}</div>
+                    <div><span className="font-semibold">Insurance Company:</span> {data.insuranceCompany || "—"}</div>
+                    <div><span className="font-semibold">Adjuster:</span> {data.insuranceAdjuster || "—"}</div>
+                    <div><span className="font-semibold">Assignee:</span> {data.eventAssignee || "—"}</div>
+                    <div><span className="font-semibold">Vehicle:</span> {data.eventVehicle || "—"}</div>
+                    <div><span className="font-semibold">Additional Companies:</span> {Object.entries(data.additionalCompanies || {}).map(([t, v]) => v?.company || v?.contact ? `${t}: ${v.company || "—"} (${v.contact || "—"})` : null).filter(Boolean).join(" • ") || "—"}</div>
+                  </div>
+                )}
               </div>
                           <div className="grid grid-cols-2 gap-4">
                               <div><label className="text-xs font-bold text-slate-400 uppercase">Type</label><div className="font-medium">{confirmDetails.type}</div></div>
                               <div><label className="text-xs font-bold text-slate-400 uppercase">Date & Time</label><div className="font-medium">{confirmDetails.date} @ {confirmDetails.time}</div></div>
                           </div>
                           <div><label className="text-xs font-bold text-slate-400 uppercase">Address</label><div className="font-medium">{confirmDetails.address || "No Primary Address Set"}</div></div>
+                          {!data.eventFirm && (
+                            <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+                              This event is not firm. {data.pickupTimeTentative ? "Confirming will send a tentative appointment." : "Mark as firm or confirm a tentative appointment to proceed."}
+                              {data.pickupTimeTentative && (
+                                <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-orange-700">
+                                  <input type="checkbox" checked={confirmTentativeOk} onChange={(e)=>setConfirmTentativeOk(e.target.checked)} />
+                                  I want to confirm a tentative appointment
+                                </label>
+                              )}
+                            </div>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            <button onClick={downloadIcs} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:border-sky-300 hover:text-sky-700">📅 Add to Calendar</button>
+                          </div>
                   </div>
                   <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
-                      <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setConfirmDetails(null)}>Edit</button>
-                      <button className="rounded-lg bg-green-600 px-6 py-2 text-sm font-bold text-white shadow hover:bg-green-700" onClick={() => { setToast("Appointment Confirmed & Sent!"); setConfirmDetails(null); }}>Send Confirmation</button>
+                      <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setConfirmDetails(null)}>Cancel</button>
+                      <button
+                        className={`rounded-lg px-6 py-2 text-sm font-bold text-white shadow ${((!data.eventFirm && (!data.pickupTimeTentative || !confirmTentativeOk)) || (!confirmMissingOk && (( !data.eventVehicle) || (!data.eventAssignee) || (!confirmDetails.address)))) ? "bg-slate-300 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"}`}
+                        disabled={(!data.eventFirm && (!data.pickupTimeTentative || !confirmTentativeOk)) || (!confirmMissingOk && (( !data.eventVehicle) || (!data.eventAssignee) || (!confirmDetails.address)))}
+                        onClick={() => { setToast("Appointment Confirmed & Sent!"); setConfirmDetails(null); }}
+                      >
+                        Send Confirmation
+                      </button>
                   </div>
               </div>
           </div>
+      )}
+
+      {reminderModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">Schedule Reminder</h3>
+                <div className="text-sm text-sky-100 mt-1">Choose when to send a reminder.</div>
+              </div>
+              <button
+                className="text-white/80 hover:text-white text-2xl font-bold leading-none"
+                onClick={() => setReminderModalOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Reminder Date">
+                  <DatePicker value={reminderDraft.date} onChange={(v)=>setReminderDraft(d => ({ ...d, date: v }))} />
+                </Field>
+                <Field label="Reminder Time">
+                  <TimePicker value={reminderDraft.time} onChange={(v)=>setReminderDraft(d => ({ ...d, time: v }))} />
+                </Field>
+              </div>
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+              {data.reminderEnabled && (
+                <button
+                  className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                  onClick={() => {
+                    updateMany({ reminderEnabled: false, reminderDate: "", reminderTime: "" });
+                    setReminderModalOpen(false);
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setReminderModalOpen(false)}>Cancel</button>
+              <button
+                className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
+                onClick={() => {
+                  updateMany({ reminderEnabled: true, reminderDate: reminderDraft.date, reminderTime: reminderDraft.time });
+                  setReminderModalOpen(false);
+                  setToast("Reminder scheduled");
+                }}
+              >
+                Save Reminder
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {welcomeModal.isOpen && (
@@ -4838,6 +5706,7 @@ export default function App(){
                             ) : (
                               <div className="text-xs text-slate-500">No attachments selected.</div>
                             )}
+                            <div className="text-xs text-red-500 mt-2">company specific docs available here</div>
                             {!hasMobile && (
                               <div className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                                 Add a mobile phone number to send texts.
