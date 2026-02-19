@@ -1939,7 +1939,7 @@ const Section = ({ id, title, helpText, isOpen, onToggle, children, badges, clas
 const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts }) => {
   const toggleList = (list, value) => list.includes(value) ? list.filter(v=>v!==value) : [...list, value];
   const [householdName, setHouseholdName] = useState("");
-  const [open, setOpen] = useState(index === 0);
+  const [open, setOpen] = useState(false);
   const hasMobile = (c.phone || "").replace(/[^\d]/g, "").length >= 10;
   const canSendWelcome = hasMobile && !c.doNotContact;
   const toggleQuickNote = (noteLabel) => {
@@ -1958,18 +1958,19 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
       
       <div className="mb-4 flex flex-col gap-3 pl-1 sm:pl-2 sm:flex-row sm:items-center sm:justify-between">
          <div className="flex items-center gap-2">
-            {total > 1 && (
-              <button
-                type="button"
-                onClick={() => setOpen(v => !v)}
-                className="text-slate-400 hover:text-slate-600"
-                title={open ? "Collapse" : "Expand"}
-              >
-                <Chevron open={open} />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setOpen(v => !v)}
+              className="text-slate-400 hover:text-slate-600"
+              title={open ? "Collapse" : "Expand"}
+            >
+              <Chevron open={open} />
+            </button>
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-600">{index + 1}</div>
-            <span className="text-sm font-semibold text-slate-800">{c.first && c.last ? `${c.first} ${c.last}` : "Customer"}</span>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-slate-800">{c.first && c.last ? `${c.first} ${c.last}` : "Customer"}</span>
+              <span className="text-[10px] text-slate-500">{c.type || "Relationship"}</span>
+            </div>
          </div>
          <div className="flex flex-wrap gap-2">
             <ToggleMulti className="!py-1 !px-3 sm:!px-3 !text-xs" label="Primary" checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: true })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
@@ -2132,6 +2133,7 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
 
 const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing, index, onVerify, auditOn, rentOrOwn, rentCoverageLimit, onRentOrOwnChange, onRentCoverageChange, forceShowCoords }) => {
   const [coordsOpen, setCoordsOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     if (forceShowCoords) setCoordsOpen(true);
   }, [forceShowCoords]);
@@ -2141,10 +2143,22 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
       {addr.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
       {total > 1 && ( <button onClick={()=>onRemove(addr.id)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
       <div className="mb-4 pl-1 sm:pl-2 flex items-center gap-2">
-         <span className="text-sm font-bold text-slate-800">{addr.street || "Address"}</span>
+         <button
+           type="button"
+           onClick={() => setOpen(v => !v)}
+           className="text-slate-400 hover:text-slate-600"
+           title={open ? "Collapse" : "Expand"}
+         >
+           <Chevron open={open} />
+         </button>
+         <div className="flex flex-col">
+           <span className="text-sm font-bold text-slate-800">{addr.street || "Address"}</span>
+           <span className="text-[10px] text-slate-500">{addr.type || "Type"}</span>
+         </div>
          {addr.isPrimary && <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-700">Primary</span>}
          {addr.isLossSite && <span className="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Loss Site</span>}
       </div>
+      {open && (
       <div className="grid gap-4 pl-1 sm:pl-2">
         <div className="rounded-lg border border-sky-100 bg-sky-50/50 p-2">
           <Field label="Find on Google (recommended)" subtle className="text-sky-700">
@@ -2222,6 +2236,7 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
            <button onClick={() => onVerify?.(addr.id)} className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Verify</button>
         </div>
       </div>
+      )}
     </div>
   );
 });
