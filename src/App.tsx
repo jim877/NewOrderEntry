@@ -1,5 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import SameDayScope from './SameDayScope';
+import SdsDocument from './SdsDocument';
 
 // --- STYLES ---
 const STYLES = `
@@ -235,8 +237,7 @@ const stripEventSystemLines = (text = "") =>
   text
     .split("\n")
     .filter(line => !EVENT_SYSTEM_PREFIXES.some(prefix => line.trim().startsWith(prefix)))
-    .join("\n")
-    .trimEnd();
+    .join("\n");
 
 const buildEventSystemEntries = (data, conditionSummary) => {
   const entries = [];
@@ -291,7 +292,32 @@ const normalizeCompany = (value) => value.trim().toLowerCase();
 
 // --- CONSTANTS ---
 const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
-const CUSTOMER_TYPES=["Primary","Secondary","Husband","Wife","Father","Mother","Brother","Sister","Son","Daughter","Relative","Boyfriend","Girlfriend","Housekeeper","Neighbor","Owner","Partner","Policyholder","Assistant","Attorney","Employee","Manager","POC","Other"];
+const CUSTOMER_TYPES=[
+  "Primary",
+  "Secondary",
+  "Point of Contact",
+  "Assistant",
+  "Employee",
+  "Husband",
+  "Wife",
+  "Father",
+  "Mother",
+  "Brother",
+  "Sister",
+  "Son",
+  "Daughter",
+  "Relative",
+  "Boyfriend",
+  "Girlfriend",
+  "Housekeeper",
+  "Neighbor",
+  "Owner",
+  "Partner",
+  "Policyholder",
+  "Attorney",
+  "Manager",
+  "Other"
+];
 const ORDER_STATUSES=["New","Intake Complete","Pickup Complete","Tagging Complete","Ready to Bill"];
 const MEETING_TYPES = ["Scope", "Pickup", "In-Home", "Meeting"];
 const DEFAULT_COMPANIES=["Allstate", "State Farm", "Chubb", "Servpro of Anytown", "Metro Claims", "Pure Insurance", "DKI FastDry", "United Claims", "Croziers Moving", "Company 1", "Company 2"];
@@ -299,7 +325,21 @@ const DEFAULT_CONTACTS=["Alex Morgan", "Jamie Lee", "Pat Adjuster", "Ronzel Simm
 const WELCOME_CAMPAIGNS=["Brochure", "Rush Guide", "Vcard"];
 const VENDOR_TYPES=["Art","Contents","Moving","Mitigation","Contractor","Consultant","Agent","Broker","Decorator","Building Management","Superintendent","Other"];
 const SALES_REPS=["Dave Fenyo, Sales Rep","Jim Fenyo","Josh Cintron, Sales Rep"];
-const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Textiles","TLI"];
+const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Textiles","TLI","Expert Stain Removal"];
+const SUGGESTED_GROUPS = ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"];
+const SUGGESTED_GROUP_HELP = {
+  RD: "Rush Delivery (within 1 week)",
+  RFD: "Rush Final Delivery (all within 1 week)",
+  STD: "Short Term Delivery (within 1 month)",
+  STFD: "Short Term Final (all within 1 month)",
+  LTD: "Long Term Delivery (greater than 1 month)",
+  LTFD: "Long Term Final Delivery (greater than 1 month)",
+  Inhome: "In-Home-Cleaning",
+  TLI: "Total Loss Inventory of non-salvageable items",
+  Test: "Test cleaning to determine scope (results needed ASAP)",
+  Dispose: "Items that will not be returned",
+  "Storage Only": "Items that will be stored and returned without cleaning"
+};
 const SERVICE_OFFERING_HELP = {
   Appliance: "Large items requiring specialized handling (refrigerators, ranges, etc.).",
   Art: "Items valued for artistic/aesthetic merit.",
@@ -310,7 +350,8 @@ const SERVICE_OFFERING_HELP = {
   Rugs: "Area rugs and carpets.",
   "Storage Only": "Items stored without cleaning.",
   Textiles: "Fabric/leather items (clothing, accessories, etc.).",
-  TLI: "Total Loss Inventory - listing/valuing non-restorable items."
+  TLI: "Total Loss Inventory - listing/valuing non-restorable items.",
+  "Expert Stain Removal": "Specialized stain removal services."
 };
 
 // --- CONSTANTS FOR SELECTIONS ---
@@ -319,7 +360,7 @@ const NON_RESTORATION_TYPES = ["Commercial Cleaning", "Residential Cleaning", "O
 
 const CAUSES = {
   "Fire": ["Battery", "Candle", "Cooking", "Electrical", "Explosion", "Fireplace", "Flammables", "Heating", "Neighbor", "Protein", "Smoking", "Wildfire"],
-  "Water": ["Roof Leak", "Window/Door Leak", "Frozen Pipes", "Pipe Burst", "Overflow", "Storm"],
+  "Water": ["Roof Leak", "Window/Door Leak", "Frozen Pipes", "Pipe Burst", "Overflow", "Storm", "Sprinkler", "Firefighting"],
   "Mold": ["Spores Only", "Visible Mold", "Moldy Odor"],
   "Dust/Debris": ["Mitigation", "Construction", "Fiberglass"],
   "Puffback": ["Oily Odor"],
@@ -331,6 +372,7 @@ const ORIGINS = ["Basement", "Bathroom", "Attic", "Family", "Garage", "Kitchen",
 
 const PHONE_TYPES = ["Mobile", "Home", "Office"];
 const ESTIMATE_TYPES = ["Ballpark", "Tag and Hold", "Itemized (costs)", "TLI", "Cash-out"];
+const PRICING_PLATFORMS = ["Xactimate", "Cotality", "Textile Solutions"];
 const TECHS = ["Mike S.", "Sarah J.", "Tom B.", "Unassigned"];
 const LEAD_SOURCES = ["Referral", "Marketing", "Internal"];
 const CONTACT_METHODS = ["Call", "Email", "Form Submission", "Meeting", "Text", "TPA Assignment"];
@@ -387,6 +429,35 @@ const COMPANY_TYPES = [
   "Boardup",
 ];
 
+const SDS_CONSIDERATIONS = ["Elderly", "Pregnancy", "Baby", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"];
+const SDS_OBSERVATIONS = ["Pets", "Fireplace", "Insects", "Moth Damage", "Sun Damage", "Smoking"];
+const SDS_SERVICES = ["Fold as Much as Possible", "Re-Hanging", "Photo Inventory", "Unpacking", "Needs Assistance", "Anti-Microbial", "Drying Needed", "Disposal", "Fiber Protection", "Moving", "Rolling Racks"];
+const SDS_ICON_MAP = {
+  "Elderly": "/Gemini_Elderly.png",
+  "Pregnancy": "/Gemini_Pregnancy.png",
+  "Baby": "/Gemini_Baby.png",
+  "Needs Assistance": "/Gemini_Needs_Assistance.png",
+  "Respiratory Concerns": "/Gemini_Health_Concerns.png",
+  "Premium Brands": "/Gemini_Premium_Brands.png",
+  "Skin Sensitivity": "/Gemini_Skin_Sensitivity.png",
+  "Pets": "/Gemini_Pets.png",
+  "Fireplace": "/Gemini_Fireplace.png",
+  "Insects": "/Gemini_Generated_Image_n42bx9n42bx9n42b.png",
+  "Moth Damage": "/Gemini_Moth_Holes.png",
+  "Sun Damage": "/Gemini_Generated_Image_bvveb5bvveb5bvve.png",
+  "Smoking": "/Gemini_Smoking.png",
+  "Fold as Much as Possible": "/Gemini_Fold_AMAP.png",
+  "Re-Hanging": "/Gemini_Generated_Image_jnzpynjnzpynjnzp.png",
+  "Photo Inventory": "/Gemini_Photo_Inventory.png",
+  "Unpacking": "/Gemini_Unpacking.png",
+  "Anti-Microbial": "/Gemini_Anti_Microbial.png",
+  "Drying Needed": "/Gemini_Generated_Image_tydpketydpketydp.png",
+  "Disposal": "/Gemini_Generated_Image_b58khsb58khsb58k.png",
+  "Fiber Protection": "/Gemini_Fiber_Protection.png",
+  "Moving": "/Gemini_Generated_Image_wqmls4wqmls4wqml.png",
+  "Rolling Racks": "/Gemini_Generated_Image_bxkqrbxkqrbxkqrb.png",
+};
+
 const QUICK_INSTRUCTION_NOTES = [
   "Gate code needed",
   "Call upon arrival",
@@ -394,6 +465,32 @@ const QUICK_INSTRUCTION_NOTES = [
   "Beware of pets",
   "Owner on-site",
 ];
+
+const LOAD_ITEMS = [
+  "Heater",
+  "Ladder",
+  "Lights",
+  "Tyvek",
+  "Plastic Bags",
+  "Toolbox",
+  "Floor Protection",
+  "Dolly",
+  "Hand Truck",
+  "Blankets",
+  "Bubble Wrap",
+  "TV Boxes",
+];
+
+const PACKOUT_LOAD_MAP = {
+  "Remove Hardware": ["Toolbox", "Ladder", "Floor Protection"],
+  "Remove Furniture": ["Dolly", "Hand Truck"],
+  "Remove Electronics": ["Blankets", "Bubble Wrap", "TV Boxes"],
+};
+
+const summarizeAddress = (addr = {}) => {
+  const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
+  return parts.length ? parts.join(", ") : "No address yet";
+};
 
 const TIME_SLOTS = [];
 for(let i=8; i<=18; i++) {
@@ -475,6 +572,35 @@ function initCustomer(overrides={}){
   }; 
 }
 
+function initLossSeverity(overrides = {}) {
+  return {
+    touched: false,
+    fire: {
+      enabled: false,
+      values: {
+        "Heat": 0,
+        "Soot": 0,
+        "Odor": 0,
+        "Extinguisher Powder": 0,
+        "Remediation Debris": 0
+      }
+    },
+    water: {
+      enabled: false,
+      values: {
+        "Water": 0,
+        "Humidity": 0,
+        "Musty Smell": 0,
+        "Visible Mildew": 0,
+        "Visible Mold": 0,
+        "Sprinkler Chemical": 0,
+        "Flood Cut Debris": 0
+      }
+    },
+    ...overrides
+  };
+}
+
 const DEFAULT_FORM={
   isLead: null,
   isRestorationProject: "",
@@ -487,7 +613,7 @@ const DEFAULT_FORM={
   contactMethod: "", 
   orderStatus: "New",
   
-  orderNumber:"150001", orderName:"", orderNameLocked:false,
+  orderNumber:"150001", orderName:"", orderNameLocked:false, orderNameAuto:true,
   referringCompany:"", referrer:"",
   
   orderTypes: [],
@@ -516,6 +642,8 @@ const DEFAULT_FORM={
   independentAdjuster:"", tpaCompany:"", tpaContact:"", 
   salesRep: "",
   serviceOfferings: [],
+  groupAddressLinks: {},
+  lossSeverity: initLossSeverity(),
   vendors:[],
   vendorDetails:{},
   showReferralVendor: true,
@@ -554,6 +682,9 @@ const DEFAULT_FORM={
   eventAssignee: "",
   eventVehicle: "",
   quickInstructionNotes: [],
+  sdsConsiderations: [],
+  sdsObservations: [],
+  sdsServices: [],
   estimateRequested: false, 
   estimateRequestedType: "",
   meetingWith: [],
@@ -570,6 +701,7 @@ const DEFAULT_FORM={
     testCleaning:{taken:false,left:false,listed:false},
   },
   additionalObservations:[], whoAtPickup:[], storageNeeded:"", storageMonths:"", highlightMissing:{},
+  suggestedGroups: [],
 };
 
 // --- UI PRIMITIVES ---
@@ -874,7 +1006,7 @@ const normalizeOption = (opt) => {
   return { label, value, type: opt?.type || "generic" };
 };
 
-const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, className, onKeyDown, onBlur, clearOnCommit, inputRef, onEmptyEnter, ...props }) => {
+const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, className, onKeyDown, onBlur, clearOnCommit, inputRef, onEmptyEnter, maxResults = 8, uppercase = false, ...props }) => {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [query, setQuery] = useState(value || "");
@@ -889,10 +1021,10 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
 
   const filtered = useMemo(() => {
     const q = (query || "").trim().toLowerCase();
-    if (!q) return normalizedOptions.slice(0, 8);
+    if (!q) return normalizedOptions.slice(0, maxResults);
     const starts = normalizedOptions.filter(o => o.label.toLowerCase().startsWith(q) || o.value.toLowerCase().startsWith(q));
     const includes = normalizedOptions.filter(o => !starts.includes(o) && (o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q)));
-    return [...starts, ...includes].slice(0, 8);
+    return [...starts, ...includes].slice(0, maxResults);
   }, [query, normalizedOptions]);
 
   useEffect(() => {
@@ -915,13 +1047,14 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
   }, [highlight, filtered.length]);
 
   const commit = (val) => {
-    onChange(val);
+    const nextVal = uppercase ? String(val || "").toUpperCase() : val;
+    onChange(nextVal);
     if (clearOnCommit) {
       setQuery("");
       onQueryChange?.("");
     } else {
-      setQuery(val);
-      onQueryChange?.(val);
+      setQuery(nextVal);
+      onQueryChange?.(nextVal);
     }
     setOpen(false);
   };
@@ -931,10 +1064,16 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
       <Input
         ref={inputRef}
         value={query}
-        onChange={e => { setQuery(e.target.value); setOpen(true); onQueryChange?.(e.target.value); }}
+        onChange={e => {
+          const raw = e.target.value;
+          const next = uppercase ? raw.toUpperCase() : raw;
+          setQuery(next);
+          setOpen(true);
+          onQueryChange?.(next);
+        }}
         onFocus={() => setOpen(true)}
         placeholder={placeholder || "Type to search..."}
-        className="pr-10"
+        className={`pr-10 ${className||""}`}
         onKeyDown={(e) => {
           if (e.key === "Enter" && onEmptyEnter && !query.trim()) {
             e.preventDefault();
@@ -1478,7 +1617,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
           </div>
       </Field>
 
-      <Field label="Sales Rep" className="max-w-[140px]">
+      <Field label="Sales Rep" className="max-w-[90px]">
         <div className="relative inline-flex items-center gap-2">
           <button
             type="button"
@@ -1515,9 +1654,15 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       {showInlineHelp && <div className="text-[11px] text-slate-400">Employee managing customer relationships/accounts.</div>}
       {showSuggestedRoles && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 fade-in">
-            <div className="text-base font-bold text-slate-800 mb-2">Apply Suggested Roles</div>
-            <div className="text-sm text-slate-500 mb-3">Choose which roles to apply for this referrer.</div>
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden fade-in">
+            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
+              <div>
+                <div className="text-xl font-bold text-white">Apply Suggested Roles</div>
+                <div className="text-sm text-sky-100">Choose which roles to apply for this referrer.</div>
+              </div>
+              <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setShowSuggestedRoles(false)}>×</button>
+            </div>
+            <div className="p-6 space-y-3">
             <div className="grid gap-2 text-base">
               {[
                 { id: "insurance", label: "Insurance Carrier" },
@@ -1540,9 +1685,10 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                 </label>
               ))}
             </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowSuggestedRoles(false)} className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700">Skip</button>
-              <button onClick={() => { ensureReferrerFromQuery(); onApplyReferrerRoles?.(suggestedSelection); setShowSuggestedRoles(false); }} className="rounded-full bg-sky-500 px-3 py-1 text-xs font-bold text-white hover:bg-sky-600">Apply</button>
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+              <button onClick={() => setShowSuggestedRoles(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700">Skip</button>
+              <button onClick={() => { ensureReferrerFromQuery(); onApplyReferrerRoles?.(suggestedSelection); setShowSuggestedRoles(false); }} className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white hover:bg-sky-600">Apply</button>
             </div>
           </div>
         </div>
@@ -1566,23 +1712,81 @@ const LoadListFields = memo(({ data, update, toggleMulti }) => (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
          <h3 className="mb-3 text-sm font-bold uppercase text-slate-500 tracking-wider">To Bring (Load List)</h3>
          <div className="flex flex-wrap gap-2">
-             <ToggleMulti label="Heater" checked={(data.loadList||[]).includes("Heater")} onChange={()=>update("loadList", toggleMulti(data.loadList||[], "Heater"))} className={data.noHeat ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" : ""} />
-             <ToggleMulti label="Ladder" checked={(data.loadList||[]).includes("Ladder")} onChange={()=>update("loadList", toggleMulti(data.loadList||[], "Ladder"))} />
-             <ToggleMulti label="Lights" checked={(data.loadList||[]).includes("Lights")} onChange={()=>update("loadList", toggleMulti(data.loadList||[], "Lights"))} className={data.noLights || data.boardedUp ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" : ""} />
-             <ToggleMulti label="Tyvek" checked={(data.loadList||[]).includes("Tyvek")} onChange={()=>update("loadList", toggleMulti(data.loadList||[], "Tyvek"))} className={(data.orderTypes||[]).includes('Mold') ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" : ""} />
-             <ToggleMulti label="Plastic Bags" checked={(data.loadList||[]).includes("Plastic Bags")} onChange={()=>update("loadList", toggleMulti(data.loadList||[], "Plastic Bags"))} className={data.damageWasWet === "Y" || (data.orderTypes||[]).includes('Mold') ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" : ""} />
+             {LOAD_ITEMS.map(item => (
+               <ToggleMulti
+                 key={item}
+                 label={item}
+                 checked={(data.loadList||[]).includes(item)}
+                 onChange={() => update("loadList", toggleMulti(data.loadList||[], item))}
+                 className={
+                   item === "Heater" && data.noHeat ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" :
+                   item === "Lights" && (data.noLights || data.boardedUp) ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" :
+                   item === "Tyvek" && (data.orderTypes||[]).includes('Mold') ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" :
+                   item === "Plastic Bags" && (data.damageWasWet === "Y" || (data.orderTypes||[]).includes('Mold')) ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" :
+                   ""
+                 }
+               />
+             ))}
          </div>
     </div>
 ));
 
+const AI_USAGE_GUIDELINES = [
+  "Choose the right entry mode: Use Detailed Entry when you have a lot of information (e.g., multiple contacts, insurance details, scheduling) to capture. Use Quick Entry for basic details, location, and scheduling when the information is minimal.",
+  "Always specify a referrer: The referrer is the person or company that provided the job or assignment. Use the quick entry search—type in the name and select the correct contact/company from the suggestions.",
+  "Ensure a Bill‑To is entered: Identify who will pay for the services. If an insurance company is the referrer, that company typically serves as both the Bill‑To and the insurance provider.",
+  "Provide an order name: An order name helps identify the job. It will auto‑populate when you enter the customer’s name and address, but verify it before saving.",
+  "Capture contact information: Make sure at least one phone number or email is recorded for the primary customer. Include additional contacts (spouse, adjuster, mover) if relevant.",
+  "Fill in the Interview section: Open the Interview section and answer as many questions as you can (e.g., project type, severity, origin, cause). Smart fields marked with a lightning‑bolt icon will automatically fill related fields and display a confirmation toast.",
+  "Scheduling appointments: In the Schedule section you can either type directly over the date and time or use the calendar and clock icons to pick them. Indicate whether the event is firm or tentative, select the correct service offerings, and provide clear event instructions.",
+  "Refinements for insurance claims: When entering insurance details, indicate whether it’s an insurance claim, select the insurance company, and add the adjuster’s contact via the quick‑add menu. Use the same menu to add other companies (e.g., movers, contractors).",
+  "Review before saving: Check that all required fields (Referrer, Bill‑To, order name, schedule date/time) are completed. Missing required fields may trigger a warning before submission. Once complete, click Save, review the summary, and then choose Continue Save to submit the order."
+];
+
+const AI_TIME_SAVING_TIPS = [
+  "Use “quick add” wherever possible: The quick‑add menu is the fastest way to assign roles like adjuster, mover or contractors. Begin typing a name or company and select the correct match from the drop‑down instead of creating contacts from scratch.",
+  "Type times directly into the schedule: If the time picker is hard to use, double‑click in the time field, press Ctrl + A to highlight the existing entry and type the desired time (e.g., 12:00 PM). Press Enter to confirm.",
+  "Look for auto‑fill hints: When you enter a customer’s name and address, the order name and other fields may auto‑populate. Accept these suggestions to save time and ensure consistency.",
+  "Document thoroughly in notes: Use the Interview and Event Instructions fields to capture details about the job (e.g., site conditions, special handling instructions, pets on site). Detailed notes reduce follow‑up questions later.",
+  "Use keyboard shortcuts: Press Tab to move forward and Shift + Tab to move backward through fields. Keyboard navigation can speed up data entry and reduce reliance on the mouse."
+];
+
 // --- START SCREEN ---
-const StartScreen = ({ onSelect }) => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 fade-in scale-in">
-    <div className="text-center mb-12">
-      <h1 className="text-5xl font-extrabold text-slate-900 mb-2 tracking-tight">New Order Entry</h1>
-      <p className="text-lg text-slate-500">Choose your entry mode</p>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+const StartScreen = ({ onSelect }) => {
+  const [showGuidelines, setShowGuidelines] = useState(false);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 fade-in scale-in">
+      <div className="text-center mb-8">
+        <h1 className="text-5xl font-extrabold text-slate-900 mb-2 tracking-tight">New Order Entry</h1>
+        <p className="text-lg text-slate-500">Choose your entry mode</p>
+        <button
+          type="button"
+          onClick={() => setShowGuidelines(v => !v)}
+          className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-sky-600 hover:text-sky-700"
+        >
+          Start here {showGuidelines ? "▾" : "▸"}
+        </button>
+      </div>
+
+      {showGuidelines && (
+        <div className="mb-10 w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="text-sm font-bold uppercase tracking-widest text-sky-600">AI App Usage Guidelines</div>
+          <ul className="mt-4 list-disc space-y-2 pl-6 text-sm text-slate-700">
+            {AI_USAGE_GUIDELINES.map(line => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <div className="mt-6 text-sm font-bold uppercase tracking-widest text-slate-500">Additional Time‑Saving Tips</div>
+          <ul className="mt-3 list-disc space-y-2 pl-6 text-sm text-slate-700">
+            {AI_TIME_SAVING_TIPS.map(line => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
       <button 
         onClick={() => onSelect('quick')}
         className="group relative flex flex-col items-center p-10 rounded-3xl bg-white border border-slate-200 shadow-xl hover:shadow-2xl hover:border-sky-300 hover:-translate-y-1 transition-all duration-300"
@@ -1601,9 +1805,19 @@ const StartScreen = ({ onSelect }) => (
         <p className="text-center text-slate-500">Full interview process. Smart triggers, detailed conditions, and billing.</p>
         <div className="mt-6 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Start Detailed →</div>
       </button>
+      <button 
+        onClick={() => onSelect('same-day-scope')}
+        className="group relative flex flex-col items-center p-10 rounded-3xl bg-white border border-slate-200 shadow-xl hover:shadow-2xl hover:border-sky-400 hover:-translate-y-1 transition-all duration-300"
+      >
+        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">📦</div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-3">Same Day Scope</h2>
+        <p className="text-center text-slate-500">Room-by-room pack-out scope with guided lists and notes.</p>
+        <div className="mt-6 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Open Scope →</div>
+      </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // --- SEARCH COMPONENT ---
 const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
@@ -1752,7 +1966,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 };
 
 // --- UNIFIED FLOATING HEADER (PROGRESS HEADER) ---
-const Header = ({ activeSection, visitedSections, onJump, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal }) => {
+const Header = ({ activeSection, visitedSections, onJump, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
     const steps = [
         { id: 'sec1', label: 'Order' },
         { id: 'sec2', label: 'Customer' },
@@ -1854,6 +2068,13 @@ const Header = ({ activeSection, visitedSections, onJump, title, version, entryM
                             >
                                 <span>Sample Data</span>
                                 <span>▤</span>
+                            </button>
+                            <button
+                                onClick={onOpenPresets}
+                                className="w-full mt-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all hover:bg-slate-50 text-slate-600"
+                            >
+                                <span>Test Data Presets</span>
+                                <span>{presetCount ? `(${presetCount})` : "▤"}</span>
                             </button>
                             <div className="mt-2 px-3 py-2">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Current User</label>
@@ -1983,7 +2204,7 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
       <div className="grid gap-4 pl-1 sm:pl-2">
          <div className="w-full sm:w-1/2">
             <label className="text-xs font-semibold text-slate-500 mb-1 block">Type</label>
-            <SearchSelect value={c.type || ""} onChange={(v)=>updateCust(c.id,{type:v})} options={CUSTOMER_TYPES} listId={`customer-type-${c.id}`} placeholder="Search relationship..." />
+            <SearchSelect value={c.type || ""} onChange={(v)=>updateCust(c.id,{type:v})} options={CUSTOMER_TYPES} listId={`customer-type-${c.id}`} placeholder="Search relationship..." maxResults={CUSTOMER_TYPES.length} />
          </div>
 
          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -2071,58 +2292,70 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
              <Textarea value={c.note} onChange={e => updateCust(c.id, { note: e.target.value })} placeholder="Add notes about this customer..." />
          </Field>
 
-         <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 space-y-3">
-             <div className="flex items-center justify-between">
-                 <span className="text-sm font-bold text-emerald-800">Household</span>
-             </div>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-               <Field label="Number of Members">
-                 <Input type="number" value={c.householdCount || ""} onChange={e=>updateCust(c.id,{householdCount:e.target.value})} placeholder="#" />
-               </Field>
-               <Field label="Animals">
-                 <Input value={c.householdAnimals || ""} onChange={e=>updateCust(c.id,{householdAnimals:e.target.value})} placeholder="Pets / animals" />
-               </Field>
-             </div>
-             <Field label="Quick Add Names">
-               <div className="flex gap-2">
-                 <Input
-                   value={householdName}
-                   onChange={e=>setHouseholdName(e.target.value)}
-                   placeholder="Name"
-                   onKeyDown={(e) => {
-                     if (e.key === "Enter") {
-                       e.preventDefault();
+         {c.isPrimary && (
+           <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 space-y-3">
+               <div className="flex items-center justify-between">
+                   <span className="text-sm font-bold text-emerald-800">Household</span>
+               </div>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                 <Field label="Number of Members">
+                   <Input type="number" value={c.householdCount || ""} onChange={e=>updateCust(c.id,{householdCount:e.target.value})} placeholder="#" />
+                 </Field>
+                <Field label="Pets">
+                  <Input value={c.householdAnimals || ""} onChange={e=>updateCust(c.id,{householdAnimals:e.target.value})} placeholder="Enter type and names" />
+                </Field>
+               </div>
+               <Field label="Quick Add Names">
+                 <div className="flex gap-2">
+                   <Input
+                     value={householdName}
+                     onChange={e=>setHouseholdName(e.target.value)}
+                     placeholder="Name"
+                     onKeyDown={(e) => {
+                       if (e.key === "Enter") {
+                         e.preventDefault();
+                         const name = householdName.trim();
+                         if (!name) return;
+                         const next = [...(c.householdMembers || []), name];
+                         updateCust(c.id, { householdMembers: next });
+                         setHouseholdName("");
+                       }
+                     }}
+                   />
+                   <button
+                     onClick={() => {
                        const name = householdName.trim();
                        if (!name) return;
                        const next = [...(c.householdMembers || []), name];
                        updateCust(c.id, { householdMembers: next });
                        setHouseholdName("");
-                     }
-                   }}
-                 />
-                 <button
-                   onClick={() => {
-                     const name = householdName.trim();
-                     if (!name) return;
-                     const next = [...(c.householdMembers || []), name];
-                     updateCust(c.id, { householdMembers: next });
-                     setHouseholdName("");
-                   }}
-                   className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-                 >
-                   Add
-                 </button>
-               </div>
-               {(c.householdMembers || []).length > 0 && (
-                 <div className="mt-2 flex flex-wrap gap-2">
-                   {(c.householdMembers || []).map((n, idx) => (
-                     <span key={`${n}-${idx}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                       {n}
-                     </span>
-                   ))}
+                     }}
+                     className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                   >
+                     Add
+                   </button>
                  </div>
-               )}
-             </Field>
+                 {(c.householdMembers || []).length > 0 && (
+                   <div className="mt-2 flex flex-wrap gap-2">
+                     {(c.householdMembers || []).map((n, idx) => (
+                       <span key={`${n}-${idx}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                         {n}
+                       </span>
+                     ))}
+                   </div>
+                 )}
+               </Field>
+           </div>
+         )}
+
+         <div className="flex justify-end">
+           <button
+             type="button"
+             onClick={() => setOpen(false)}
+             className="rounded-full bg-sky-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
+           >
+             Done
+           </button>
          </div>
 
       </div>
@@ -2152,8 +2385,8 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
            <Chevron open={open} />
          </button>
          <div className="flex flex-col">
-           <span className="text-sm font-bold text-slate-800">{addr.street || "Address"}</span>
-           <span className="text-[10px] text-slate-500">{addr.type || "Type"}</span>
+           <span className="text-sm font-bold text-slate-800">{addr.type || "Address"}</span>
+           <span className="text-[10px] text-slate-500">{summarizeAddress(addr)}</span>
          </div>
          {addr.isPrimary && <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-700">Primary</span>}
          {addr.isLossSite && <span className="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Loss Site</span>}
@@ -2180,14 +2413,27 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[140px]">
-            <Field label="Type"><Select value={addr.type} onChange={e=>updateAddr(addr.id,{type:e.target.value})}><option value="" disabled>Select Type...</option>{["House","Apartment","Garden Apartment","Row House","Neighbor","Hotel","Temp","Work","Other"].map(t=><option key={t} value={t}>{t}</option>)}</Select></Field>
+            <Field label="Type"><Select value={addr.type} onChange={e=>updateAddr(addr.id,{type:e.target.value})}><option value="" disabled>Select Type...</option>{["House","Apartment","Garden Apartment","Row House","Neighbor","Hotel","Relative","Rental","Other Home","Temp","Work","Other"].map(t=><option key={t} value={t}>{t}</option>)}</Select></Field>
           </div>
           <div className="flex-1"><Field label="Location Status"><div className="flex gap-2"><ToggleMulti label="Primary" checked={!!addr.isPrimary} onChange={()=>updateAddr(addr.id,{isPrimary:!addr.isPrimary})} colorClass="!bg-sky-100 !border-sky-400 !text-sky-700" showDot={false} /><ToggleMulti label="Loss Site" checked={!!addr.isLossSite} onChange={()=>updateAddr(addr.id,{isLossSite:!addr.isLossSite})} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} /></div></Field></div>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><Field label="Street Address"><Input data-audit-key="addrStreet" className={index===0 && auditOn && highlightMissing?.addrStreet ? "audit-missing" : ""} value={addr.street} onChange={e=>updateAddr(addr.id,{street:e.target.value})} /></Field><Field label="Apt / Unit #"><Input value={addr.apt} onChange={e=>updateAddr(addr.id,{apt:e.target.value})} /></Field></div>
         <div className="grid grid-cols-3 gap-4">
            <div className="col-span-1"><Field label="City"><Input data-audit-key="addrCity" className={index===0 && auditOn && highlightMissing?.addrCity ? "audit-missing" : ""} value={addr.city} onChange={e=>updateAddr(addr.id,{city:e.target.value})} /></Field></div>
-           <div className="col-span-1"><Field label="State"><Select data-audit-key="addrState" className={index===0 && auditOn && highlightMissing?.addrState ? "audit-missing" : ""} value={addr.state} onChange={e=>updateAddr(addr.id,{state:e.target.value})}><option value="">Select</option>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</Select></Field></div>
+           <div className="col-span-1">
+             <Field label="State">
+               <SearchSelect
+                 value={addr.state}
+                 onChange={(v)=>updateAddr(addr.id,{state:v})}
+                 options={STATES}
+                 placeholder="State"
+                 className={index===0 && auditOn && highlightMissing?.addrState ? "audit-missing" : ""}
+                 maxResults={STATES.length}
+                 uppercase
+               />
+               <div className="mt-1 text-[10px] text-slate-400">Press Tab to accept.</div>
+             </Field>
+           </div>
            <div className="col-span-1"><Field label="Zip"><Input data-audit-key="addrZip" className={index===0 && auditOn && highlightMissing?.addrZip ? "audit-missing" : ""} value={addr.zip} onChange={e=>updateAddr(addr.id,{zip:e.target.value})} inputMode="numeric" pattern="\d{5}" /></Field></div>
         </div>
         <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${verified ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"} ${index===0 && auditOn && (!addr.lat || !addr.lng) ? "audit-missing" : ""}`}>
@@ -2234,6 +2480,15 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
         <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
            <div className="text-xs text-slate-500">Verify address and auto-fill lat/long (demo)</div>
            <button onClick={() => onVerify?.(addr.id)} className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Verify</button>
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="rounded-full bg-sky-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
+          >
+            Done
+          </button>
         </div>
       </div>
       )}
@@ -2559,7 +2814,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       <div className="absolute right-3 top-12 z-20 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
                         <div className="text-xs font-bold text-slate-500 mb-2">📦 Items to load</div>
                         <div className="flex flex-wrap gap-2">
-                          {["Heater","Ladder","Lights","Tyvek","Plastic Bags"].map(item => (
+                          {LOAD_ITEMS.map(item => (
                             <ToggleMulti key={item} label={item} checked={(data.loadList||[]).includes(item)} onChange={() => update("loadList", toggleMulti(data.loadList||[], item))} />
                           ))}
                         </div>
@@ -2647,6 +2902,17 @@ export default function App(){
   });
   const [toast, setToast] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const TEST_PRESETS_KEY = "noe-test-presets";
+  const [showPresetModal, setShowPresetModal] = useState(false);
+  const [presetName, setPresetName] = useState("");
+  const [testPresets, setTestPresets] = useState(() => {
+    try {
+      const raw = localStorage.getItem(TEST_PRESETS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
   const [openSections, setOpenSections] = useState({sec1:true, sec2:false, sec3:false, sec4:false, sec5:false}); 
   const [modal, setModal] = useState({type:"",value:"",onSave:null});
   const [openCodes, setOpenCodes] = useState(false);
@@ -2675,7 +2941,20 @@ export default function App(){
   const [timeCloseTick, setTimeCloseTick] = useState(0);
   const [welcomeModal, setWelcomeModal] = useState({ isOpen: false, customerId: null, note: "" });
   const [showWelcomeQuickNotes, setShowWelcomeQuickNotes] = useState(false);
-  const [crmModal, setCrmModal] = useState({ isOpen: false, method: "", owner: "", subject: "", orderLink: "", notes: "" });
+  const [crmModal, setCrmModal] = useState({
+    isOpen: false,
+    method: "",
+    owner: "",
+    subject: "",
+    orderLink: "",
+    notes: "",
+    followUpEnabled: false,
+    followUpDate: "",
+    followUpTime: "",
+    notifySalesRep: true,
+    notifyOrderLead: true,
+    notifyOthers: ""
+  });
   const [quickQuestionsCollapsed, setQuickQuestionsCollapsed] = useState(false);
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [newPlanStep, setNewPlanStep] = useState("");
@@ -2691,6 +2970,7 @@ export default function App(){
   const [addCompanyType, setAddCompanyType] = useState("");
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [companyModalCloseArmed, setCompanyModalCloseArmed] = useState(false);
+  const [addCompanyPanel, setAddCompanyPanel] = useState("");
   const [newCompanyDraft, setNewCompanyDraft] = useState({ contact: "", company: "" });
   const [addContactExisting, setAddContactExisting] = useState({ contact: "", company: "" });
   const [addCompanyQuery, setAddCompanyQuery] = useState("");
@@ -2706,6 +2986,7 @@ export default function App(){
   const [showSampleDataModal, setShowSampleDataModal] = useState(false);
   const addCompanyInputRef = useRef(null);
   const [autoFlash, setAutoFlash] = useState({ key: "", ts: 0 });
+  const [scheduleIconsOpen, setScheduleIconsOpen] = useState(false);
 
   useEffect(() => {
     if (entryMode === "quick") {
@@ -2720,13 +3001,13 @@ export default function App(){
   }, [data.referringCompany, data.referrer]);
 
   useEffect(() => {
-    if (data.moldCoverageConfirm && data.moldLimit !== data.moldCoverageConfirm) {
+    if (data.moldCoverageConfirm && !data.moldLimit) {
       setData(prev => ({ ...prev, moldLimit: prev.moldCoverageConfirm || prev.moldLimit }));
     }
   }, [data.moldCoverageConfirm, data.moldLimit]);
 
   useEffect(() => {
-    if (data.rentCoverageLimit && data.contentsCoverageLimit !== data.rentCoverageLimit) {
+    if (data.rentCoverageLimit && !data.contentsCoverageLimit) {
       setData(prev => ({ ...prev, contentsCoverageLimit: prev.rentCoverageLimit || prev.contentsCoverageLimit }));
     }
   }, [data.rentCoverageLimit, data.contentsCoverageLimit]);
@@ -2806,6 +3087,17 @@ export default function App(){
       billingPayer: prev.billingPayer || "Insurance"
     }));
   }, [data.referringCompany, data.referrer]);
+
+  useEffect(() => {
+    const isAdjusterReferrer = !!data.referrer && data.referrer === data.insuranceAdjuster;
+    const billToMatch =
+      (!!data.billingContact && data.billingContact === data.referrer) ||
+      (!!data.billingCompany && !!data.referringCompany && normalizeCompany(data.billingCompany) === normalizeCompany(data.referringCompany));
+    if (isAdjusterReferrer && billToMatch && !data.eventBillToContacted) {
+      setData(prev => ({ ...prev, eventBillToContacted: true }));
+      setToast("Bill To Contacted auto-selected (adjuster is referrer).");
+    }
+  }, [data.referrer, data.insuranceAdjuster, data.billingContact, data.billingCompany, data.referringCompany, data.eventBillToContacted]);
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditOn, setAuditOn] = useState(false);
   const [auditMissing, setAuditMissing] = useState([]);
@@ -2823,6 +3115,7 @@ export default function App(){
   const [sourceSubOpen, setSourceSubOpen] = useState(false);
   const [interviewSubOpen, setInterviewSubOpen] = useState(false);
   const [codesSubOpen, setCodesSubOpen] = useState(false);
+  const [scheduleSubOpen, setScheduleSubOpen] = useState(true);
 
   useEffect(() => {
     if (entryMode !== "detailed") return;
@@ -2878,6 +3171,59 @@ export default function App(){
   const getFlashClass = (key) => (autoFlash.key === key ? "auto-flash" : "");
   const updateAddr = useCallback((id,patch) => setData(p => ({...p, addresses: p.addresses.map(a=>a.id===id?{...a,...patch}:a)})), []);
   const updateCust = useCallback((id,patch) => setData(p => ({...p, customers: p.customers.map(c=>c.id===id?{...c,...patch}:c)})), []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TEST_PRESETS_KEY, JSON.stringify(testPresets));
+    } catch {}
+  }, [testPresets]);
+
+  const saveTestPreset = useCallback(() => {
+    const name = presetName.trim();
+    if (!name) {
+      setToast("Enter a preset name.");
+      return;
+    }
+    const payload = {
+      id: safeUid(),
+      name,
+      createdAt: new Date().toISOString(),
+      data
+    };
+    setTestPresets(prev => {
+      const existingIndex = prev.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+      if (existingIndex >= 0) {
+        const next = [...prev];
+        next[existingIndex] = { ...payload, id: prev[existingIndex].id };
+        return next;
+      }
+      return [payload, ...prev];
+    });
+    setPresetName("");
+    setToast("Test preset saved.");
+  }, [data, presetName]);
+
+  const loadTestPreset = useCallback((preset) => {
+    if (!preset?.data) return;
+    const parsed = preset.data;
+    setData({
+      ...DEFAULT_FORM,
+      ...parsed,
+      addresses: parsed.addresses?.length ? parsed.addresses : DEFAULT_FORM.addresses,
+      customers: parsed.customers?.length ? parsed.customers : DEFAULT_FORM.customers,
+    });
+    setToast("Test preset loaded.");
+  }, []);
+
+  const deleteTestPreset = useCallback((id) => {
+    setTestPresets(prev => prev.filter(p => p.id !== id));
+    setToast("Test preset deleted.");
+  }, []);
+
+  const clearAllPresets = useCallback(() => {
+    setTestPresets([]);
+    setToast("All presets cleared.");
+  }, []);
   const addEventNote = useCallback((text) => {
     const note = (text || "").trim();
     if (!note) return;
@@ -3101,6 +3447,88 @@ export default function App(){
       });
   };
 
+  const ensureAddressType = (type) => {
+    if (!type) return;
+    setData(prev => {
+      const exists = (prev.addresses || []).some(a => (a.type || "").toLowerCase() === type.toLowerCase());
+      if (exists) return prev;
+      return {
+        ...prev,
+        addresses: [...(prev.addresses || []), initAddress({ type, isPrimary: false, isLossSite: false })]
+      };
+    });
+  };
+
+  const updateLivingStatus = (value) => {
+    update("livingStatus", value);
+    if (["Hotel", "Neighbor", "Relative", "Rental", "Other Home"].includes(value)) {
+      ensureAddressType(value);
+    }
+  };
+
+  const updateLossSeverity = useCallback((next) => {
+    update("lossSeverity", { ...next, touched: true });
+  }, [update]);
+
+  useEffect(() => {
+    if (data.orderNameLocked) return;
+    if (!data.orderNameAuto) return;
+    const primaryCustomer = (data.customers || []).find(c => c.isPrimary) || {};
+    const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || {};
+    const last = (primaryCustomer.last || "").trim();
+    const city = (primaryAddr.city || "").trim();
+    const state = (primaryAddr.state || "").trim();
+    if (!last && !city && !state) return;
+    const town = [city, state].filter(Boolean).join("");
+    const nextName = [last || "Order", town].filter(Boolean).join("-").replace(/\s+/g, "");
+    if (nextName && nextName !== data.orderName) {
+      update("orderName", nextName);
+    }
+  }, [data.orderNameLocked, data.orderNameAuto, data.customers, data.addresses, data.orderName, update]);
+
+  const groupLinks = data.groupAddressLinks || {};
+  const [groupLinkModal, setGroupLinkModal] = useState({ open: false, group: "" });
+  const openGroupLinkModal = (group) => {
+    setGroupLinkModal({ open: true, group });
+  };
+  const closeGroupLinkModal = () => setGroupLinkModal({ open: false, group: "" });
+  const getGroupLink = (group) => groupLinks[group] || { addressId: "", date: "" };
+  const setGroupLink = (group, patch) => {
+    const current = getGroupLink(group);
+    update("groupAddressLinks", { ...groupLinks, [group]: { ...current, ...patch } });
+  };
+  const clearGroupLink = (group) => {
+    const next = { ...groupLinks };
+    delete next[group];
+    update("groupAddressLinks", next);
+  };
+
+  useEffect(() => {
+    const selected = data.packoutSummary || [];
+    if (!selected.length) return;
+    const current = new Set(data.loadList || []);
+    const added = [];
+    selected.forEach(item => {
+      (PACKOUT_LOAD_MAP[item] || []).forEach(loadItem => {
+        if (!current.has(loadItem)) {
+          current.add(loadItem);
+          added.push(loadItem);
+        }
+      });
+    });
+    if (added.length) {
+      setData(prev => {
+        const next = new Set(prev.loadList || []);
+        added.forEach(i => next.add(i));
+        return { ...prev, loadList: Array.from(next) };
+      });
+      setSmartNotification({
+        message: `Bring: ${added.join(", ")} added because Packout Summary`,
+        loadListToRemove: added
+      });
+    }
+  }, [data.packoutSummary, data.loadList]);
+
   const updateHowDry = (v) => {
       const addCodes = [];
       const removeCodes = [];
@@ -3230,7 +3658,20 @@ export default function App(){
     const defaultMethod = data.contactMethod || "Call";
     const owner = data.salesRep || "Sales Rep";
     const subject = `New ${data.isLead === false ? "Order" : "Lead"}`;
-    setCrmModal({ isOpen: true, method: defaultMethod, owner, subject, orderLink: "", notes: "" });
+    setCrmModal({
+      isOpen: true,
+      method: defaultMethod,
+      owner,
+      subject,
+      orderLink: "",
+      notes: "",
+      followUpEnabled: false,
+      followUpDate: "",
+      followUpTime: "",
+      notifySalesRep: !!data.salesRep,
+      notifyOrderLead: !!data.eventAssignee,
+      notifyOthers: ""
+    });
   };
   
   const addNewAddress = useCallback(() => {
@@ -3262,6 +3703,21 @@ export default function App(){
       return { ...prev, customers: updated };
     });
   }, [data.involvesInsurance, data.restorationType]);
+
+  useEffect(() => {
+    const lossSeverity = data.lossSeverity || initLossSeverity();
+    if (lossSeverity.touched) return;
+    const hasFire = (data.orderTypes || []).includes("Fire");
+    const hasWater = (data.orderTypes || []).includes("Water");
+    const next = {
+      ...lossSeverity,
+      fire: { ...lossSeverity.fire, enabled: hasFire },
+      water: { ...lossSeverity.water, enabled: hasWater }
+    };
+    if (next.fire.enabled !== lossSeverity.fire.enabled || next.water.enabled !== lossSeverity.water.enabled) {
+      update("lossSeverity", next);
+    }
+  }, [data.orderTypes, data.lossSeverity]);
 
   const addHouseholdMember = useCallback((name) => {
     setData(p => ({ ...p, peopleQuick: [...(p.peopleQuick || []), { first: name }] }));
@@ -3326,7 +3782,7 @@ export default function App(){
           if (el.focus) el.focus();
         }
       });
-    }, 260);
+    }, 420);
   }, []);
 
   useEffect(() => {
@@ -4449,6 +4905,33 @@ export default function App(){
   };
 
   if (entryMode === 'start') return <StartScreen onSelect={handleEntryModeSelect} />;
+  if (entryMode === 'same-day-scope') {
+    const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {};
+    const addressLabel = [primaryAddr.street, primaryAddr.city, primaryAddr.state].filter(Boolean).join(", ");
+    return (
+      <SameDayScope
+        onExit={() => setEntryMode('start')}
+        eventInstructions={data.eventInstructions || ""}
+        onEventInstructionsChange={(val) => update("eventInstructions", val)}
+        serviceOfferings={data.serviceOfferings || []}
+        onServiceOfferingsChange={(list) => update("serviceOfferings", list)}
+        suggestedGroups={data.suggestedGroups || []}
+        onSuggestedGroupsChange={(list) => update("suggestedGroups", list)}
+        lossSeverity={data.lossSeverity}
+        onLossSeverityChange={updateLossSeverity}
+        orderTypes={data.orderTypes || []}
+        severityCodes={data.severityCodes || []}
+        claimNumber={data.claimNumber || ""}
+        addressLabel={addressLabel}
+        customers={data.customers || []}
+        familyMedicalIssues={data.familyMedicalIssues}
+        soapFragAllergies={data.soapFragAllergies}
+        sdsConsiderations={data.sdsConsiderations || []}
+        sdsObservations={data.sdsObservations || []}
+        sdsServices={data.sdsServices || []}
+      />
+    );
+  }
 
   return (
     <React.Fragment>
@@ -4472,6 +4955,8 @@ export default function App(){
             currentUser={data.currentUser}
             setCurrentUser={(v)=>update("currentUser", v)}
             setShowSampleDataModal={setShowSampleDataModal}
+            onOpenPresets={() => setShowPresetModal(true)}
+            presetCount={testPresets.length}
         />
 
         <div className={`min-h-screen bg-slate-50 pb-32 font-sans fade-in scale-in ${compactMode ? 'compact-mode' : ''} ${entryMode === 'detailed' ? 'pt-28' : 'pt-24'}`}>
@@ -4503,8 +4988,8 @@ export default function App(){
                             <SubSection title="Order" open={orderSubOpen} onToggle={() => setOrderSubOpen(!orderSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("order") ? "audit-outline" : ""}>
                                 <Field label={<span>Order Name <span className="font-normal text-slate-400 text-xs ml-1">(Auto-generated)</span></span>} missing={data.highlightMissing?.orderName}>
                                   <div className="flex gap-2">
-                                      <Input data-audit-key="orderName" className={auditOn && data.highlightMissing?.orderName ? "audit-missing" : ""} value={data.orderName} onChange={e=>update("orderName",e.target.value)} disabled={!!data.orderNameLocked} placeholder="e.g. Name-TownST" />
-                                      <button className={`rounded-lg border px-3 text-xs font-bold transition-all ${data.orderNameLocked?"bg-slate-800 text-white":"bg-white hover:bg-slate-50"}`} onClick={()=>update("orderNameLocked",!data.orderNameLocked)}>{data.orderNameLocked?"LOCKED":"LOCK"}</button>
+                                      <Input data-audit-key="orderName" className={auditOn && data.highlightMissing?.orderName ? "audit-missing" : ""} value={data.orderName} onChange={e=>updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })} disabled={!!data.orderNameLocked} placeholder="e.g. Name-TownST" />
+                                      <button className={`rounded-lg border px-3 text-xs font-bold transition-all ${data.orderNameLocked?"bg-slate-800 text-white":"bg-white hover:bg-slate-50"}`} onClick={()=>updateMany({ orderNameLocked: !data.orderNameLocked, orderNameAuto: data.orderNameLocked ? data.orderNameAuto : false })}>{data.orderNameLocked?"LOCKED":"LOCK"}</button>
                                   </div>
                                 </Field>
                                 <div className="grid gap-4 sm:grid-cols-2">
@@ -4617,12 +5102,8 @@ export default function App(){
 
                             <SubSection title="Interview" open={interviewSubOpen} onToggle={() => setInterviewSubOpen(!interviewSubOpen)} compact={compactMode}>
                                 <div id="sec1-interview">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200"><Field label="Living Situation"><div className="flex flex-wrap gap-2">{["Staying in home", "Temp - Short Term", "Temp - Long Term", "Moving"].map(s => (<ToggleMulti key={s} label={s} checked={data.livingStatus === s} onChange={()=>update("livingStatus", data.livingStatus === s ? "" : s)} />))}</div></Field></div>
-                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200"><Field label="Delivery + Storage Timeline"><div className="flex flex-wrap gap-2">{["Deliver to Temp", "Deliver to Move", "Deliver to home ASAP", "Long-Term Storage"].map(s => (<ToggleMulti key={s} label={s} checked={data.processType === s} onChange={()=>update("processType", data.processType === s ? "" : s)} />))}</div></Field></div>
-                                  </div>
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4 space-y-4">
-                                      <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">Conditions <span className="text-orange-500">⚡</span></label>
+                                      <label className="text-xs font-bold text-sky-600 uppercase flex items-center gap-1">Conditions <span className="text-orange-500">⚡</span></label>
                                       <div className="flex flex-wrap gap-3">
                                           <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.damageWasWet ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'} ${suggestWet ? 'suggested-field' : ''}`}>
                                             <input type="checkbox" checked={data.damageWasWet} onChange={e => updateSmart('damageWasWet', e.target.checked ? 'Y' : 'N')} />
@@ -4639,17 +5120,89 @@ export default function App(){
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
                                       <div className="text-sm font-semibold text-sky-600 mb-3">Repairs Summary</div>
                                       <div className="flex flex-wrap gap-2">
-                                      {["Just Cleaning", "Clean and Paint", "Packout Rugs", "Cosmetic Damage", "Major Structural Damage", "Refinish Floors", "Replace Floors", "Complete Rebuild"].map(s => (
+                                      {["Just Cleaning", "Clean and Paint", "Cosmetic Damage", "Major Structural Damage", "Refinish Floors", "Replace Floors", "Complete Rebuild"].map(s => (
                                           <ToggleMulti key={s} label={s} checked={data.repairsSummary === s} onChange={()=>update("repairsSummary", data.repairsSummary === s ? "" : s)} />
                                         ))}
                                       </div>
                                   </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                        <Field label={<span className="text-sky-600">Living Situation</span>}>
+                                          <div className="flex flex-wrap gap-2">
+                                            {["Staying in home", "Moving", "Hotel", "Neighbor", "Relative", "Rental", "Other Home"].map(s => (
+                                              <ToggleMulti
+                                                key={s}
+                                                label={s}
+                                                checked={data.livingStatus === s}
+                                                onChange={() => updateLivingStatus(data.livingStatus === s ? "" : s)}
+                                              />
+                                            ))}
+                                          </div>
+                                        </Field>
+                                      </div>
+                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200"><Field label={<span className="text-sky-600">Delivery + Storage Timeline</span>}><div className="flex flex-wrap gap-2">{["Deliver to Temp", "Deliver to Move", "Deliver to home ASAP", "Long-Term Storage"].map(s => (<ToggleMulti key={s} label={s} checked={data.processType === s} onChange={()=>update("processType", data.processType === s ? "" : s)} />))}</div></Field></div>
+                                  </div>
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
                                       <div className="text-sm font-semibold text-sky-600 mb-3">Packout Summary</div>
                                       <div className="flex flex-wrap gap-2">
-                                        {["Remove Rugs", "Remove Window Treatments", "Remove Hardware", "Remove Furniture"].map(s => (
+                                        {["Remove Rugs", "Remove Window Treatments", "Remove Hardware", "Remove Furniture", "Remove Electronics"].map(s => (
                                           <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={()=>update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} />
                                         ))}
+                                      </div>
+                                  </div>
+                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
+                                      <div className="text-sm font-semibold text-sky-600 mb-3">Suggested Groups</div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {SUGGESTED_GROUPS.map(g => {
+                                          const selected = (data.suggestedGroups || []).includes(g);
+                                          const link = getGroupLink(g);
+                                          const linkedAddr = (data.addresses || []).find(a => a.id === link.addressId);
+                                          if (!selected) {
+                                            return (
+                                              <ToggleMulti
+                                                key={g}
+                                                label={g}
+                                                title={SUGGESTED_GROUP_HELP[g]}
+                                                checked={false}
+                                                onChange={() => {
+                                                  const next = toggleMulti(data.suggestedGroups || [], g);
+                                                  update("suggestedGroups", next);
+                                                }}
+                                              />
+                                            );
+                                          }
+
+                                          return (
+                                            <div
+                                              key={g}
+                                              className="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-sky-50 px-2 py-1"
+                                              title={SUGGESTED_GROUP_HELP[g]}
+                                            >
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const next = toggleMulti(data.suggestedGroups || [], g);
+                                                  update("suggestedGroups", next);
+                                                  if (!next.includes(g)) clearGroupLink(g);
+                                                }}
+                                                className="rounded-full border border-sky-300 bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700 hover:bg-sky-200"
+                                              >
+                                                {g}
+                                              </button>
+                                              <span className="h-4 w-px bg-sky-200" />
+                                              <button
+                                                type="button"
+                                                onClick={() => openGroupLinkModal(g)}
+                                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${link?.addressId ? "border-sky-300 bg-white text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
+                                                title="Link group to address/date"
+                                              >
+                                                <span>📍</span>
+                                                <span>{link?.addressId ? (linkedAddr?.type || "Address") : "Link"}</span>
+                                                {link?.date ? <span>• {link.date}</span> : null}
+                                              </button>
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                   </div>
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -4775,133 +5328,6 @@ export default function App(){
 
                     <Section id="sec4" title="4. Billing & Companies" helpText="Who pays + who’s involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onToggle={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
                       <div className="grid gap-6">
-                        <SubSection title="Billing" open={billingSubOpen} onToggle={() => setBillingSubOpen(!billingSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("billing") ? "audit-outline" : ""}>
-                          <Field label="Bill To"><div data-audit-key="billingPayer" className={auditOn && data.highlightMissing?.billingPayer ? "audit-missing rounded-lg p-1" : ""}><ToggleGroup options={["Insurance","Customer","Referrer","Public Adjuster","Building","Contractor","Other"]} value={data.billingPayer} onChange={v=>update("billingPayer",v)} /></div></Field>
-                          {!(data.billingPayer === "Customer" || data.payorQuick === "Self-pay") && (
-                            <div className="grid sm:grid-cols-2 gap-4">
-                              <Field label={
-                                <span className="inline-flex items-center gap-2">
-                                  Billing Company
-                                  <span className="inline-flex items-center gap-1">
-                                    {companyRolesFor({ company: data.billingCompany, contact: data.billingContact }).map(r => <RoleBadge key={`billing-${r.title}`} icon={r.icon} title={r.title} />)}
-                                  </span>
-                                </span>
-                              }><Input className={getFlashClass("billingCompany")} value={data.billingCompany} onChange={e=>update("billingCompany", e.target.value)} placeholder="Billing company" /></Field>
-                              <Field label="Billing Contact" subtle action={<span className="text-[10px] text-slate-400">Auto-fill company</span>}>
-                                <Input value={data.billingContact} onChange={e=>handleBillingContactChange(e.target.value)} placeholder="Billing contact" />
-                              </Field>
-                            </div>
-                          )}
-                          <Field label="Billing Note"><Textarea value={data.billingNote} onChange={e=>update("billingNote",e.target.value)} /></Field>
-                        </SubSection>
-                        <SubSection title="Finance" open={financeSubOpen} onToggle={() => setFinanceSubOpen(!financeSubOpen)} compact={compactMode}>
-                          <div className="grid sm:grid-cols-3 gap-4">
-                            <Field label="Pricing Platform">
-                              <Input data-audit-key="pricePlatform" value={data.pricePlatform} onChange={e=>update("pricePlatform", e.target.value)} placeholder="Platform" />
-                            </Field>
-                            <Field label="Price List">
-                              <Input data-audit-key="priceList" value={data.priceList} onChange={e=>update("priceList", e.target.value)} placeholder="Price list" />
-                            </Field>
-                            <Field label="Price Multiplier">
-                              <Input data-audit-key="multiplier" value={data.multiplier} onChange={e=>update("multiplier", e.target.value)} placeholder="e.g. 1.10" />
-                            </Field>
-                          </div>
-                          <div className="mt-4">
-                            <Field label="Estimate Requested">
-                              <Switch data-audit-key="estimateRequested" checked={!!data.estimateRequested} onChange={(v)=>update("estimateRequested", v)} />
-                            </Field>
-                            {data.estimateRequested && (
-                              <div className="mt-3 space-y-2">
-                                <div className="flex flex-wrap gap-2">
-                                  {ESTIMATE_TYPES.map(t => (
-                                    <ToggleMulti key={t} label={t} checked={data.estimateType === t} onChange={()=>update("estimateType", t)} />
-                                  ))}
-                                </div>
-                                <Input value={data.estimateRequestedBy} onChange={e=>update("estimateRequestedBy", e.target.value)} placeholder="Who is requesting?" />
-                              </div>
-                            )}
-                          </div>
-                        </SubSection>
-                        <SubSection title="Insurance" open={insuranceSubOpen} onToggle={() => setInsuranceSubOpen(!insuranceSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
-                          <Field label="Insurance Claim?" smart action={<ToggleGroup options={["Yes","No"]} value={data.insuranceClaim} onChange={v=>update("insuranceClaim",v)} />} />
-                          <Field label="Direction of Payment"><ToggleGroup options={["Direct from Insurance","Check","Credit Card","Other"]} value={data.directionOfPayment} onChange={v=>update("directionOfPayment",v)} /></Field>
-                          {data.insuranceClaim==="Yes" && (
-                            <div className="animate-purple-section-fade slide-up rounded-xl bg-white p-4 grid gap-4 shadow-sm">
-                              <div className="grid sm:grid-cols-[1fr_220px] gap-4 items-start">
-                                <Field label={
-                                  <span className="inline-flex items-center gap-2">
-                                    Insurance Company
-                                    <span className="inline-flex items-center gap-1">
-                                      {companyRolesFor({ company: data.insuranceCompany, contact: data.insuranceAdjuster }).map(r => <RoleBadge key={`ins-${r.title}`} icon={r.icon} title={r.title} />)}
-                                    </span>
-                                  </span>
-                                }>
-                                  <div className={`flex gap-2 ${getFlashClass("insuranceCompany")}`}>
-                                    <SearchSelect value={data.insuranceCompany} onChange={(v)=>update("insuranceCompany",v)} options={companies} listId="insurance-company-list" />
-                                    <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"company",value:"",onSave:(name)=>update("insuranceCompany",name)})}>+</button>
-                                  </div>
-                                </Field>
-                                <Field label="National Carrier">
-                                  <SearchSelect value={data.nationalCarrier} onChange={(v)=>update("nationalCarrier",v)} options={NATIONAL_CARRIERS} listId="national-carrier-list" placeholder="Linked" className={getFlashClass("nationalCarrier")} />
-                                </Field>
-                              </div>
-                              <Field label="Adjuster">
-                                <div className={`flex gap-2 ${getFlashClass("insuranceAdjuster")}`}>
-                                  <SearchSelect value={data.insuranceAdjuster} onChange={(v)=>handleAdjusterContactChange(v)} options={contacts} listId="insurance-adjuster-list" />
-                                  <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"contact",value:"",onSave:(name)=>update("insuranceAdjuster",name)})}>+</button>
-                                </div>
-                              </Field>
-                              <div className="grid grid-cols-2 gap-4">
-                                <Field label="Claim #"><Input value={data.claimNumber} onChange={e=>update("claimNumber",e.target.value)} /></Field>
-                                <Field label="Date of Loss"><Input value={data.dateOfLoss} onChange={e=>update("dateOfLoss",e.target.value)} placeholder="mm/dd/yyyy" /></Field>
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <Field label="Work Order #"><Input value={data.workOrderNumber} onChange={e=>update("workOrderNumber",e.target.value)} placeholder="Work order" /></Field>
-                                <Field label="Policy #"><Input value={data.policyNumber} onChange={e=>update("policyNumber",e.target.value)} placeholder="Policy number" /></Field>
-                              </div>
-                              <Field label="Order Specific Email">
-                                <Input value={data.insuranceOrderEmail} onChange={e=>update("insuranceOrderEmail",e.target.value)} placeholder="special-email@carrier.com" />
-                              </Field>
-                              <div className="grid grid-cols-2 gap-4">
-                                <Field label="Contents Limit ($)"><Input value={data.contentsCoverageLimit} onChange={e=>update("contentsCoverageLimit",e.target.value)} placeholder="Coverage limit" /></Field>
-                                <Field label="Mold Limit ($)"><Input className={attentionMold ? "attention-fill" : ""} value={data.moldLimit} onChange={e=>update("moldLimit",e.target.value)} placeholder="Mold limit" /></Field>
-                              </div>
-                              {attentionMold && (
-                                <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-                                  Visible Mold selected → confirm Mold Limit.
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {[
-                            { label: "Billing", value: data.billingCompany },
-                            { label: "Insurance", value: data.insuranceCompany },
-                            { label: "National Carrier", value: data.nationalCarrier },
-                            { label: "Independent Adjusting", value: data.independentAdjustingCo },
-                            { label: "Public Adjusting", value: data.publicAdjustingCompany },
-                            { label: "TPA", value: data.tpaCompany }
-                          ].some(i => i.value) && (
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                              <div className="text-xs font-bold text-slate-500 mb-2">Companies Involved</div>
-                              <div className="grid sm:grid-cols-2 gap-2 text-sm text-slate-600">
-                                {[
-                                  { label: "Billing", value: data.billingCompany },
-                                  { label: "Insurance", value: data.insuranceCompany },
-                                  { label: "National Carrier", value: data.nationalCarrier },
-                                  { label: "Independent Adjusting", value: data.independentAdjustingCo },
-                                  { label: "Public Adjusting", value: data.publicAdjustingCompany },
-                                  { label: "TPA", value: data.tpaCompany }
-                                ].filter(i => i.value).map(item => (
-                                  <div key={item.label} className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold uppercase text-slate-400 w-32">{item.label}</span>
-                                    <span className="font-semibold text-slate-700">{item.value}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </SubSection>
-
                         <SubSection
                           title="Companies & Contacts"
                           open={companiesSubOpen}
@@ -5047,6 +5473,110 @@ export default function App(){
                             </div>
                           </div>
                         </SubSection>
+                        <SubSection title="Billing" open={billingSubOpen} onToggle={() => setBillingSubOpen(!billingSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("billing") ? "audit-outline" : ""}>
+                          <Field label="Bill To"><div data-audit-key="billingPayer" className={auditOn && data.highlightMissing?.billingPayer ? "audit-missing rounded-lg p-1" : ""}><ToggleGroup options={["Insurance","Customer","Referrer","Public Adjuster","Building","Contractor","Other"]} value={data.billingPayer} onChange={v=>update("billingPayer",v)} /></div></Field>
+                          {!(data.billingPayer === "Customer" || data.payorQuick === "Self-pay") && (
+                            <div className="grid sm:grid-cols-2 gap-4">
+                              <Field label={
+                                <span className="inline-flex items-center gap-2">
+                                  Billing Company
+                                  <span className="inline-flex items-center gap-1">
+                                    {companyRolesFor({ company: data.billingCompany, contact: data.billingContact }).map(r => <RoleBadge key={`billing-${r.title}`} icon={r.icon} title={r.title} />)}
+                                  </span>
+                                </span>
+                              }><Input className={getFlashClass("billingCompany")} value={data.billingCompany} onChange={e=>update("billingCompany", e.target.value)} placeholder="Billing company" /></Field>
+                              <Field label="Billing Contact" subtle action={<span className="text-[10px] text-slate-400">Auto-fill company</span>}>
+                                <Input value={data.billingContact} onChange={e=>handleBillingContactChange(e.target.value)} placeholder="Billing contact" />
+                              </Field>
+                            </div>
+                          )}
+                          <Field label="Billing Note"><Textarea value={data.billingNote} onChange={e=>update("billingNote",e.target.value)} /></Field>
+                        </SubSection>
+                        <SubSection title="Finance" open={financeSubOpen} onToggle={() => setFinanceSubOpen(!financeSubOpen)} compact={compactMode}>
+                          <div className="grid sm:grid-cols-3 gap-4">
+                            <Field label="Pricing Platform">
+                              <Select data-audit-key="pricePlatform" value={data.pricePlatform} onChange={e=>update("pricePlatform", e.target.value)}>
+                                <option value="">Select platform...</option>
+                                {PRICING_PLATFORMS.map(p => (
+                                  <option key={p} value={p}>{p}</option>
+                                ))}
+                              </Select>
+                            </Field>
+                            <Field label="Price List">
+                              <Input data-audit-key="priceList" value={data.priceList} onChange={e=>update("priceList", e.target.value)} placeholder="Price list" />
+                            </Field>
+                            <Field label="Price Multiplier">
+                              <Input data-audit-key="multiplier" value={data.multiplier} onChange={e=>update("multiplier", e.target.value)} placeholder="e.g. 1.10" />
+                            </Field>
+                          </div>
+                          <div className="mt-4">
+                            <Field label="Estimate Requested">
+                              <Switch data-audit-key="estimateRequested" checked={!!data.estimateRequested} onChange={(v)=>update("estimateRequested", v)} />
+                            </Field>
+                            {data.estimateRequested && (
+                              <div className="mt-3 space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                  {ESTIMATE_TYPES.map(t => (
+                                    <ToggleMulti key={t} label={t} checked={data.estimateType === t} onChange={()=>update("estimateType", t)} />
+                                  ))}
+                                </div>
+                                <Input value={data.estimateRequestedBy} onChange={e=>update("estimateRequestedBy", e.target.value)} placeholder="Who is requesting?" />
+                              </div>
+                            )}
+                          </div>
+                        </SubSection>
+                        <SubSection title="Insurance" open={insuranceSubOpen} onToggle={() => setInsuranceSubOpen(!insuranceSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
+                          <Field label="Insurance Claim?" smart action={<ToggleGroup options={["Yes","No"]} value={data.insuranceClaim} onChange={v=>update("insuranceClaim",v)} />} />
+                          <Field label="Direction of Payment"><ToggleGroup options={["Direct from Insurance","Check","Credit Card","Other"]} value={data.directionOfPayment} onChange={v=>update("directionOfPayment",v)} /></Field>
+                          {data.insuranceClaim==="Yes" && (
+                            <div className="animate-purple-section-fade slide-up rounded-xl bg-white p-4 grid gap-4 shadow-sm">
+                              <div className="grid sm:grid-cols-[1fr_220px] gap-4 items-start">
+                                <Field label={
+                                  <span className="inline-flex items-center gap-2">
+                                    Insurance Company
+                                    <span className="inline-flex items-center gap-1">
+                                      {companyRolesFor({ company: data.insuranceCompany, contact: data.insuranceAdjuster }).map(r => <RoleBadge key={`ins-${r.title}`} icon={r.icon} title={r.title} />)}
+                                    </span>
+                                  </span>
+                                }>
+                                  <div className={`flex gap-2 ${getFlashClass("insuranceCompany")}`}>
+                                    <SearchSelect value={data.insuranceCompany} onChange={(v)=>update("insuranceCompany",v)} options={companies} listId="insurance-company-list" />
+                                    <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"company",value:"",onSave:(name)=>update("insuranceCompany",name)})}>+</button>
+                                  </div>
+                                </Field>
+                                <Field label="National Carrier">
+                                  <SearchSelect value={data.nationalCarrier} onChange={(v)=>update("nationalCarrier",v)} options={NATIONAL_CARRIERS} listId="national-carrier-list" placeholder="Linked" className={getFlashClass("nationalCarrier")} />
+                                </Field>
+                              </div>
+                              <Field label="Adjuster">
+                                <div className={`flex gap-2 ${getFlashClass("insuranceAdjuster")}`}>
+                                  <SearchSelect value={data.insuranceAdjuster} onChange={(v)=>handleAdjusterContactChange(v)} options={contacts} listId="insurance-adjuster-list" />
+                                  <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"contact",value:"",onSave:(name)=>update("insuranceAdjuster",name)})}>+</button>
+                                </div>
+                              </Field>
+                              <div className="grid grid-cols-2 gap-4">
+                                <Field label="Claim #"><Input value={data.claimNumber} onChange={e=>update("claimNumber",e.target.value)} /></Field>
+                                <Field label="Date of Loss"><DatePicker value={data.dateOfLoss} onChange={(v)=>update("dateOfLoss", v)} /></Field>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <Field label="Work Order #"><Input value={data.workOrderNumber} onChange={e=>update("workOrderNumber",e.target.value)} placeholder="Work order" /></Field>
+                                <Field label="Policy #"><Input value={data.policyNumber} onChange={e=>update("policyNumber",e.target.value)} placeholder="Policy number" /></Field>
+                              </div>
+                              <Field label="Order Specific Email">
+                                <Input value={data.insuranceOrderEmail} onChange={e=>update("insuranceOrderEmail",e.target.value)} placeholder="special-email@carrier.com" />
+                              </Field>
+                              <div className="grid grid-cols-2 gap-4">
+                                <Field label="Contents Limit ($)"><Input value={data.contentsCoverageLimit} onChange={e=>update("contentsCoverageLimit",e.target.value)} placeholder="Coverage limit" /></Field>
+                                <Field label="Mold Limit ($)"><Input className={attentionMold ? "attention-fill" : ""} value={data.moldLimit} onChange={e=>update("moldLimit",e.target.value)} placeholder="Mold limit" /></Field>
+                              </div>
+                              {attentionMold && (
+                                <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+                                  Visible Mold selected → confirm Mold Limit.
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </SubSection>
 
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec4')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
@@ -5057,6 +5587,7 @@ export default function App(){
 
                     <Section id="sec5" title="5. Schedule" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onToggle={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}>
                       <div className="space-y-6">
+                        <SubSection title="Schedule" open={scheduleSubOpen} onToggle={() => setScheduleSubOpen(!scheduleSubOpen)} compact={compactMode}>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                           <button onClick={() => update('scheduleType', 'Scope')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Scope' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">📋</span><span className="font-bold text-xs">Scope Only</span></button>
                           <button onClick={() => update('scheduleType', 'Pickup')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Pickup' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🚚</span><span className="font-bold text-xs">Pickup</span></button>
@@ -5204,7 +5735,7 @@ export default function App(){
                               <div className="absolute right-3 top-12 z-20 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
                                 <div className="text-xs font-bold text-slate-500 mb-2">📦 Items to load</div>
                                 <div className="flex flex-wrap gap-2">
-                                  {["Heater","Ladder","Lights","Tyvek","Plastic Bags"].map(item => (
+                                  {LOAD_ITEMS.map(item => (
                                     <ToggleMulti key={item} label={item} checked={(data.loadList||[]).includes(item)} onChange={() => update("loadList", toggleMulti(data.loadList||[], item))} />
                                   ))}
                                 </div>
@@ -5262,6 +5793,71 @@ export default function App(){
                             + Add CRM Log
                           </button>
                         </div>
+                        </SubSection>
+                        <SubSection title="SDS Icon Selections" open={scheduleIconsOpen} onToggle={() => setScheduleIconsOpen(!scheduleIconsOpen)} compact={compactMode}>
+                          <div className="space-y-4">
+                            <div>
+                              <div className="text-xs font-bold text-slate-500 mb-2">Considerations</div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                                {SDS_CONSIDERATIONS.map(item => {
+                                  const active = (data.sdsConsiderations || []).includes(item);
+                                  const iconSrc = SDS_ICON_MAP[item] || "/Icons_Copilot.png";
+                                  return (
+                                    <button
+                                      key={item}
+                                      type="button"
+                                      title={item}
+                                      onClick={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], item))}
+                                      className={`h-[13rem] w-[13rem] flex items-center justify-center border-2 ${active ? "border-sky-400" : "border-transparent"} hover:border-sky-200`}
+                                    >
+                                      <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-slate-500 mb-2">Observations</div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                                {SDS_OBSERVATIONS.map(item => {
+                                  const active = (data.sdsObservations || []).includes(item);
+                                  const iconSrc = SDS_ICON_MAP[item] || "/Icons_Copilot.png";
+                                  return (
+                                    <button
+                                      key={item}
+                                      type="button"
+                                      title={item}
+                                      onClick={() => update("sdsObservations", toggleMulti(data.sdsObservations || [], item))}
+                                      className={`h-[13rem] w-[13rem] flex items-center justify-center border-2 ${active ? "border-sky-400" : "border-transparent"} hover:border-sky-200`}
+                                    >
+                                      <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-slate-500 mb-2">Services Requested</div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                                {SDS_SERVICES.map(item => {
+                                  const active = (data.sdsServices || []).includes(item);
+                                  const iconSrc = SDS_ICON_MAP[item] || "/Icons_Copilot.png";
+                                  return (
+                                    <button
+                                      key={item}
+                                      type="button"
+                                      title={item}
+                                      onClick={() => update("sdsServices", toggleMulti(data.sdsServices || [], item))}
+                                      className={`h-[13rem] w-[13rem] flex items-center justify-center border-2 ${active ? "border-sky-400" : "border-transparent"} hover:border-sky-200`}
+                                    >
+                                      <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </SubSection>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec5')} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">Done</button>
                         </div>
@@ -5327,8 +5923,8 @@ export default function App(){
         />
 
         {(auditOpen || auditOn) && (
-          <div className="fixed right-4 top-28 z-[80] w-[190px] rounded-2xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+          <div className="fixed right-4 top-28 z-[80] w-[170px] rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200">
               <div className="text-sm font-bold text-slate-800">Audit</div>
               <div className="flex items-center gap-2">
                 <button
@@ -5349,11 +5945,11 @@ export default function App(){
                 <button className="text-slate-400 hover:text-slate-600" onClick={() => { setAuditOn(false); setAuditOpen(false); }}>×</button>
               </div>
             </div>
-            <div className="px-4 py-3 text-xs text-slate-500 flex items-center justify-between">
+            <div className="px-3 py-2 text-[11px] text-slate-500 flex items-center justify-between">
               <span>Missing critical fields:</span>
               <span className="font-bold text-slate-600">{auditPercent}% complete</span>
             </div>
-            <div className="max-h-[520px] overflow-y-auto custom-scroll px-4 pb-4 space-y-2">
+            <div className="max-h-[520px] overflow-y-auto custom-scroll px-3 pb-3 space-y-2">
               {auditMissing.length === 0 ? (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">All critical fields complete.</div>
               ) : (
@@ -5524,10 +6120,59 @@ export default function App(){
         </div>
       )}
 
+      {showPresetModal && (
+        <div className="fixed inset-0 z-[112] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
+              <div>
+                <div className="text-lg font-bold text-white">Test Data Presets</div>
+                <div className="text-sm text-sky-100">Save, load, or delete preset data for fast testing.</div>
+              </div>
+              <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setShowPresetModal(false)}>×</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold text-slate-500">Preset Name</label>
+                  <Input value={presetName} onChange={(e)=>setPresetName(e.target.value)} placeholder="e.g. Fire Claim - Quick Entry" />
+                </div>
+                <button onClick={saveTestPreset} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
+                  Save Preset
+                </button>
+              </div>
+              <div className="max-h-64 overflow-auto rounded-xl border border-slate-200">
+                {testPresets.length === 0 ? (
+                  <div className="p-4 text-sm text-slate-500">No presets yet.</div>
+                ) : (
+                  <div className="divide-y">
+                    {testPresets.map(preset => (
+                      <div key={preset.id} className="flex items-center justify-between p-3">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-800">{preset.name}</div>
+                          <div className="text-[11px] text-slate-500">{new Date(preset.createdAt).toLocaleString()}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => loadTestPreset(preset)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Load</button>
+                          <button onClick={() => deleteTestPreset(preset.id)} className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-between items-center">
+                <button onClick={clearAllPresets} className="text-xs font-semibold text-rose-600 hover:text-rose-700">Delete All Presets</button>
+                <button onClick={() => setShowPresetModal(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Done</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {addCompanyModalOpen && (
           <div
             className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4"
-            onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); }}
+            onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); setAddCompanyPanel(""); }}
           >
           <div
             className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden fade-in"
@@ -5543,6 +6188,7 @@ export default function App(){
                 setAddContactExisting({ contact: "", company: "" });
                 setCompanyModalCloseArmed(false);
                 setAddCompanyQuery("");
+                setAddCompanyPanel("");
               }
             }}
           >
@@ -5551,7 +6197,7 @@ export default function App(){
                 <div className="text-lg font-bold text-white">Add Existing Companies and Contacts</div>
               </div>
               <button
-                onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); }}
+                onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); setAddCompanyPanel(""); }}
                 className="rounded-full border border-sky-200 px-3 py-1 text-[10px] font-bold text-white/90 hover:bg-sky-600"
               >
                 Close
@@ -5578,6 +6224,7 @@ export default function App(){
                       setAddContactExisting({ contact: "", company: "" });
                       setCompanyModalCloseArmed(false);
                       setAddCompanyQuery("");
+                      setAddCompanyPanel("");
                     }
                   }}
                   onKeyDown={(e) => {
@@ -5588,6 +6235,7 @@ export default function App(){
                       setNewCompanyDraft({ contact: "", company: "" });
                       setAddContactExisting({ contact: "", company: "" });
                       setAddCompanyQuery("");
+                      setAddCompanyPanel("");
                     }
                   }}
                   clearOnCommit
@@ -5596,21 +6244,40 @@ export default function App(){
                   placeholder="Start typing a contact or company..."
                 />
               </Field>
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="text-sm font-bold text-slate-700 mb-3">Add Contact to an Existing Company</div>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Company</label>
-                    <SearchSelect
-                      value={addContactExisting.company}
-                      onChange={(v) => setAddContactExisting(prev => ({ ...prev, company: v }))}
-                      options={existingCompanyOptions}
-                      placeholder="Select company..."
-                      clearOnCommit={false}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Contact</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setAddCompanyPanel("contact")}
+                  className={`rounded-full border px-3 py-1.5 text-[11px] font-bold ${addCompanyPanel === "contact" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
+                >
+                  Add New Contact to Existing Company
+                </button>
+                <button
+                  onClick={() => setAddCompanyPanel("company")}
+                  className={`rounded-full border px-3 py-1.5 text-[11px] font-bold ${addCompanyPanel === "company" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
+                >
+                  Add New Company
+                </button>
+                <button
+                  onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); setAddCompanyPanel(""); }}
+                  className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="text-[10px] text-slate-400">Contacts must be added to a company.</div>
+
+              {addCompanyPanel === "contact" && (
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    <div>
+                      <SearchSelect
+                        value={addContactExisting.company}
+                        onChange={(v) => setAddContactExisting(prev => ({ ...prev, company: v }))}
+                        options={existingCompanyOptions}
+                        placeholder="Company..."
+                        clearOnCommit={false}
+                      />
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Input
                         value={splitName(addContactExisting.contact || "").first}
@@ -5624,41 +6291,39 @@ export default function App(){
                       />
                     </div>
                   </div>
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      onClick={() => {
+                        const companyName = (addContactExisting.company || "").trim();
+                        const contactName = (addContactExisting.contact || "").trim();
+                        if (!companyName) {
+                          setToast("Select a company.");
+                          return;
+                        }
+                        if (!contactName) {
+                          setToast("Contact required.");
+                          return;
+                        }
+                        const type = resolveCompanyTypeForName(companyName);
+                        addContactToCompany(type, contactName, companyName);
+                        setAddContactExisting({ contact: "", company: "" });
+                      }}
+                      className="rounded-full bg-sky-500 px-3 py-1 text-[10px] font-bold text-white hover:bg-sky-600"
+                    >
+                      Add Contact
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-3 flex justify-end">
-                  <button
-                    onClick={() => {
-                      const companyName = (addContactExisting.company || "").trim();
-                      const contactName = (addContactExisting.contact || "").trim();
-                      if (!companyName) {
-                        setToast("Select a company.");
-                        return;
-                      }
-                      if (!contactName) {
-                        setToast("Contact required.");
-                        return;
-                      }
-                      const type = resolveCompanyTypeForName(companyName);
-                      addContactToCompany(type, contactName, companyName);
-                      setAddContactExisting({ contact: "", company: "" });
-                    }}
-                    className="rounded-full bg-sky-500 px-3 py-1 text-[10px] font-bold text-white hover:bg-sky-600"
-                  >
-                    Add Contact
-                  </button>
-                </div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs text-slate-500 mb-2">Can't find your contact or company?</div>
-                <div className="text-sm font-bold text-slate-700 mb-3">Add New Company and Contact Here</div>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Contact (optional)</label>
+              )}
+
+              {addCompanyPanel === "company" && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="grid sm:grid-cols-2 gap-2">
                     <div className="grid grid-cols-2 gap-2">
                       <Input
                         value={splitName(newCompanyDraft.contact || "").first}
                         onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, contact: [e.target.value, splitName(prev.contact || "").last].filter(Boolean).join(" ") })); }}
-                        placeholder="First name"
+                        placeholder="First name (optional)"
                       />
                       <Input
                         value={splitName(newCompanyDraft.contact || "").last}
@@ -5666,42 +6331,31 @@ export default function App(){
                         placeholder="Last name"
                       />
                     </div>
+                    <div>
+                      <Input
+                        value={newCompanyDraft.company}
+                        onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, company: e.target.value })); }}
+                        placeholder="Company name"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Company</label>
-                    <Input
-                      value={newCompanyDraft.company}
-                      onChange={(e)=>{ setCompanyModalCloseArmed(false); setNewCompanyDraft(prev => ({ ...prev, company: e.target.value })); }}
-                      placeholder="Company name"
-                    />
+                  <div className="mt-3 flex items-center justify-end">
+                    <button
+                      onClick={() => {
+                        const type = addCompanyType || autoTypeForCompany(newCompanyDraft.company);
+                        addCompanyDirect(type, newCompanyDraft.contact.trim(), newCompanyDraft.company.trim());
+                        setNewCompanyDraft({ contact: "", company: "" });
+                      }}
+                      className="rounded-full bg-sky-500 px-3 py-1 text-[10px] font-bold text-white hover:bg-sky-600"
+                    >
+                      Add
+                    </button>
                   </div>
+                  {newCompanyDraft.contact && !newCompanyDraft.company && (
+                    <div className="mt-2 text-[10px] font-semibold text-orange-600">Contacts must be added to a company.</div>
+                  )}
                 </div>
-                <div className="mt-2 text-[10px] text-slate-400">Contacts must be added to a company.</div>
-                <div className="mt-3 flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      const demo = newCompanyDraft.company || "New Company";
-                      setNewCompanyDraft(prev => ({ ...prev, company: demo }));
-                    }}
-                    className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  >
-                    Find on Google (demo)
-                  </button>
-                  <button
-                    onClick={() => {
-                      const type = addCompanyType || autoTypeForCompany(newCompanyDraft.company);
-                      addCompanyDirect(type, newCompanyDraft.contact.trim(), newCompanyDraft.company.trim());
-                      setNewCompanyDraft({ contact: "", company: "" });
-                    }}
-                    className="rounded-full bg-sky-500 px-3 py-1 text-[10px] font-bold text-white hover:bg-sky-600"
-                  >
-                    Add
-                  </button>
-                </div>
-                {newCompanyDraft.contact && !newCompanyDraft.company && (
-                  <div className="mt-2 text-[10px] font-semibold text-orange-600">Contacts must be added to a company.</div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -5797,6 +6451,60 @@ export default function App(){
                   </div>
               </div>
           </div>
+      )}
+
+      {groupLinkModal.open && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Link Group to Address</h3>
+            <div className="text-sm text-slate-500 mb-4">{groupLinkModal.group}</div>
+            <div className="grid gap-4">
+              <Field label="Address">
+                <Select
+                  value={getGroupLink(groupLinkModal.group).addressId || ""}
+                  onChange={(e) => setGroupLink(groupLinkModal.group, { addressId: e.target.value })}
+                >
+                  <option value="">Select address...</option>
+                  {(() => {
+                    const list = data.addresses || [];
+                    const primary = list.find(a => a.isPrimary) || list[0];
+                    return list.map(a => {
+                      const label = a.id === primary?.id
+                        ? `Primary — ${a.type || "Address"}`
+                        : `${a.type || "Address"}`;
+                      return (
+                        <option key={a.id} value={a.id}>
+                          {label} — {summarizeAddress(a)}
+                        </option>
+                      );
+                    });
+                  })()}
+                </Select>
+              </Field>
+              <Field label="Target Date">
+                <Input
+                  type="date"
+                  value={getGroupLink(groupLinkModal.group).date || ""}
+                  onChange={(e) => setGroupLink(groupLinkModal.group, { date: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="flex justify-between items-center mt-6">
+              <button
+                onClick={() => { clearGroupLink(groupLinkModal.group); closeGroupLinkModal(); }}
+                className="text-xs font-bold text-slate-400 hover:text-slate-600"
+              >
+                Clear
+              </button>
+              <button
+                onClick={closeGroupLinkModal}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-600"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {reminderModalOpen && (
@@ -5942,11 +6650,15 @@ export default function App(){
 
       {crmModal.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="bg-sky-500 px-6 py-4">
-              <h3 className="text-xl font-bold text-white">Add CRM Log</h3>
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">Add CRM Log</h3>
+                <div className="text-sm text-sky-100">Capture outreach and follow-up actions.</div>
+              </div>
+              <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" })}>×</button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-5">
               <Field label="Type">
                 <Select value={crmModal.method} onChange={e=>setCrmModal(m=>({...m, method: e.target.value}))}>
                   {CONTACT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -5964,9 +6676,42 @@ export default function App(){
               <Field label="Notes">
                 <Textarea value={crmModal.notes} onChange={e=>setCrmModal(m=>({...m, notes: e.target.value}))} placeholder="Additional notes..." />
               </Field>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <div className="text-sm font-semibold text-slate-700">Follow-up Reminder</div>
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                  <input type="checkbox" checked={crmModal.followUpEnabled} onChange={(e)=>setCrmModal(m=>({...m, followUpEnabled: e.target.checked}))} />
+                  Create follow-up reminder for referrer
+                </label>
+                {crmModal.followUpEnabled && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Input type="date" value={crmModal.followUpDate} onChange={e=>setCrmModal(m=>({...m, followUpDate: e.target.value}))} />
+                    <Input type="time" value={crmModal.followUpTime} onChange={e=>setCrmModal(m=>({...m, followUpTime: e.target.value}))} />
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                <div className="text-sm font-semibold text-slate-700">Notify Team</div>
+                <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-600">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={crmModal.notifySalesRep} onChange={(e)=>setCrmModal(m=>({...m, notifySalesRep: e.target.checked}))} />
+                    Sales Rep
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={crmModal.notifyOrderLead} onChange={(e)=>setCrmModal(m=>({...m, notifyOrderLead: e.target.checked}))} />
+                    Order Lead (Assignee)
+                  </label>
+                </div>
+                <Input
+                  value={crmModal.notifyOthers}
+                  onChange={e=>setCrmModal(m=>({...m, notifyOthers: e.target.value}))}
+                  placeholder="Notify coworkers (comma separated)"
+                />
+              </div>
             </div>
             <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
-              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"" })}>Cancel</button>
+              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" })}>Cancel</button>
               <button
                 className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
                 onClick={() => {
@@ -5976,11 +6721,24 @@ export default function App(){
                     owner: crmModal.owner,
                     subject: crmModal.subject,
                     orderLink: crmModal.orderLink,
-                    notes: crmModal.notes
+                    notes: crmModal.notes,
+                    followUp: crmModal.followUpEnabled ? { date: crmModal.followUpDate, time: crmModal.followUpTime } : null,
+                    notify: {
+                      salesRep: crmModal.notifySalesRep,
+                      orderLead: crmModal.notifyOrderLead,
+                      others: crmModal.notifyOthers
+                        .split(",")
+                        .map(v => v.trim())
+                        .filter(Boolean)
+                    }
                   };
                   setData(prev => ({ ...prev, crmLogs: [...(prev.crmLogs || []), entry] }));
-                  setToast("CRM log submitted");
-                  setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"" });
+                  if (crmModal.followUpEnabled) {
+                    setToast("CRM log submitted + follow-up reminder created");
+                  } else {
+                    setToast("CRM log submitted");
+                  }
+                  setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" });
                 }}
               >
                 Submit
