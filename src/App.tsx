@@ -84,6 +84,25 @@ const STYLES = `
       border-color: #fb923c !important;
       background-color: rgba(255, 237, 213, 0.6);
   }
+  .placeholder-shell {
+      border-width: 2px !important;
+      border-style: dotted !important;
+      border-color: #f59e0b !important;
+      background: linear-gradient(135deg, #fff7ed 0%, #ffffff 68%);
+  }
+  .placeholder-chip {
+      border: 1px dotted #f59e0b;
+      background: #fffbeb;
+      color: #b45309;
+  }
+  .placeholder-text {
+      color: #b45309;
+  }
+  .audit-placeholder-pill {
+      background: #fffbeb;
+      border-color: #fcd34d;
+      color: #b45309;
+  }
 
   /* Custom Scrollbar */
   .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -133,6 +152,25 @@ function safeUid(){
   } catch(e) {}
   return "id-" + Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
+
+const createPlaceholderFlag = (kind, reason = "") => ({
+  active: true,
+  kind,
+  reason,
+  createdAt: new Date().toISOString()
+});
+
+const isPlaceholderFlagActive = (flag) => !!flag && flag.active !== false;
+
+const hasMeaningfulValue = (value) => !!(value || "").toString().trim();
+
+const normalizePlaceholderKeyPart = (value = "") =>
+  (value || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "item";
 
 const getInitials = (name = "") => {
   const parts = name.replace(/[^a-zA-Z\s]/g, "").trim().split(/\s+/).filter(Boolean);
@@ -327,6 +365,7 @@ const VENDOR_TYPES=["Art","Contents","Moving","Mitigation","Contractor","Consult
 const SALES_REPS=["Dave Fenyo, Sales Rep","Jim Fenyo","Josh Cintron, Sales Rep"];
 const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Textiles","TLI","Expert Stain Removal"];
 const SUGGESTED_GROUPS = ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"];
+const LIVING_STATUS_ADDRESS_TYPES = ["Moving", "Hotel", "Neighbor", "Relative", "Rental", "Other Home"];
 const SUGGESTED_GROUP_HELP = {
   RD: "Rush Delivery (within 1 week)",
   RFD: "Rush Final Delivery (all within 1 week)",
@@ -381,14 +420,33 @@ const MARKETING_SOURCES = ["Website", "Google Business Page", "AI Recommendation
 const INTERNAL_TYPES = ["Met on Site", "Previous Customer", "Friend of Company", "Neighbor", "Building Staff"];
 const CUSTOMER_QUICK_NOTES = ["Elderly", "Hearing Impaired", "Spanish Only", "Do not call", "Email only", "Sales rep only"];
 const NATIONAL_CARRIERS = ["Allstate", "State Farm", "Nationwide", "Farmers", "USAA", "Liberty Mutual", "Progressive", "Travelers", "Chubb", "American Family", "Pure Insurance"];
+
+const inferRoleCapabilities = (companyType = "", companyName = "") => {
+  const type = (companyType || "").toString().trim().toLowerCase();
+  const normalizedCompany = normalizeCompany(companyName || "");
+  const insuranceLikeType =
+    type.includes("insurance") ||
+    type.includes("adjust") ||
+    type.includes("tpa") ||
+    type.includes("broker") ||
+    type.includes("agent");
+  const insuranceLikeName = NATIONAL_CARRIERS.some(c => normalizeCompany(c) === normalizedCompany);
+  const canInsure = insuranceLikeType || insuranceLikeName;
+  return {
+    canRefer: true,
+    canBill: canInsure,
+    canInsure
+  };
+};
+
 const SAMPLE_CONTACTS = [
-  { name: "Alex Morgan", company: "Allstate", companyType: "Insurance", salesRep: "Josh Cintron, Sales Rep", title: "Adjuster", isAdjuster: true },
-  { name: "Jamie Lee", company: "State Farm", companyType: "Insurance", salesRep: "Josh Cintron, Sales Rep", title: "Adjuster", isAdjuster: true },
-  { name: "Pat Adjuster", company: "Metro Claims", companyType: "Public Adjusting", salesRep: "Dave Fenyo, Sales Rep", title: "Adjuster", isAdjuster: true },
-  { name: "Ronzel Simmons", company: "Pure Insurance", companyType: "Insurance", salesRep: "Dave Fenyo, Sales Rep", title: "Adjuster", isAdjuster: true },
-  { name: "Zack Barsack", company: "DKI DryFast", companyType: "Restoration Company", salesRep: "", title: "Owner", isAdjuster: false },
-  { name: "Sim Fern", company: "United Claims", companyType: "Public Adjusting", salesRep: "", title: "Adjuster", isAdjuster: true },
-  { name: "Steven Earthman", company: "Croziers Moving", companyType: "Moving", salesRep: "", title: "Project Manager", isAdjuster: false }
+  { name: "Alex Morgan", company: "Allstate", companyType: "Insurance", salesRep: "Josh Cintron, Sales Rep", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
+  { name: "Jamie Lee", company: "State Farm", companyType: "Insurance", salesRep: "Josh Cintron, Sales Rep", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
+  { name: "Pat Adjuster", company: "Metro Claims", companyType: "Public Adjusting", salesRep: "Dave Fenyo, Sales Rep", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
+  { name: "Ronzel Simmons", company: "Pure Insurance", companyType: "Insurance", salesRep: "Dave Fenyo, Sales Rep", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
+  { name: "Zack Barsack", company: "DKI DryFast", companyType: "Restoration Company", salesRep: "", title: "Owner", isAdjuster: false, canRefer: true, canBill: false, canInsure: false },
+  { name: "Sim Fern", company: "United Claims", companyType: "Public Adjusting", salesRep: "", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
+  { name: "Steven Earthman", company: "Croziers Moving", companyType: "Moving", salesRep: "", title: "Project Manager", isAdjuster: false, canRefer: true, canBill: false, canInsure: false }
 ];
 
 const SAMPLE_PRESET_DATA = () => ({
@@ -588,6 +646,21 @@ const COMPANY_ROLE_DEFS = [
   { id: "engineer", label: "Engineer", isCore: false, type: "Engineer" },
 ];
 
+const CONTACT_ROLE_BADGES = [
+  { id: "referrer", icon: "🏷️", title: "Referrer" },
+  { id: "insurance", icon: "🛡️", title: "Insurance" },
+  { id: "billto", icon: "💳", title: "Bill To" },
+];
+
+const INSURANCE_ELIGIBLE_COMPANY_TYPES = new Set([
+  "insurance",
+  "independent adjusting",
+  "public adjusting",
+  "tpa",
+  "broker",
+  "agent",
+]);
+
 const HANDLING_META=[
   ["Box","return items in boxes"], ["Damp","tag within 5 days"], ["DC","try to Dry Clean all items"],
   ["DNR","do not reject"], ["Det","special detergent requested"], ["FMP","fold as much as possible"],
@@ -601,8 +674,66 @@ function initAddress(overrides={}){
   return { id:safeUid(), type:"", isPrimary:true, isLossSite:true,
     name:"", googleQuery:"", street:"", apt:"", city:"", state:"", zip:"", lng:"", lat:"",
     beds:"", baths:"", sqft:"", people:"", infants:"", otherUnitsAffected:"", otherUnitsNote:"",
-    coiRequired:"", coiRequestedAt:"", coiRequestedBy:"", coiProvidedAt:"", coiProvidedBy:"", coiContactNote:"", ...overrides };
+    coiRequired:"", coiRequestedAt:"", coiRequestedBy:"", coiProvidedAt:"", coiProvidedBy:"", coiContactNote:"",
+    placeholder: null,
+    ...overrides };
 }
+
+const isAddressPlaceholder = (addr = {}) => {
+  if (isPlaceholderFlagActive(addr?.placeholder)) return true;
+  const street = (addr?.street || "").trim().toUpperCase();
+  const type = (addr?.type || "").trim().toLowerCase();
+  return street === "TBD" || type.includes("placeholder");
+};
+
+const entryContactList = (entry = {}) => {
+  const fromContacts = Array.isArray(entry?.contacts) ? entry.contacts : [];
+  if (fromContacts.length) return fromContacts;
+  if (hasMeaningfulValue(entry?.contact)) return [{ name: entry.contact, inactive: false, placeholder: entry?.contactPlaceholder || null }];
+  return [];
+};
+
+const isCompanyPlaceholder = (entry = {}) => {
+  if (isPlaceholderFlagActive(entry?.placeholder)) return true;
+  return !hasMeaningfulValue(entry?.company);
+};
+
+const isContactPlaceholder = (entry = {}) => {
+  if (isPlaceholderFlagActive(entry?.contactPlaceholder)) return true;
+  const contacts = entryContactList(entry);
+  if (!contacts.length) return true;
+  return contacts.some(c => isPlaceholderFlagActive(c?.placeholder) || !hasMeaningfulValue(c?.name));
+};
+
+const syncCompanyEntryPlaceholders = (entry = {}) => {
+  const normalized = { ...(entry || {}) };
+  const hasCompany = hasMeaningfulValue(normalized.company);
+  const contacts = entryContactList(normalized).map(contact => ({
+    ...(contact || {}),
+    name: (contact?.name || "").trim(),
+    inactive: !!contact?.inactive,
+    placeholder: isPlaceholderFlagActive(contact?.placeholder) ? contact.placeholder : null
+  }));
+  const hasNamedContact = contacts.some(c => hasMeaningfulValue(c.name));
+  if (hasCompany) {
+    normalized.placeholder = null;
+  } else if (!isPlaceholderFlagActive(normalized.placeholder)) {
+    normalized.placeholder = createPlaceholderFlag("company", "Company needed");
+  }
+  if (hasNamedContact) {
+    normalized.contactPlaceholder = null;
+  } else if (!isPlaceholderFlagActive(normalized.contactPlaceholder)) {
+    normalized.contactPlaceholder = createPlaceholderFlag("contact", "Contact needed");
+  }
+  normalized.company = hasCompany ? normalized.company : "";
+  normalized.contacts = contacts;
+  if (!hasNamedContact) {
+    normalized.contact = "";
+  } else if (!hasMeaningfulValue(normalized.contact)) {
+    normalized.contact = contacts.find(c => hasMeaningfulValue(c.name))?.name || "";
+  }
+  return normalized;
+};
 
 function initCustomer(overrides={}){ 
   return { 
@@ -790,7 +921,15 @@ const Field = ({label,children,subtle,missing, className, action, smart, id}) =>
 const Input = React.forwardRef((props, ref) => (
   <input ref={ref} {...props} className={`w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 hover:border-slate-300 ${props.className||""}`} />
 ));
-const Select = ({children, ...props}) => <select {...props} className={`w-full min-h-[42px] appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 hover:border-slate-300 ${props.className||""}`}>{children}</select>;
+const Select = React.forwardRef(({children, ...props}, ref) => (
+  <select
+    ref={ref}
+    {...props}
+    className={`w-full min-h-[42px] appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 hover:border-slate-300 ${props.className||""}`}
+  >
+    {children}
+  </select>
+));
 const Textarea = (props) => <textarea {...props} className={`w-full min-h-[80px] resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 hover:border-slate-300 ${props.className||""}`} />;
 const AutoGrowTextarea = ({ value, onChange, className, ...props }) => {
   const ref = useRef(null);
@@ -1072,7 +1211,7 @@ const normalizeOption = (opt) => {
   return { label, value, type: opt?.type || "generic" };
 };
 
-const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, className, onKeyDown, onBlur, clearOnCommit, inputRef, onEmptyEnter, maxResults = 8, uppercase = false, ...props }) => {
+const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, className, onKeyDown, onBlur, clearOnCommit, inputRef, onEmptyEnter, maxResults = 8, uppercase = false, menuClassName = "", ...props }) => {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [query, setQuery] = useState(value || "");
@@ -1166,7 +1305,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
       />
       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-300">▾</span>
       {open && filtered.length > 0 && (
-        <div ref={listRef} className="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg max-h-60 overflow-auto">
+        <div ref={listRef} className={`absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg overflow-auto ${menuClassName || "max-h-60"}`}>
           {filtered.map((opt, idx) => (
             <button
               type="button"
@@ -1518,7 +1657,7 @@ const SubSection = ({ title, open, onToggle, children, compact, className, actio
 
 // --- SHARED FIELD COMPONENTS ---
 
-const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, toggleMulti, showInlineHelp, auditOn, salesRep, setSalesRep, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, setToast, getSalesRepForContact, onOpenCrmLog }) => {
+const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, toggleMulti, showInlineHelp, auditOn, salesRep, setSalesRep, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, setToast, getSalesRepForContact, onOpenCrmLog, onPromptRoleAssignment }) => {
   const [referrerQuery, setReferrerQuery] = useState(data.referrer || "");
   const [repMenuOpen, setRepMenuOpen] = useState(false);
   const [showSuggestedRoles, setShowSuggestedRoles] = useState(false);
@@ -1547,7 +1686,6 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       setToast("Contact must include a company.");
       return;
     }
-    const isCarrier = NATIONAL_CARRIERS.some(c => normalizeCompany(c) === normalizeCompany(parsed.company || ""));
     const patch = {
       referrer: parsed.contact,
       referringCompany: parsed.company || data.referringCompany
@@ -1559,13 +1697,13 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
     updateMany(patch);
     if (parsed.company) triggerAutoFlash?.("referringCompany");
     if (parsed.contact) triggerAutoFlash?.("referrer");
-    const nextSuggested = [];
-    if (parsed.contact) nextSuggested.push("adjuster");
-    if (isCarrier) nextSuggested.push("insurance", "billing", "national");
-    if (nextSuggested.length > 0) {
-      setSuggestedSelection(nextSuggested);
-      setShowSuggestedRoles(true);
-    }
+    onPromptRoleAssignment?.({
+      company: parsed.company || "",
+      contact: parsed.contact || "",
+      source: "referrer",
+      preferredRoles: ["referrer"],
+      forceRoles: ["referrer"]
+    });
   };
   const toggleReferrerRole = (roleId) => {
     const company = data.referringCompany || "";
@@ -2090,13 +2228,13 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 };
 
 // --- UNIFIED FLOATING HEADER (PROGRESS HEADER) ---
-const Header = ({ activeSection, visitedSections, onJump, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
+const Header = ({ activeSection, visitedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
     const steps = [
-        { id: 'sec1', label: 'Order' },
-        { id: 'sec2', label: 'Customer' },
-        { id: 'sec3', label: 'Address' },
-        { id: 'sec4', label: 'Billing' },
-        { id: 'sec5', label: 'Schedule' },
+        { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }, { id: "interview", label: "Interview" }, { id: "codes", label: "Codes" }] },
+        { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
+        { id: 'sec3', label: 'Address', subsections: [{ id: "address", label: "Addresses" }] },
+        { id: 'sec4', label: 'Billing', subsections: [{ id: "companies", label: "Companies and Contacts" }, { id: "billing", label: "Billing" }, { id: "finance", label: "Finance" }, { id: "insurance", label: "Insurance" }] },
+        { id: 'sec5', label: 'Schedule', subsections: [{ id: "schedule", label: "Schedule" }, { id: "sds-icons", label: "SDS Icon Selections" }] },
     ];
 
     const getStatus = (stepId) => {
@@ -2106,6 +2244,67 @@ const Header = ({ activeSection, visitedSections, onJump, title, version, entryM
     };
 
     const [showSettings, setShowSettings] = useState(false);
+    const [openStepMenu, setOpenStepMenu] = useState("");
+    const [touchLikeNav, setTouchLikeNav] = useState(false);
+    const navRef = useRef(null);
+
+    useEffect(() => {
+      if (typeof window === "undefined" || !window.matchMedia) return;
+      const media = window.matchMedia("(hover: none), (pointer: coarse)");
+      const apply = () => setTouchLikeNav(!!media.matches);
+      apply();
+      if (media.addEventListener) {
+        media.addEventListener("change", apply);
+        return () => media.removeEventListener("change", apply);
+      }
+      media.addListener?.(apply);
+      return () => media.removeListener?.(apply);
+    }, []);
+
+    useEffect(() => {
+      const handleOutside = (event) => {
+        if (!navRef.current) return;
+        if (navRef.current.contains(event.target)) return;
+        setOpenStepMenu("");
+      };
+      document.addEventListener("mousedown", handleOutside);
+      document.addEventListener("touchstart", handleOutside, { passive: true });
+      return () => {
+        document.removeEventListener("mousedown", handleOutside);
+        document.removeEventListener("touchstart", handleOutside);
+      };
+    }, []);
+
+    const openFirstSubsection = (step) => {
+      const first = step?.subsections?.[0];
+      if (first && onJumpSub) onJumpSub(step.id, first.id);
+      else onJump(step.id);
+      setOpenStepMenu("");
+    };
+
+    const handleStepClick = (step) => {
+      const hasSubsections = !!step?.subsections?.length;
+      onJump(step.id);
+      if (!hasSubsections) {
+        setOpenStepMenu("");
+        return;
+      }
+      if (openStepMenu === step.id) {
+        openFirstSubsection(step);
+        return;
+      }
+      setOpenStepMenu(step.id);
+    };
+
+    const handleStepHoverIn = (step) => {
+      if (touchLikeNav) return;
+      if (step?.subsections?.length) setOpenStepMenu(step.id);
+    };
+
+    const handleStepHoverOut = (step) => {
+      if (touchLikeNav) return;
+      setOpenStepMenu(prev => prev === step.id ? "" : prev);
+    };
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-white/60 backdrop-blur-xl border-b border-slate-200 shadow-md shadow-slate-900/5">
@@ -2122,10 +2321,11 @@ const Header = ({ activeSection, visitedSections, onJump, title, version, entryM
 
                 {entryMode === 'detailed' && (
                     <div className="flex-1 flex items-center justify-center max-w-xl">
-                        <div className="flex items-center w-full relative">
+                        <div ref={navRef} className="flex items-center w-full relative">
                              {steps.map((step, idx) => {
                                 const status = getStatus(step.id);
                                 const isLast = idx === steps.length - 1;
+                                const hasSubsections = !!step.subsections?.length;
                                 let circleClass = "bg-white border-slate-300 text-slate-400 group-hover:border-slate-400";
                                 if (status === 'active') circleClass = "bg-sky-500 border-sky-500 text-white shadow-md scale-110";
                                 else if (status === 'visited') circleClass = "bg-white border-2 border-sky-500 text-sky-600";
@@ -2133,14 +2333,48 @@ const Header = ({ activeSection, visitedSections, onJump, title, version, entryM
                                 return (
                                     <React.Fragment key={step.id}>
                                         <div className="flex-1 flex items-center relative last:flex-none">
-                                            <button onClick={() => onJump(step.id)} className="group flex flex-col items-center gap-1 focus:outline-none z-10 relative">
-                                                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 border ${circleClass}`}>
-                                                    {status === 'visited' && status !== 'active' ? '✓' : idx + 1}
+                                            <div
+                                              className="relative"
+                                              onMouseEnter={() => handleStepHoverIn(step)}
+                                              onMouseLeave={() => handleStepHoverOut(step)}
+                                            >
+                                              <button
+                                                onClick={() => handleStepClick(step)}
+                                                onDoubleClick={() => openFirstSubsection(step)}
+                                                className="group flex flex-col items-center gap-1 focus:outline-none z-10 relative"
+                                                title={hasSubsections ? "Click once for section menu, click again for first subsection" : "Go to section"}
+                                              >
+                                                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 border ${circleClass}`}>
+                                                      {status === 'visited' && status !== 'active' ? '✓' : idx + 1}
+                                                  </div>
+                                                  <span className={`absolute top-9 text-[9px] font-bold uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${status === 'active' ? 'text-sky-700 opacity-100' : 'text-slate-400 opacity-100 block'}`}>
+                                                      {step.label}
+                                                  </span>
+                                              </button>
+                                              {hasSubsections && openStepMenu === step.id && (
+                                                <div className="absolute left-1/2 top-12 z-[70] w-52 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                                                  <div className="px-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">{step.label} sections</div>
+                                                  <div className="max-h-56 overflow-y-auto custom-scroll space-y-1">
+                                                    {step.subsections.map((sub, subIdx) => (
+                                                      <button
+                                                        key={`${step.id}-${sub.id}`}
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          if (onJumpSub) onJumpSub(step.id, sub.id);
+                                                          else onJump(step.id);
+                                                          setOpenStepMenu("");
+                                                        }}
+                                                        className="w-full rounded-lg border border-slate-100 px-2 py-1.5 text-left text-[11px] font-semibold text-slate-600 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
+                                                      >
+                                                        <span className="mr-1 text-[10px] text-slate-400">{subIdx + 1}.</span>
+                                                        {sub.label}
+                                                      </button>
+                                                    ))}
+                                                  </div>
                                                 </div>
-                                                <span className={`absolute top-9 text-[9px] font-bold uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${status === 'active' ? 'text-sky-700 opacity-100' : 'text-slate-400 opacity-100 block'}`}>
-                                                    {step.label}
-                                                </span>
-                                            </button>
+                                              )}
+                                            </div>
                                             {!isLast && (
                                                 <div className="flex-1 h-[2px] bg-slate-200 mx-2 rounded relative overflow-hidden">
                                                     <div className={`absolute left-0 top-0 h-full bg-sky-500 transition-all duration-500`} style={{ width: status === 'visited' || status === 'active' ? '100%' : '0%' }}></div>
@@ -2264,21 +2498,51 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, onAudit, auditOn, se
 };
 
 
-const Section = ({ id, title, helpText, isOpen, onToggle, children, badges, className, compact }) => (
-  <div id={id} className={`mb-0 overflow-hidden rounded-none border-y border-slate-200 bg-white shadow-sm transition-shadow duration-300 scroll-mt-28 sm:mb-4 sm:rounded-xl sm:border ${isOpen ? 'ring-1 ring-sky-500/20 shadow-md' : ''} ${className||""}`}>
-    <button className={`flex w-full cursor-pointer items-center justify-between px-4 py-4 sm:px-6 sm:py-5 text-left font-semibold text-slate-800 transition-colors ${compact ? "section-header-tight" : ""} ${isOpen ? "bg-white" : "bg-slate-50/50 hover:bg-slate-50"}`} onClick={onToggle}>
-      <div className="flex flex-col items-start">
-        <div className="flex items-center gap-3">
-          <span className={`text-lg ${isOpen ? "text-slate-900" : "text-slate-700"}`}>{title}</span>
-          {badges}
-        </div>
-        {helpText && <div className="mt-1 text-[11px] text-slate-500">{helpText}</div>}
+const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaretClick, children, badges, className, compact }) => {
+  const handleHeaderClick = () => {
+    if (onHeaderClick) {
+      onHeaderClick();
+      return;
+    }
+    onToggle?.();
+  };
+  const handleCaretClick = () => {
+    if (onCaretClick) {
+      onCaretClick();
+      return;
+    }
+    onToggle?.();
+  };
+  return (
+    <div id={id} className={`mb-0 overflow-hidden rounded-none border-y border-slate-200 bg-white shadow-sm transition-shadow duration-300 scroll-mt-28 sm:mb-4 sm:rounded-xl sm:border ${isOpen ? 'ring-1 ring-sky-500/20 shadow-md' : ''} ${className||""}`}>
+      <div className={`flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5 text-left font-semibold text-slate-800 transition-colors ${compact ? "section-header-tight" : ""} ${isOpen ? "bg-white" : "bg-slate-50/50 hover:bg-slate-50"}`}>
+        <button
+          type="button"
+          className="flex flex-1 cursor-pointer items-center text-left"
+          onClick={handleHeaderClick}
+          aria-expanded={isOpen}
+        >
+          <div className="flex flex-col items-start">
+            <div className="flex items-center gap-3">
+              <span className={`text-lg ${isOpen ? "text-slate-900" : "text-slate-700"}`}>{title}</span>
+              {badges}
+            </div>
+            {helpText && <div className="mt-1 text-[11px] text-slate-500">{helpText}</div>}
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={handleCaretClick}
+          className="ml-2 rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-sky-700"
+          aria-label={isOpen ? "Collapse section" : "Expand section"}
+        >
+          <Chevron open={isOpen} />
+        </button>
       </div>
-      <Chevron open={isOpen} />
-    </button>
-    {isOpen && <div className={`border-t border-slate-100 ${compact ? 'p-3 sm:p-4' : 'p-4 sm:p-6'} fade-in`}>{children}</div>}
-  </div>
-);
+      {isOpen && <div className={`border-t border-slate-100 ${compact ? 'p-3 sm:p-4' : 'p-4 sm:p-6'} fade-in`}>{children}</div>}
+    </div>
+  );
+};
 
 // --- SUB-COMPONENTS ---
 const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts }) => {
@@ -2502,15 +2766,40 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
   );
 });
 
-const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing, index, onVerify, auditOn, rentOrOwn, rentCoverageLimit, onRentOrOwnChange, onRentCoverageChange, forceShowCoords }) => {
+const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing, index, onVerify, auditOn, rentOrOwn, rentCoverageLimit, onRentOrOwnChange, onRentCoverageChange, forceShowCoords, autoOpenForTypePrompt, autoFocusTypePrompt, onTypePromptFocused }) => {
   const [coordsOpen, setCoordsOpen] = useState(false);
   const [open, setOpen] = useState(false);
+  const typeSelectRef = useRef(null);
+  const placeholder = isAddressPlaceholder(addr);
   useEffect(() => {
     if (forceShowCoords) setCoordsOpen(true);
   }, [forceShowCoords]);
+  useEffect(() => {
+    if (autoOpenForTypePrompt) setOpen(true);
+  }, [autoOpenForTypePrompt]);
+  useEffect(() => {
+    if (!autoFocusTypePrompt) return;
+    if (!open) {
+      setOpen(true);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const el = typeSelectRef.current;
+      if (el instanceof HTMLElement) {
+        el.focus();
+        el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
+      onTypePromptFocused?.(addr.id);
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [autoFocusTypePrompt, open, onTypePromptFocused, addr.id]);
   const verified = !!addr.lat && !!addr.lng;
   return (
-    <div className={`group relative overflow-hidden rounded-lg sm:rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all hover:shadow-md ${addr.isPrimary ? "border-sky-400 ring-1 ring-sky-50" : "border-slate-200"}`}>
+    <div
+      data-address-item-id={addr.id}
+      data-audit-key={placeholder ? `placeholder-address-${addr.id}` : undefined}
+      className={`group relative overflow-hidden rounded-lg sm:rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all hover:shadow-md ${placeholder ? "placeholder-shell" : (addr.isPrimary ? "border-sky-400 ring-1 ring-sky-50" : "border-slate-200")}`}
+    >
       {addr.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
       {total > 1 && ( <button onClick={()=>onRemove(addr.id)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
       <div className="mb-4 pl-1 sm:pl-2 flex items-center gap-2">
@@ -2523,9 +2812,10 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
            <Chevron open={open} />
          </button>
          <div className="flex flex-col">
-           <span className="text-sm font-bold text-slate-800">{addr.type || "Address"}</span>
+           <span className={`text-sm font-bold ${placeholder ? "placeholder-text" : "text-slate-800"}`}>{addr.type || "Address"}</span>
            <span className="text-[10px] text-slate-500">{summarizeAddress(addr)}</span>
          </div>
+         {placeholder && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>}
          {addr.isPrimary && <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-700">Primary</span>}
          {addr.isLossSite && <span className="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Loss Site</span>}
       </div>
@@ -2551,7 +2841,22 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[140px]">
-            <Field label="Type"><Select value={addr.type} onChange={e=>updateAddr(addr.id,{type:e.target.value})}><option value="" disabled>Select Type...</option>{["House","Apartment","Garden Apartment","Row House","Neighbor","Hotel","Relative","Rental","Other Home","Temp","Work","Other"].map(t=><option key={t} value={t}>{t}</option>)}</Select></Field>
+            <Field label="Type">
+              <Select
+                ref={typeSelectRef}
+                value={addr.type}
+                onChange={e=>updateAddr(addr.id,{type:e.target.value})}
+                className={placeholder && !addr.type ? "attention-fill" : ""}
+              >
+                <option value="" disabled>Select Type...</option>
+                {["House","Apartment","Garden Apartment","Row House","Neighbor","Hotel","Moving","Relative","Rental","Other Home","Temp","Work","Other"].map(t=><option key={t} value={t}>{t}</option>)}
+              </Select>
+              {placeholder && !addr.type && (
+                <div className="mt-1 text-[10px] font-semibold text-orange-700">
+                  Select address type now, or leave as placeholder for later.
+                </div>
+              )}
+            </Field>
           </div>
           <div className="flex-1"><Field label="Location Status"><div className="flex gap-2"><ToggleMulti label="Primary" checked={!!addr.isPrimary} onChange={()=>updateAddr(addr.id,{isPrimary:!addr.isPrimary})} colorClass="!bg-sky-100 !border-sky-400 !text-sky-700" showDot={false} /><ToggleMulti label="Loss Site" checked={!!addr.isLossSite} onChange={()=>updateAddr(addr.id,{isLossSite:!addr.isLossSite})} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} /></div></Field></div>
         </div>
@@ -2635,7 +2940,7 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
 });
 
 // --- QUICK ENTRY COMPONENT ---
-const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, updateSmart, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal }) => {
+const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, updateSmart, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment }) => {
     const [eventNoteDraft, setEventNoteDraft] = useState("");
     const [showQuickInstructions, setShowQuickInstructions] = useState(false);
     const [showLoadListPanel, setShowLoadListPanel] = useState(false);
@@ -2729,7 +3034,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
               )}
             </div>
 
-            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={onApplyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={onOpenCrmLog} />
+            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={onApplyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={onOpenCrmLog} onPromptRoleAssignment={onPromptRoleAssignment} />
 
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Quick Flags</h3>
@@ -3012,16 +3317,32 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
 export default function App(){
   const SECTION_ORDER = ["sec1","sec2","sec3","sec4","sec5"];
+  const createSmartConfirmState = () => ({
+    isOpen: false,
+    title: "",
+    message: "",
+    details: [],
+    confirmLabel: "Remove",
+    cancelLabel: "Keep",
+    onConfirm: null,
+    onCancel: null,
+  });
   const normalizeSampleContacts = (rows = []) => (
-    rows.map(r => ({
-      id: r.id || safeUid(),
-      name: r.name || "",
-      company: r.company || "",
-      companyType: r.companyType || "",
-      title: r.title || "",
-      salesRep: r.salesRep || "",
-      isAdjuster: !!r.isAdjuster
-    }))
+    rows.map(r => {
+      const defaults = inferRoleCapabilities(r.companyType || "", r.company || "");
+      return {
+        id: r.id || safeUid(),
+        name: r.name || "",
+        company: r.company || "",
+        companyType: r.companyType || "",
+        title: r.title || "",
+        salesRep: r.salesRep || "",
+        isAdjuster: !!r.isAdjuster,
+        canRefer: typeof r.canRefer === "boolean" ? r.canRefer : defaults.canRefer,
+        canBill: typeof r.canBill === "boolean" ? r.canBill : defaults.canBill,
+        canInsure: typeof r.canInsure === "boolean" ? r.canInsure : defaults.canInsure
+      };
+    })
   );
   const [entryMode, setEntryMode] = useState("start"); 
   const [showInlineHelp, setShowInlineHelp] = useState(true);
@@ -3097,6 +3418,15 @@ export default function App(){
 
   const [alertModal, setAlertModal] = useState({ isOpen: false, message: "", onConfirm: null });
   const [smartNotification, setSmartNotification] = useState(null);
+  const [smartConfirm, setSmartConfirm] = useState(createSmartConfirmState);
+  const [roleAssignModal, setRoleAssignModal] = useState({
+    isOpen: false,
+    source: "",
+    company: "",
+    contact: "",
+    options: [],
+    selected: []
+  });
   const [confirmDetails, setConfirmDetails] = useState(null);
   const [confirmTentativeOk, setConfirmTentativeOk] = useState(false);
   const [confirmMissingOk, setConfirmMissingOk] = useState(false);
@@ -3150,6 +3480,7 @@ export default function App(){
     }
   });
   const [showSampleDataModal, setShowSampleDataModal] = useState(false);
+  const [livingAddressPrompt, setLivingAddressPrompt] = useState({ open: false, type: "" });
   const addCompanyInputRef = useRef(null);
   const [autoFlash, setAutoFlash] = useState({ key: "", ts: 0 });
   const [scheduleIconsOpen, setScheduleIconsOpen] = useState(false);
@@ -3230,7 +3561,7 @@ export default function App(){
         additionalCompanyTypes: Array.from(types),
         additionalCompanies: {
           ...(prev.additionalCompanies || {}),
-          ["Insurance"]: { contact, company }
+          ["Insurance"]: syncCompanyEntryPlaceholders({ contact, company })
         }
       };
     });
@@ -3279,6 +3610,7 @@ export default function App(){
   const eventNoteInputRef = useRef(null);
   const [autoScrollDone, setAutoScrollDone] = useState(false);
   const [lastLossDetailTouched, setLastLossDetailTouched] = useState(null);
+  const [pendingAddressTypePromptId, setPendingAddressTypePromptId] = useState("");
   const [orderSubOpen, setOrderSubOpen] = useState(true);
   const [sourceSubOpen, setSourceSubOpen] = useState(false);
   const [interviewSubOpen, setInterviewSubOpen] = useState(false);
@@ -3364,7 +3696,20 @@ export default function App(){
     setTimeout(() => setAutoFlash({ key: "", ts: 0 }), 1400);
   }, []);
   const getFlashClass = (key) => (autoFlash.key === key ? "auto-flash" : "");
-  const updateAddr = useCallback((id,patch) => setData(p => ({...p, addresses: p.addresses.map(a=>a.id===id?{...a,...patch}:a)})), []);
+  const updateAddr = useCallback((id, patch) => setData(p => ({
+    ...p,
+    addresses: p.addresses.map(a => {
+      if (a.id !== id) return a;
+      const next = { ...a, ...patch };
+      const hasResolvedAddressData = [next.street, next.city, next.state, next.zip, next.googleQuery]
+        .some(v => hasMeaningfulValue(v) && (v || "").toString().trim().toUpperCase() !== "TBD");
+      if (hasResolvedAddressData) {
+        next.placeholder = null;
+        if ((next.street || "").trim().toUpperCase() === "TBD") next.street = "";
+      }
+      return next;
+    })
+  })), []);
   const updateCust = useCallback((id,patch) => setData(p => ({...p, customers: p.customers.map(c=>c.id===id?{...c,...patch}:c)})), []);
 
   useEffect(() => {
@@ -3496,13 +3841,29 @@ export default function App(){
     window.scrollTo({ top: y, behavior: "smooth" });
   };
 
-  const handleToggleSection = (key) => {
-    // Close sub-sections to keep scroll target consistent
+  const resetOpenSubSections = () => {
     setBillingSubOpen(false);
     setInsuranceSubOpen(false);
     setCompaniesSubOpen(false);
     setFinanceSubOpen(false);
     setOpenCodes(false);
+  };
+
+  const handleOpenSection = (key) => {
+    resetOpenSubSections();
+    setOpenSections(prev => {
+      const nextOpen = !prev[key];
+      if (nextOpen) {
+        setVisitedSections(prevV => new Set([...prevV, key]));
+        setActiveSection(key);
+        setTimeout(() => scrollToSection(key), 100);
+      }
+      return { ...prev, [key]: nextOpen };
+    });
+  };
+
+  const handleToggleSection = (key) => {
+    resetOpenSubSections();
     setOpenSections(prev => {
         const isOpen = !prev[key];
         if(isOpen) {
@@ -3515,12 +3876,7 @@ export default function App(){
   };
 
   const jumpToSection = (key) => {
-      // Close sub-sections to keep scroll target consistent
-      setBillingSubOpen(false);
-      setInsuranceSubOpen(false);
-      setCompaniesSubOpen(false);
-      setFinanceSubOpen(false);
-      setOpenCodes(false);
+      resetOpenSubSections();
       // Collapse other sections for a clean view
       setOpenSections(prev => ({
         sec1: key === "sec1",
@@ -3594,23 +3950,48 @@ export default function App(){
   };
 
   useEffect(() => {
+    const focusableSelector = [
+      'input:not([type="hidden"]):not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      'button:not([disabled])',
+      'a[href]',
+      '[tabindex]:not([tabindex="-1"])'
+    ].join(", ");
+
     const collectFocusable = (scope) => {
       if (!(scope instanceof HTMLElement)) return [];
-      const selector = [
-        'input:not([type="hidden"]):not([disabled])',
-        'select:not([disabled])',
-        'textarea:not([disabled])',
-        'button:not([disabled])',
-        'a[href]',
-        '[tabindex]:not([tabindex="-1"])'
-      ].join(", ");
-      return Array.from(scope.querySelectorAll(selector)).filter((node) => {
+      return Array.from(scope.querySelectorAll(focusableSelector)).filter((node) => {
         if (!(node instanceof HTMLElement)) return false;
         if (node.closest("[aria-hidden='true']")) return false;
         const style = window.getComputedStyle(node);
         if (style.display === "none" || style.visibility === "hidden") return false;
         return node.getClientRects().length > 0;
       });
+    };
+    const resolveCurrentIndex = (scope, target, focusable) => {
+      if (!(scope instanceof HTMLElement)) return -1;
+      const candidates = [];
+      if (target instanceof HTMLElement) {
+        const nearest = target.closest(focusableSelector);
+        if (nearest instanceof HTMLElement) candidates.push(nearest);
+        candidates.push(target);
+      }
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && scope.contains(active)) {
+        const nearestActive = active.closest(focusableSelector);
+        if (nearestActive instanceof HTMLElement) candidates.push(nearestActive);
+        candidates.push(active);
+      }
+      const seen = new Set();
+      for (const node of candidates) {
+        if (!(node instanceof HTMLElement)) continue;
+        if (seen.has(node)) continue;
+        seen.add(node);
+        const idx = focusable.findIndex((el) => el === node || el.contains(node));
+        if (idx >= 0) return idx;
+      }
+      return -1;
     };
     const isEnterAdvanceTarget = (target) => {
       if (!(target instanceof HTMLElement)) return false;
@@ -3629,22 +4010,38 @@ export default function App(){
       const isTab = event.key === "Tab";
       const isEnter = event.key === "Enter";
       if ((!isTab && !isEnter) || event.altKey || event.ctrlKey || event.metaKey) return;
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented && !isTab) return;
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
 
       const modalScope = document.querySelector("[data-suggested-roles-modal='true']");
-      if (!(modalScope instanceof HTMLElement) && entryMode !== "detailed") return;
-      const scope = modalScope instanceof HTMLElement ? modalScope : appContentRef.current;
-      if (!(scope instanceof HTMLElement) || !scope.contains(target)) return;
+      const inModal = modalScope instanceof HTMLElement;
+      const guidedKeyboardMode = entryMode === "detailed" || entryMode === "quick";
+      if (!inModal && !guidedKeyboardMode) return;
+      const scope = inModal
+        ? modalScope
+        : (appContentRef.current instanceof HTMLElement ? appContentRef.current : document.body);
+      if (!(scope instanceof HTMLElement)) return;
+      const activeEl = document.activeElement;
+      const inScopeTarget = scope.contains(target);
+      const inScopeActive = activeEl instanceof HTMLElement && scope.contains(activeEl);
+      if (!inScopeTarget && !inScopeActive) return;
       if (isEnter && !isEnterAdvanceTarget(target)) return;
 
       const focusable = collectFocusable(scope);
       if (!focusable.length) return;
-      const currentIndex = focusable.findIndex((el) => el === target || el.contains(target));
-      if (currentIndex < 0) return;
-
       const movingBackward = (isTab && event.shiftKey) || (isEnter && event.shiftKey);
+      const origin = inScopeTarget ? target : activeEl;
+      const currentIndex = resolveCurrentIndex(scope, origin, focusable);
+      if (currentIndex < 0) {
+        event.preventDefault();
+        const fallback = movingBackward ? focusable[focusable.length - 1] : focusable[0];
+        fallback?.focus();
+        requestAnimationFrame(() => {
+          fallback?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+        });
+        return;
+      }
       const nextIndex = currentIndex + (movingBackward ? -1 : 1);
       if (nextIndex >= 0 && nextIndex < focusable.length) {
         event.preventDefault();
@@ -3657,7 +4054,7 @@ export default function App(){
       }
 
       event.preventDefault();
-      if (modalScope instanceof HTMLElement) {
+      if (inModal) {
         const wrapIndex = movingBackward ? focusable.length - 1 : 0;
         focusable[wrapIndex]?.focus();
         return;
@@ -3678,8 +4075,8 @@ export default function App(){
       focusable[wrapIndex]?.focus();
     };
 
-    document.addEventListener("keydown", handleKeyboardNavigation);
-    return () => document.removeEventListener("keydown", handleKeyboardNavigation);
+    document.addEventListener("keydown", handleKeyboardNavigation, true);
+    return () => document.removeEventListener("keydown", handleKeyboardNavigation, true);
   }, [entryMode, goToNextSection, goToPreviousSection]);
 
   const toggleLossType = (type) => {
@@ -3737,13 +4134,58 @@ export default function App(){
       setMinimizedLossTypes(prev => ({ ...prev, [type]: !prev[type] }));
   };
 
+  const SMART_TRIGGER_LABELS = {
+    noHeat: "No Heat",
+    noLights: "No Electricity",
+    boardedUp: "Boarded Up",
+    damageWasWet: "Still Wet",
+    damageMoldMildew: "Visible Mold",
+  };
+
+  const shouldRetainSharedLoadItem = (fieldKey, item, nextValue, currentData) => {
+    const nextOn = nextValue === true || nextValue === "Y";
+    if (item !== "Lights") return false;
+    if (fieldKey === "noLights") {
+      return !nextOn && !!currentData.boardedUp;
+    }
+    if (fieldKey === "boardedUp") {
+      return !nextOn && !!currentData.noLights;
+    }
+    return false;
+  };
+
+  const openSmartConfirm = useCallback((config = {}) => {
+    setSmartConfirm({
+      isOpen: true,
+      title: config.title || "Confirm Smart Update",
+      message: config.message || "",
+      details: Array.isArray(config.details) ? config.details : [],
+      confirmLabel: config.confirmLabel || "Remove",
+      cancelLabel: config.cancelLabel || "Keep",
+      onConfirm: typeof config.onConfirm === "function" ? config.onConfirm : null,
+      onCancel: typeof config.onCancel === "function" ? config.onCancel : null,
+    });
+  }, []);
+
+  const resolveSmartConfirm = useCallback((accepted) => {
+    setSmartConfirm(prev => {
+      const action = accepted ? prev.onConfirm : prev.onCancel;
+      if (typeof action === "function") {
+        setTimeout(() => action(), 0);
+      }
+      return createSmartConfirmState();
+    });
+  }, []);
+
   const updateSmart = (k, v) => {
       let loadListAdded = [];
       let addHandling = [];
-      let removeHandling = [];
       const isOn = v === true || v === "Y";
-      const isOff = v === false || v === "N" || v === "";
+      const isOff = v === false || v === "N" || v === "" || v === null;
       let currentLoadList = new Set(data.loadList || []);
+      const currentHandling = new Set(data.handlingCodes || []);
+      const currentOrderTypes = new Set(data.orderTypes || []);
+      const pendingRemovals = { load: [], handling: [], orderTypes: [] };
 
       if (k === 'noHeat' && isOn && !currentLoadList.has('Heater')) loadListAdded.push('Heater');
       if ((k === 'noLights' && isOn) || (k === 'boardedUp' && isOn)) { if(!currentLoadList.has('Lights')) loadListAdded.push('Lights'); }
@@ -3752,11 +4194,43 @@ export default function App(){
 
       if (k === "damageWasWet") {
         if (isOn) addHandling.push("Wet");
-        if (isOff) removeHandling.push("Wet");
       }
       if (k === "damageMoldMildew") {
         if (isOn) addHandling.push("PPE");
-        if (isOff) removeHandling.push("PPE");
+      }
+
+      if (isOff) {
+        const candidates = {
+          load: [],
+          handling: [],
+          orderTypes: [],
+        };
+        if (k === "noHeat") candidates.load.push("Heater");
+        if (k === "noLights" || k === "boardedUp") candidates.load.push("Lights");
+        if (k === "damageWasWet") {
+          candidates.load.push("Plastic Bags");
+          candidates.handling.push("Wet");
+        }
+        if (k === "damageMoldMildew") {
+          candidates.load.push("Tyvek");
+          candidates.handling.push("PPE");
+          candidates.orderTypes.push("Mold");
+        }
+        if (k === "damageMoldMildew" && currentOrderTypes.has("Mold")) {
+          // If Mold remains selected, PPE is still auto-required elsewhere.
+          candidates.handling = candidates.handling.filter(code => code !== "PPE");
+        }
+
+        const presentLoad = candidates.load.filter((item) => {
+          if (!currentLoadList.has(item)) return false;
+          if (shouldRetainSharedLoadItem(k, item, v, data)) return false;
+          return true;
+        });
+        const presentHandling = candidates.handling.filter((code) => currentHandling.has(code));
+        const presentOrderTypes = candidates.orderTypes.filter((type) => currentOrderTypes.has(type));
+        pendingRemovals.load = presentLoad;
+        pendingRemovals.handling = presentHandling;
+        pendingRemovals.orderTypes = presentOrderTypes;
       }
 
       if (loadListAdded.length > 0) {
@@ -3779,33 +4253,131 @@ export default function App(){
           if (k === "damageMoldMildew" && isOn && !(prev.orderTypes || []).includes("Mold")) {
             newData.orderTypes = [...(prev.orderTypes || []), "Mold"];
           }
-          if (addHandling.length || removeHandling.length) {
+          if (addHandling.length) {
             const handling = new Set(prev.handlingCodes || []);
-            removeHandling.forEach(c => handling.delete(c));
             addHandling.forEach(c => handling.add(c));
             newData.handlingCodes = Array.from(handling);
           }
           return newData;
       });
+
+      const hasPendingRemovals =
+        pendingRemovals.load.length ||
+        pendingRemovals.handling.length ||
+        pendingRemovals.orderTypes.length;
+
+      if (isOff && hasPendingRemovals) {
+        const label = SMART_TRIGGER_LABELS[k] || "this condition";
+        const details = [];
+        if (pendingRemovals.load.length) {
+          details.push(`Bring Instructions: ${pendingRemovals.load.join(", ")}`);
+        }
+        if (pendingRemovals.handling.length) {
+          details.push(`Handling Codes: ${pendingRemovals.handling.join(", ")}`);
+        }
+        if (pendingRemovals.orderTypes.length) {
+          details.push(`Order Type: ${pendingRemovals.orderTypes.join(", ")}`);
+        }
+        openSmartConfirm({
+          title: "Remove Smart-Triggered Fields?",
+          message: `Since "${label}" is no longer selected, do you want to remove these linked fields?`,
+          details,
+          confirmLabel: "Yes, Remove",
+          cancelLabel: "Keep Fields",
+          onConfirm: () => {
+            setData(prev => {
+              const next = { ...prev };
+              if (pendingRemovals.load.length) {
+                const list = new Set(prev.loadList || []);
+                pendingRemovals.load.forEach(item => list.delete(item));
+                next.loadList = Array.from(list);
+              }
+              if (pendingRemovals.handling.length) {
+                const handling = new Set(prev.handlingCodes || []);
+                pendingRemovals.handling.forEach(code => handling.delete(code));
+                next.handlingCodes = Array.from(handling);
+              }
+              if (pendingRemovals.orderTypes.length) {
+                next.orderTypes = (prev.orderTypes || []).filter(type => !pendingRemovals.orderTypes.includes(type));
+              }
+              return next;
+            });
+          }
+        });
+      }
   };
 
-  const ensureAddressType = (type) => {
-    if (!type) return;
+  const prevPackoutSummaryRef = useRef(data.packoutSummary || []);
+
+  const hasAddressType = useCallback((type) => {
+    if (!type) return false;
+    return (data.addresses || []).some(a => (a.type || "").trim().toLowerCase() === type.trim().toLowerCase());
+  }, [data.addresses]);
+
+  const ensureAddressType = (type, { placeholder = false } = {}) => {
+    if (!type) return false;
+    let created = false;
     setData(prev => {
       const exists = (prev.addresses || []).some(a => (a.type || "").toLowerCase() === type.toLowerCase());
       if (exists) return prev;
+      created = true;
       return {
         ...prev,
-        addresses: [...(prev.addresses || []), initAddress({ type, isPrimary: false, isLossSite: false })]
+        addresses: [
+          ...(prev.addresses || []),
+          initAddress({
+            type,
+            isPrimary: false,
+            isLossSite: false,
+            street: placeholder ? "TBD" : "",
+            placeholder: placeholder ? createPlaceholderFlag("address", `${type} placeholder`) : null
+          })
+        ]
       };
     });
+    return created;
   };
+
+  const promptForLivingAddress = useCallback((type) => {
+    if (!type || !LIVING_STATUS_ADDRESS_TYPES.includes(type)) return;
+    if (hasAddressType(type)) return;
+    setLivingAddressPrompt({ open: true, type });
+  }, [hasAddressType]);
+
+  const addLivingAddressFromPrompt = useCallback((mode) => {
+    const type = livingAddressPrompt.type;
+    if (!type) return;
+    const added = ensureAddressType(type, { placeholder: mode === "placeholder" });
+    setLivingAddressPrompt({ open: false, type: "" });
+    if (!added) {
+      setToast(`${type} address already exists.`);
+      return;
+    }
+    setOpenSections(prev => ({ ...prev, sec3: true }));
+    setVisitedSections(prevV => new Set([...prevV, "sec3"]));
+    setActiveSection("sec3");
+    setTimeout(() => {
+      const section = document.getElementById("sec3");
+      section?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    setToast(
+      mode === "placeholder"
+        ? `${type} placeholder address added.`
+        : `${type} address row added.`
+    );
+  }, [livingAddressPrompt.type]);
+
+  const closeLivingAddressPrompt = useCallback(() => {
+    setLivingAddressPrompt({ open: false, type: "" });
+  }, []);
 
   const updateLivingStatus = (value) => {
     update("livingStatus", value);
-    if (["Hotel", "Neighbor", "Relative", "Rental", "Other Home"].includes(value)) {
-      ensureAddressType(value);
+    if (!value) {
+      closeLivingAddressPrompt();
+      return;
     }
+    promptForLivingAddress(value);
   };
 
   const updateLossSeverity = useCallback((next) => {
@@ -3830,10 +4402,24 @@ export default function App(){
 
   const groupLinks = data.groupAddressLinks || {};
   const [groupLinkModal, setGroupLinkModal] = useState({ open: false, group: "" });
+  const [groupLinkAddressMode, setGroupLinkAddressMode] = useState("select");
+  const [groupLinkAddressDraft, setGroupLinkAddressDraft] = useState({
+    type: "",
+    street: "",
+    city: "",
+    state: "",
+    zip: ""
+  });
   const openGroupLinkModal = (group) => {
+    setGroupLinkAddressMode("select");
+    setGroupLinkAddressDraft({ type: "", street: "", city: "", state: "", zip: "" });
     setGroupLinkModal({ open: true, group });
   };
-  const closeGroupLinkModal = () => setGroupLinkModal({ open: false, group: "" });
+  const closeGroupLinkModal = () => {
+    setGroupLinkModal({ open: false, group: "" });
+    setGroupLinkAddressMode("select");
+    setGroupLinkAddressDraft({ type: "", street: "", city: "", state: "", zip: "" });
+  };
   const getGroupLink = (group) => groupLinks[group] || { addressId: "", date: "" };
   const setGroupLink = (group, patch) => {
     const current = getGroupLink(group);
@@ -3844,10 +4430,69 @@ export default function App(){
     delete next[group];
     update("groupAddressLinks", next);
   };
+  const addPlaceholderAddressToGroup = () => {
+    const group = groupLinkModal.group;
+    if (!group) return;
+    const typeLabel = (groupLinkAddressDraft.type || "").trim() || `${group} Placeholder`;
+    const newAddress = initAddress({
+      type: typeLabel,
+      isPrimary: false,
+      isLossSite: false,
+      street: "TBD",
+      placeholder: createPlaceholderFlag("address", `${group} placeholder`)
+    });
+    setData(prev => {
+      const links = { ...(prev.groupAddressLinks || {}) };
+      const current = links[group] || {};
+      links[group] = { ...current, addressId: newAddress.id };
+      return {
+        ...prev,
+        addresses: [...(prev.addresses || []), newAddress],
+        groupAddressLinks: links
+      };
+    });
+    setToast("Placeholder address added and linked.");
+    setGroupLinkAddressMode("select");
+    setGroupLinkAddressDraft({ type: "", street: "", city: "", state: "", zip: "" });
+  };
+  const addFullAddressToGroup = () => {
+    const group = groupLinkModal.group;
+    if (!group) return;
+    const hasAddressData = [groupLinkAddressDraft.street, groupLinkAddressDraft.city, groupLinkAddressDraft.state, groupLinkAddressDraft.zip]
+      .some(v => (v || "").trim());
+    if (!hasAddressData) {
+      setToast("Enter at least one address field.");
+      return;
+    }
+    const typeLabel = (groupLinkAddressDraft.type || "").trim() || `${group} Address`;
+    const newAddress = initAddress({
+      type: typeLabel,
+      street: (groupLinkAddressDraft.street || "").trim(),
+      city: (groupLinkAddressDraft.city || "").trim(),
+      state: (groupLinkAddressDraft.state || "").trim(),
+      zip: (groupLinkAddressDraft.zip || "").trim(),
+      isPrimary: false,
+      isLossSite: false,
+      placeholder: null
+    });
+    setData(prev => {
+      const links = { ...(prev.groupAddressLinks || {}) };
+      const current = links[group] || {};
+      links[group] = { ...current, addressId: newAddress.id };
+      return {
+        ...prev,
+        addresses: [...(prev.addresses || []), newAddress],
+        groupAddressLinks: links
+      };
+    });
+    setToast("Address added and linked.");
+    setGroupLinkAddressMode("select");
+    setGroupLinkAddressDraft({ type: "", street: "", city: "", state: "", zip: "" });
+  };
 
   useEffect(() => {
     const selected = data.packoutSummary || [];
-    if (!selected.length) return;
+    const previous = prevPackoutSummaryRef.current || [];
     const current = new Set(data.loadList || []);
     const added = [];
     selected.forEach(item => {
@@ -3855,6 +4500,16 @@ export default function App(){
         if (!current.has(loadItem)) {
           current.add(loadItem);
           added.push(loadItem);
+        }
+      });
+    });
+    const removedSelections = previous.filter(item => !selected.includes(item));
+    const removeCandidates = [];
+    removedSelections.forEach(item => {
+      (PACKOUT_LOAD_MAP[item] || []).forEach(loadItem => {
+        const stillRequired = selected.some(sel => (PACKOUT_LOAD_MAP[sel] || []).includes(loadItem));
+        if (!stillRequired && current.has(loadItem) && !removeCandidates.includes(loadItem)) {
+          removeCandidates.push(loadItem);
         }
       });
     });
@@ -3869,7 +4524,25 @@ export default function App(){
         loadListToRemove: added
       });
     }
-  }, [data.packoutSummary, data.loadList]);
+    if (removeCandidates.length) {
+      const removedLabel = removedSelections.join(", ");
+      openSmartConfirm({
+        title: "Remove Packout Bring Items?",
+        message: `Since ${removedLabel} ${removedSelections.length > 1 ? "were" : "was"} unselected, do you want to remove these Bring items?`,
+        details: [`Bring Instructions: ${removeCandidates.join(", ")}`],
+        confirmLabel: "Yes, Remove",
+        cancelLabel: "Keep Items",
+        onConfirm: () => {
+          setData(prev => {
+            const next = new Set(prev.loadList || []);
+            removeCandidates.forEach(i => next.delete(i));
+            return { ...prev, loadList: Array.from(next) };
+          });
+        }
+      });
+    }
+    prevPackoutSummaryRef.current = selected;
+  }, [data.packoutSummary, data.loadList, openSmartConfirm]);
 
   const updateHowDry = (v) => {
       const addCodes = [];
@@ -3878,16 +4551,35 @@ export default function App(){
       if (v === "Low Heat") { addCodes.push("Low"); removeCodes.push("NoDry"); }
       if (v === "Dryer") { removeCodes.push("NoDry", "Low"); }
 
+      const currentHandling = new Set(data.handlingCodes || []);
+      const removableNow = removeCodes.filter(c => currentHandling.has(c));
+
       if (addCodes.length) {
           setSmartNotification({ message: `Smart Update: Added ${addCodes.join(", ")} handling code${addCodes.length > 1 ? "s" : ""}` });
       }
 
       setData(prev => {
           const current = new Set(prev.handlingCodes || []);
-          removeCodes.forEach(c => current.delete(c));
           addCodes.forEach(c => current.add(c));
           return { ...prev, howDryLaundry: v, handlingCodes: Array.from(current) };
       });
+
+      if (removableNow.length) {
+        openSmartConfirm({
+          title: "Remove Linked Handling Codes?",
+          message: `Since dry method changed to "${v}", do you want to remove these handling codes?`,
+          details: [`Handling Codes: ${removableNow.join(", ")}`],
+          confirmLabel: "Yes, Remove",
+          cancelLabel: "Keep Codes",
+          onConfirm: () => {
+            setData(prev => {
+              const current = new Set(prev.handlingCodes || []);
+              removableNow.forEach(c => current.delete(c));
+              return { ...prev, handlingCodes: Array.from(current) };
+            });
+          }
+        });
+      }
   };
 
   const rejectSmartAction = () => {
@@ -3922,10 +4614,17 @@ export default function App(){
     if (key === "source") setSourceSubOpen(true);
     if (key === "interview") setInterviewSubOpen(true);
     if (key === "codes") { setCodesSubOpen(true); setOpenCodes(true); }
+    if (key === "customer") {}
+    if (key === "address") {}
     if (key === "billing") setBillingSubOpen(true);
     if (key === "insurance") setInsuranceSubOpen(true);
     if (key === "companies") setCompaniesSubOpen(true);
     if (key === "finance") setFinanceSubOpen(true);
+    if (key === "schedule") setScheduleSubOpen(true);
+    if (key === "sds-icons") {
+      setScheduleSubOpen(true);
+      setScheduleIconsOpen(true);
+    }
   };
 
   const focusSearchLabel = (label) => {
@@ -4017,14 +4716,33 @@ export default function App(){
   };
   
   const addNewAddress = useCallback(() => {
+    const addressId = safeUid();
     setData(p => {
         const hasPrimary = p.addresses.some(a => a.isPrimary);
-        return { ...p, addresses: [...p.addresses, initAddress({ isPrimary: !hasPrimary, isLossSite: false, type: "" })] };
+        return {
+          ...p,
+          addresses: [
+            ...p.addresses,
+            initAddress({
+              id: addressId,
+              isPrimary: !hasPrimary,
+              isLossSite: false,
+              type: "",
+              placeholder: createPlaceholderFlag("address", "Address type needed")
+            })
+          ]
+        };
     });
-  }, []);
+    setPendingAddressTypePromptId(addressId);
+    setToast("Address placeholder added. Select a Type now, or leave it for later.");
+  }, [setToast]);
   
   const addNewCustomer = useCallback(() => {
     setData(p => ({ ...p, customers: [...p.customers, initCustomer({ type: "", policyHolder: false, isPrimary: false })] }));
+  }, []);
+
+  const handleAddressTypePromptFocused = useCallback((addressId) => {
+    setPendingAddressTypePromptId(prev => (prev === addressId ? "" : prev));
   }, []);
 
   useEffect(() => {
@@ -4103,8 +4821,12 @@ export default function App(){
       if (item.key === "codes") setCodesSubOpen(true);
     }
     if (item.section === "sec4") {
-      setBillingSubOpen(true);
-      setInsuranceSubOpen(true);
+      if ((item.key || "").startsWith("placeholder-company-") || (item.key || "").startsWith("placeholder-contact-")) {
+        setCompaniesSubOpen(true);
+      } else {
+        setBillingSubOpen(true);
+        setInsuranceSubOpen(true);
+      }
     }
     if (item.key === "addrLat" || item.key === "addrLng") {
       setShowPrimaryCoords(true);
@@ -4361,6 +5083,41 @@ export default function App(){
       if (!data.estimateRequested) missing.push({ id: "sec4", label: "Estimate Requested", section: "sec4", key: "estimateRequested" });
     }
 
+    (data.addresses || []).forEach((addr, idx) => {
+      if (!isAddressPlaceholder(addr)) return;
+      const addressLabel = addr?.type || (idx === 0 ? "Primary Address" : `Address ${idx + 1}`);
+      missing.push({
+        id: "sec3",
+        label: `Resolve Placeholder: ${addressLabel}`,
+        section: "sec3",
+        key: `placeholder-address-${addr.id}`,
+        category: "placeholders"
+      });
+    });
+
+    Object.entries(data.additionalCompanies || {}).forEach(([type, rawEntry]) => {
+      const entry = syncCompanyEntryPlaceholders(rawEntry || {});
+      const companyPending = isCompanyPlaceholder(entry);
+      if (companyPending) {
+        missing.push({
+          id: "sec4",
+          label: `Resolve Placeholder: ${type} company`,
+          section: "sec4",
+          key: `placeholder-company-${normalizePlaceholderKeyPart(type)}`,
+          category: "placeholders"
+        });
+      }
+      if (!companyPending && isContactPlaceholder(entry)) {
+        missing.push({
+          id: "sec4",
+          label: `Resolve Placeholder: ${type} contact`,
+          section: "sec4",
+          key: `placeholder-contact-${normalizePlaceholderKeyPart(type)}`,
+          category: "placeholders"
+        });
+      }
+    });
+
     return missing;
   };
 
@@ -4392,6 +5149,15 @@ export default function App(){
     if (needsFinanceAudit) {
       total += 4; // pricePlatform, priceList, multiplier, estimateRequested
     }
+    total += (data.addresses || []).filter(addr => isAddressPlaceholder(addr)).length;
+    total += Object.values(data.additionalCompanies || {}).reduce((acc, rawEntry) => {
+      const entry = syncCompanyEntryPlaceholders(rawEntry || {});
+      let count = acc;
+      const companyPending = isCompanyPlaceholder(entry);
+      if (companyPending) count += 1;
+      if (!companyPending && isContactPlaceholder(entry)) count += 1;
+      return count;
+    }, 0);
     return total;
   };
 
@@ -4410,6 +5176,8 @@ export default function App(){
       if (["moldCoverageConfirm","orderTypes"].includes(m.key)) subsections.add("order");
       if (["rentCoverageLimit"].includes(m.key)) subsections.add("address");
       if (["pricePlatform","priceList","multiplier","estimateRequested"].includes(m.key)) subsections.add("finance");
+      if ((m.key || "").startsWith("placeholder-company-") || (m.key || "").startsWith("placeholder-contact-")) subsections.add("companies");
+      if ((m.key || "").startsWith("placeholder-address-")) subsections.add("address");
       if (m.key === "interview") subsections.add("interview");
       if (m.key === "codes") { subsections.add("codes"); setOpenCodes(true); }
     });
@@ -4456,6 +5224,13 @@ export default function App(){
   const attentionWater = data.damageWasWet === "Y" || data.damageWasWet === true;
   const attentionMold = !!data.damageMoldMildew;
   const highlightStorageFromProcess = data.processType === "Long-Term Storage";
+  const expectedSeverityGroups = useMemo(() => {
+    return (data.orderTypes || []).reduce((acc, t) => {
+      const group = t === "Dust/Debris" ? "Dust" : t;
+      if (SEVERITY_GROUPS.includes(group)) acc.add(group);
+      return acc;
+    }, new Set());
+  }, [data.orderTypes]);
 
   const contactCompanyMap = useMemo(() => {
     const map = new Map();
@@ -4500,12 +5275,11 @@ export default function App(){
 
   const companyRoleAssignments = useMemo(() => {
     return COMPANY_ROLE_DEFS.map(role => {
-      const entry = data.additionalCompanies?.[role.type];
+      const rawEntry = data.additionalCompanies?.[role.type];
+      const entry = rawEntry ? syncCompanyEntryPlaceholders(rawEntry) : null;
       const sourceCompany = role.source ? (data[role.source] || "") : "";
       const sourceContact = role.contactSource ? (data[role.contactSource] || "") : "";
-      const contactsFromEntry = entry?.contacts && entry.contacts.length
-        ? entry.contacts
-        : (entry?.contact ? [{ name: entry.contact }] : []);
+      const contactsFromEntry = entryContactList(entry);
       const companyName = sourceCompany || entry?.company || "";
       const contactsFromSample = (() => {
         if (!companyName) return [];
@@ -4526,9 +5300,29 @@ export default function App(){
         ...contactsFromSample.filter(c => !contactsFromEntry.find(e => normalizeContact(e.name) === normalizeContact(c.name)))
       ];
       const contactName = sourceContact || mergedContacts[0]?.name || "";
-      const pending = !!entry && !entry.company && !sourceCompany;
+      const normalizedEntry = syncCompanyEntryPlaceholders({
+        ...(entry || {}),
+        company: companyName || entry?.company || "",
+        contact: contactName || entry?.contact || "",
+        contacts: mergedContacts,
+        placeholder: entry?.placeholder || null,
+        contactPlaceholder: entry?.contactPlaceholder || null
+      });
+      const companyPlaceholder = !!entry && !sourceCompany && isCompanyPlaceholder(normalizedEntry);
+      const contactPlaceholder = !!entry && !sourceContact && !companyPlaceholder && isContactPlaceholder(normalizedEntry);
+      const pending = companyPlaceholder || contactPlaceholder;
       const filled = !!companyName;
-      return { ...role, companyName, contactName, pending, filled, entry, contacts: mergedContacts };
+      return {
+        ...role,
+        companyName,
+        contactName,
+        pending,
+        filled,
+        companyPlaceholder,
+        contactPlaceholder,
+        entry: normalizedEntry,
+        contacts: mergedContacts
+      };
     });
   }, [
     data.additionalCompanies,
@@ -4626,6 +5420,237 @@ export default function App(){
     return { contact: v, company: "" };
   };
 
+  const normalizeCompanyType = useCallback((type) => (type || "").toString().trim().toLowerCase(), []);
+
+  const getCompanyTypeForRoles = useCallback((companyName = "") => {
+    if (!companyName) return "";
+    const fromAdditional = Object.entries(data.additionalCompanies || {}).find(([, entry]) =>
+      normalizeCompany(entry?.company || "") === normalizeCompany(companyName)
+    );
+    if (fromAdditional?.[0]) return fromAdditional[0];
+    const sample = sampleContacts.find(c => normalizeCompany(c.company || "") === normalizeCompany(companyName));
+    if (sample?.companyType) return sample.companyType;
+    return autoTypeForCompany(companyName);
+  }, [data.additionalCompanies, sampleContacts]);
+
+  const getCompanyRoleCapabilities = useCallback((companyName = "", typeOverride = "") => {
+    const defaultCaps = inferRoleCapabilities(typeOverride || getCompanyTypeForRoles(companyName), companyName);
+    if (!companyName) return defaultCaps;
+    const normalizedCompany = normalizeCompany(companyName);
+    const sample = sampleContacts.find(c => normalizeCompany(c.company || "") === normalizedCompany);
+    if (!sample) return defaultCaps;
+    return {
+      canRefer: typeof sample.canRefer === "boolean" ? sample.canRefer : defaultCaps.canRefer,
+      canBill: typeof sample.canBill === "boolean" ? sample.canBill : defaultCaps.canBill,
+      canInsure: typeof sample.canInsure === "boolean" ? sample.canInsure : defaultCaps.canInsure
+    };
+  }, [getCompanyTypeForRoles, sampleContacts]);
+
+  const isRoleEligibleForCompany = useCallback((roleId, companyName, typeOverride = "") => {
+    const capabilities = getCompanyRoleCapabilities(companyName, typeOverride);
+    if (roleId === "referrer") return !!capabilities.canRefer;
+    if (roleId === "billto") return !!capabilities.canBill;
+    if (roleId !== "insurance") return true;
+    if (!capabilities.canInsure) return false;
+    const normalizedType = normalizeCompanyType(typeOverride || getCompanyTypeForRoles(companyName));
+    if (!normalizedType) return true;
+    if (INSURANCE_ELIGIBLE_COMPANY_TYPES.has(normalizedType)) return true;
+    if (normalizedType.includes("contractor")) return false;
+    if (normalizedType.includes("insurance")) return true;
+    const carrierMatch = NATIONAL_CARRIERS.some(c => normalizeCompany(c) === normalizeCompany(companyName || ""));
+    return carrierMatch;
+  }, [getCompanyRoleCapabilities, getCompanyTypeForRoles, normalizeCompanyType]);
+
+  const getEligibleRoleLabels = useCallback((companyName, typeOverride = "") => {
+    return CONTACT_ROLE_BADGES
+      .filter(role => isRoleEligibleForCompany(role.id, companyName, typeOverride))
+      .map(role => role.title);
+  }, [isRoleEligibleForCompany]);
+
+  const closeRoleAssignmentPrompt = useCallback(() => {
+    setRoleAssignModal({
+      isOpen: false,
+      source: "",
+      company: "",
+      contact: "",
+      options: [],
+      selected: []
+    });
+  }, []);
+
+  const getRolePromptOptions = useCallback((company, contact, skipRoles = [], forceRoles = []) => {
+    const blocked = new Set(skipRoles || []);
+    const forced = new Set(forceRoles || []);
+    const referrerAssigned = !!(data.referringCompany || data.referrer);
+    const insuranceAssigned = !!(data.insuranceCompany || data.insuranceAdjuster);
+    const billToAssigned = !!(data.billingCompany || data.billingContact);
+    const normalizedCompany = normalizeCompany(company || "");
+    const normalizedContact = normalizeContact(contact || "");
+    const sameReferrer =
+      (!!normalizedCompany && normalizeCompany(data.referringCompany || "") === normalizedCompany) ||
+      (!!normalizedContact && normalizeContact(data.referrer || "") === normalizedContact);
+    const sameInsurance =
+      (!!normalizedCompany && normalizeCompany(data.insuranceCompany || "") === normalizedCompany) ||
+      (!!normalizedContact && normalizeContact(data.insuranceAdjuster || "") === normalizedContact);
+    const sameBillTo =
+      (!!normalizedCompany && normalizeCompany(data.billingCompany || "") === normalizedCompany) ||
+      (!!normalizedContact && normalizeContact(data.billingContact || "") === normalizedContact);
+    return CONTACT_ROLE_BADGES.filter(role => {
+      if (blocked.has(role.id) && !forced.has(role.id)) return false;
+      if (forced.has(role.id)) return isRoleEligibleForCompany(role.id, company);
+      if (!isRoleEligibleForCompany(role.id, company)) return false;
+      if (role.id === "referrer") return !referrerAssigned || sameReferrer;
+      if (role.id === "insurance") return !insuranceAssigned || sameInsurance;
+      if (role.id === "billto") return !billToAssigned || sameBillTo;
+      return false;
+    });
+  }, [
+    data.referringCompany,
+    data.referrer,
+    data.insuranceCompany,
+    data.insuranceAdjuster,
+    data.billingCompany,
+    data.billingContact,
+    isRoleEligibleForCompany
+  ]);
+
+  const openRoleAssignmentPrompt = useCallback(({ company, contact, source = "", skipRoles = [], preferredRoles = [], forceRoles = [] }) => {
+    const nextCompany = (company || "").trim();
+    const nextContact = (contact || "").trim();
+    if (!nextCompany && !nextContact) return;
+    const options = getRolePromptOptions(nextCompany, nextContact, skipRoles, forceRoles);
+    if (!options.length) return;
+    const optionIds = new Set(options.map(option => option.id));
+    const sourceKey = (source || "").toLowerCase();
+    const preferredFromSource =
+      sourceKey.includes("referrer") ? "referrer" :
+      sourceKey.includes("billing") ? "billto" :
+      (sourceKey.includes("insurance") || sourceKey.includes("adjuster")) ? "insurance" :
+      "";
+    const matchedContact = nextContact
+      ? sampleContacts.find(c => normalizeContact(c.name || "") === normalizeContact(nextContact))
+      : null;
+    const titleHint = (matchedContact?.title || "").toLowerCase();
+    const companyTypeHint = normalizeCompanyType(getCompanyTypeForRoles(nextCompany));
+    const capabilities = getCompanyRoleCapabilities(nextCompany, companyTypeHint);
+    const suggested = [];
+    if (capabilities.canRefer && optionIds.has("referrer")) suggested.push("referrer");
+    if (capabilities.canInsure && optionIds.has("insurance")) suggested.push("insurance");
+    if (capabilities.canBill && optionIds.has("billto")) suggested.push("billto");
+    (forceRoles || []).forEach(roleId => { if (optionIds.has(roleId)) suggested.push(roleId); });
+    (preferredRoles || []).forEach(roleId => { if (optionIds.has(roleId)) suggested.push(roleId); });
+    if (preferredFromSource && optionIds.has(preferredFromSource)) suggested.push(preferredFromSource);
+    if (titleHint.includes("adjuster") && optionIds.has("insurance")) suggested.push("insurance");
+    if (companyTypeHint.includes("insurance") && optionIds.has("insurance")) suggested.push("insurance");
+    if (!suggested.length && options.length === 1) suggested.push(options[0].id);
+    const selectedDefaults = Array.from(new Set(suggested));
+    setRoleAssignModal({
+      isOpen: true,
+      source,
+      company: nextCompany,
+      contact: nextContact,
+      options,
+      selected: selectedDefaults
+    });
+  }, [getRolePromptOptions, getCompanyTypeForRoles, normalizeCompanyType, sampleContacts, getCompanyRoleCapabilities]);
+
+  const applyRoleAssignments = useCallback((roles, company, contact) => {
+    const selected = new Set(roles || []);
+    if (!selected.size) return;
+    const hasCompany = !!company;
+    const hasContact = !!contact;
+    setData(prev => {
+      const next = { ...prev };
+      if (selected.has("referrer") && hasCompany) {
+        next.referringCompany = company;
+        if (hasContact) next.referrer = contact;
+      }
+      if (selected.has("insurance") && hasCompany) {
+        if (!isRoleEligibleForCompany("insurance", company)) {
+          selected.delete("insurance");
+        } else {
+        next.insuranceCompany = company;
+        if (hasContact) next.insuranceAdjuster = contact;
+        next.insuranceClaim = "Yes";
+        next.involvesInsurance = "Yes";
+        if (!next.billingPayer) next.billingPayer = "Insurance";
+        }
+      }
+      if (selected.has("billto") && hasCompany) {
+        next.billingCompany = company;
+        if (hasContact) next.billingContact = contact;
+        if (!next.billingPayer) next.billingPayer = "Referrer";
+      }
+      return next;
+    });
+    if (hasContact || hasCompany) {
+      const roleNames = CONTACT_ROLE_BADGES
+        .filter(role => selected.has(role.id))
+        .map(role => role.title);
+      if (roleNames.length) {
+        setToast(`Assigned ${roleNames.join(", ")} role${roleNames.length > 1 ? "s" : ""}.`);
+      }
+    }
+  }, [setToast, isRoleEligibleForCompany]);
+
+  const toggleRoleAssignmentSelection = useCallback((roleId) => {
+    setRoleAssignModal(prev => {
+      const active = prev.selected.includes(roleId);
+      return {
+        ...prev,
+        selected: active ? prev.selected.filter(id => id !== roleId) : [...prev.selected, roleId]
+      };
+    });
+  }, []);
+
+  const applySelectedRoleAssignments = useCallback(() => {
+    if (!roleAssignModal.isOpen) return;
+    applyRoleAssignments(roleAssignModal.selected, roleAssignModal.company, roleAssignModal.contact);
+    closeRoleAssignmentPrompt();
+  }, [roleAssignModal, applyRoleAssignments, closeRoleAssignmentPrompt]);
+
+  const goBackFromRoleAssignmentPrompt = useCallback(() => {
+    const source = roleAssignModal.source || "";
+    closeRoleAssignmentPrompt();
+
+    if (!source) return;
+    if (source === "referrer") {
+      setOpenSections(prev => ({ ...prev, sec1: true }));
+      setSourceSubOpen(true);
+      setTimeout(() => {
+        const el = document.querySelector('[data-audit-key="referrer"]');
+        if (el instanceof HTMLElement) {
+          el.focus();
+          el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        }
+      }, 120);
+      return;
+    }
+    if (source === "billing-contact") {
+      setOpenSections(prev => ({ ...prev, sec4: true }));
+      setBillingSubOpen(true);
+      setTimeout(() => {
+        const el = document.querySelector('[data-audit-key="billingContact"]');
+        if (el instanceof HTMLElement) {
+          el.focus();
+          el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        }
+      }, 120);
+      return;
+    }
+    if (source === "insurance-contact") {
+      setOpenSections(prev => ({ ...prev, sec4: true }));
+      setInsuranceSubOpen(true);
+      setTimeout(() => {
+        const el = document.querySelector('[data-audit-key="insuranceAdjuster"]');
+        if (el instanceof HTMLElement) {
+          el.focus();
+          el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        }
+      }, 120);
+    }
+  }, [closeRoleAssignmentPrompt, roleAssignModal.source]);
+
   const applyReferrerRoles = (roles) => {
     setData(prev => {
       const company = prev.referringCompany || "";
@@ -4666,7 +5691,15 @@ export default function App(){
     setData(prev => {
       const updated = { ...prev, additionalCompanyTypes: next };
       const entries = { ...(prev.additionalCompanies || {}) };
-      if (!entries[type]) entries[type] = { contact: "", company: "" };
+      if (!entries[type]) {
+        entries[type] = syncCompanyEntryPlaceholders({
+          contact: "",
+          company: "",
+          placeholder: createPlaceholderFlag("company", `${type} pending`)
+        });
+      } else {
+        entries[type] = syncCompanyEntryPlaceholders(entries[type]);
+      }
       updated.additionalCompanies = entries;
       return updated;
     });
@@ -4677,7 +5710,10 @@ export default function App(){
       ...prev,
       additionalCompanies: {
         ...(prev.additionalCompanies || {}),
-        [type]: { ...(prev.additionalCompanies?.[type] || { contact: "", company: "", inactive: false }), ...patch }
+        [type]: syncCompanyEntryPlaceholders({
+          ...(prev.additionalCompanies?.[type] || { contact: "", company: "", inactive: false }),
+          ...patch
+        })
       }
     }));
   };
@@ -4721,7 +5757,19 @@ export default function App(){
           next[existingIndex] = { ...existing, company: company || existing.company };
           return next;
         }
-        return [...normalized, { id: safeUid(), name: contact, company, companyType: autoTypeForCompany(company), title: "", salesRep: "", isAdjuster: false }];
+        const defaults = inferRoleCapabilities(autoTypeForCompany(company), company);
+        return [...normalized, {
+          id: safeUid(),
+          name: contact,
+          company,
+          companyType: autoTypeForCompany(company),
+          title: "",
+          salesRep: "",
+          isAdjuster: false,
+          canRefer: defaults.canRefer,
+          canBill: defaults.canBill,
+          canInsure: defaults.canInsure
+        }];
       });
     }
   };
@@ -4736,7 +5784,8 @@ export default function App(){
     const exists = Object.entries(data.additionalCompanies || {}).find(([t, entry]) => {
       const sameCompany = parsed.company && entry?.company && normalizeCompany(entry.company) === normalizeCompany(parsed.company);
       const sameContact = parsed.contact && entry?.contact && normalizeContact(entry.contact) === normalizeContact(parsed.contact);
-      return sameCompany || sameContact;
+      const sameContactInList = parsed.contact && entryContactList(entry || {}).some(c => normalizeContact(c?.name || "") === normalizeContact(parsed.contact));
+      return sameCompany || sameContact || sameContactInList;
     });
     if (exists && exists[0] === type) {
       triggerAutoFlash(`company-${exists[0]}`);
@@ -4747,6 +5796,11 @@ export default function App(){
     triggerAutoFlash(`company-${type}`);
     setCompanyEdit(prev => ({ ...prev, [type]: false }));
     setCompanyModalCloseArmed(true);
+    openRoleAssignmentPrompt({
+      source: "quick-add-search",
+      company: parsed.company || "",
+      contact: parsed.contact || ""
+    });
   };
 
   const addCompanyDirect = (type, contact, company) => {
@@ -4758,7 +5812,8 @@ export default function App(){
     const exists = Object.entries(data.additionalCompanies || {}).find(([t, entry]) => {
       const sameCompany = company && entry?.company && normalizeCompany(entry.company) === normalizeCompany(company);
       const sameContact = contact && entry?.contact && normalizeContact(entry.contact) === normalizeContact(contact);
-      return sameCompany || sameContact;
+      const sameContactInList = contact && entryContactList(entry || {}).some(c => normalizeContact(c?.name || "") === normalizeContact(contact));
+      return sameCompany || sameContact || sameContactInList;
     });
     if (exists && exists[0] === nextType) {
       triggerAutoFlash(`company-${exists[0]}`);
@@ -4769,6 +5824,11 @@ export default function App(){
     triggerAutoFlash(`company-${nextType}`);
     setCompanyEdit(prev => ({ ...prev, [nextType]: false }));
     setCompanyModalCloseArmed(true);
+    openRoleAssignmentPrompt({
+      source: "quick-add-company",
+      company: company || "",
+      contact: contact || ""
+    });
   };
 
   const getContactOptionsForCompany = (company) => {
@@ -4814,17 +5874,28 @@ export default function App(){
     }
     setData(prev => {
       const entries = { ...(prev.additionalCompanies || {}) };
-      const entry = entries[type] || { contact: "", company: companyName, contacts: [] };
+      const entry = syncCompanyEntryPlaceholders(entries[type] || { contact: "", company: companyName, contacts: [] });
       const list = entry.contacts && entry.contacts.length
         ? entry.contacts
-        : (entry.contact ? [{ name: entry.contact, inactive: false }] : []);
+        : (entry.contact ? [{ name: entry.contact, inactive: false, placeholder: null }] : []);
       if (list.find(c => normalizeContact(c.name) === normalizeContact(name))) return prev;
-      const next = [...list, { name, inactive: false }];
-      entries[type] = { ...entry, company: companyName, contacts: next, contact: entry.contact || next[0]?.name || "" };
+      const next = [...list, { name, inactive: false, placeholder: null }];
+      entries[type] = syncCompanyEntryPlaceholders({
+        ...entry,
+        company: companyName,
+        contacts: next,
+        contact: entry.contact || next[0]?.name || "",
+        contactPlaceholder: null
+      });
       return { ...prev, additionalCompanies: entries };
     });
     registerContactCompany(name, companyName);
     triggerAutoFlash(`company-${type}`);
+    openRoleAssignmentPrompt({
+      source: "quick-add-contact",
+      company: companyName,
+      contact: name
+    });
   };
 
   const getSalesRepForContact = (name) => {
@@ -4837,17 +5908,39 @@ export default function App(){
     return found?.title || "";
   };
 
+  const updateCompanyCapability = useCallback((companyName, rowIndex, field, value) => {
+    setSampleContacts(prev => {
+      const normalized = normalizeSampleContacts(prev);
+      const fallbackCompany = normalized[rowIndex]?.company || "";
+      const targetCompany = normalizeCompany(companyName || fallbackCompany);
+      if (!targetCompany) {
+        return normalized.map((row, idx) => idx === rowIndex ? { ...row, [field]: value } : row);
+      }
+      return normalized.map(row =>
+        normalizeCompany(row.company || "") === targetCompany ? { ...row, [field]: value } : row
+      );
+    });
+  }, []);
+
   const addPlaceholderCompanyType = (type) => {
     if (!type) return;
     setData(prev => {
       const types = new Set(prev.additionalCompanyTypes || []);
       types.add(type);
+      const existing = prev.additionalCompanies?.[type];
       return {
         ...prev,
         additionalCompanyTypes: Array.from(types),
         additionalCompanies: {
           ...(prev.additionalCompanies || {}),
-          [type]: prev.additionalCompanies?.[type] || { contact: "", company: "" }
+          [type]: syncCompanyEntryPlaceholders(
+            existing || {
+              contact: "",
+              company: "",
+              placeholder: createPlaceholderFlag("company", `${type} pending`),
+              contactPlaceholder: createPlaceholderFlag("contact", `${type} contact pending`)
+            }
+          )
         }
       };
     });
@@ -4900,10 +5993,10 @@ export default function App(){
       const nextCompanies = { ...(prev.additionalCompanies || {}) };
       delete nextCompanies["Referring Company"];
       const existing = nextCompanies[inferredType] || { contact: "", company: "" };
-      nextCompanies[inferredType] = {
+      nextCompanies[inferredType] = syncCompanyEntryPlaceholders({
         contact: legacyEntry.contact || existing.contact || "",
         company: legacyEntry.company || existing.company || ""
-      };
+      });
       return { ...prev, additionalCompanyTypes: Array.from(nextTypes), additionalCompanies: nextCompanies };
     });
   }, [data.additionalCompanies, data.referringCompany]);
@@ -4914,25 +6007,37 @@ export default function App(){
     let changed = false;
     const cleaned = { ...entries };
     Object.entries(entries).forEach(([type, entry]) => {
-      const key = `${entry?.company ? normalizeCompany(entry.company) : ""}`;
+      const normalizedCurrent = syncCompanyEntryPlaceholders(cleaned[type] || entry);
+      if (JSON.stringify(normalizedCurrent) !== JSON.stringify(cleaned[type] || entry)) {
+        cleaned[type] = normalizedCurrent;
+        changed = true;
+      }
+      const key = `${normalizedCurrent?.company ? normalizeCompany(normalizedCurrent.company) : ""}`;
       if (!key) return;
       if (seen.has(key)) {
         const keepType = seen.get(key);
-        const keepEntry = cleaned[keepType] || {};
+        const keepEntry = syncCompanyEntryPlaceholders(cleaned[keepType] || {});
         const keepContacts = keepEntry.contacts && keepEntry.contacts.length
           ? keepEntry.contacts
           : (keepEntry.contact ? [{ name: keepEntry.contact, inactive: false }] : []);
-        const entryContacts = entry.contacts && entry.contacts.length
-          ? entry.contacts
-          : (entry.contact ? [{ name: entry.contact, inactive: false }] : []);
+        const entryContacts = normalizedCurrent.contacts && normalizedCurrent.contacts.length
+          ? normalizedCurrent.contacts
+          : (normalizedCurrent.contact ? [{ name: normalizedCurrent.contact, inactive: false }] : []);
         const merged = [...keepContacts];
         entryContacts.forEach(c => {
           if (!c?.name) return;
           if (!merged.find(x => normalizeContact(x.name) === normalizeContact(c.name))) {
-            merged.push({ name: c.name, inactive: !!c.inactive });
+            merged.push({ name: c.name, inactive: !!c.inactive, placeholder: c.placeholder || null });
           }
         });
-        cleaned[keepType] = { ...keepEntry, ...entry, contacts: merged, contact: merged[0]?.name || keepEntry.contact || entry.contact || "" };
+        cleaned[keepType] = syncCompanyEntryPlaceholders({
+          ...keepEntry,
+          ...normalizedCurrent,
+          contacts: merged,
+          contact: merged[0]?.name || keepEntry.contact || normalizedCurrent.contact || "",
+          placeholder: keepEntry.placeholder || normalizedCurrent.placeholder || null,
+          contactPlaceholder: keepEntry.contactPlaceholder || normalizedCurrent.contactPlaceholder || null
+        });
         delete cleaned[type];
         changed = true;
         return;
@@ -4958,43 +6063,48 @@ export default function App(){
   };
 
   const upsertAdditionalCompany = (type, entry) => {
-    const nextType = type || autoTypeForCompany(entry.company);
+    const nextType = type || autoTypeForCompany(entry?.company || "");
     setData(prev => {
       const types = new Set(prev.additionalCompanyTypes || []);
       const entries = { ...(prev.additionalCompanies || {}) };
-      const keyContact = entry.contact ? normalizeContact(entry.contact) : "";
-      const keyCompany = entry.company ? normalizeCompany(entry.company) : "";
+      const incomingEntry = syncCompanyEntryPlaceholders(entry || {});
+      const incomingContacts = entryContactList(incomingEntry);
+      const keyContact = incomingEntry.contact ? normalizeContact(incomingEntry.contact) : "";
+      const keyCompany = incomingEntry.company ? normalizeCompany(incomingEntry.company) : "";
       const existingType = Object.entries(entries).find(([t, e]) => {
+        const existingContacts = entryContactList(e || {});
         const sameContact = keyContact && e?.contact && normalizeContact(e.contact) === keyContact;
+        const sameContactInList = incomingContacts.some(incoming =>
+          existingContacts.some(existing => normalizeContact(existing?.name || "") === normalizeContact(incoming?.name || ""))
+        );
         const sameCompany = keyCompany && e?.company && normalizeCompany(e.company) === keyCompany;
-        return sameContact || sameCompany;
+        return sameContact || sameContactInList || sameCompany;
       })?.[0];
       const targetType = existingType || nextType;
       if (existingType && existingType !== targetType) {
         delete entries[existingType];
         types.delete(existingType);
       }
-      const existingEntry = entries[targetType] || {};
-      const existingContacts = existingEntry.contacts && existingEntry.contacts.length
-        ? existingEntry.contacts
-        : (existingEntry.contact ? [{ name: existingEntry.contact, inactive: false }] : []);
-      const incomingContacts = entry.contacts && entry.contacts.length
-        ? entry.contacts
-        : (entry.contact ? [{ name: entry.contact, inactive: false }] : []);
+      const existingEntry = syncCompanyEntryPlaceholders(entries[targetType] || {});
+      const existingContacts = entryContactList(existingEntry);
       const mergedContacts = [...existingContacts];
       incomingContacts.forEach(c => {
         if (!c?.name) return;
         if (!mergedContacts.find(x => normalizeContact(x.name) === normalizeContact(c.name))) {
-          mergedContacts.push({ name: c.name, inactive: !!c.inactive });
+          mergedContacts.push({ name: c.name, inactive: !!c.inactive, placeholder: c.placeholder || null });
         }
       });
       types.add(targetType);
-      entries[targetType] = {
+      entries[targetType] = syncCompanyEntryPlaceholders({
         ...(existingEntry || {}),
-        ...entry,
+        ...incomingEntry,
         contacts: mergedContacts,
-        contact: mergedContacts[0]?.name || entry.contact || existingEntry.contact || ""
-      };
+        contact: mergedContacts.find(c => hasMeaningfulValue(c?.name))?.name || incomingEntry.contact || existingEntry.contact || "",
+        placeholder: hasMeaningfulValue(incomingEntry.company) ? null : (incomingEntry.placeholder || existingEntry.placeholder || null),
+        contactPlaceholder: mergedContacts.some(c => hasMeaningfulValue(c?.name))
+          ? null
+          : (incomingEntry.contactPlaceholder || existingEntry.contactPlaceholder || createPlaceholderFlag("contact", `${targetType} contact pending`))
+      });
       setCompanyEdit(prev => ({ ...prev, [targetType]: false }));
       return { ...prev, additionalCompanyTypes: Array.from(types), additionalCompanies: entries };
     });
@@ -5032,32 +6142,79 @@ export default function App(){
       ...prev,
       additionalCompanies: {
         ...(prev.additionalCompanies || {}),
-        [type]: {
+        [type]: syncCompanyEntryPlaceholders({
           ...(prev.additionalCompanies?.[type] || { contact: "", company: "" }),
           contact,
-          company: (prev.additionalCompanies?.[type]?.company || suggested || "")
-        }
+          company: (prev.additionalCompanies?.[type]?.company || suggested || ""),
+          contactPlaceholder: hasMeaningfulValue(contact) ? null : (prev.additionalCompanies?.[type]?.contactPlaceholder || createPlaceholderFlag("contact", `${type} contact pending`))
+        })
       }
     }));
     // roles are handled via chips; no special type handling
   };
 
-  const handleBillingContactChange = (contact) => {
-    const suggested = contactCompanyMap.get(normalizeContact(contact));
+  const handleBillingContactChange = (value) => {
+    const raw = (value || "").trim();
+    const parsed = parseCombinedContact(raw);
+    const contact = parsed.contact || (companySet.has(raw) ? "" : raw);
+    const mappedCompany = contact ? (contactCompanyMap.get(normalizeContact(contact)) || "") : "";
+    const resolvedCompany = parsed.company || mappedCompany || data.billingCompany || "";
+
+    if (contact && !resolvedCompany) {
+      setToast("Select or add a company before adding a contact.");
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       billingContact: contact,
-      billingCompany: prev.billingCompany || suggested || ""
+      billingCompany: contact
+        ? (resolvedCompany || prev.billingCompany || "")
+        : (parsed.company || prev.billingCompany || "")
     }));
+
+    if (contact && resolvedCompany) {
+      registerContactCompany(contact, resolvedCompany);
+      openRoleAssignmentPrompt({
+        source: "billing-contact",
+        company: resolvedCompany,
+        contact,
+        skipRoles: ["billto"]
+      });
+    }
   };
 
-  const handleAdjusterContactChange = (contact) => {
-    const suggested = contactCompanyMap.get(normalizeContact(contact));
+  const handleAdjusterContactChange = (value) => {
+    const raw = (value || "").trim();
+    const parsed = parseCombinedContact(raw);
+    const contact = parsed.contact || (companySet.has(raw) ? "" : raw);
+    const mappedCompany = contact ? (contactCompanyMap.get(normalizeContact(contact)) || "") : "";
+    const resolvedCompany = parsed.company || mappedCompany || data.insuranceCompany || data.adjusterCompany || "";
+
+    if (contact && !resolvedCompany) {
+      setToast("Select or add a company before adding a contact.");
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       insuranceAdjuster: contact,
-      adjusterCompany: prev.adjusterCompany || suggested || ""
+      adjusterCompany: contact
+        ? (resolvedCompany || prev.adjusterCompany || "")
+        : (parsed.company || prev.adjusterCompany || ""),
+      insuranceCompany: prev.insuranceCompany || parsed.company || resolvedCompany || ""
     }));
+
+    if (contact && resolvedCompany) {
+      registerContactCompany(contact, resolvedCompany);
+      openRoleAssignmentPrompt({
+        source: "insurance-contact",
+        company: resolvedCompany,
+        contact,
+        preferredRoles: ["insurance"],
+        forceRoles: ["insurance"]
+      });
+    }
   };
 
   useEffect(() => {
@@ -5151,6 +6308,9 @@ export default function App(){
 
   const companyRolesFor = (entry) => {
     const roles = [];
+    const addRole = (id, icon, title) => {
+      if (!roles.find(r => r.id === id)) roles.push({ id, icon, title });
+    };
     const company = entry?.company || "";
     const contacts = entry?.contacts && entry.contacts.length
       ? entry.contacts
@@ -5158,13 +6318,16 @@ export default function App(){
     const contactNames = contacts.map(c => c.name);
     const isReferrerContact = !!data.referrer && contactNames.includes(data.referrer);
     const isBillToContact = !!data.billingContact && contactNames.includes(data.billingContact);
-    const isAdjusterContact = !!data.insuranceAdjuster && contactNames.includes(data.insuranceAdjuster);
+    const isInsuranceContact = !!data.insuranceAdjuster && contactNames.includes(data.insuranceAdjuster);
     const isReferrerCompany = !data.referrer && !!data.referringCompany && data.referringCompany === company;
     const isBillToCompany = !data.billingContact && !!data.billingCompany && data.billingCompany === company;
-    const isAdjusterCompany = !data.insuranceAdjuster && false;
-    if (isReferrerCompany) roles.push({ id: "referrer", icon: "🏷️", title: "Referrer" });
-    if (isBillToCompany) roles.push({ id: "billto", icon: "💳", title: "Bill To" });
-    if (isAdjusterCompany) roles.push({ id: "adjuster", icon: "🧑‍💼", title: "Adjuster" });
+    const isInsuranceCompany = !data.insuranceAdjuster && !!data.insuranceCompany && data.insuranceCompany === company;
+    if (isReferrerContact) addRole("referrer", "🏷️", "Referrer");
+    if (isInsuranceContact) addRole("insurance", "🛡️", "Insurance");
+    if (isBillToContact) addRole("billto", "💳", "Bill To");
+    if (isReferrerCompany) addRole("referrer", "🏷️", "Referrer");
+    if (isInsuranceCompany) addRole("insurance", "🛡️", "Insurance");
+    if (isBillToCompany) addRole("billto", "💳", "Bill To");
     return roles;
   };
 
@@ -5172,24 +6335,25 @@ export default function App(){
     const roles = [];
     const isReferrer = !!data.referrer && contact && data.referrer === contact;
     const isBillTo = !!data.billingContact && contact && data.billingContact === contact;
-    const isAdjuster = !!data.insuranceAdjuster && contact && data.insuranceAdjuster === contact;
+    const isInsurance = !!data.insuranceAdjuster && contact && data.insuranceAdjuster === contact;
     if (isReferrer) roles.push({ id: "referrer", icon: "🏷️", title: "Referrer" });
+    if (isInsurance) roles.push({ id: "insurance", icon: "🛡️", title: "Insurance" });
     if (isBillTo) roles.push({ id: "billto", icon: "💳", title: "Bill To" });
-    if (isAdjuster) roles.push({ id: "adjuster", icon: "🧑‍💼", title: "Adjuster" });
     return roles;
   };
 
   const getRoleOptionsForContact = (company, contact) => {
     const isReferrer = !!data.referrer && contact && data.referrer === contact;
     const isBillTo = !!data.billingContact && contact && data.billingContact === contact;
-    const isAdjuster = !!data.insuranceAdjuster && contact && data.insuranceAdjuster === contact;
+    const isInsurance = !!data.insuranceAdjuster && contact && data.insuranceAdjuster === contact;
     const refAssigned = !!data.referringCompany || !!data.referrer;
+    const insuranceAssigned = !!data.insuranceCompany || !!data.insuranceAdjuster;
     const billAssigned = !!data.billingCompany || !!data.billingContact;
-    const adjusterAssigned = !!data.insuranceAdjuster;
+    const insuranceEligible = isRoleEligibleForCompany("insurance", company);
     const options = [];
     if (!refAssigned || isReferrer) options.push({ id: "referrer", label: "Referrer", icon: "🏷️", active: isReferrer });
+    if (isInsurance || (!insuranceAssigned && insuranceEligible)) options.push({ id: "insurance", label: "Insurance", icon: "🛡️", active: isInsurance });
     if (!billAssigned || isBillTo) options.push({ id: "billto", label: "Bill To", icon: "💳", active: isBillTo });
-    if (!adjusterAssigned || isAdjuster) options.push({ id: "adjuster", label: "Adjuster", icon: "🧑‍💼", active: isAdjuster });
     return options;
   };
 
@@ -5197,8 +6361,8 @@ export default function App(){
     if (!company && !contact) return;
     const patch = {};
     const refActive = (!!data.referrer && contact && data.referrer === contact) || (!data.referrer && !!data.referringCompany && data.referringCompany === company);
+    const insuranceActive = (!!data.insuranceAdjuster && contact && data.insuranceAdjuster === contact) || (!data.insuranceAdjuster && !!data.insuranceCompany && data.insuranceCompany === company);
     const billActive = (!!data.billingContact && contact && data.billingContact === contact) || (!data.billingContact && !!data.billingCompany && data.billingCompany === company);
-    const adjActive = !!data.insuranceAdjuster && contact && data.insuranceAdjuster === contact;
 
     if (id === "referrer") {
       if (refActive) {
@@ -5218,13 +6382,20 @@ export default function App(){
         if (contact) patch.billingContact = contact;
       }
     }
-    if (id === "adjuster") {
-      if (adjActive) {
-        patch.insuranceAdjuster = "";
-      } else if (contact) {
-        patch.insuranceAdjuster = contact;
+    if (id === "insurance") {
+      if (!insuranceActive && !isRoleEligibleForCompany("insurance", company)) {
+        setToast("Insurance role is not eligible for this company type.");
+        return;
+      }
+      if (insuranceActive) {
+        if (company && data.insuranceCompany === company) patch.insuranceCompany = "";
+        if (contact && data.insuranceAdjuster === contact) patch.insuranceAdjuster = "";
+      } else {
+        if (company) patch.insuranceCompany = company;
+        if (contact) patch.insuranceAdjuster = contact;
         patch.insuranceClaim = "Yes";
         patch.involvesInsurance = "Yes";
+        if (!data.billingPayer) patch.billingPayer = "Insurance";
       }
     }
     updateMany(patch);
@@ -5303,6 +6474,12 @@ export default function App(){
             activeSection={activeSectionId} 
             visitedSections={visitedSections} 
             onJump={jumpToSection} 
+            onJumpSub={(sectionId, subId) => {
+              jumpToSection(sectionId);
+              if (subId) {
+                setTimeout(() => openSearchSubsection(subId), 160);
+              }
+            }}
             title={entryMode === 'quick' ? 'Quick Entry' : 'New Order'} 
             version="v55"
             entryMode={entryMode}
@@ -5334,7 +6511,8 @@ export default function App(){
                       title="1. Order & Interview"
                       helpText="Enter job basics + call details (source, scope/needs, internal codes if known)."
                       isOpen={openSections.sec1}
-                      onToggle={()=>handleToggleSection('sec1')}
+                      onHeaderClick={()=>handleOpenSection('sec1')}
+                      onCaretClick={()=>handleToggleSection('sec1')}
                       badges={
                         <div className="flex items-center gap-2">
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${recordTypeLabel === "Select Type" ? "bg-amber-50 text-amber-700" : "bg-sky-50 text-sky-700"}`}>{recordTypeLabel}</span>
@@ -5348,7 +6526,16 @@ export default function App(){
                             <SubSection title="Order" open={orderSubOpen} onToggle={() => setOrderSubOpen(!orderSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("order") ? "audit-outline" : ""}>
                                 <Field label={<span>Order Name <span className="font-normal text-slate-400 text-xs ml-1">(Auto-generated)</span></span>} missing={data.highlightMissing?.orderName}>
                                   <div className="flex gap-2">
-                                      <Input ref={orderNameInputRef} data-audit-key="orderName" className={auditOn && data.highlightMissing?.orderName ? "audit-missing" : ""} value={data.orderName} onChange={e=>updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })} disabled={!!data.orderNameLocked} placeholder="e.g. Name-TownST" />
+                                      <Input
+                                        ref={orderNameInputRef}
+                                        data-audit-key="orderName"
+                                        className={`${auditOn && data.highlightMissing?.orderName ? "audit-missing" : ""} ${data.orderNameLocked ? "bg-slate-100 text-slate-500" : ""}`}
+                                        value={data.orderName}
+                                        onChange={e=>updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })}
+                                        readOnly={!!data.orderNameLocked}
+                                        aria-readonly={!!data.orderNameLocked}
+                                        placeholder="e.g. Name-TownST"
+                                      />
                                       <button className={`rounded-lg border px-3 text-xs font-bold transition-all ${data.orderNameLocked?"bg-slate-800 text-white":"bg-white hover:bg-slate-50"}`} onClick={()=>updateMany({ orderNameLocked: !data.orderNameLocked, orderNameAuto: data.orderNameLocked ? data.orderNameAuto : false })}>{data.orderNameLocked?"LOCKED":"LOCK"}</button>
                                   </div>
                                 </Field>
@@ -5401,7 +6588,8 @@ export default function App(){
                                     const severityLetterMap = { Fire: "F", Water: "W", Mold: "M", Dust: "D", Protein: "P", Oil: "O" };
                                     const severityCode = (data.severityCodes || []).find(c => c.startsWith(severityGroup + "-"));
                                     const severityShort = severityCode ? `${severityLetterMap[severityGroup] || ""}${severityCode.split("-")[1]}` : "";
-                                    const attentionForSeverity = (severityGroup === "Water" && attentionWater) || (severityGroup === "Mold" && attentionMold);
+                                    const needsSeverityCode = hasSeverity && data.restorationType !== "Non-Restoration Project" && expectedSeverityGroups.has(severityGroup) && !severityCode;
+                                    const attentionForSeverity = (severityGroup === "Water" && attentionWater) || (severityGroup === "Mold" && attentionMold) || needsSeverityCode;
                                     return (
                                         <div key={type} className="animate-purple-section-fade rounded-xl border border-sky-100 bg-sky-50/30 overflow-hidden transition-all shadow-sm">
                                             <button type="button" className="flex w-full items-center justify-between px-4 py-3 bg-sky-50/50 hover:bg-sky-100/50 transition-colors text-left" onClick={() => { toggleMinimizeLoss(type); if (isMinimized) setManualEditLossTypes(p => ({ ...p, [type]: true })); }}>
@@ -5420,7 +6608,14 @@ export default function App(){
                                                 <div className="p-4 grid gap-4 border-t border-sky-100 bg-white">
                                                     {hasSeverity && data.restorationType !== "Non-Restoration Project" && (
                                                         <Field label="Severity" subtle>
-                                                            <div className="flex gap-2" data-audit-key={`severity-${severityGroup.toLowerCase()}`}>{SEVERITY_LEVELS.map(level => { const code = `${severityGroup}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`h-9 w-9 rounded-lg text-sm font-bold transition-all border ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : 'bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-200'} ${attentionForSeverity ? 'attention-outline' : ''}`}>{level}</button>); })}</div>
+                                                            <div className={`rounded-lg ${needsSeverityCode ? "border border-orange-200 bg-orange-50/60 p-2" : ""}`}>
+                                                              <div className="flex gap-2" data-audit-key={`severity-${severityGroup.toLowerCase()}`}>{SEVERITY_LEVELS.map(level => { const code = `${severityGroup}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`h-9 w-9 rounded-lg text-sm font-bold transition-all border ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : needsSeverityCode ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100' : 'bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-200'} ${attentionForSeverity && !needsSeverityCode ? 'attention-outline' : ''}`}>{level}</button>); })}</div>
+                                                              {needsSeverityCode && (
+                                                                <div className="mt-1 text-[11px] font-semibold text-orange-700">
+                                                                  Expected: select a {severityGroup} severity code.
+                                                                </div>
+                                                              )}
+                                                            </div>
                                                         </Field>
                                                     )}
                                                     {hasCauses && (<Field label={`${type} Cause`} subtle><div className="flex flex-wrap gap-2">{CAUSES[type].map(c => (<ToggleMulti key={c} label={c} checked={(details.causes || []).includes(c)} onChange={() => updateLossDetail(type, 'causes', c)} />))}</div></Field>)}
@@ -5457,7 +6652,7 @@ export default function App(){
                             </SubSection>
 
                             <SubSection title="Source" open={sourceSubOpen} onToggle={() => setSourceSubOpen(!sourceSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("source") ? "audit-outline" : ""}>
-                            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} />
+                            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} onPromptRoleAssignment={openRoleAssignmentPrompt} />
                             </SubSection>
 
                             <SubSection title="Interview" open={interviewSubOpen} onToggle={() => setInterviewSubOpen(!interviewSubOpen)} compact={compactMode}>
@@ -5465,16 +6660,64 @@ export default function App(){
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4 space-y-4">
                                       <label className="text-xs font-bold text-sky-600 uppercase flex items-center gap-1">Conditions <span className="text-orange-500">⚡</span></label>
                                       <div className="flex flex-wrap gap-3">
-                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.damageWasWet ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'} ${suggestWet ? 'suggested-field' : ''}`}>
-                                            <input type="checkbox" checked={data.damageWasWet} onChange={e => updateSmart('damageWasWet', e.target.checked ? 'Y' : 'N')} />
-                                            <span className="text-sm">Still Wet</span>
-                                            {suggestWet && <span className="ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold suggested-pill">Suggested</span>}
-                                          </div>
-                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.damageMoldMildew ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.damageMoldMildew} onChange={e => updateSmart('damageMoldMildew', e.target.checked)} /><span className="text-sm">Visible Mold</span></div>
-                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.structuralElectricDamage === 'Y' ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.structuralElectricDamage === 'Y'} onChange={e => update("structuralElectricDamage", e.target.checked ? 'Y' : 'N')} /><span className="text-sm">Structural Damage</span></div>
-                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.noLights ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.noLights} onChange={e => updateSmart('noLights', e.target.checked)} /><span className="text-sm">No Electricity</span></div>
-                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.noHeat ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.noHeat} onChange={e => updateSmart('noHeat', e.target.checked)} /><span className="text-sm">No Heat</span></div>
-                                          <div className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${data.boardedUp ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}><input type="checkbox" checked={data.boardedUp} onChange={e => updateSmart('boardedUp', e.target.checked)} /><span className="text-sm">Boarded Up</span></div>
+                                          {[
+                                            {
+                                              id: "wet",
+                                              label: "Still Wet",
+                                              active: !!data.damageWasWet,
+                                              onToggle: () => updateSmart("damageWasWet", data.damageWasWet ? "N" : "Y"),
+                                              suggested: suggestWet
+                                            },
+                                            {
+                                              id: "mold",
+                                              label: "Visible Mold",
+                                              active: !!data.damageMoldMildew,
+                                              onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew)
+                                            },
+                                            {
+                                              id: "structural",
+                                              label: "Structural Damage",
+                                              active: data.structuralElectricDamage === "Y",
+                                              onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y")
+                                            },
+                                            {
+                                              id: "lights",
+                                              label: "No Electricity",
+                                              active: !!data.noLights,
+                                              onToggle: () => updateSmart("noLights", !data.noLights)
+                                            },
+                                            {
+                                              id: "heat",
+                                              label: "No Heat",
+                                              active: !!data.noHeat,
+                                              onToggle: () => updateSmart("noHeat", !data.noHeat)
+                                            },
+                                            {
+                                              id: "boarded",
+                                              label: "Boarded Up",
+                                              active: !!data.boardedUp,
+                                              onToggle: () => updateSmart("boardedUp", !data.boardedUp)
+                                            }
+                                          ].map(item => (
+                                            <button
+                                              key={item.id}
+                                              type="button"
+                                              onClick={item.onToggle}
+                                              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+                                                item.active
+                                                  ? "border-orange-300 bg-orange-50 text-slate-800"
+                                                  : "border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:text-sky-700"
+                                              } ${item.suggested ? "suggested-field" : ""}`}
+                                            >
+                                              <span className={`inline-block h-2 w-2 rounded-full ${item.active ? "bg-sky-500" : "bg-slate-300"}`} />
+                                              <span>{item.label}</span>
+                                              {item.suggested ? (
+                                                <span className="ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold suggested-pill">
+                                                  Suggested
+                                                </span>
+                                              ) : null}
+                                            </button>
+                                          ))}
                                       </div>
                                   </div>
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
@@ -5631,12 +6874,18 @@ export default function App(){
                                                 <div className="mb-2 text-xs font-bold text-slate-400">SEVERITY</div>
                                                 <div className="text-xs text-slate-500 mb-3">1 = No Rejects, 5 = Many Rejects (higher means more rejects).</div>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">{SEVERITY_GROUPS.map(type => {
-                                                  const needsAttention = (type === "Water" && attentionWater) || (type === "Mold" && attentionMold);
+                                                  const hasGroupCode = (data.severityCodes || []).some(c => c.startsWith(`${type}-`));
+                                                  const expectsGroupCode = expectedSeverityGroups.has(type);
+                                                  const needsExpectedCode = expectsGroupCode && !hasGroupCode;
+                                                  const needsAttention = (type === "Water" && attentionWater) || (type === "Mold" && attentionMold) || needsExpectedCode;
                                                   return (
-                                                    <div key={type} data-audit-key={`severity-${type.toLowerCase()}`} className={`rounded-lg border border-slate-200 p-2 ${needsAttention ? "attention-outline" : ""}`}>
-                                                      <div className="text-xs font-bold text-slate-600 mb-1.5">{type}</div>
+                                                    <div key={type} data-audit-key={`severity-${type.toLowerCase()}`} className={`rounded-lg border p-2 ${needsExpectedCode ? "border-orange-300 bg-orange-50/60" : "border-slate-200"} ${needsAttention && !needsExpectedCode ? "attention-outline" : ""}`}>
+                                                      <div className="mb-1.5 flex items-center justify-between">
+                                                        <div className="text-xs font-bold text-slate-600">{type}</div>
+                                                        {needsExpectedCode ? <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">Expected</span> : null}
+                                                      </div>
                                                       <div className="flex gap-1">
-                                                        {SEVERITY_LEVELS.map(level => { const code = `${type}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`flex-1 rounded py-1 text-xs font-bold transition-all ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : 'bg-slate-100 border border-slate-300 text-slate-600 hover:bg-slate-200'} ${needsAttention ? "attention-outline" : ""}`}>{level}</button>); })}
+                                                        {SEVERITY_LEVELS.map(level => { const code = `${type}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`flex-1 rounded py-1 text-xs font-bold transition-all ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : needsExpectedCode ? 'bg-orange-50 border border-orange-300 text-orange-700 hover:bg-orange-100' : 'bg-slate-100 border border-slate-300 text-slate-600 hover:bg-slate-200'} ${needsAttention && !needsExpectedCode ? "attention-outline" : ""}`}>{level}</button>); })}
                                                       </div>
                                                     </div>
                                                   );
@@ -5664,7 +6913,7 @@ export default function App(){
                         </div>
                     </Section>
 
-                    <Section id="sec2" title="2. Customer" helpText="Add the customer + any key contacts (spouse, tenant, neighbor, PM)." isOpen={openSections.sec2} onToggle={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}>
+                    <Section id="sec2" title="2. Customer" helpText="Add the customer + any key contacts (spouse, tenant, neighbor, PM)." isOpen={openSections.sec2} onHeaderClick={()=>handleOpenSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}>
                       <div className="space-y-4">
                         {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
@@ -5675,9 +6924,9 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec3" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onToggle={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}>
+                    <Section id="sec3" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onHeaderClick={()=>handleOpenSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}>
                       <div className="space-y-4">
-                        {data.addresses.map((a,i)=><AddressItem key={a.id} addr={a} total={data.addresses.length} updateAddr={updateAddr} onRemove={removeAddr} index={i} highlightMissing={data.highlightMissing} auditOn={auditOn} onVerify={verifyAddressDemo} ToggleMulti={ToggleMulti} rentOrOwn={data.rentOrOwn} rentCoverageLimit={data.rentCoverageLimit} onRentOrOwnChange={(v)=>update("rentOrOwn", v)} onRentCoverageChange={(v)=>update("rentCoverageLimit", v)} forceShowCoords={i===0 ? showPrimaryCoords : false} />)}
+                        {data.addresses.map((a,i)=><AddressItem key={a.id} addr={a} total={data.addresses.length} updateAddr={updateAddr} onRemove={removeAddr} index={i} highlightMissing={data.highlightMissing} auditOn={auditOn} onVerify={verifyAddressDemo} ToggleMulti={ToggleMulti} rentOrOwn={data.rentOrOwn} rentCoverageLimit={data.rentCoverageLimit} onRentOrOwnChange={(v)=>update("rentOrOwn", v)} onRentCoverageChange={(v)=>update("rentCoverageLimit", v)} forceShowCoords={i===0 ? showPrimaryCoords : false} autoOpenForTypePrompt={pendingAddressTypePromptId === a.id} autoFocusTypePrompt={pendingAddressTypePromptId === a.id} onTypePromptFocused={handleAddressTypePromptFocused} />)}
                         <div className="pt-2"><button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button></div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec3')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
@@ -5686,7 +6935,7 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec4" title="4. Billing & Companies" helpText="Who pays + who’s involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onToggle={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
+                    <Section id="sec4" title="4. Billing & Companies" helpText="Who pays + who’s involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onHeaderClick={()=>handleOpenSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
                       <div className="grid gap-6">
                         <SubSection
                           title="Companies & Contacts"
@@ -5708,8 +6957,8 @@ export default function App(){
                               <div className="text-sm font-bold text-slate-700">Roles</div>
                               <div className="flex items-center gap-2">
                                 {pendingCompanyRoleCount > 0 && (
-                                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                                    {pendingCompanyRoleCount} pending
+                                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">
+                                    {pendingCompanyRoleCount} placeholders
                                   </span>
                                 )}
                                 <button
@@ -5740,7 +6989,17 @@ export default function App(){
                                   const anyContactRoles = !!(getRolesForContact && contacts.some(c => (getRolesForContact(role.companyName, c.name) || []).length));
                                   const rows = contacts.length ? contacts : [{ name: "" }];
                                   return rows.map((c, idx) => (
-                                    <div key={`${role.id}-${c.name || idx}`} className={`grid grid-cols-1 md:grid-cols-12 gap-2 px-4 py-2 ${role.pending ? 'bg-emerald-50/40' : ''}`}>
+                                    <div
+                                      key={`${role.id}-${c.name || idx}`}
+                                      data-audit-key={
+                                        role.companyPlaceholder
+                                          ? `placeholder-company-${normalizePlaceholderKeyPart(role.type || role.id)}`
+                                          : (role.contactPlaceholder && idx === 0
+                                            ? `placeholder-contact-${normalizePlaceholderKeyPart(role.type || role.id)}`
+                                            : undefined)
+                                      }
+                                      className={`grid grid-cols-1 md:grid-cols-12 gap-2 px-4 py-2 ${(role.pending || isPlaceholderFlagActive(c?.placeholder)) ? 'placeholder-shell rounded-lg' : ''}`}
+                                    >
                                       <button
                                         type="button"
                                         onClick={() => toggleCompanyRoleNeeded(role)}
@@ -5749,7 +7008,12 @@ export default function App(){
                                       >
                                         {idx === 0 && (
                                           <div className="flex flex-col gap-1">
-                                            <span className="text-sm font-semibold text-sky-700">{role.label}</span>
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-sm font-semibold text-sky-700">{role.label}</span>
+                                              {role.pending && (
+                                                <span className="text-[10px] font-bold uppercase tracking-wider placeholder-text">Placeholder</span>
+                                              )}
+                                            </div>
                                           </div>
                                         )}
                                       </button>
@@ -5761,7 +7025,7 @@ export default function App(){
                                       >
                                         {idx === 0 && (
                                           <div className="flex flex-col gap-1">
-                                            <span className={`font-medium ${role.companyName ? 'text-slate-700' : 'text-sky-600'}`}>
+                                            <span className={`font-medium ${role.companyName ? 'text-slate-700' : 'placeholder-text'}`}>
                                               {role.companyName || "Add company"}
                                             </span>
                                             {(() => {
@@ -5798,7 +7062,7 @@ export default function App(){
                                       >
                                         {c?.name ? (
                                           <div className="flex flex-col">
-                                            <span className="font-medium text-slate-700">{c.name}</span>
+                                            <span className={`font-medium ${isPlaceholderFlagActive(c?.placeholder) ? "placeholder-text" : "text-slate-700"}`}>{c.name}</span>
                                             <span className="text-[11px] text-slate-500">{getTitleForContact(c.name) || "Contact"}</span>
                                             {getRolesForContact && (
                                               <div className="mt-1 flex flex-wrap gap-1">
@@ -5821,8 +7085,8 @@ export default function App(){
                                             )}
                                           </div>
                                         ) : (
-                                          <span className={role.companyName ? "text-sky-600" : "text-slate-300"}>
-                                            {role.companyName ? "Add contact" : "—"}
+                                          <span className="placeholder-text">
+                                            Add contact
                                           </span>
                                         )}
                                       </button>
@@ -5846,7 +7110,7 @@ export default function App(){
                                 </span>
                               }><Input className={getFlashClass("billingCompany")} value={data.billingCompany} onChange={e=>update("billingCompany", e.target.value)} placeholder="Billing company" /></Field>
                               <Field label="Billing Contact" subtle action={<span className="text-[10px] text-slate-400">Auto-fill company</span>}>
-                                <Input value={data.billingContact} onChange={e=>handleBillingContactChange(e.target.value)} placeholder="Billing contact" />
+                                <SearchSelect data-audit-key="billingContact" value={data.billingContact} onChange={(v)=>handleBillingContactChange(v)} options={combinedContactOptions} listId="billing-contact-list" />
                               </Field>
                             </div>
                           )}
@@ -5910,7 +7174,7 @@ export default function App(){
                               </div>
                               <Field label="Adjuster">
                                 <div className={`flex gap-2 ${getFlashClass("insuranceAdjuster")}`}>
-                                  <SearchSelect value={data.insuranceAdjuster} onChange={(v)=>handleAdjusterContactChange(v)} options={contacts} listId="insurance-adjuster-list" />
+                                  <SearchSelect data-audit-key="insuranceAdjuster" value={data.insuranceAdjuster} onChange={(v)=>handleAdjusterContactChange(v)} options={combinedContactOptions} listId="insurance-adjuster-list" />
                                   <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"contact",value:"",onSave:(name)=>update("insuranceAdjuster",name)})}>+</button>
                                 </div>
                               </Field>
@@ -5945,7 +7209,7 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec5" title="5. Schedule" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onToggle={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}>
+                    <Section id="sec5" title="5. Schedule" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onHeaderClick={()=>handleOpenSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}>
                       <div className="space-y-6">
                         <SubSection title="Schedule" open={scheduleSubOpen} onToggle={() => setScheduleSubOpen(!scheduleSubOpen)} compact={compactMode}>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -6260,6 +7524,7 @@ export default function App(){
                     onSetNowTime={setNowTime}
                     dateCloseSignal={dateCloseTick}
                     timeCloseSignal={timeCloseTick}
+                    onPromptRoleAssignment={openRoleAssignmentPrompt}
                 />
               )}
 
@@ -6307,7 +7572,7 @@ export default function App(){
               </div>
             </div>
             <div className="px-3 py-2 text-[11px] text-slate-500 flex items-center justify-between">
-              <span>Missing critical fields:</span>
+              <span>Critical fields + placeholders:</span>
               <span className="font-bold text-slate-600">{auditPercent}% complete</span>
             </div>
             <div className="max-h-[520px] overflow-y-auto custom-scroll px-3 pb-3 space-y-2">
@@ -6318,10 +7583,10 @@ export default function App(){
                   <button
                     key={`${item.key}-${idx}`}
                     onClick={() => focusAuditItem(item)}
-                    className="w-full text-left rounded-lg px-3 py-2 border border-slate-200 hover:border-sky-300 hover:bg-sky-50"
+                    className={`w-full text-left rounded-lg px-3 py-2 border hover:border-sky-300 hover:bg-sky-50 ${(item.key || "").startsWith("placeholder-") ? "audit-placeholder-pill" : "border-slate-200"}`}
                   >
                     <div className="text-xs font-bold text-slate-700">{item.label}</div>
-                    <div className="text-[10px] text-slate-400">Go to section</div>
+                    <div className="text-[10px] text-slate-400">{item.category === "placeholders" ? "Placeholder Queue" : "Go to section"}</div>
                   </button>
                 ))
               )}
@@ -6331,6 +7596,119 @@ export default function App(){
       
       {toast && <Toast message={toast} onClose={()=>setToast("")} />}
       {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} />}
+      {smartConfirm.isOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+            <div className="bg-sky-500 px-6 py-4">
+              <h3 className="text-xl font-bold text-white">{smartConfirm.title || "Confirm Smart Update"}</h3>
+            </div>
+            <div className="p-6 space-y-3">
+              {smartConfirm.message && (
+                <p className="text-sm text-slate-700">{smartConfirm.message}</p>
+              )}
+              {smartConfirm.details?.length > 0 && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                  <ul className="space-y-1 text-sm text-slate-700">
+                    {smartConfirm.details.map((detail, index) => (
+                      <li key={`${detail}-${index}`}>• {detail}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+              <button
+                className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                onClick={() => resolveSmartConfirm(false)}
+              >
+                {smartConfirm.cancelLabel || "Keep"}
+              </button>
+              <button
+                className="rounded-lg bg-orange-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-orange-600"
+                onClick={() => resolveSmartConfirm(true)}
+              >
+                {smartConfirm.confirmLabel || "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {roleAssignModal.isOpen && (
+        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[131] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-12 sm:pt-20">
+          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+            <div className="bg-sky-500 px-6 py-4">
+              <h3 className="text-xl font-bold text-white">Assign Company/Contact Roles</h3>
+              <div className="mt-1 text-base text-sky-100">Apply badges for this company/contact now.</div>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="space-y-2 text-base leading-7 text-slate-700">
+                {roleAssignModal.company ? (
+                    <div className="grid grid-cols-[132px_1fr] items-start gap-x-3">
+                      <span className="font-semibold text-slate-900">Company</span>
+                      <span>{roleAssignModal.company}</span>
+                    </div>
+                ) : null}
+                {roleAssignModal.company ? (
+                    <div className="grid grid-cols-[132px_1fr] items-start gap-x-3">
+                      <span className="font-semibold text-slate-900">Company Type</span>
+                      <span>{getCompanyTypeForRoles(roleAssignModal.company) || "Unknown"}</span>
+                    </div>
+                ) : null}
+                {roleAssignModal.contact ? (
+                    <div className="grid grid-cols-[132px_1fr] items-start gap-x-3">
+                      <span className="font-semibold text-slate-900">Contact</span>
+                      <span>{roleAssignModal.contact}</span>
+                    </div>
+                ) : null}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-bold uppercase tracking-widest text-slate-500">Available Badges</div>
+                <div className="flex flex-wrap gap-2">
+                  {roleAssignModal.options.map(role => {
+                    const active = roleAssignModal.selected.includes(role.id);
+                    return (
+                      <button
+                        key={`role-assign-${role.id}`}
+                        type="button"
+                        onClick={() => toggleRoleAssignmentSelection(role.id)}
+                        className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${active ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"}`}
+                      >
+                        <span className="mr-1">{role.icon}</span>
+                        {role.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex items-center justify-between gap-3 border-t border-slate-200">
+              <button
+                className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                onClick={goBackFromRoleAssignmentPrompt}
+              >
+                Go Back
+              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                  onClick={closeRoleAssignmentPrompt}
+                >
+                  Skip
+                </button>
+                <button
+                  className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  onClick={applySelectedRoleAssignments}
+                  disabled={!roleAssignModal.selected.length}
+                >
+                  Apply Roles
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {saveSummaryOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
@@ -6415,7 +7793,7 @@ export default function App(){
       {showSampleDataModal && (
         <div className="fixed inset-0 z-[115] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div
-            className="w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/5"
+            className="w-full max-w-5xl rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/5"
             onMouseDown={(e)=>e.stopPropagation()}
             onClick={(e)=>e.stopPropagation()}
             onKeyDown={(e)=>e.stopPropagation()}
@@ -6430,39 +7808,109 @@ export default function App(){
                 Close
               </button>
             </div>
-            <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-slate-400 uppercase">
-              <div className="col-span-3">Contact</div>
-              <div className="col-span-3">Company</div>
-              <div className="col-span-2">Company Type</div>
-              <div className="col-span-2">Title</div>
-              <div className="col-span-1">Rep</div>
-              <div className="col-span-1">Adj</div>
+            <div className="grid grid-cols-[2fr_2fr_1.4fr_1.4fr_1fr_0.7fr_0.8fr_0.8fr_0.8fr_2fr_0.5fr] gap-2 text-[10px] font-bold text-slate-400 uppercase">
+              <div>Contact</div>
+              <div>Company</div>
+              <div>Company Type</div>
+              <div>Title</div>
+              <div>Rep</div>
+              <div>Adj</div>
+              <div>Refer</div>
+              <div>Bill</div>
+              <div>Insure</div>
+              <div>Eligible Roles</div>
+              <div></div>
             </div>
             <div className="mt-2 space-y-2">
               {sampleContacts.map((row, idx) => (
-                <div key={row.id || idx} className="grid grid-cols-12 gap-2">
-                  <div className="col-span-3">
+                <div key={row.id || idx} className="grid grid-cols-[2fr_2fr_1.4fr_1.4fr_1fr_0.7fr_0.8fr_0.8fr_0.8fr_2fr_0.5fr] gap-2 items-center">
+                  <div>
                     <Input value={row.name} onChange={(e)=>setSampleContacts(prev => prev.map((r,i)=> i===idx ? { ...r, name: e.target.value } : r))} className="!py-1.5 !text-xs" />
                   </div>
-                  <div className="col-span-3">
-                    <Input value={row.company} onChange={(e)=>setSampleContacts(prev => prev.map((r,i)=> i===idx ? { ...r, company: e.target.value } : r))} className="!py-1.5 !text-xs" />
+                  <div>
+                    <Input
+                      value={row.company}
+                      onChange={(e)=>setSampleContacts(prev => {
+                        const normalized = normalizeSampleContacts(prev);
+                        const nextCompany = e.target.value;
+                        const peer = normalized.find((r, i) => i !== idx && normalizeCompany(r.company || "") === normalizeCompany(nextCompany || ""));
+                        const fallback = inferRoleCapabilities(normalized[idx]?.companyType || "", nextCompany);
+                        const nextCaps = peer
+                          ? { canRefer: !!peer.canRefer, canBill: !!peer.canBill, canInsure: !!peer.canInsure }
+                          : fallback;
+                        return normalized.map((r,i)=> i===idx ? { ...r, company: nextCompany, ...nextCaps } : r);
+                      })}
+                      className="!py-1.5 !text-xs"
+                    />
                   </div>
-                  <div className="col-span-2">
-                    <Input value={row.companyType || ""} onChange={(e)=>setSampleContacts(prev => prev.map((r,i)=> i===idx ? { ...r, companyType: e.target.value } : r))} className="!py-1.5 !text-xs" placeholder="Type" />
+                  <div>
+                    <Input
+                      value={row.companyType || ""}
+                      onChange={(e)=>setSampleContacts(prev => {
+                        const normalized = normalizeSampleContacts(prev);
+                        const nextType = e.target.value;
+                        const companyName = normalized[idx]?.company || "";
+                        const peers = normalized.filter((r, i) => i !== idx && normalizeCompany(r.company || "") === normalizeCompany(companyName || ""));
+                        const inferred = inferRoleCapabilities(nextType, companyName);
+                        return normalized.map((r, i) => {
+                          if (i !== idx) return r;
+                          if (peers.length) return { ...r, companyType: nextType };
+                          return {
+                            ...r,
+                            companyType: nextType,
+                            canRefer: inferred.canRefer,
+                            canBill: inferred.canBill,
+                            canInsure: inferred.canInsure
+                          };
+                        });
+                      })}
+                      className="!py-1.5 !text-xs"
+                      placeholder="Type"
+                    />
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <Input value={row.title || ""} onChange={(e)=>setSampleContacts(prev => prev.map((r,i)=> i===idx ? { ...r, title: e.target.value } : r))} className="!py-1.5 !text-xs" />
                   </div>
-                  <div className="col-span-1">
+                  <div>
                     <Select value={row.salesRep || ""} onChange={(e)=>setSampleContacts(prev => prev.map((r,i)=> i===idx ? { ...r, salesRep: e.target.value } : r))} className="!py-1.5 !text-[10px]">
                       <option value="">Unassigned</option>
                       {SALES_REPS.map(rep => <option key={rep} value={rep}>{rep}</option>)}
                     </Select>
                   </div>
-                  <div className="col-span-1 flex items-center justify-center gap-2">
+                  <div className="flex items-center justify-center">
                     <label className="flex items-center gap-1 text-[10px] text-slate-400">
                       <input type="checkbox" checked={!!row.isAdjuster} onChange={(e)=>setSampleContacts(prev => prev.map((r,i)=> i===idx ? { ...r, isAdjuster: e.target.checked } : r))} />
                     </label>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={!!row.canRefer}
+                      onChange={(e) => updateCompanyCapability(row.company, idx, "canRefer", e.target.checked)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={!!row.canBill}
+                      onChange={(e) => updateCompanyCapability(row.company, idx, "canBill", e.target.checked)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={!!row.canInsure}
+                      onChange={(e) => updateCompanyCapability(row.company, idx, "canInsure", e.target.checked)}
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {getEligibleRoleLabels(row.company || "", row.companyType || "").map(role => (
+                      <span key={`${row.id || idx}-${role}`} className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
+                        {role}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-center">
                     <button onClick={() => setSampleContacts(prev => prev.filter((_,i)=>i!==idx))} className="text-rose-600 text-xs font-bold">×</button>
                   </div>
                 </div>
@@ -6470,12 +7918,12 @@ export default function App(){
             </div>
             <div className="mt-3 flex items-center justify-between">
               <button
-                onClick={() => setSampleContacts(prev => [...prev, { id: safeUid(), name: "", company: "", companyType: "", title: "", salesRep: "", isAdjuster: false }])}
+                onClick={() => setSampleContacts(prev => [...prev, { id: safeUid(), name: "", company: "", companyType: "", title: "", salesRep: "", isAdjuster: false, canRefer: true, canBill: false, canInsure: false }])}
                 className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
               >
                 + Add Row
               </button>
-              <div className="text-[10px] text-slate-400">Edits save automatically.</div>
+              <div className="text-[10px] text-slate-400">Edits save automatically. Refer/Bill/Insure apply to all contacts at the same company.</div>
             </div>
           </div>
         </div>
@@ -6532,11 +7980,11 @@ export default function App(){
 
       {addCompanyModalOpen && (
           <div
-            className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[110] flex items-start justify-center bg-slate-900/30 backdrop-blur-sm p-4 pt-12 sm:pt-20"
             onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); setAddCompanyPanel(""); }}
           >
           <div
-            className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden fade-in"
+            className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden fade-in"
             onClick={(e)=>e.stopPropagation()}
             tabIndex={0}
             onKeyDown={(e) => {
@@ -6591,6 +8039,8 @@ export default function App(){
                   clearOnCommit
                   inputRef={addCompanyInputRef}
                   options={combinedContactOptions}
+                  maxResults={16}
+                  menuClassName="max-h-[28rem]"
                   placeholder="Start typing a contact or company..."
                 />
               </Field>
@@ -6803,9 +8253,50 @@ export default function App(){
           </div>
       )}
 
+      {livingAddressPrompt.open && (
+        <div className="fixed inset-0 z-[109] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Add {livingAddressPrompt.type} Address?</h3>
+            <div className="text-sm text-slate-600 mb-4">
+              No <span className="font-semibold">{livingAddressPrompt.type}</span> address exists yet.
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Choose how to continue:
+              <div className="mt-2 space-y-1">
+                <div>• Add address now with type preselected</div>
+                <div>• Use a TBD placeholder for now</div>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeLivingAddressPrompt}
+                className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+              >
+                Not Now
+              </button>
+              <button
+                type="button"
+                onClick={() => addLivingAddressFromPrompt("placeholder")}
+                className="rounded-lg border border-sky-300 bg-white px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-50"
+              >
+                Use TBD Placeholder
+              </button>
+              <button
+                type="button"
+                onClick={() => addLivingAddressFromPrompt("full")}
+                className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-white hover:bg-sky-600"
+              >
+                Add Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {groupLinkModal.open && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5">
             <h3 className="text-lg font-bold text-slate-900 mb-2">Link Group to Address</h3>
             <div className="text-sm text-slate-500 mb-4">{groupLinkModal.group}</div>
             <div className="grid gap-4">
@@ -6831,6 +8322,86 @@ export default function App(){
                   })()}
                 </Select>
               </Field>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Address Actions</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGroupLinkAddressMode("select")}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-bold ${groupLinkAddressMode === "select" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
+                  >
+                    Use Existing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGroupLinkAddressMode("placeholder")}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-bold ${groupLinkAddressMode === "placeholder" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
+                  >
+                    Add Placeholder
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGroupLinkAddressMode("full")}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-bold ${groupLinkAddressMode === "full" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
+                  >
+                    Add Full Address
+                  </button>
+                </div>
+                {groupLinkAddressMode === "placeholder" && (
+                  <div className="mt-3 space-y-2">
+                    <Input
+                      value={groupLinkAddressDraft.type}
+                      onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, type: e.target.value }))}
+                      placeholder="Label (e.g., RD Drop, Hotel, Neighbor)"
+                    />
+                    <button
+                      type="button"
+                      onClick={addPlaceholderAddressToGroup}
+                      className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
+                    >
+                      Add Placeholder Address
+                    </button>
+                  </div>
+                )}
+                {groupLinkAddressMode === "full" && (
+                  <div className="mt-3 grid gap-2">
+                    <Input
+                      value={groupLinkAddressDraft.type}
+                      onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, type: e.target.value }))}
+                      placeholder="Address Type (optional)"
+                    />
+                    <Input
+                      value={groupLinkAddressDraft.street}
+                      onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, street: e.target.value }))}
+                      placeholder="Street"
+                    />
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input
+                        value={groupLinkAddressDraft.city}
+                        onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, city: e.target.value }))}
+                        placeholder="City"
+                      />
+                      <Input
+                        value={groupLinkAddressDraft.state}
+                        onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, state: e.target.value }))}
+                        placeholder="State"
+                      />
+                      <Input
+                        value={groupLinkAddressDraft.zip}
+                        onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, zip: e.target.value }))}
+                        placeholder="Zip"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addFullAddressToGroup}
+                      className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
+                    >
+                      Add Full Address
+                    </button>
+                  </div>
+                )}
+              </div>
               <Field label="Target Date">
                 <Input
                   type="date"

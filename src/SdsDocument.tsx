@@ -754,9 +754,12 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     <div className="print-avoid rounded-xl border border-slate-200 bg-white px-3 py-2">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <BrandMark className="h-8 w-36 shrink-0" />
+          <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
+            <span className="h-3 w-3 rounded-full bg-emerald-500" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700">RCS</span>
+          </div>
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold text-slate-700">Renewal cares.</div>
+            <div className="text-[11px] font-semibold text-slate-700">{BRAND.name}</div>
             <div className="truncate text-[10px] text-slate-500">
               Compassion-driven service from first call to final delivery.
             </div>
