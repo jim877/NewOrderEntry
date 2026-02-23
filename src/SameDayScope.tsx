@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Camera, MessageSquare, Trash2, ChevronDown, Check, CheckCircle2, AlertTriangle, FilePenLine, X, Info, ArrowLeft, Copy, Settings } from 'lucide-react';
 import SdsDocument from "./SdsDocument";
 
@@ -217,15 +217,19 @@ const InstructionsList = ({ rooms, selectedServices, anticipatedGroups, showOnly
         }
         text += "\n";
 
-        if (initialInstructions.some(inst => inst.person || inst.instruction)) {
-            initialInstructions.forEach(inst => {
-                if(inst.person || inst.instruction) {
-                    text += `- From: ${inst.person || 'N/A'} (${inst.role || 'N/A'})\n`;
-                    text += `  Instruction: ${inst.instruction}\n\n`;
-                }
+    const instructionLines = (eventInstructions || "")
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean)
+        .filter(line => !/^Service Offerings\s*:/i.test(line));
+
+        if (instructionLines.length > 0) {
+            instructionLines.forEach(line => {
+                text += `- ${line}\n`;
             });
+            text += "\n";
         } else {
-            text += 'None\n\n';
+            text += "None\n\n";
         }
 
         text += "SERVICE OFFERINGS:\n";
@@ -382,16 +386,29 @@ const InstructionsList = ({ rooms, selectedServices, anticipatedGroups, showOnly
                 </div>
                 <div>
                     <h3 className="text-sm font-semibold text-slate-500 mb-1">Initial Instructions</h3>
-                    {initialInstructions.some(inst => inst.person || inst.instruction) ? (
-                        initialInstructions.map(inst => (
-                            (inst.person || inst.instruction) && (
-                                <div key={inst.id} className="text-xs text-slate-700 mb-2 pb-2 border-b last:border-b-0">
-                                    <p><span className="font-semibold">From:</span> {inst.person} ({inst.role})</p>
-                                    <p><span className="font-semibold">Instruction:</span> {inst.instruction}</p>
-                                </div>
-                            )
-                        ))
-                    ) : <p className="text-xs text-slate-500">No initial instructions were provided.</p>}
+                    {eventInstructions && eventInstructions.trim().length > 0 ? (
+                        <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
+                            {eventInstructions
+                                .split("\n")
+                                .map(line => line.trim())
+                                .filter(Boolean)
+                                .map((line, idx) => {
+                                    const parts = line.split(":");
+                                    if (parts.length > 1) {
+                                        const label = parts.shift();
+                                        const rest = parts.join(":").trim();
+                                        return (
+                                            <li key={`${line}-${idx}`}>
+                                                <span className="font-semibold">{label.trim()}:</span> {rest}
+                                            </li>
+                                        );
+                                    }
+                                    return <li key={`${line}-${idx}`}>{line}</li>;
+                                })}
+                        </ul>
+                    ) : (
+                        <p className="text-xs text-slate-500">No event instructions yet.</p>
+                    )}
                     
                     <div className="mt-2 pt-2 border-t">
                         {instructionAgreement === 'agree' && <p className="text-xs text-green-700 font-semibold">Status: Instructions Agreed Upon.</p>}
@@ -468,7 +485,7 @@ const TourTooltip = ({ tourStep, prevStep, nextStep, endTour, refs }) => {
 
     const tourSteps = [
         { id: 1, ref: refs.modeToggleRef, text: 'Start in Scope Mode to add detailed room-by-room instructions for the pack-out team.' },
-        { id: 2, ref: refs.initialInstructionsRef, text: 'Use this section to record any initial instructions from contacts like adjusters or homeowners.' },
+        { id: 2, ref: refs.initialInstructionsRef, text: 'Use this section to review and edit the event instructions synced from the schedule.' },
         { id: 3, ref: refs.servicesRef, text: 'Add the service offering categories we will be performing on this order. Any that are not selected will be excluded in the pack-out options.' },
         { id: 4, ref: refs.anticipatedGroupsRef, text: 'Add Delivery Groups and notes that you anticipate needing.' },
         { id: 5, ref: refs.floorsRef, text: 'Next, define the floors for the property.' },
@@ -548,9 +565,15 @@ const TourTooltip = ({ tourStep, prevStep, nextStep, endTour, refs }) => {
 
 // --- Data & Constants ---
 const uid = () => Math.random().toString(36).slice(2, 10);
-const ROOMS_BY_FLOOR_DEFAULTS = { "Floor 1": ["Kitchen", "Living", "Bathroom", "Entrance", "Dining", "Coat", "Family"], "Floor 2": ["Master", "Bedroom 2", "Bedroom 3", "M-Bath"], "Floor 3": [], "Basement": ["Basement"], "Attic": ["Attic"] };
+const parseRoomList = (value = "") =>
+  value
+    .split(",")
+    .map(item => item.trim())
+    .filter(Boolean);
 const ROOM_MASTER_DEFAULTS = ["Kitchen", "Living", "Master", "Bathroom", "Bedroom 2", "Bedroom 3", "Basement", "Attic", "Dining", "Coat", "Family"];
 const APARTMENT_ROOMS_DEFAULTS = ["Kitchen", "Living", "Master", "Bathroom", "Entrance", "Dining", "Coat", "M-Bath"];
+const SEVERITY_GROUPS = ["Fire", "Water", "Mold", "Dust", "Protein", "Oil"];
+const SEVERITY_LEVELS = ["1", "2", "3", "5"];
 const SERVICE_OFFERINGS = {
   'Appliance': [],
   'Art': [],
@@ -578,12 +601,12 @@ const ORDER_CONTACTS = [
   { id: '4', name: 'Sally Fields', role: 'Tenant' },
 ];
 
-const newRoom = (name, floor = "") => ({ id: uid(), name, floorLabel: /basement|attic/i.test(name) ? name : floor, photos: [], severitySelections: [], tasks: [], affected: null, hasCleaning: null, packOut: null, leaveOnsite: null, details: { packOut: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } }, leaveOnsite: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } } }, ui: { openRoom: false, openStatus: false, openNotes: true, openTasks: true, openCleanQ: false, openPackQ: false, openLeaveQ: false }, completedSections: {} });
+const newRoom = (name, floor = "") => ({ id: uid(), name, floorLabel: /basement|attic/i.test(name) ? name : floor, photos: [], severitySelections: [], roomSeverityCodes: [], odorLevel: "", tasks: [], affected: null, hasCleaning: null, packOut: null, leaveOnsite: null, details: { packOut: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } }, leaveOnsite: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } } }, ui: { openRoom: false, openStatus: false, openNotes: true, openTasks: true, openCleanQ: false, openPackQ: false, openLeaveQ: false }, completedSections: {} });
 const buildAllProxy = () => ({ ...newRoom("Apply to Selected Room(s)"), id: "ALL", ui: { openRoom: true, openStatus: false, openNotes: false, openTasks: false, openCleanQ: false, openPackQ: false, openLeaveQ: false } });
 
 // --- Room Card Component ---
 
-const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggleSection, onSetField, onToggleSeverity, onToggleInline, mode, dynamicItemOptions, onSetTaskStatus, onSetTaskReason, onDeleteTask, onAddTask, onApplyChanges, bulkDirty, onDeleteRequest, selectedIds, onChangeNote, newlyAddedRoomId, onSetTaskQuantity, tourRefs }) => {
+const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggleSection, onSetField, onToggleSeverity, onToggleInline, onToggleRoomSeverity, orderSeverityCodes, mode, dynamicItemOptions, onSetTaskStatus, onSetTaskReason, onDeleteTask, onAddTask, onApplyChanges, bulkDirty, onDeleteRequest, selectedIds, onChangeNote, newlyAddedRoomId, onSetTaskQuantity, tourRefs }) => {
     const cardRef = useRef(null);
 
     useEffect(() => {
@@ -635,6 +658,14 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
     }
     
     const showPackOutChip = room.details.packOut.locations.include.length > 0 || room.details.packOut.items.include.length > 0;
+    const effectiveRoomSeverityCodes = (room.roomSeverityCodes && room.roomSeverityCodes.length)
+      ? room.roomSeverityCodes
+      : (orderSeverityCodes || []);
+    const severityGroups = Object.keys((orderSeverityCodes || []).reduce((acc, code) => {
+      const [group] = String(code || "").split("-");
+      if (group) acc[group] = true;
+      return acc;
+    }, {}));
     
     return (
       <div ref={cardRef} className={wrapperClass}>
@@ -653,6 +684,27 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
                      {hasChangedTasks && <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800 flex-shrink-0">Changed</span>}
                   </div>
                   <div className="text-sm opacity-70">{room.floorLabel || ""}</div>
+                  {room.id !== 'ALL' && mode === 'scope' && (
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500" onClick={(e) => e.stopPropagation()}>
+                      <span className="font-semibold">Odor</span>
+                      <select
+                        value={room.odorLevel || ""}
+                        onChange={(e) => onSetField(room.id, "odorLevel", e.target.value)}
+                        className="border border-slate-200 rounded-md bg-white px-1.5 py-0.5 text-[11px]"
+                      >
+                        <option value="">—</option>
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                      </select>
+                    </div>
+                  )}
+                  {effectiveRoomSeverityCodes.length > 0 && (
+                    <div className="mt-1 text-[11px] text-slate-500">
+                      Severity: <span className="font-semibold">{effectiveRoomSeverityCodes.join(", ")}</span>
+                    </div>
+                  )}
                 </div>
             </div>
             { room.id !== 'ALL' &&
@@ -677,7 +729,56 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
                   )}
                   <div ref={tourRefs?.affectedRef}>
                     <StatusSection title="Affected by loss?" open={room.ui?.openStatus} onToggle={() => onToggleSection(room.id, "openStatus", 'affected')} right={<YesNo value={room.affected} onYes={() => onSetField(room.id, "affected", true)} onNo={() => onSetField(room.id, "affected", false)} />} isComplete={room.completedSections?.affected} >
-                        {<div className="flex flex-wrap gap-1">{SEVERITY_OPTIONS.map(s => <button key={s} onClick={() => onToggleSeverity(room.id, s)} className={`px-2 py-0.5 text-xs rounded-full border ${room.severitySelections.includes(s) ? "bg-sky-500 text-white" : "bg-white"}`}>{s}</button>)}</div>}
+                        <div className="space-y-3">
+                            <div className="flex flex-wrap gap-1">
+                              {SEVERITY_OPTIONS.map(s => (
+                                <button key={s} onClick={() => onToggleSeverity(room.id, s)} className={`px-2 py-0.5 text-xs rounded-full border ${room.severitySelections.includes(s) ? "bg-sky-500 text-white" : "bg-white"}`}>{s}</button>
+                              ))}
+                            </div>
+                            {severityGroups.length > 0 && (
+                              <div className="space-y-2">
+                                <div className="text-xs font-semibold text-slate-500">Room Severity (from Order)</div>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  {severityGroups.map(group => (
+                                    <div key={group} className="flex items-center gap-2">
+                                      <span className="w-14 text-xs font-semibold text-slate-600">{group}</span>
+                                      <div className="flex gap-2">
+                                        {SEVERITY_LEVELS.map(level => {
+                                          const code = `${group}-${level}`;
+                                          const isActive = effectiveRoomSeverityCodes.includes(code);
+                                          return (
+                                            <button
+                                              key={level}
+                                              type="button"
+                                              onClick={() => onToggleRoomSeverity(room.id, code)}
+                                              className={`h-8 w-8 rounded-lg text-xs font-bold transition-all border ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : 'bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-200'}`}
+                                            >
+                                              {level}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="text-[11px] text-slate-400">Defaults from Order severity. Click to override per room.</div>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs font-semibold text-slate-600">Odor Level</label>
+                              <select
+                                value={room.odorLevel || ""}
+                                onChange={(e) => onSetField(room.id, "odorLevel", e.target.value)}
+                                className="border rounded-lg px-2 py-1 text-xs bg-white"
+                              >
+                                <option value="">Select</option>
+                                <option value="0">0</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                              </select>
+                            </div>
+                        </div>
                     </StatusSection>
                   </div>
                   {(room.affected === false || room.id === 'ALL') && <StatusSection title="Any tasks for us?" open={room.ui?.openCleanQ} onToggle={() => onToggleSection(room.id, "openCleanQ", 'hasCleaning')} right={<YesNo value={room.hasCleaning} onYes={() => onSetField(room.id, "hasCleaning", true)} onNo={() => onSetField(room.id, "hasCleaning", false)} />} isComplete={room.completedSections?.hasCleaning} />}
@@ -732,15 +833,14 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
 };
 
 // --- Main App Component ---
-export default function SameDayScope({ onExit, eventInstructions, onEventInstructionsChange, serviceOfferings, onServiceOfferingsChange, suggestedGroups, onSuggestedGroupsChange, lossSeverity, onLossSeverityChange, orderTypes = [], severityCodes = [], claimNumber = "", addressLabel = "", customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [] }) {
-  const [rooms, setRooms] = useState([]);
+export default function SameDayScope({ onExit, eventInstructions, onEventInstructionsChange, serviceOfferings, onServiceOfferingsChange, suggestedGroups, onSuggestedGroupsChange, lossSeverity, onLossSeverityChange, orderTypes = [], severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", addressLabel = "", customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsRooms = [], onSdsRoomsChange, sdsProjectFloors = [], onSdsProjectFloorsChange, sdsApartmentType = "", onSdsApartmentTypeChange, sdsPrebagged = "", onSdsPrebaggedChange, sdsInitialInstructions = [], onSdsInitialInstructionsChange, sdsInstructionAgreement = null, onSdsInstructionAgreementChange, sdsDisagreementNote = "", onSdsDisagreementNoteChange }) {
+  const [rooms, setRooms] = useState(Array.isArray(sdsRooms) ? sdsRooms : []);
   const [mode, setMode] = useState("scope");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [allModel, setAllModel] = useState(buildAllProxy());
   const [bulkDirty, setBulkDirty] = useState(false);
   const [openAddRooms, setOpenAddRooms] = useState(false);
-  const [newRoomName, setNewRoomName] = useState("");
   const [showConfirmation, setShowConfirmation] = useState({ open: false, type: null, selection: [] });
   const [showFromListSelection, setShowFromListSelection] = useState({open: false, floor: 'Floor 1'});
   const [selectedFromList, setSelectedFromList] = useState([]);
@@ -749,36 +849,48 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
   const [changeNote, setChangeNote] = useState("");
   const [selectedServices, setSelectedServices] = useState(serviceOfferings || []);
   const [eventInstructionDraft, setEventInstructionDraft] = useState(eventInstructions || "");
+  const [editInstructions, setEditInstructions] = useState(false);
+  const [freeFormDraft, setFreeFormDraft] = useState("");
   const [openServiceOfferings, setOpenServiceOfferings] = useState(false);
   const [anticipatedGroups, setAnticipatedGroups] = useState(ANTICIPATED_GROUPS.reduce((acc, group) => ({...acc, [group]: {selected: false, note: ''}}), {}));
   const [openAnticipatedGroups, setOpenAnticipatedGroups] = useState(false);
   const [textileFilters, setTextileFilters] = useState(SERVICE_OFFERINGS['Textiles']);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [deletingRoomId, setDeletingRoomId] = useState(null);
-  const [projectFloors, setProjectFloors] = useState([]);
+  const [projectFloors, setProjectFloors] = useState(Array.isArray(sdsProjectFloors) ? sdsProjectFloors : []);
   const [openFloors, setOpenFloors] = useState(false);
   const [newFloorNumber, setNewFloorNumber] = useState("");
   const [showOnlyRoomsWithTasks, setShowOnlyRoomsWithTasks] = useState(false);
   const [showDoneConfirm, setShowDoneConfirm] = useState(false);
   const [newlyAddedRoomId, setNewlyAddedRoomId] = useState(null);
-  const [bedroomNames, setBedroomNames] = useState([]);
-  const [numBedrooms, setNumBedrooms] = useState("");
   const [masterRoomList, setMasterRoomList] = useState(ROOM_MASTER_DEFAULTS);
   const [apartmentRoomList, setApartmentRoomList] = useState(APARTMENT_ROOMS_DEFAULTS);
-  const [roomsByFloor, setRoomsByFloor] = useState(ROOMS_BY_FLOOR_DEFAULTS);
   const [viewAsList, setViewAsList] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showSdsDoc, setShowSdsDoc] = useState(false);
   const [showSdsSetup, setShowSdsSetup] = useState(false);
   const [sdsSelectedServices, setSdsSelectedServices] = useState([]);
+  const [selectedRoomFloors, setSelectedRoomFloors] = useState([]);
+  const [selectedRoomTemplates, setSelectedRoomTemplates] = useState([]);
+  const [bedroomCountDraft, setBedroomCountDraft] = useState("");
+  const [bathroomCountDraft, setBathroomCountDraft] = useState("");
+  const [customRoomsDraft, setCustomRoomsDraft] = useState("");
   const [tourStep, setTourStep] = useState(0);
   const [isTourStarting, setIsTourStarting] = useState(false);
-  const [initialInstructions, setInitialInstructions] = useState([{ id: uid(), person: '', role: '', instruction: '' }]);
+  const [initialInstructions, setInitialInstructions] = useState(
+    Array.isArray(sdsInitialInstructions) && sdsInitialInstructions.length
+      ? sdsInitialInstructions
+      : [{ id: uid(), person: '', role: '', instruction: '' }]
+  );
   const [openInitialInstructions, setOpenInitialInstructions] = useState(false);
-  const [instructionAgreement, setInstructionAgreement] = useState(null);
-  const [disagreementNote, setDisagreementNote] = useState('');
+  const [instructionAgreement, setInstructionAgreement] = useState(sdsInstructionAgreement ?? null);
+  const [disagreementNote, setDisagreementNote] = useState(sdsDisagreementNote || '');
   const [hideDoneButton, setHideDoneButton] = useState(false);
   const [showPackoutSettings, setShowPackoutSettings] = useState(false);
+  const [openApartmentOptions, setOpenApartmentOptions] = useState(false);
+  const [openPrebaggedOptions, setOpenPrebaggedOptions] = useState(false);
+  const [apartmentType, setApartmentType] = useState(sdsApartmentType || "");
+  const [prebaggedType, setPrebaggedType] = useState(sdsPrebagged || "");
   const settingsRef = useRef(null);
   const bulkEditCardRef = useRef(null);
   const roomListContainerRef = useRef(null);
@@ -797,7 +909,13 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
     { id: "Fiber Protection", icon: "/Gemini_Fiber_Protection.png" },
     { id: "Premium Brands", icon: "/Gemini_Premium_Brands.png" },
     { id: "Anti-Microbial", icon: "/Gemini_Anti_Microbial.png" },
-    { id: "Fold ASAP", icon: "/Gemini_Fold_AMAP.png" }
+    { id: "Fold ASAP", icon: "/Gemini_Fold_AMAP.png" },
+    { id: "Re-Hanging", icon: "/Gemini_Generated_Image_jnzpynjnzpynjnzp.png" },
+    { id: "Drying", icon: "/Drying.jpg" },
+    { id: "Total Loss Inventory", icon: "/Total_Loss_Inventory.jpg" },
+    { id: "Content Manipulation", icon: "/Content_Manipulation.jpg" },
+    { id: "High Density", icon: "/High_Density_Parking.jpg" },
+    { id: "Expert Stain Removal", icon: "/Expert_Stain_Removal.jpg" }
   ];
 
   const setGroupsAndSync = (updater) => {
@@ -832,6 +950,117 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
     }
   }, [serviceOfferings]);
 
+  const roomsSyncRef = useRef("");
+  const floorsSyncRef = useRef("");
+  const instructionsSyncRef = useRef("");
+
+  useEffect(() => {
+    const serialized = JSON.stringify(Array.isArray(sdsRooms) ? sdsRooms : []);
+    if (serialized !== roomsSyncRef.current) {
+      roomsSyncRef.current = serialized;
+      setRooms(Array.isArray(sdsRooms) ? sdsRooms : []);
+    }
+  }, [sdsRooms]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(rooms || []);
+    if (serialized !== roomsSyncRef.current) {
+      roomsSyncRef.current = serialized;
+      onSdsRoomsChange?.(rooms);
+    }
+  }, [rooms, onSdsRoomsChange]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(Array.isArray(sdsProjectFloors) ? sdsProjectFloors : []);
+    if (serialized !== floorsSyncRef.current) {
+      floorsSyncRef.current = serialized;
+      setProjectFloors(Array.isArray(sdsProjectFloors) ? sdsProjectFloors : []);
+    }
+  }, [sdsProjectFloors]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(projectFloors || []);
+    if (serialized !== floorsSyncRef.current) {
+      floorsSyncRef.current = serialized;
+      onSdsProjectFloorsChange?.(projectFloors);
+    }
+  }, [projectFloors, onSdsProjectFloorsChange]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(Array.isArray(sdsInitialInstructions) ? sdsInitialInstructions : []);
+    if (serialized !== instructionsSyncRef.current) {
+      instructionsSyncRef.current = serialized;
+      setInitialInstructions(Array.isArray(sdsInitialInstructions) && sdsInitialInstructions.length
+        ? sdsInitialInstructions
+        : [{ id: uid(), person: '', role: '', instruction: '' }]
+      );
+    }
+  }, [sdsInitialInstructions]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(initialInstructions || []);
+    if (serialized !== instructionsSyncRef.current) {
+      instructionsSyncRef.current = serialized;
+      onSdsInitialInstructionsChange?.(initialInstructions);
+    }
+  }, [initialInstructions, onSdsInitialInstructionsChange]);
+
+  useEffect(() => {
+    if (sdsInstructionAgreement !== undefined && sdsInstructionAgreement !== instructionAgreement) {
+      setInstructionAgreement(sdsInstructionAgreement ?? null);
+    }
+  }, [sdsInstructionAgreement]);
+
+  useEffect(() => {
+    onSdsInstructionAgreementChange?.(instructionAgreement);
+  }, [instructionAgreement, onSdsInstructionAgreementChange]);
+
+  useEffect(() => {
+    if (typeof sdsDisagreementNote === "string" && sdsDisagreementNote !== disagreementNote) {
+      setDisagreementNote(sdsDisagreementNote);
+    }
+  }, [sdsDisagreementNote]);
+
+  useEffect(() => {
+    onSdsDisagreementNoteChange?.(disagreementNote);
+  }, [disagreementNote, onSdsDisagreementNoteChange]);
+
+  useEffect(() => {
+    if (sdsApartmentType !== undefined && sdsApartmentType !== apartmentType) {
+      setApartmentType(sdsApartmentType || "");
+    }
+  }, [sdsApartmentType]);
+
+  useEffect(() => {
+    onSdsApartmentTypeChange?.(apartmentType || "");
+  }, [apartmentType, onSdsApartmentTypeChange]);
+
+  useEffect(() => {
+    if (sdsPrebagged !== undefined && sdsPrebagged !== prebaggedType) {
+      setPrebaggedType(sdsPrebagged || "");
+    }
+  }, [sdsPrebagged]);
+
+  useEffect(() => {
+    onSdsPrebaggedChange?.(prebaggedType || "");
+  }, [prebaggedType, onSdsPrebaggedChange]);
+
+  useEffect(() => {
+    if (!projectFloors.length) {
+      setSelectedRoomFloors([]);
+      return;
+    }
+    if (projectFloors.length === 1) {
+      setSelectedRoomFloors([projectFloors[0]]);
+      return;
+    }
+    setSelectedRoomFloors(prev => {
+      if (!prev.length) return [];
+      const next = prev.filter(f => projectFloors.includes(f));
+      return next.length ? [next[0]] : [];
+    });
+  }, [projectFloors]);
+
   useEffect(() => {
     if (!Array.isArray(suggestedGroups)) return;
     setAnticipatedGroups(prev => {
@@ -849,9 +1078,78 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
     setEventInstructionDraft(next);
   }, [eventInstructions]);
 
+  const AUTO_LABELS = useMemo(() => new Set([
+    "Conditions",
+    "Bring",
+    "Load",
+    "Items to load",
+    "Service Offerings",
+    "Quick Notes",
+    "Estimate Required",
+    "Estimate Requested",
+    "Estimate",
+  ]), []);
+
+  const HIDDEN_AUTO_LABELS = useMemo(() => new Set([
+    "Service Offerings"
+  ]), []);
+
+  const parseInstructionLines = useCallback((text) => {
+    const lines = (text || "")
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean);
+    const autoAll = [];
+    const autoDisplay = [];
+    const free = [];
+    lines.forEach((line) => {
+      const parts = line.split(":");
+      if (parts.length > 1) {
+        const label = parts.shift().trim();
+        const rest = parts.join(":").trim();
+        if (AUTO_LABELS.has(label)) {
+          const entry = { label, value: rest };
+          autoAll.push(entry);
+          if (!HIDDEN_AUTO_LABELS.has(label)) {
+            autoDisplay.push(entry);
+          }
+          return;
+        }
+      }
+      free.push(line);
+    });
+    return { autoAll, autoDisplay, freeText: free.join("\n") };
+  }, [AUTO_LABELS, HIDDEN_AUTO_LABELS]);
+
+  const { autoAll: autoInstructionLinesAll, autoDisplay: autoInstructionLines, freeText: parsedFreeText } = useMemo(
+    () => parseInstructionLines(eventInstructionDraft),
+    [eventInstructionDraft, parseInstructionLines]
+  );
+
+  useEffect(() => {
+    setFreeFormDraft(parsedFreeText || "");
+  }, [parsedFreeText]);
+
+  const buildInstructionText = useCallback((autoLines, freeText) => {
+    const autoStrings = (autoLines || [])
+      .map(line => line.value ? `${line.label}: ${line.value}` : line.label)
+      .filter(Boolean);
+    const free = (freeText || "").trim();
+    if (free) {
+      return autoStrings.length ? `${autoStrings.join("\n")}\n\n${free}` : free;
+    }
+    return autoStrings.join("\n");
+  }, []);
+
   const handleEventInstructionChange = (value) => {
     setEventInstructionDraft(value);
     onEventInstructionsChange?.(value);
+  };
+
+  const handleFreeFormChange = (value) => {
+    setFreeFormDraft(value);
+    const next = buildInstructionText(autoInstructionLinesAll, value);
+    handleEventInstructionChange(next);
   };
 
   const isSectionUpdated = (room, key) => {
@@ -967,41 +1265,118 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
     return rooms;
   }, [rooms, mode, showOnlyRoomsWithTasks]);
 
-  const addSingleRoom = (name, floor, shouldOpen = false) => {
+  const normalizeBaseLabel = (label) => {
+      const lower = (label || "").toLowerCase();
+      if (lower === "bath" || lower === "bathroom") return "Bath";
+      if (lower === "bedroom") return "Bedroom";
+      return null;
+  };
+
+  const stripFloorPrefix = (name) => (name || "").replace(/^\d+\.\s*/, "").trim();
+
+  const roomBaseName = (name) => {
+      const stripped = stripFloorPrefix(name);
+      const lower = stripped.toLowerCase();
+      if (lower.startsWith("bath")) return "Bath";
+      if (lower.startsWith("bedroom")) return "Bedroom";
+      return stripped;
+  };
+
+  const floorNumberForLabel = (floorLabel) => {
+      const label = (floorLabel || "").toLowerCase();
+      if (label.includes("basement")) return 0;
+      const match = label.match(/(\d+)/);
+      if (match) return Number(match[1]);
+      if (label.includes("attic")) {
+          const nums = (projectFloors || [])
+            .map(f => (f || "").match(/(\d+)/))
+            .filter(Boolean)
+            .map(m => Number(m[1]))
+            .filter(n => !Number.isNaN(n));
+          const maxNum = nums.length ? Math.max(...nums) : 1;
+          return maxNum + 1;
+      }
+      return 1;
+  };
+
+  const countExistingBase = (baseLabel, floorLabel) => {
+      if (!baseLabel) return 0;
+      return (rooms || []).filter(r => (r.floorLabel || "") === (floorLabel || ""))
+        .map(r => roomBaseName(r.name))
+        .filter(name => name.toLowerCase() === baseLabel.toLowerCase()).length;
+  };
+
+  const formatRoomNameForFloor = (rawName, floorLabel, baseCounts) => {
+      const trimmed = rawName.trim();
+      if (!trimmed) return trimmed;
+      const baseLabel = normalizeBaseLabel(trimmed) || trimmed;
+      const floorNumber = floorNumberForLabel(floorLabel);
+      const currentCount = baseCounts?.[baseLabel] ?? countExistingBase(baseLabel, floorLabel);
+      const nextCount = currentCount + 1;
+      if (baseCounts) baseCounts[baseLabel] = nextCount;
+      const suffix = (normalizeBaseLabel(trimmed) ? (nextCount > 1 ? ` ${nextCount}` : "") : "");
+      return `${floorNumber}. ${baseLabel}${suffix}`;
+  };
+
+  const addSingleRoom = (name, floor, shouldOpen = false, shouldFocus = false) => {
       const trimmedName = name.trim();
       if (!trimmedName) return;
-      const newR = newRoom(trimmedName, floor);
+      const formattedName = formatRoomNameForFloor(trimmedName, floor);
+      const newR = newRoom(formattedName, floor);
       newR.ui.openRoom = shouldOpen;
       setRooms(prev => {
-        if (prev.some(r => r.name === trimmedName)) {
+        if (prev.some(r => r.name === formattedName)) {
             // If room exists but we need to ensure it's open for the tour
             if (shouldOpen) {
-                return prev.map(r => r.name === trimmedName ? {...r, ui: {...r.ui, openRoom: true}} : r);
+                return prev.map(r => r.name === formattedName ? {...r, ui: {...r.ui, openRoom: true}} : r);
             }
             return prev;
         }
         const newRooms = [...prev, newR];
-        if(shouldOpen){
+        if(shouldFocus){
             setNewlyAddedRoomId(newR.id);
             setTimeout(() => setNewlyAddedRoomId(null), 2100);
         }
         return newRooms;
       });
+      setMasterRoomList(prev => Array.from(new Set([...prev, trimmedName])));
   };
-  
-  const addMultipleRooms = (names, floor) => {
-      const roomsToAdd = names.filter(name => name.trim() && !rooms.some(r => r.name === name.trim()));
-      if (roomsToAdd.length === 0) return;
 
-      const newRooms = roomsToAdd.map(name => newRoom(name.trim(), floor));
-      setRooms(prev => [...prev, ...newRooms]);
-      const lastRoomId = newRooms[newRooms.length - 1].id;
-      setNewlyAddedRoomId(lastRoomId);
-      setTimeout(() => setNewlyAddedRoomId(null), 2100);
+  
+  const addMultipleRooms = (names, floor, { shouldFocus = true } = {}) => {
+      let lastRoomId = null;
+      setRooms(prev => {
+        const baseCounts = {};
+        prev
+          .filter(r => (r.floorLabel || "") === (floor || ""))
+          .forEach(r => {
+            const base = roomBaseName(r.name);
+            baseCounts[base] = (baseCounts[base] || 0) + 1;
+          });
+        const roomsToAdd = names
+          .map(name => formatRoomNameForFloor(name, floor, baseCounts))
+          .filter(name => name.trim() && !prev.some(r => r.name === name.trim()));
+        if (roomsToAdd.length === 0) return prev;
+
+        const newRooms = roomsToAdd.map(name => newRoom(name.trim(), floor));
+        if (shouldFocus) {
+          lastRoomId = newRooms[newRooms.length - 1].id;
+        }
+        return [...prev, ...newRooms];
+      });
+      if (shouldFocus && lastRoomId) {
+        setNewlyAddedRoomId(lastRoomId);
+        setTimeout(() => setNewlyAddedRoomId(null), 2100);
+      }
   };
   
   const handleQuickAdd = (type) => setShowConfirmation({ open: true, type, selection: [...(type === "Home" ? masterRoomList : apartmentRoomList)] });
-  const handleQuickAddConfirm = () => { addMultipleRooms(showConfirmation.selection); setShowConfirmation({ open: false, type: null, selection: [] }); };
+  const handleQuickAddConfirm = () => {
+    const targetFloor = primaryRoomFloor || selectedRoomFloors[0] || "";
+    if (!targetFloor) return;
+    addMultipleRooms(showConfirmation.selection, targetFloor, { shouldFocus: false });
+    setShowConfirmation({ open: false, type: null, selection: [] });
+  };
   const toggleQuickAddRoom = (roomName) => setShowConfirmation(prev => ({ ...prev, selection: prev.selection.includes(roomName) ? prev.selection.filter(r => r !== roomName) : [...prev.selection, roomName] }));
   
   const addFromListRooms = () => { 
@@ -1028,6 +1403,16 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
     setDeletingRoomId(null);
   }
 
+  const sortFloors = (list) => {
+    return [...list].sort((a, b) => {
+      if (a === 'Basement') return -1;
+      if (b === 'Basement') return 1;
+      if (a === 'Attic') return 1;
+      if (b === 'Attic') return -1;
+      return a.localeCompare(b, undefined, { numeric: true });
+    });
+  };
+
   const toggleFloor = (floor) => {
     const apartmentTypes = ['Studio', 'Duplex', 'Triplex'];
 
@@ -1048,17 +1433,11 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
         } else {
             let floorsToRemove = [floor];
              if (floor === 'Duplex') floorsToRemove.push('Floor 1', 'Floor 2');
-             if (floor === 'Triplex') floorsToRemove.push('Floor 1', 'Floor 2', 'Floor 3');
+            if (floor === 'Triplex') floorsToRemove.push('Floor 1', 'Floor 2', 'Floor 3');
             next = next.filter(f => !floorsToRemove.includes(f));
         }
 
-        return next.sort((a,b) => {
-            if (a === 'Basement') return -1;
-            if (b === 'Basement') return 1;
-            if (a === 'Attic') return 1;
-            if (b === 'Attic') return -1;
-            return a.localeCompare(b, undefined, {numeric: true});
-        });
+        return sortFloors(next);
     });
 };
 
@@ -1076,16 +1455,34 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
       
       setProjectFloors(prev => {
           const newFloors = [...new Set([...prev, ...floorsToAdd])];
-           return newFloors.sort((a,b) => {
-            if (a === 'Basement') return -1;
-            if (b === 'Basement') return 1;
-            if (a === 'Attic') return 1;
-            if (b === 'Attic') return -1;
-            return a.localeCompare(b, undefined, {numeric: true});
-        });
+          return sortFloors(newFloors);
       });
 
       setNewFloorNumber("");
+  };
+
+  const apartmentFloorsForType = (type) => {
+    if (type === "Studio") return ["Floor 1"];
+    if (type === "Duplex") return ["Floor 1", "Floor 2"];
+    if (type === "Triplex") return ["Floor 1", "Floor 2", "Floor 3"];
+    return [];
+  };
+
+  const handleApartmentTypeSelect = (type) => {
+    const nextType = apartmentType === type ? "" : type;
+    setApartmentType(nextType);
+    if (!nextType) return;
+    const aptFloors = apartmentFloorsForType(nextType);
+    setProjectFloors(prev => {
+      const filtered = prev.filter(f => !["Floor 1", "Floor 2", "Floor 3"].includes(f));
+      return sortFloors([...new Set([...filtered, ...aptFloors])]);
+    });
+    setSelectedRoomFloors(aptFloors.length > 1 ? [] : aptFloors);
+  };
+
+  const handlePrebaggedSelect = (type) => {
+    const nextType = prebaggedType === type ? "" : type;
+    setPrebaggedType(nextType);
   };
 
   const toggleRoomSection = (roomId, sectionKey, completedKey) => {
@@ -1255,6 +1652,9 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
       if (allModel.floorLabel && !/basement|attic/i.test(next.name)) next.floorLabel = allModel.floorLabel;
       if (allModel.affected !== null) next.affected = allModel.affected;
       next.severitySelections = union(r.severitySelections, allModel.severitySelections);
+      if (allModel.roomSeverityCodes && allModel.roomSeverityCodes.length) {
+        next.roomSeverityCodes = [...allModel.roomSeverityCodes];
+      }
       next.details.packOut.locations.include = union(r.details.packOut.locations.include, allModel.details.packOut.locations.include);
       next.details.packOut.items.include = union(r.details.packOut.items.include, allModel.details.packOut.items.include);
       next.tasks = rebuildTasks(next);
@@ -1288,42 +1688,6 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
     }, 100);
   };
   
-  const handleNumBedroomsChange = (e) => {
-      const count = parseInt(e.target.value, 10);
-      setNumBedrooms(e.target.value);
-
-      if (count > 0) {
-          const names = ['Master'];
-          for (let i = 2; i <= count; i++) {
-              names.push(`Bedroom ${i}`);
-          }
-          setBedroomNames(names);
-      } else {
-          setBedroomNames([]);
-      }
-  };
-
-  const handleBedroomNameChange = (index, newName) => {
-      const updatedNames = [...bedroomNames];
-      updatedNames[index] = newName;
-      setBedroomNames(updatedNames);
-  };
-
-  const handleAddBedrooms = () => {
-    const newMasterList = [...new Set([...masterRoomList, ...bedroomNames])];
-    setMasterRoomList(newMasterList);
-    setApartmentRoomList(prev => [...new Set([...prev, ...bedroomNames])]);
-
-    const newRoomsByFloor = {...roomsByFloor};
-    Object.keys(newRoomsByFloor).forEach(floor => {
-        newRoomsByFloor[floor] = [...new Set([...newRoomsByFloor[floor], ...bedroomNames])]
-    });
-    setRoomsByFloor(newRoomsByFloor);
-
-    setNumBedrooms("");
-    setBedroomNames([]);
-  };
-
   const handleInstructionChange = (id, field, value) => {
     setInitialInstructions(prev => {
         const next = prev.map(inst => {
@@ -1357,14 +1721,153 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
   const groupsComplete = useMemo(() => Object.values(anticipatedGroups).some(g => g.selected), [anticipatedGroups]);
   const floorsComplete = projectFloors.length > 0;
   const roomsComplete = rooms.length > 0;
-  const initialInstructionsComplete = initialInstructions.some(inst => inst.person.trim() !== '' && inst.instruction.trim() !== '') && instructionAgreement === 'agree';
+  const initialInstructionsComplete = eventInstructionDraft.trim() !== "" && instructionAgreement === 'agree';
   const initialInstructionsBorderClass = !openInitialInstructions ? (instructionAgreement === 'agree' ? 'border-green-500 border-2' : 'border-red-500 border-2') : 'border-slate-200';
 
-  const availableRoomsFromMaster = useMemo(() => {
-    const usedRoomNames = new Set(rooms.map(r => r.name));
-    const currentList = roomsByFloor[showFromListSelection.floor] || masterRoomList;
-    return currentList.filter(roomName => !usedRoomNames.has(roomName));
-  }, [rooms, masterRoomList, roomsByFloor, showFromListSelection.floor]);
+  const primaryRoomFloor = selectedRoomFloors[0] || "";
+
+  const roomsOnActiveFloor = useMemo(() => {
+    return (rooms || []).filter(r => (r.floorLabel || "") === (primaryRoomFloor || ""));
+  }, [rooms, primaryRoomFloor]);
+
+  const roomCountsOnActiveFloor = useMemo(() => {
+    const counts = {};
+    roomsOnActiveFloor.forEach(r => {
+      const base = roomBaseName(r.name);
+      counts[base] = (counts[base] || 0) + 1;
+    });
+    return counts;
+  }, [roomsOnActiveFloor]);
+
+  const roomOptionsForSelection = useMemo(() => {
+    const baseList = masterRoomList;
+    const usedBases = new Set(
+      roomsOnActiveFloor.map(r => (roomBaseName(r.name) || "").toLowerCase())
+    );
+    const seenBases = new Set();
+    const options = [];
+
+    baseList.forEach(item => {
+      const base = normalizeBaseLabel(item) || item;
+      const baseLower = base.toLowerCase();
+      const isBedroom = baseLower === "bedroom";
+      const isBath = baseLower === "bath";
+
+      // Remove numbered bedroom/bath options so only the base appears once.
+      if ((isBedroom || isBath) && baseLower !== item.toLowerCase()) return;
+
+      if (seenBases.has(baseLower)) return;
+      if (!isBedroom && !isBath && usedBases.has(baseLower)) return;
+
+      seenBases.add(baseLower);
+      options.push(base);
+    });
+
+    if (!seenBases.has("bedroom")) options.unshift("Bedroom");
+    if (!seenBases.has("bath")) options.unshift("Bath");
+
+    return options;
+  }, [masterRoomList, roomsOnActiveFloor]);
+
+  const hasRoomsByFloor = useMemo(() => {
+    const map = {};
+    (projectFloors || []).forEach(f => {
+      map[f] = (rooms || []).some(r => (r.floorLabel || "") === f);
+    });
+    return map;
+  }, [rooms, projectFloors]);
+
+  const hasRoomAddInputs = useMemo(() => {
+    const bedroomCount = parseInt(bedroomCountDraft, 10);
+    const bathroomCount = parseInt(bathroomCountDraft, 10);
+    const customNames = parseRoomList(customRoomsDraft);
+    return Boolean(selectedRoomTemplates.length
+      || (Number.isFinite(bedroomCount) && bedroomCount > 0)
+      || (Number.isFinite(bathroomCount) && bathroomCount > 0)
+      || customNames.length);
+  }, [selectedRoomTemplates, bedroomCountDraft, bathroomCountDraft, customRoomsDraft]);
+
+  const orderSeverityCodes = useMemo(() => {
+    const map = {};
+    (severityCodes || []).forEach(code => {
+      const [group, level] = String(code || "").split("-");
+      if (group && level) map[group] = level;
+    });
+    return Object.entries(map).map(([group, level]) => `${group}-${level}`);
+  }, [severityCodes]);
+
+  const toggleRoomSelection = (label) => {
+    setSelectedRoomTemplates(prev => (
+      prev.includes(label) ? prev.filter(r => r !== label) : [...prev, label]
+    ));
+  };
+
+  const toggleRoomFloorSelection = (floor) => {
+    setSelectedRoomFloors(prev => (prev[0] === floor ? [] : [floor]));
+  };
+
+  const toggleRoomSeverity = (roomId, code) => {
+    const group = String(code || "").split("-")[0];
+    const apply = (room) => {
+      const defaults = orderSeverityCodes;
+      const current = (room.roomSeverityCodes && room.roomSeverityCodes.length) ? room.roomSeverityCodes : defaults;
+      const filtered = current.filter(c => !c.startsWith(`${group}-`));
+      const next = current.includes(code) ? filtered : [...filtered, code];
+      return { ...room, roomSeverityCodes: next };
+    };
+
+    if (isSelectionMode || roomId === "ALL") {
+      setAllModel(prev => apply(prev));
+      setBulkDirty(true);
+      return;
+    }
+    setRooms(prev => prev.map(r => (r.id === roomId ? apply(r) : r)));
+  };
+
+  const addSelectedRooms = (selectForBulk = false) => {
+    if (!selectedRoomFloors.length) return;
+    const selections = selectedRoomTemplates;
+    const bedroomCount = parseInt(bedroomCountDraft, 10);
+    const bathroomCount = parseInt(bathroomCountDraft, 10);
+    const customNames = parseRoomList(customRoomsDraft);
+    const extraBedrooms = Number.isFinite(bedroomCount) && bedroomCount > 0 ? Array.from({ length: bedroomCount }, () => "Bedroom") : [];
+    const extraBaths = Number.isFinite(bathroomCount) && bathroomCount > 0 ? Array.from({ length: bathroomCount }, () => "Bath") : [];
+    const extraNames = [...extraBedrooms, ...extraBaths, ...customNames];
+
+    if (!selections.length && !extraNames.length) return;
+    const created = [];
+    setRooms(prev => {
+      let next = [...prev];
+      selectedRoomFloors.forEach(floor => {
+        const baseCounts = {};
+        next
+          .filter(r => (r.floorLabel || "") === floor)
+          .forEach(r => {
+            const base = roomBaseName(r.name);
+            baseCounts[base] = (baseCounts[base] || 0) + 1;
+          });
+        [...selections, ...extraNames].forEach(label => {
+          const name = formatRoomNameForFloor(label, floor, baseCounts).trim();
+          if (!name || next.some(r => r.name === name)) return;
+          const r = newRoom(name, floor);
+          created.push(r);
+          next = [...next, r];
+        });
+      });
+      return selectForBulk ? next.map(r => ({ ...r, ui: { ...r.ui, openRoom: false } })) : next;
+    });
+    if (selectForBulk && created.length) {
+      setIsSelectionMode(true);
+      setSelectedIds(created.map(r => r.id));
+    }
+    setSelectedRoomTemplates([]);
+    setBedroomCountDraft("");
+    setBathroomCountDraft("");
+    setCustomRoomsDraft("");
+    if (customNames.length) {
+      setMasterRoomList(prev => Array.from(new Set([...prev, ...customNames])));
+    }
+  };
   
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1441,74 +1944,64 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
         <>
             <div ref={tourRefs.initialInstructionsRef} className={`border rounded-2xl overflow-hidden shadow-sm bg-white transition-all duration-300 ${initialInstructionsBorderClass}`}>
                 <button className="w-full flex items-center justify-between px-3 py-2" onClick={() => setOpenInitialInstructions(v => !v)}>
-                    <div className="font-bold text-lg">1. Initial Instructions</div>
+                    <div className="font-bold text-lg">1. Event Instructions</div>
                     <span className={`opacity-60 transition-transform ${openInitialInstructions ? "rotate-180" : ""}`}><ChevronDown/></span>
                 </button>
                 {openInitialInstructions && (
-                    <div className="p-3 border-t space-y-4">
-                        <div className="space-y-2 p-2 border rounded-lg">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs font-semibold text-slate-600">Instructions (synced with Schedule)</label>
-                                <span className="text-[10px] text-slate-400">Auto-linked</span>
-                            </div>
-                            <textarea
-                                value={eventInstructionDraft}
-                                onChange={(e) => handleEventInstructionChange(e.target.value)}
-                                placeholder="Enter instructions here..."
-                                className="w-full min-h-[80px] border rounded-lg p-2 text-sm bg-white"
-                            />
-                            <div className="text-[10px] text-slate-400">Edits here update the Schedule Event Instructions.</div>
-                        </div>
-                        {initialInstructions.map((inst, index) => (
-                            <div key={inst.id} className="space-y-2 p-2 border rounded-lg relative">
-                                {initialInstructions.length > 1 && (
-                                    <button 
-                                        onClick={() => removeInstruction(inst.id)} 
-                                        className="absolute top-1 right-1 p-1 text-slate-400 hover:text-red-600 rounded-full"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                )}
-                                <div className="flex items-center gap-2">
-                                    <label className="w-32 text-sm font-semibold">Contact:</label>
-                                     <select
-                                        value={ORDER_CONTACTS.find(c => c.name === inst.person)?.id || ''}
-                                        onChange={(e) => handleInstructionChange(inst.id, 'contact', e.target.value)}
-                                        className="flex-1 border rounded-lg px-2 py-1 text-sm bg-white"
-                                    >
-                                        <option value="">Select a Contact</option>
-                                        {ORDER_CONTACTS.map(contact => (
-                                            <option key={contact.id} value={contact.id}>
-                                                {contact.name}
-                                            </option>
+                    <div className="p-4 border-t space-y-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                                {autoInstructionLines.length > 0 ? (
+                                    <ul className="list-disc pl-5 text-base text-slate-700 space-y-1">
+                                        {autoInstructionLines.map((line, idx) => (
+                                            <li key={`${line.label}-${idx}`}>
+                                                <span className="font-semibold">{line.label}:</span> {line.value}
+                                            </li>
                                         ))}
-                                    </select>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label className="w-32 text-sm font-semibold">Role:</label>
-                                    <input 
-                                        type="text" 
-                                        value={inst.role} 
-                                        readOnly
-                                        className="flex-1 border rounded-lg px-2 py-1 text-sm bg-slate-100"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold mb-1">Instructions:</label>
-                                    <textarea
-                                        value={inst.instruction}
-                                        onChange={(e) => handleInstructionChange(inst.id, 'instruction', e.target.value)}
-                                        placeholder="Enter instructions here..."
-                                        className="w-full h-20 border rounded-lg p-2 text-sm"
-                                    />
-                                </div>
+                                    </ul>
+                                ) : (
+                                    <div className="text-sm text-slate-500">No auto-filled instructions yet.</div>
+                                )}
+                                {freeFormDraft.trim() && (
+                                    <div className="mt-3 text-base text-slate-700 whitespace-pre-line">
+                                        {freeFormDraft.trim()}
+                                    </div>
+                                )}
                             </div>
-                        ))}
-                        <button onClick={addInstruction} className="w-full text-sm font-semibold text-sky-600 py-2 rounded-lg hover:bg-blue-50">
-                            + Add Instruction
-                        </button>
+                            <button
+                                type="button"
+                                onClick={() => setEditInstructions(v => !v)}
+                                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-100"
+                                title="Edit instructions"
+                            >
+                                <FilePenLine size={16} />
+                            </button>
+                        </div>
+
+                        {editInstructions && (
+                            <div className="space-y-2">
+                                <textarea
+                                    value={eventInstructionDraft}
+                                    onChange={(e) => handleEventInstructionChange(e.target.value)}
+                                    placeholder="Enter instructions here..."
+                                    className="w-full min-h-[140px] rounded-xl border border-slate-200 bg-white p-3 text-base text-slate-700 shadow-sm focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10"
+                                />
+                                <div className="text-xs text-slate-500">Edits here update the Schedule Event Instructions.</div>
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Additional Instructions</div>
+                            <textarea
+                                value={freeFormDraft}
+                                onChange={(e) => handleFreeFormChange(e.target.value)}
+                                placeholder="Add any extra instructions here..."
+                                className="w-full min-h-[120px] rounded-xl border border-slate-200 bg-white p-3 text-base text-slate-700 shadow-sm focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10"
+                            />
+                        </div>
+
                         {instructionAgreement !== 'disagree' ? (
-                            <div className="flex justify-end gap-2 pt-4 border-t">
+                            <div className="flex flex-wrap justify-end gap-2 pt-2">
                                 <button 
                                     onClick={() => setInstructionAgreement('disagree')}
                                     className="px-4 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700"
@@ -1526,12 +2019,12 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
                                 </button>
                             </div>
                         ) : (
-                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="space-y-3 rounded-xl border border-red-200 bg-red-50 p-3">
                                 <div className="flex items-center gap-2 text-red-700">
                                     <AlertTriangle size={20} />
                                     <h4 className="font-semibold">Please explain your concerns</h4>
                                 </div>
-                                <p className="text-xs text-red-600 mt-1 mb-2">Please alert sales rep to address your concerns before proceeding.</p>
+                                <p className="text-xs text-red-600">Please alert sales rep to address your concerns before proceeding.</p>
                                 <textarea
                                     value={disagreementNote}
                                     onChange={(e) => setDisagreementNote(e.target.value)}
@@ -1542,7 +2035,7 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
                                     onClick={() => {
                                         setOpenInitialInstructions(false);
                                     }}
-                                    className="w-full mt-2 bg-slate-200 text-slate-800 font-semibold py-2 rounded-lg hover:bg-slate-300 text-sm"
+                                    className="w-full bg-slate-200 text-slate-800 font-semibold py-2 rounded-lg hover:bg-slate-300 text-sm"
                                 >
                                     Done
                                 </button>
@@ -1591,27 +2084,83 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
                     <div className="p-3 border-t space-y-4">
                         <div>
                             <h4 className="font-semibold text-sm mb-2 text-slate-600">Standard Floors</h4>
-                            <div className="flex flex-wrap gap-2">
-                                {['Basement', 'Floor 1', 'Floor 2', 'Floor 3', 'Attic'].map(f => <button key={f} onClick={() => toggleFloor(f)} className={`px-3 py-1 text-sm rounded-full border font-semibold ${projectFloors.includes(f) ? 'bg-sky-500 text-white' : 'bg-white'}`}>{f}</button>)}
+                            <div className="flex flex-wrap items-center gap-2">
+                                {['Basement', 'Floor 1', 'Floor 2', 'Floor 3', 'Floor 4', 'Attic'].map(f => (
+                                    <button key={f} onClick={() => toggleFloor(f)} className={`px-3 py-1 text-sm rounded-full border font-semibold ${projectFloors.includes(f) ? 'bg-sky-500 text-white' : 'bg-white'}`}>{f}</button>
+                                ))}
                             </div>
                         </div>
-                        <div>
-                             <h4 className="font-semibold text-sm mb-2 text-slate-600">Apartment:</h4>
-                             <div className="flex flex-wrap gap-2">
-                                {['Studio', 'Duplex', 'Triplex'].map(f => <button key={f} onClick={() => toggleFloor(f)} className={`px-3 py-1 text-sm rounded-full border font-semibold ${projectFloors.includes(f) ? 'bg-sky-500 text-white' : 'bg-white'}`}>{f}</button>)}
-                            </div>
+                        <div className="rounded-lg border border-slate-200 bg-slate-50">
+                            <button
+                                type="button"
+                                onClick={() => setOpenApartmentOptions(v => !v)}
+                                className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-700"
+                            >
+                                Apartment / Hotels?
+                                <span className={`opacity-60 transition-transform ${openApartmentOptions ? "rotate-180" : ""}`}><ChevronDown size={16} /></span>
+                            </button>
+                            {openApartmentOptions && (
+                                <div className="px-3 pb-3">
+                                    <div className="text-xs text-slate-500 mb-2">Selecting a type auto-selects the required floors. Hotels can add any number of floors below.</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {['Studio', 'Duplex', 'Triplex'].map(f => (
+                                            <button
+                                                key={f}
+                                                type="button"
+                                                onClick={() => handleApartmentTypeSelect(f)}
+                                                className={`px-3 py-1 text-sm rounded-full border font-semibold ${apartmentType === f ? 'bg-sky-500 text-white' : 'bg-white'}`}
+                                            >
+                                                {f}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <input
+                                            type="number"
+                                            value={newFloorNumber}
+                                            onChange={e => setNewFloorNumber(e.target.value)}
+                                            placeholder="# floors"
+                                            className="w-24 border rounded-lg px-3 py-1.5 text-sm"
+                                        />
+                                        <button
+                                            onClick={addNumericFloor}
+                                            type="button"
+                                            className="bg-indigo-500 text-white font-semibold px-3 py-1.5 rounded-lg text-sm"
+                                        >
+                                            Add Floors
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <div>
-                             <h4 className="font-semibold text-sm mb-2 text-slate-600">Pre-bagged</h4>
-                             <div className="flex flex-wrap gap-2">
-                                {['Pre-Bagged Offsite', 'Pre-Bagged Inhome'].map(f => <button key={f} onClick={() => toggleFloor(f)} className={`px-3 py-1 text-sm rounded-full border font-semibold ${projectFloors.includes(f) ? 'bg-sky-500 text-white' : 'bg-white'}`}>{f}</button>)}
-                            </div>
+                        <div className="rounded-lg border border-slate-200 bg-slate-50">
+                            <button
+                                type="button"
+                                onClick={() => setOpenPrebaggedOptions(v => !v)}
+                                className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-700"
+                            >
+                                Pre-bagged?
+                                <span className={`opacity-60 transition-transform ${openPrebaggedOptions ? "rotate-180" : ""}`}><ChevronDown size={16} /></span>
+                            </button>
+                            {openPrebaggedOptions && (
+                                <div className="px-3 pb-3">
+                                    <div className="text-xs text-slate-500 mb-2">Use when items were bagged by someone else.</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {['Off-site', 'In the home', 'In the rooms'].map(option => (
+                                            <button
+                                                key={option}
+                                                type="button"
+                                                onClick={() => handlePrebaggedSelect(option)}
+                                                className={`px-3 py-1 text-sm rounded-full border font-semibold ${prebaggedType === option ? 'bg-sky-500 text-white' : 'bg-white'}`}
+                                            >
+                                                {option}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <form onSubmit={(e) => { e.preventDefault(); addNumericFloor();}} className="flex gap-2 items-center pt-3 border-t">
-                            <input type="number" value={newFloorNumber} onChange={e => setNewFloorNumber(e.target.value)} placeholder="Add # of floors" className="flex-grow border rounded-lg px-3 py-2 text-sm w-24" />
-                            <button type="submit" className="bg-sky-500 text-white font-semibold px-4 py-2 rounded-lg text-sm">Add</button>
-                        </form>
-                         <button onClick={() => setOpenFloors(false)} className="w-full mt-2 bg-slate-200 text-slate-800 font-semibold py-2 rounded-lg hover:bg-slate-300 text-sm">Done</button>
+                        <button onClick={() => setOpenFloors(false)} className="w-full mt-2 bg-slate-200 text-slate-800 font-semibold py-2 rounded-lg hover:bg-slate-300 text-sm">Done</button>
                     </div>
                 )}
             </div>
@@ -1626,26 +2175,108 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
                 </div>
                 {openAddRooms && (
                     <div className="p-3 border-t space-y-3">
-                        <div className="space-y-2 border-b pb-4 mb-4">
-                            <h4 className="font-semibold text-sm">Bulk Add Bedrooms</h4>
-                            <div className="flex gap-2 items-center">
-                                <input type="number" value={numBedrooms} onChange={handleNumBedroomsChange} placeholder="# Bedrooms" className="border rounded-lg px-3 py-2 text-sm w-32" />
-                                <button onClick={handleAddBedrooms} disabled={bedroomNames.length === 0} className="bg-sky-500 text-white font-semibold px-4 py-2 rounded-lg text-sm disabled:bg-gray-400">
-                                    Add Bedrooms to Lists
-                                </button>
-                            </div>
-                            {bedroomNames.length > 0 && (
-                                <div className="grid grid-cols-2 gap-2 mt-2">
-                                    {bedroomNames.map((name, index) => (
-                                        <input key={index} type="text" value={name} onChange={(e) => handleBedroomNameChange(index, e.target.value)} className="border rounded-lg px-3 py-2 text-sm" />
-                                    ))}
+                        <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Step 1 • Select floor (you are adding rooms to)</div>
+                            <div className="text-xs text-slate-500">If more than one floor exists, choose the floor you are working on.</div>
+                            {projectFloors.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {projectFloors.filter(f => f !== 'Duplex' && f !== 'Triplex').map(f => {
+                                        const selected = selectedRoomFloors.includes(f);
+                                        return (
+                                            <button
+                                                key={f}
+                                                type="button"
+                                                onClick={() => toggleRoomFloorSelection(f)}
+                                                className={`px-3 py-1 text-sm rounded-full border font-semibold ${selected ? 'border-sky-400 bg-sky-500 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                                            >
+                                                {f}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+                            ) : (
+                                <div className="text-xs text-slate-500">Add floors first to start adding rooms.</div>
                             )}
                         </div>
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap"><button onClick={() => setShowFromListSelection({open: true, floor: projectFloors.find(f => f.startsWith('Floor')) || 'Floor 1'})} className="rounded-full border-2 border-green-500 bg-white px-3 py-1 text-sm">From List</button><button onClick={() => handleQuickAdd("Home")} className="rounded-full border bg-white px-3 py-1 text-sm">Home</button></div>
-                            <form onSubmit={e => { e.preventDefault(); addSingleRoom(newRoomName, undefined, true); setNewRoomName(""); }} className="flex gap-2"><input type="text" value={newRoomName} onChange={e => setNewRoomName(e.target.value)} placeholder="Add custom room" className="flex-grow border rounded-lg px-3 py-2 text-sm" /><button type="submit" disabled={!newRoomName.trim()} className="bg-sky-500 text-white font-semibold px-4 py-2 rounded-lg text-sm disabled:bg-gray-400">Add</button></form>
-                        </div>
+
+                        <div className="space-y-2 rounded-lg border border-slate-200 bg-white px-3 py-3">
+                                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Step 2 • Select rooms to add</div>
+                                <div className="text-xs text-slate-500">
+                                    {selectedRoomFloors.length ? `Adding rooms to: ${selectedRoomFloors.join(", ")}` : "Select a floor first to add rooms."}
+                                </div>
+                                {selectedRoomFloors.length ? (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {roomOptionsForSelection.map(room => {
+                                                    const base = normalizeBaseLabel(room) || room;
+                                                    const count = roomCountsOnActiveFloor[base] || 0;
+                                                    const selected = selectedRoomTemplates.includes(room);
+                                                    return (
+                                                        <button
+                                                            key={`${primaryRoomFloor || "all"}-${room}`}
+                                                            type="button"
+                                                            onClick={() => toggleRoomSelection(room)}
+                                                            className={`px-3 py-1 text-sm rounded-full border font-semibold ${selected ? 'border-sky-400 bg-sky-100 text-sky-800' : 'border-slate-200 bg-white text-slate-700'}`}
+                                                        >
+                                                            {room}
+                                                            {count > 0 && <span className="ml-2 text-xs font-bold">{count}</span>}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                            <div className="text-[11px] font-semibold text-slate-500 mb-2">Optional • Add bedrooms, baths, or custom rooms (comma separated)</div>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={bedroomCountDraft}
+                                                    onChange={(e) => setBedroomCountDraft(e.target.value)}
+                                                    placeholder="# Bedrooms"
+                                                    className="w-28 border-2 border-sky-200 rounded-lg px-3 py-1.5 text-sm bg-white"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={bathroomCountDraft}
+                                                    onChange={(e) => setBathroomCountDraft(e.target.value)}
+                                                    placeholder="# Baths"
+                                                    className="w-24 border-2 border-sky-200 rounded-lg px-3 py-1.5 text-sm bg-white"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={customRoomsDraft}
+                                                    onChange={(e) => setCustomRoomsDraft(e.target.value)}
+                                                    placeholder="Custom rooms (ex: John, Sally, Kevin)"
+                                                    className="flex-1 min-w-[160px] border-2 border-sky-200 rounded-lg px-3 py-1.5 text-sm bg-white"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => addSelectedRooms(false)}
+                                                disabled={!hasRoomAddInputs}
+                                                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:bg-slate-200 disabled:text-slate-400"
+                                            >
+                                                Add
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => addSelectedRooms(true)}
+                                                disabled={!hasRoomAddInputs}
+                                                className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:bg-slate-200 disabled:text-slate-300"
+                                            >
+                                                Add and select
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-xs text-slate-500">Select a floor before choosing rooms.</div>
+                                )}
+                            </div>
                         <button onClick={() => setOpenAddRooms(false)} className="w-full mt-2 bg-slate-200 text-slate-800 font-semibold py-2 rounded-lg hover:bg-slate-300 text-sm">Done</button>
                     </div>
                 )}
@@ -1690,21 +2321,21 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
                     </div>
                     {!hideDoneButton && <button onClick={() => setShowDoneConfirm(true)} className="px-4 py-2 text-sm font-semibold bg-sky-500 text-white rounded-lg hover:bg-sky-600">Done with Pack-out</button>}
                 </div>
-                <div className="space-y-3">{visibleRooms.map((room, index) => <div ref={index === 0 ? tourRefs.firstRoomRef : null} key={room.id}><RoomCard room={room} isSelectionMode={isSelectionMode} isSelected={selectedIds.includes(room.id)} onSelect={() => setSelectedIds(p => p.includes(room.id) ? p.filter(id => id !== room.id) : [...p, room.id])} onToggleSection={toggleRoomSection} onSetField={setRoomField} onToggleSeverity={toggleSeverity} onToggleInline={toggleInline} mode={mode} dynamicItemOptions={dynamicItemOptions} onSetTaskStatus={setTaskStatus} onSetTaskReason={setTaskReason} onDeleteTask={deleteTask} onAddTask={addTask} onDeleteRequest={setDeletingRoomId} selectedIds={selectedIds} onChangeNote={openChangeNoteModal} newlyAddedRoomId={newlyAddedRoomId} onSetTaskQuantity={setTaskQuantity} tourRefs={tourRefs} rooms={rooms}/></div>)}</div>
+                <div className="space-y-3">{visibleRooms.map((room, index) => <div ref={index === 0 ? tourRefs.firstRoomRef : null} key={room.id}><RoomCard room={room} isSelectionMode={isSelectionMode} isSelected={selectedIds.includes(room.id)} onSelect={() => setSelectedIds(p => p.includes(room.id) ? p.filter(id => id !== room.id) : [...p, room.id])} onToggleSection={toggleRoomSection} onSetField={setRoomField} onToggleSeverity={toggleSeverity} onToggleRoomSeverity={toggleRoomSeverity} orderSeverityCodes={orderSeverityCodes} onToggleInline={toggleInline} mode={mode} dynamicItemOptions={dynamicItemOptions} onSetTaskStatus={setTaskStatus} onSetTaskReason={setTaskReason} onDeleteTask={deleteTask} onAddTask={addTask} onDeleteRequest={setDeletingRoomId} selectedIds={selectedIds} onChangeNote={openChangeNoteModal} newlyAddedRoomId={newlyAddedRoomId} onSetTaskQuantity={setTaskQuantity} tourRefs={tourRefs} rooms={rooms}/></div>)}</div>
                 </>
             )}
         </>
       )}
 
 
-      {isSelectionMode && <div ref={bulkEditCardRef}><RoomCard room={allModel} rooms={rooms} projectFloors={projectFloors} selectedIds={selectedIds} onSetField={setRoomField} onToggleSection={toggleRoomSection} onToggleSeverity={toggleSeverity} onToggleInline={toggleInline} isSelectionMode={true} onApplyChanges={applyBulkChanges} bulkDirty={bulkDirty} onSetTaskReason={setTaskReason} onAddTask={addTask} onDeleteTask={deleteTask} onChangeNote={openChangeNoteModal} onSetTaskQuantity={setTaskQuantity} dynamicItemOptions={dynamicItemOptions}/></div>}
+      {isSelectionMode && <div ref={bulkEditCardRef}><RoomCard room={allModel} rooms={rooms} projectFloors={projectFloors} selectedIds={selectedIds} onSetField={setRoomField} onToggleSection={toggleRoomSection} onToggleSeverity={toggleSeverity} onToggleRoomSeverity={toggleRoomSeverity} orderSeverityCodes={orderSeverityCodes} onToggleInline={toggleInline} isSelectionMode={true} onApplyChanges={applyBulkChanges} bulkDirty={bulkDirty} onSetTaskReason={setTaskReason} onAddTask={addTask} onDeleteTask={deleteTask} onChangeNote={openChangeNoteModal} onSetTaskQuantity={setTaskQuantity} dynamicItemOptions={dynamicItemOptions}/></div>}
 
-      {mode === 'scope' && <div ref={roomListContainerRef} className="space-y-3">{visibleRooms.map((room, index) => <div ref={index === 0 ? tourRefs.firstRoomRef : null} key={room.id}><RoomCard room={room} rooms={rooms} isSelectionMode={isSelectionMode} isSelected={selectedIds.includes(room.id)} onSelect={() => setSelectedIds(p => p.includes(room.id) ? p.filter(id => id !== room.id) : [...p, room.id])} onToggleSection={toggleRoomSection} onSetField={setRoomField} onToggleSeverity={toggleSeverity} onToggleInline={toggleInline} mode={mode} dynamicItemOptions={dynamicItemOptions} onSetTaskStatus={setTaskStatus} onSetTaskReason={setTaskReason} onDeleteTask={deleteTask} onAddTask={addTask} onDeleteRequest={setDeletingRoomId} selectedIds={selectedIds} onChangeNote={openChangeNoteModal} newlyAddedRoomId={newlyAddedRoomId} onSetTaskQuantity={setTaskQuantity} tourRefs={tourRefs} /></div>)}</div>}
+      {mode === 'scope' && <div ref={roomListContainerRef} className="space-y-3">{visibleRooms.map((room, index) => <div ref={index === 0 ? tourRefs.firstRoomRef : null} key={room.id}><RoomCard room={room} rooms={rooms} isSelectionMode={isSelectionMode} isSelected={selectedIds.includes(room.id)} onSelect={() => setSelectedIds(p => p.includes(room.id) ? p.filter(id => id !== room.id) : [...p, room.id])} onToggleSection={toggleRoomSection} onSetField={setRoomField} onToggleSeverity={toggleSeverity} onToggleRoomSeverity={toggleRoomSeverity} orderSeverityCodes={orderSeverityCodes} onToggleInline={toggleInline} mode={mode} dynamicItemOptions={dynamicItemOptions} onSetTaskStatus={setTaskStatus} onSetTaskReason={setTaskReason} onDeleteTask={deleteTask} onAddTask={addTask} onDeleteRequest={setDeletingRoomId} selectedIds={selectedIds} onChangeNote={openChangeNoteModal} newlyAddedRoomId={newlyAddedRoomId} onSetTaskQuantity={setTaskQuantity} tourRefs={tourRefs} /></div>)}</div>}
 
       {deletingRoomId && <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[100]"><div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm"><div className="flex items-center gap-3"><AlertTriangle className="text-red-500" size={32}/><h3 className="text-lg font-bold">Delete Room?</h3></div><p className="text-sm text-slate-600 my-4">Are you sure you want to delete this room? This action cannot be undone.</p><div className="flex justify-end gap-2"><button onClick={() => setDeletingRoomId(null)} className="px-4 py-2 bg-slate-200 rounded-lg">Cancel</button><button onClick={() => handleDeleteRoom(deletingRoomId)} className="px-4 py-2 bg-red-600 text-white rounded-lg">Confirm Delete</button></div></div></div>}
       {showClearConfirm && <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[100]"><div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm"><div className="flex items-center gap-3"><AlertTriangle className="text-red-500" size={32}/><h3 className="text-lg font-bold">Clear All Data?</h3></div><p className="text-sm text-slate-600 my-4">This will remove all rooms and reset the form. This action cannot be undone.</p><div className="flex justify-end gap-2"><button onClick={() => setShowClearConfirm(false)} className="px-4 py-2 bg-slate-200 rounded-lg">Cancel</button><button onClick={handleClearAll} className="px-4 py-2 bg-red-600 text-white rounded-lg">Confirm Clear</button></div></div></div>}
       {showConfirmation.open && <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]"><div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm"><h3 className="text-lg font-bold mb-4">Add {showConfirmation.type} Rooms</h3><div className="grid grid-cols-2 gap-2 mb-6">{(showConfirmation.type === 'Home' ? masterRoomList : apartmentRoomList).map(r => <button key={r} onClick={() => toggleQuickAddRoom(r)} className={`px-2 py-1 text-sm rounded-lg border ${showConfirmation.selection.includes(r) ? 'bg-sky-500 text-white' : 'bg-slate-100'}`}>{r}</button>)}</div><div className="flex justify-end gap-2"><button onClick={() => setShowConfirmation({ open: false, type: null, selection: [] })} className="px-4 py-2 bg-slate-200 rounded-lg">Cancel</button><button onClick={handleQuickAddConfirm} className="px-4 py-2 bg-sky-500 text-white rounded-lg">Add</button></div></div></div>}
-      {showFromListSelection.open && <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]"><div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm"><h3 className="text-lg font-bold mb-4">Add Rooms to a Floor</h3><div className="flex justify-center gap-1 mb-4 bg-slate-200 p-1 rounded-full">{projectFloors.length > 0 ? projectFloors.filter(f => f !== 'Duplex' && f !== 'Triplex').map(f => <button key={f} onClick={() => setShowFromListSelection(p => ({...p, floor: f}))} className={`px-3 py-1 text-xs font-semibold rounded-full ${showFromListSelection.floor === f ? 'bg-white shadow' : ''}`}>{f}</button>) : <button onClick={() => {setShowFromListSelection({open: false, floor: 'Floor 1'}); setOpenFloors(true);}} className="text-sm bg-sky-100 text-sky-700 font-semibold px-4 py-2 rounded-lg">Add Floors to Project First</button>}</div><div className="max-h-60 overflow-y-auto grid grid-cols-2 gap-2 mb-6 pr-2">{availableRoomsFromMaster.map(r => <button key={r} onClick={() => setSelectedFromList(p => p.includes(r) ? p.filter(i => i !== r) : [...p, r])} className={`px-3 py-2 text-sm rounded-lg border font-semibold ${selectedFromList.includes(r) ? 'bg-sky-500 text-white border-blue-700' : 'bg-slate-100 hover:bg-slate-200'}`}>{r}</button>)}</div><div className="flex justify-end gap-2"><button onClick={() => setShowFromListSelection({open: false, floor: 'Floor 1'})} className="px-4 py-2 bg-slate-200 rounded-lg">Cancel</button><button onClick={addFromListRooms} className="px-4 py-2 bg-sky-500 text-white rounded-lg">Add</button></div></div></div>}
+      {false && showFromListSelection.open && <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]"><div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm"><h3 className="text-lg font-bold mb-1">Add Rooms to {showFromListSelection.floor}</h3><p className="text-xs text-slate-500 mb-4">Select rooms to add to this floor.</p><div className="max-h-60 overflow-y-auto grid grid-cols-2 gap-2 mb-6 pr-2">{availableRoomsFromMaster.map(r => <button key={r} onClick={() => setSelectedFromList(p => p.includes(r) ? p.filter(i => i !== r) : [...p, r])} className={`px-3 py-2 text-sm rounded-lg border font-semibold ${selectedFromList.includes(r) ? 'bg-sky-500 text-white border-sky-600' : 'bg-slate-100 hover:bg-slate-200'}`}>{r}</button>)}</div><div className="flex justify-end gap-2"><button onClick={() => setShowFromListSelection({open: false, floor: 'Floor 1'})} className="px-4 py-2 bg-slate-200 rounded-lg">Cancel</button><button onClick={addFromListRooms} className="px-4 py-2 bg-sky-500 text-white rounded-lg">Add</button></div></div></div>}
       {editingTask && <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]"><div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm"><h3 className="text-lg font-bold mb-4">Select Reason</h3><div className="flex flex-col gap-2 max-h-60 overflow-y-auto">{TASK_REASONS.map(reason => <button key={reason} onClick={() => {const {roomId, taskId} = editingTask; setRooms(prev => prev.map(r => r.id === roomId ? { ...r, tasks: r.tasks.map(t => t.id === taskId ? { ...t, reason } : t) } : r)); setEditingTask(null);}} className="w-full text-left p-2 hover:bg-slate-100 rounded-lg">{reason}</button>)}</div><button onClick={() => setEditingTask(null)} className="mt-4 w-full px-4 py-2 bg-slate-200 rounded-lg">Cancel</button></div></div>}
       {changingTask && <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]"><div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm"><h3 className="text-lg font-bold mb-4">Add Change Note</h3><div className="flex flex-col gap-2 max-h-60 overflow-y-auto">{CHANGE_REASONS.map(reason => <button key={reason} onClick={() => handleSetChangeNote(reason)} className="w-full text-left p-2 hover:bg-slate-100 rounded-lg">{reason}</button>)}</div><form onSubmit={e => { e.preventDefault(); handleSetChangeNote(changeNote); }} className="flex gap-2 mt-4"><input type="text" placeholder="Or type custom note" value={changeNote} onChange={e => setChangeNote(e.target.value)} className="w-full border rounded-lg px-3 py-1.5 text-sm" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSetChangeNote(changeNote); }}} /><button type="submit" className="bg-sky-500 text-white font-semibold px-4 py-2 rounded-lg text-sm">Save</button></form><button onClick={() => setChangingTask(null)} className="mt-4 w-full px-4 py-2 bg-slate-200 rounded-lg">Cancel</button></div></div>}
       {showDoneConfirm && <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[100]"><div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm">{ totalTasks === 0 ? (
@@ -1756,11 +2387,11 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
                       key={opt.id}
                       type="button"
                       onClick={() => setSdsSelectedServices(prev => prev.includes(opt.id) ? prev.filter(id => id !== opt.id) : [...prev, opt.id])}
-                      className={`rounded-xl border px-3 py-3 text-left transition-all ${active ? "border-sky-400 bg-sky-50" : "border-slate-200 hover:border-sky-200"}`}
+                      className={`rounded-xl border px-4 py-4 text-left transition-all ${active ? "border-sky-400 bg-sky-50" : "border-slate-200 hover:border-sky-200"}`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden">
-                          <img src={opt.icon} alt={opt.id} className="h-10 w-10 object-contain" />
+                      <div className="flex items-center gap-4">
+                        <div className="h-16 w-16 flex items-center justify-center overflow-hidden">
+                          <img src={opt.icon} alt={opt.id} className="h-16 w-16 object-contain" />
                         </div>
                         <div className="text-sm font-semibold text-slate-700">{opt.id}</div>
                       </div>
@@ -1790,7 +2421,11 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
           rooms={rooms}
           orderTypes={orderTypes}
           severityCodes={severityCodes}
+          orderName={orderName}
           claimNumber={claimNumber}
+          insuranceCompany={insuranceCompany}
+          insuranceAdjuster={insuranceAdjuster}
+          dateOfLoss={dateOfLoss}
           address={addressLabel}
           selectedServices={sdsSelectedServices}
           customers={customers}

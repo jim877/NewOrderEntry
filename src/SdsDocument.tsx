@@ -1,9 +1,28 @@
 // @ts-nocheck
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { Droplet, Flame } from "lucide-react";
 
 const MAX_SEVERITY = 3;
 const valueMap = [0, 1, 2, 3];
+
+const BRAND = {
+  name: "Renewal Claim Solutions",
+  tagline: "Recovery starts here.",
+  website: "renewalclaimsolutions.com",
+  phone: "(877) 630-6273",
+  email: "info@renewalclaims.com",
+  logoSrc: "/renewal-logo.svg",
+};
+
+const toAbsoluteAssetUrl = (src) => {
+  if (!src) return src;
+  if (/^(https?:|data:|blob:)/i.test(src)) return src;
+  try {
+    return new URL(src, window.location.href).href;
+  } catch {
+    return src;
+  }
+};
 
 const interpolateColor = (color1, color2, factor) => {
   const clamp = (v) => Math.max(0, Math.min(1, v));
@@ -35,7 +54,7 @@ const getSliderBackground = (value, start, end, disabled) => {
 };
 
 const sliderClasses =
-  "w-full h-1.5 rounded-full appearance-none outline-none transition-all";
+  "w-full h-1 rounded-full appearance-none outline-none";
 
 const LOSS_SEVERITY_CONFIG = [
   {
@@ -78,18 +97,179 @@ const Slider = ({ value, onChange, colorStart, colorEnd, disabled }) => (
   />
 );
 
-export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], severityCodes = [], claimNumber = "", address = "", selectedServices = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [] }) {
+export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", address = "", selectedServices = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [] }) {
   const docSeverity = lossSeverity || {};
+  const printRootRef = useRef(null);
+
+  const orderSeverityBySection = useMemo(() => {
+    const map = { fire: 0, water: 0 };
+    (severityCodes || []).forEach((code) => {
+      const [group, levelRaw] = String(code || "").split("-");
+      const level = Math.min(Math.max(Number(levelRaw) || 0, 0), MAX_SEVERITY);
+      if (group === "Fire") map.fire = Math.max(map.fire, level);
+      if (group === "Water") map.water = Math.max(map.water, level);
+    });
+    return map;
+  }, [severityCodes]);
+
+  const deriveSectionState = (section) => {
+    const typeSelected = orderTypes.length ? orderTypes.includes(section.label) : false;
+    const base = docSeverity[section.key] || { enabled: typeSelected, values: {} };
+    const level = Number(orderSeverityBySection[section.key] || 0);
+    const touched = Boolean(docSeverity?.touched);
+    const values = { ...(base.values || {}) };
+
+    // Seed default field values from order-level severity codes until user edits.
+    if (!touched && level >= 1) {
+      section.fields.forEach((field) => {
+        const raw = Number(values[field] ?? 0);
+        if (raw <= 0) values[field] = level;
+      });
+    }
+
+    return {
+      ...base,
+      enabled: touched ? Boolean(base.enabled) : Boolean(base.enabled || typeSelected || level >= 1),
+      values,
+    };
+  };
+
+  const highSeverityFieldsForSection = (section, state) =>
+    section.fields.filter((field) => Number(state.values?.[field] ?? 0) > 1);
+
+  const handlePrint = async () => {
+    const printNode = printRootRef.current;
+    if (!printNode) {
+      window.focus();
+      window.print();
+      return;
+    }
+
+    const popup = window.open("", "_blank", "noopener,noreferrer,width=1100,height=850");
+    if (!popup) {
+      window.focus();
+      window.print();
+      return;
+    }
+
+    const headMarkup = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
+      .map((el) => el.outerHTML)
+      .join("\n");
+    const baseHref = document.baseURI || window.location.href;
+    const contentNode = printNode.children?.[1];
+    const sourceForPrint = contentNode instanceof HTMLElement ? contentNode : printNode;
+    const printableClone = sourceForPrint.cloneNode(true);
+    Array.from(printableClone.querySelectorAll("img")).forEach((img) => {
+      const src = img.getAttribute("src");
+      if (!src) return;
+      img.setAttribute("src", toAbsoluteAssetUrl(src));
+    });
+    const printMarkup = printableClone.outerHTML;
+
+    popup.document.open();
+    popup.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>SDS Document</title>
+          <base href="${baseHref}" />
+          ${headMarkup}
+          <style>
+            @page { size: letter portrait; margin: 0.65in; }
+            html, body { background: #fff; margin: 0; padding: 0; }
+            .sds-popup-doc > .p-6 { padding: 0 !important; background: #fff !important; }
+            .print-hidden { display: none !important; }
+            .print-container { box-shadow: none !important; border: none !important; }
+            .print-page { page-break-after: always; break-after: page; }
+            .print-page:last-child { page-break-after: auto; break-after: auto; }
+            .print-avoid { break-inside: avoid; }
+            .print-scroll { max-height: none !important; overflow: visible !important; }
+            .print-hide-low-severity { display: none !important; }
+            .print-hide-empty-severity-card { display: none !important; }
+            .print-hide-no-high-severity { display: none !important; }
+            @media print {
+              body * {
+                visibility: visible !important;
+                animation: none !important;
+                transition: none !important;
+              }
+              .sds-popup-doc, .sds-popup-doc * {
+                visibility: visible !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="sds-popup-doc">
+            ${printMarkup}
+          </div>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+
+    const waitForAssets = async () => {
+      const imagePromises = Array.from(popup.document.images || []).map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true });
+        });
+      });
+      const stylePromises = Array.from(popup.document.querySelectorAll("link[rel='stylesheet']")).map((link) => {
+        if (link.sheet) return Promise.resolve();
+        return new Promise((resolve) => {
+          link.addEventListener("load", resolve, { once: true });
+          link.addEventListener("error", resolve, { once: true });
+        });
+      });
+      await Promise.race([
+        Promise.all([...imagePromises, ...stylePromises]),
+        new Promise((resolve) => setTimeout(resolve, 1200)),
+      ]);
+    };
+
+    await waitForAssets();
+    popup.document.documentElement.scrollTop = 0;
+    popup.document.body.scrollTop = 0;
+    popup.focus();
+    popup.print();
+    setTimeout(() => popup.close(), 500);
+  };
 
   const visibleSections = useMemo(() => {
     return LOSS_SEVERITY_CONFIG.filter((section) => {
-      const state = docSeverity[section.key] || { values: {} };
-      const values = Object.values(state.values || {});
-      const hasSeverity = values.some((v) => Number(v) >= 1);
-      const typeSelected = orderTypes.length ? orderTypes.includes(section.label) : true;
-      return hasSeverity && typeSelected;
+      const state = deriveSectionState(section);
+      return highSeverityFieldsForSection(section, state).length > 0;
     });
-  }, [docSeverity, orderTypes]);
+  }, [docSeverity, orderTypes, orderSeverityBySection]);
+
+  const hasAnyHighSeverityRows = useMemo(() => {
+    return visibleSections.some((section) => {
+      const state = deriveSectionState(section);
+      return highSeverityFieldsForSection(section, state).length > 0;
+    });
+  }, [visibleSections, docSeverity, orderTypes, orderSeverityBySection]);
+
+  const primaryCustomerName = useMemo(() => {
+    const list = Array.isArray(customers) ? customers : [];
+    const primary = list.find((c) => c?.isPrimary) || list[0] || {};
+    const first = String(primary?.first || "").trim();
+    const last = String(primary?.last || "").trim();
+    const combined = [first, last].filter(Boolean).join(" ");
+    if (combined) return combined;
+    const fallback = String(primary?.name || "").trim();
+    return fallback || "";
+  }, [customers]);
+
+  const formattedDateOfLoss = useMemo(() => {
+    const raw = String(dateOfLoss || "").trim();
+    if (!raw) return "";
+    const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!isoMatch) return raw;
+    return `${isoMatch[2]}/${isoMatch[3]}/${isoMatch[1]}`;
+  }, [dateOfLoss]);
 
   const normalizeSeverity = (s) => String(s ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -258,7 +438,13 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     "Fiber Protection": "/Gemini_Fiber_Protection.png",
     "Premium Brands": "/Gemini_Premium_Brands.png",
     "Anti-Microbial": "/Gemini_Anti_Microbial.png",
-    "Fold ASAP": "/Gemini_Fold_AMAP.png"
+    "Fold ASAP": "/Gemini_Fold_AMAP.png",
+    "Re-Hanging": "/Gemini_Generated_Image_jnzpynjnzpynjnzp.png",
+    "Drying": "/Drying.jpg",
+    "Total Loss Inventory": "/Total_Loss_Inventory.jpg",
+    "Content Manipulation": "/Content_Manipulation.jpg",
+    "High Density": "/High_Density_Parking.jpg",
+    "Expert Stain Removal": "/Expert_Stain_Removal.jpg"
   };
   const SDS_ICON_MAP = {
     "Elderly": "/Gemini_Elderly.png",
@@ -278,28 +464,33 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     "Photo Inventory": "/Gemini_Photo_Inventory.png",
     "Unpacking": "/Gemini_Unpacking.png",
     "Anti-Microbial": "/Gemini_Anti_Microbial.png",
-    "Drying Needed": "/Gemini_Generated_Image_tydpketydpketydp.png",
+    "Drying Needed": "/Drying.jpg",
+    "Drying": "/Drying.jpg",
     "Disposal": "/Gemini_Generated_Image_b58khsb58khsb58k.png",
     "Fiber Protection": "/Gemini_Fiber_Protection.png",
     "Moving": "/Gemini_Generated_Image_wqmls4wqmls4wqml.png",
     "Rolling Racks": "/Gemini_Generated_Image_bxkqrbxkqrbxkqrb.png",
+    "Total Loss Inventory": "/Total_Loss_Inventory.jpg",
+    "Content Manipulation": "/Content_Manipulation.jpg",
+    "High Density": "/High_Density_Parking.jpg",
+    "Expert Stain Removal": "/Expert_Stain_Removal.jpg",
   };
   const TILE_SIZE = "2in";
 
   const ServiceRequestsWidget = () => (
     <div className="flex items-center gap-3">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden" style={{ width: TILE_SIZE, height: TILE_SIZE }}>
-          <img
-            src={unpackingIcon}
-            alt="Unpacking"
-            className="h-full w-full object-contain"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
-        </div>
-        <div>
-          <div className="text-sm font-semibold text-slate-800">Unpacking</div>
-          <div className="text-xs text-slate-500">Dust order request</div>
-        </div>
+      <div className="sds-icon-tile">
+        <img
+          src={unpackingIcon}
+          alt="Unpacking"
+          className="sds-icon-img"
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
+        />
+      </div>
+      <div>
+        <div className="text-sm font-semibold text-slate-800">Unpacking</div>
+        <div className="text-xs text-slate-500">Dust order request</div>
+      </div>
     </div>
   );
 
@@ -307,11 +498,11 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     const active = (orderTypes || []).filter(t => LOSS_ICON_MAP[t]);
     if (!active.length) return null;
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-3">
         {active.map(type => (
           <div key={type} className="flex flex-col items-center gap-2">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden" style={{ width: TILE_SIZE, height: TILE_SIZE }}>
-              <img src={LOSS_ICON_MAP[type]} alt={type} className="h-full w-full object-contain" />
+            <div className="sds-icon-tile">
+              <img src={LOSS_ICON_MAP[type]} alt={type} className="sds-icon-img" />
             </div>
             <div className="text-[11px] font-semibold text-slate-600">{type}</div>
           </div>
@@ -327,13 +518,13 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     const renderGroup = (title, items) => {
       if (!items || !items.length) return null;
       return (
-        <div>
+        <div className="rounded-xl border border-slate-200 p-3">
           <div className="text-xs font-bold text-slate-500 mb-2">{title}</div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {items.map(item => (
               <div key={item} className="flex flex-col items-center gap-1">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden" style={{ width: TILE_SIZE, height: TILE_SIZE }}>
-                  <img src={SDS_ICON_MAP[item] || "/Icons_Copilot.png"} alt={item} className="h-full w-full object-contain" />
+                <div className="sds-icon-tile">
+                  <img src={SDS_ICON_MAP[item] || "/Icons_Copilot.png"} alt={item} className="sds-icon-img" />
                 </div>
                 <div className="text-[11px] font-semibold text-slate-600 text-center max-w-[120px]">{item}</div>
               </div>
@@ -372,12 +563,12 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
       "Do Not Contact": "/Gemini_Needs_Assistance.png"
     };
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-3">
         {items.map(item => (
           <div key={item} className="flex flex-col items-center gap-2">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden" style={{ width: TILE_SIZE, height: TILE_SIZE }}>
+            <div className="sds-icon-tile">
               {ICON_MAP[item] ? (
-                <img src={ICON_MAP[item]} alt={item} className="h-full w-full object-contain" />
+                <img src={ICON_MAP[item]} alt={item} className="sds-icon-img" />
               ) : (
                 <div className="text-xs font-semibold text-slate-500 px-2 text-center">{item}</div>
               )}
@@ -418,7 +609,8 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
   );
 
   const updateSeverity = (sectionKey, field, value) => {
-    const section = docSeverity[sectionKey] || { enabled: true, values: {} };
+    const config = LOSS_SEVERITY_CONFIG.find((item) => item.key === sectionKey);
+    const section = config ? deriveSectionState(config) : (docSeverity[sectionKey] || { enabled: true, values: {} });
     const next = {
       ...docSeverity,
       [sectionKey]: {
@@ -466,8 +658,132 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     );
   };
 
+  const BrandMark = ({ large = false }) => {
+    const frameClass = large ? "h-24 w-80" : "h-12 w-52";
+    const imgClass = large ? "h-24 w-auto max-w-full object-contain" : "h-12 w-auto max-w-full object-contain";
+    return (
+      <div className={`${frameClass} flex items-center justify-center`}>
+        <img
+          src={toAbsoluteAssetUrl(BRAND.logoSrc)}
+          alt={BRAND.name}
+          className={imgClass}
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
+        />
+      </div>
+    );
+  };
+
+  const BrandHeader = () => (
+    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex items-center gap-3">
+        <BrandMark />
+        <div>
+          <div className="text-lg font-bold text-slate-900">{BRAND.name}</div>
+          <div className="text-xs text-slate-500">{BRAND.tagline}</div>
+        </div>
+      </div>
+      <div className="text-xs text-slate-500 text-right">
+        <div>{BRAND.website}</div>
+        {(BRAND.phone || BRAND.email) && (
+          <div>{[BRAND.phone, BRAND.email].filter(Boolean).join(" • ")}</div>
+        )}
+      </div>
+    </div>
+  );
+
+  const BrandFooter = () => (
+    <div className="border-t border-slate-200 pt-3 text-[11px] text-slate-500 flex justify-between">
+      <span>{BRAND.name}</span>
+      <span>{BRAND.website}</span>
+    </div>
+  );
+
+  const PageBlock = ({ children }) => (
+    <div className="print-page space-y-6">
+      <BrandHeader />
+      {children}
+      <BrandFooter />
+    </div>
+  );
+
+  const SummaryField = ({ label, value }) => (
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-800">{value || "—"}</div>
+    </div>
+  );
+
+  const ProjectSummarySection = () => (
+    <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-sm font-bold text-slate-900">Project Summary</div>
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-sky-600">NOE + Scope Snapshot</div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-2">
+          <SummaryField label="Order Name" value={orderName} />
+          <SummaryField label="Customer" value={primaryCustomerName} />
+          <SummaryField label="Address" value={address} />
+        </div>
+        <div className="space-y-2">
+          <SummaryField label="Insurance Company" value={insuranceCompany} />
+          <SummaryField label="Adjuster" value={insuranceAdjuster} />
+          <SummaryField label="Date of Loss" value={formattedDateOfLoss} />
+          <SummaryField label="Claim Number" value={claimNumber} />
+        </div>
+      </div>
+      <div className="mt-4 rounded-xl border border-sky-100 bg-white p-3">
+        <div className="inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
+          Approve
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-600">
+          Simply reply 'Approve' if this looks good to you. If we haven&apos;t heard back within 3 days, we&apos;ll assume your approval and move forward with the project as outlined.
+        </p>
+      </div>
+    </div>
+  );
+
+  const BrochurePage = () => (
+    <PageBlock>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-4">
+            <div className="text-2xl font-bold text-slate-900">Restore. Renew. Restart.</div>
+            <p className="text-sm text-slate-600">
+              We help families recover after fire, water, and mold losses by handling pickup,
+              inventory, cleaning, storage, and delivery of soft goods and belongings.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                "24/7 claim support",
+                "Photo barcoding & inventory",
+                "Specialized cleaning & deodorizing",
+                "Flexible storage & delivery",
+              ].map((item) => (
+                <div key={item} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Contact</div>
+              <div className="mt-2 text-sm font-semibold text-slate-800">{BRAND.phone}</div>
+              <div className="text-sm text-slate-600">{BRAND.email}</div>
+              <div className="text-sm text-slate-600">{BRAND.website}</div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 flex flex-col items-center justify-center text-center">
+            <BrandMark large />
+            <div className="mt-4 text-sm font-semibold text-slate-700">Your trusted restoration partner</div>
+            <div className="mt-1 text-xs text-slate-500">Serving Greater NYC and beyond</div>
+          </div>
+        </div>
+      </div>
+    </PageBlock>
+  );
+
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/70 p-4 sds-print-overlay">
       <style>{`
         .border-gradient-fire {
           border: 2px solid transparent;
@@ -480,8 +796,8 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
         input[type="range"]::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 16px;
-          height: 16px;
+          width: 12px;
+          height: 12px;
           background: #ffffff;
           border: 2px solid #9ca3af;
           border-radius: 9999px;
@@ -489,8 +805,8 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         input[type="range"]::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
+          width: 12px;
+          height: 12px;
           background: #ffffff;
           border: 2px solid #9ca3af;
           border-radius: 9999px;
@@ -508,25 +824,67 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
           margin: 0.65in;
         }
         @media print {
-          body { background: #fff; }
+          html, body { background: #fff !important; }
+          body * {
+            visibility: hidden !important;
+            animation: none !important;
+            transition: none !important;
+          }
+          .sds-print-root, .sds-print-root * {
+            visibility: visible !important;
+          }
+          .sds-print-overlay {
+            position: static !important;
+            inset: auto !important;
+            display: block !important;
+            padding: 0 !important;
+            background: #fff !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+          .sds-print-root {
+            width: 100% !important;
+            max-width: none !important;
+            max-height: none !important;
+            overflow: visible !important;
+            border-radius: 0 !important;
+          }
           .print-hidden { display: none !important; }
           .print-container { box-shadow: none !important; border: none !important; }
-          .print-page { page-break-after: always; }
+          .print-page { page-break-after: always; break-after: page; }
+          .print-page:last-child { page-break-after: auto; break-after: auto; }
           .print-avoid { break-inside: avoid; }
           .print-scroll { max-height: none !important; overflow: visible !important; }
+          .print-hide-low-severity { display: none !important; }
+          .print-hide-empty-severity-card { display: none !important; }
+          .print-hide-no-high-severity { display: none !important; }
+        }
+        .sds-icon-tile {
+          width: ${TILE_SIZE};
+          height: ${TILE_SIZE};
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 16px;
+          background: transparent;
+        }
+        .sds-icon-img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
         }
       `}</style>
 
-      <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-slate-200 print-container print-scroll">
+      <div ref={printRootRef} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-slate-200 print-container print-scroll sds-print-root">
         <div className="bg-sky-500 px-6 py-4 flex items-center justify-between print-hidden">
           <div>
             <h3 className="text-xl font-bold text-white">SDS Document</h3>
-            <div className="text-sm text-sky-100">Loss Severity Widget</div>
+            <div className="text-sm text-sky-100">Print-ready summary</div>
           </div>
           <div className="flex gap-2">
             <button
               className="rounded-lg border border-white/40 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/10"
-              onClick={() => window.print()}
+              onClick={handlePrint}
             >
               Print / PDF
             </button>
@@ -537,70 +895,82 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
         </div>
 
         <div className="p-6 bg-slate-50 space-y-8">
-          <WidgetSection title="Loss Severity">
-            <div className="mb-4 pt-2 pb-3 border-b border-slate-200/60">
-              <div className="flex justify-between items-center px-2 mb-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Severity Scale</span>
-                <span className="text-[11px] font-bold text-sky-600 uppercase tracking-widest bg-sky-50 px-2 py-0.5 rounded-full">Score 0 — 3</span>
-              </div>
-              <div className="flex justify-between items-center px-2">
-                <div className="flex items-center text-xs font-bold text-slate-600">
-                  <div className="w-3 h-3 rounded-full bg-slate-300 mr-2 border border-white shadow-sm"></div>
-                  <span>0: None</span>
+          <PageBlock>
+            <ProjectSummarySection />
+          </PageBlock>
+          <PageBlock>
+            <WidgetSection title="Loss Severity" className={`mx-auto w-full max-w-[22rem] ${hasAnyHighSeverityRows ? "" : "print-hide-no-high-severity"}`}>
+              <div className="mb-2 pt-1 pb-2 border-b border-slate-200/60">
+                <div className="flex justify-between items-center px-1 mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Severity Scale</span>
+                  <span className="text-[10px] font-bold text-sky-600 uppercase tracking-widest bg-sky-50 px-1.5 py-0.5 rounded-full">0 — 3</span>
                 </div>
-                <div className="flex-1 mx-4 h-1 bg-gradient-to-r from-slate-300 via-slate-400 to-slate-600 rounded-full opacity-30"></div>
-                <div className="flex items-center text-xs font-bold text-slate-600 text-right">
-                  <span>3: Extreme</span>
-                  <div className="w-3 h-3 rounded-full bg-slate-700 ml-2 border border-white shadow-sm"></div>
+                <div className="flex justify-between items-center px-1">
+                  <div className="flex items-center text-[10px] font-bold text-slate-600">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-300 mr-1.5 border border-white shadow-sm"></div>
+                    <span>0: None</span>
+                  </div>
+                  <div className="flex-1 mx-2 h-1 bg-gradient-to-r from-slate-300 via-slate-400 to-slate-600 rounded-full opacity-30"></div>
+                  <div className="flex items-center text-[10px] font-bold text-slate-600 text-right">
+                    <span>3: Extreme</span>
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-700 ml-1.5 border border-white shadow-sm"></div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="mx-auto max-w-sm print-avoid">
-              {visibleSections.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-500">
-                  No loss severity has been recorded yet.
-                </div>
-              ) : (
-                <div className={`grid gap-4 ${visibleSections.length > 1 ? "md:grid-cols-2" : ""}`}>
-                  {visibleSections.map(section => {
-                  const state = docSeverity[section.key] || { enabled: false, values: {} };
-                  return (
-                    <div key={section.key} className={`p-4 rounded-2xl transition-all duration-300 ${section.border}`}>
-                      <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-base font-bold text-slate-800">{section.label}</h2>
-                        <button
-                          className={`h-6 w-6 rounded-md border-2 flex items-center justify-center text-[10px] font-bold ${state.enabled ? "bg-sky-500 border-sky-500 text-white" : "bg-white border-slate-400 text-slate-600"}`}
-                          onClick={() => toggleSection(section.key)}
-                          title={state.enabled ? "Disable" : "Enable"}
-                        >
-                          ✓
-                        </button>
-                      </div>
-                      <div className="space-y-4">
-                        {section.fields.map(field => (
-                          <div key={field} className="slider-container" data-color-start={section.colorStart} data-color-end={section.colorEnd}>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">{field}</label>
-                            <Slider
-                              value={state.values?.[field] ?? 0}
-                              disabled={!state.enabled}
-                              colorStart={section.colorStart}
-                              colorEnd={section.colorEnd}
-                              onChange={(val) => updateSeverity(section.key, field, val)}
-                            />
-                            <div className="flex justify-between text-[10px] font-medium text-slate-400 mt-1 px-1">
-                              <span>0</span><span>1</span><span>2</span><span>3</span>
+              <div className="mx-auto max-w-[12rem] print-avoid">
+                {visibleSections.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-4 text-center text-[11px] text-slate-500">
+                    No severity rows above 1 to include.
+                  </div>
+                ) : (
+                  <div className={`grid gap-2 ${visibleSections.length > 1 ? "md:grid-cols-2" : ""}`}>
+                    {visibleSections.map(section => {
+                    const state = deriveSectionState(section);
+                    const highFields = highSeverityFieldsForSection(section, state);
+                    const hasPrintableRows = highFields.length > 0;
+                    return (
+                      <div key={section.key} className={`p-2 rounded-xl ${section.border} ${hasPrintableRows ? "" : "print-hide-empty-severity-card"}`}>
+                        <div className="flex justify-between items-center mb-2">
+                          <h2 className="text-sm font-bold text-slate-800">{section.label}</h2>
+                          <button
+                            className={`h-5 w-5 rounded-md border-2 flex items-center justify-center text-[9px] font-bold ${state.enabled ? "bg-sky-500 border-sky-500 text-white" : "bg-white border-slate-400 text-slate-600"}`}
+                            onClick={() => toggleSection(section.key)}
+                            title={state.enabled ? "Disable" : "Enable"}
+                          >
+                            ✓
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {highFields.map(field => (
+                            <div
+                              key={field}
+                              className={`slider-container ${Number(state.values?.[field] ?? 0) > 1 ? "" : "print-hide-low-severity"}`}
+                              data-color-start={section.colorStart}
+                              data-color-end={section.colorEnd}
+                            >
+                              <label className="block text-[10px] font-semibold text-slate-700 mb-1">{field}</label>
+                              <Slider
+                                value={state.values?.[field] ?? 0}
+                                disabled={!state.enabled}
+                                colorStart={section.colorStart}
+                                colorEnd={section.colorEnd}
+                                onChange={(val) => updateSeverity(section.key, field, val)}
+                              />
+                              <div className="flex justify-between text-[9px] font-medium text-slate-400 mt-0.5 px-0.5">
+                                <span>0</span><span>1</span><span>2</span><span>3</span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-                </div>
-              )}
-            </div>
-          </WidgetSection>
+                    );
+                  })}
+                  </div>
+                )}
+              </div>
+            </WidgetSection>
+          </PageBlock>
 
           {getPerils().length > 0 && (
             <div className="space-y-6">
@@ -610,17 +980,17 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                   ? `Loss Type: ${perilLabel} · Claim #: ${claimNumber}`
                   : `Loss Type: ${perilLabel}`;
                 return (
-                  <div key={peril} className="print-page">
+                  <PageBlock key={peril}>
                     <WidgetSection title="Home Loss Visualization" subtitle={subtitle}>
                       <LossOverviewWidget peril={peril} />
                     </WidgetSection>
-                  </div>
+                  </PageBlock>
                 );
               })}
             </div>
           )}
           {(hasLossIcons || hasSpecialConsiderations || hasSdsIconSelections) && (
-            <div className="space-y-6 print-page">
+            <PageBlock>
               {hasLossIcons && (
                 <WidgetSection title="Loss Type">
                   <LossTypeIconsWidget />
@@ -636,15 +1006,16 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                   <SpecialConsiderationsWidget />
                 </WidgetSection>
               )}
-            </div>
+            </PageBlock>
           )}
           {showDustWidget && (
-            <div className="space-y-6 print-page">
+            <PageBlock>
               <WidgetSection title="Service Requests">
                 <ServiceRequestsWidget />
               </WidgetSection>
-            </div>
+            </PageBlock>
           )}
+          <BrochurePage />
         </div>
       </div>
     </div>

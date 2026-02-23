@@ -391,6 +391,44 @@ const SAMPLE_CONTACTS = [
   { name: "Steven Earthman", company: "Croziers Moving", companyType: "Moving", salesRep: "", title: "Project Manager", isAdjuster: false }
 ];
 
+const SAMPLE_PRESET_DATA = () => ({
+  ...DEFAULT_FORM,
+  orderName: "Sample Water Loss - Smith",
+  orderNameAuto: false,
+  recordType: "Order",
+  leadSourceCategory: "Referral",
+  referringCompany: "Pure Insurance",
+  referrer: "Ronzel Simmons",
+  billingCompany: "Pure Insurance",
+  billingContact: "Ronzel Simmons",
+  insuranceClaim: "Yes",
+  insuranceCompany: "Pure Insurance",
+  insuranceAdjuster: "Ronzel Simmons",
+  claimNumber: "CLM-1001",
+  dateOfLoss: "2026-02-14",
+  serviceOfferings: ["Textiles", "Art"],
+  suggestedGroups: ["RD", "TLI"],
+  eventInstructions: "Bring: Heater\nConditions: Still Wet\nQuick Notes: Everything Affected",
+  customers: [
+    initCustomer({ isPrimary: true, firstName: "Mary", lastName: "Smith", type: "Primary", phone: "(555) 555-0101" })
+  ],
+  addresses: [
+    initAddress({
+      isPrimary: true,
+      street: "123 Main St",
+      city: "Houston",
+      state: "TX",
+      zip: "77002",
+      type: "Primary"
+    })
+  ],
+  sdsInitialInstructions: [
+    { id: "inst-1", person: "Ronzel Simmons", role: "Adjuster", instruction: "Please secure all contents before pickup." }
+  ],
+  sdsInstructionAgreement: "agree",
+  sdsDisagreementNote: "",
+});
+
 const LEAD_SOURCE_HELP = {
   Referral: "Recommendation from existing contact.",
   Marketing: "Digital/print campaigns to attract business.",
@@ -431,7 +469,23 @@ const COMPANY_TYPES = [
 
 const SDS_CONSIDERATIONS = ["Elderly", "Pregnancy", "Baby", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"];
 const SDS_OBSERVATIONS = ["Pets", "Fireplace", "Insects", "Moth Damage", "Sun Damage", "Smoking"];
-const SDS_SERVICES = ["Fold as Much as Possible", "Re-Hanging", "Photo Inventory", "Unpacking", "Needs Assistance", "Anti-Microbial", "Drying Needed", "Disposal", "Fiber Protection", "Moving", "Rolling Racks"];
+const SDS_SERVICES = [
+  "Fold as Much as Possible",
+  "Re-Hanging",
+  "Photo Inventory",
+  "Unpacking",
+  "Needs Assistance",
+  "Anti-Microbial",
+  "Drying",
+  "Disposal",
+  "Fiber Protection",
+  "Moving",
+  "Rolling Racks",
+  "Total Loss Inventory",
+  "Content Manipulation",
+  "High Density",
+  "Expert Stain Removal",
+];
 const SDS_ICON_MAP = {
   "Elderly": "/Gemini_Elderly.png",
   "Pregnancy": "/Gemini_Pregnancy.png",
@@ -451,11 +505,16 @@ const SDS_ICON_MAP = {
   "Photo Inventory": "/Gemini_Photo_Inventory.png",
   "Unpacking": "/Gemini_Unpacking.png",
   "Anti-Microbial": "/Gemini_Anti_Microbial.png",
-  "Drying Needed": "/Gemini_Generated_Image_tydpketydpketydp.png",
+  "Drying Needed": "/Drying.jpg",
+  "Drying": "/Drying.jpg",
   "Disposal": "/Gemini_Generated_Image_b58khsb58khsb58k.png",
   "Fiber Protection": "/Gemini_Fiber_Protection.png",
   "Moving": "/Gemini_Generated_Image_wqmls4wqmls4wqml.png",
   "Rolling Racks": "/Gemini_Generated_Image_bxkqrbxkqrbxkqrb.png",
+  "Total Loss Inventory": "/Total_Loss_Inventory.jpg",
+  "Content Manipulation": "/Content_Manipulation.jpg",
+  "High Density": "/High_Density_Parking.jpg",
+  "Expert Stain Removal": "/Expert_Stain_Removal.jpg",
 };
 
 const QUICK_INSTRUCTION_NOTES = [
@@ -685,6 +744,13 @@ const DEFAULT_FORM={
   sdsConsiderations: [],
   sdsObservations: [],
   sdsServices: [],
+  sdsRooms: [],
+  sdsProjectFloors: [],
+  sdsApartmentType: "",
+  sdsPrebagged: "",
+  sdsInitialInstructions: [],
+  sdsInstructionAgreement: null,
+  sdsDisagreementNote: "",
   estimateRequested: false, 
   estimateRequestedType: "",
   meetingWith: [],
@@ -1172,10 +1238,10 @@ const ToggleGroup = ({ options, value, onChange }) => (
        const label = typeof opt === "string" ? opt : opt.label;
        const title = typeof opt === "string" ? undefined : opt.title;
        const isActive = value === label;
-       return (<div key={label} title={title} onClick={() => onChange(isActive ? "" : label)} className={isActive ? `${pillBase} ${pillActive}` : `${pillBase} ${pillInactive}`}>
+       return (<button key={label} type="button" title={title} aria-pressed={isActive} onClick={() => onChange(isActive ? "" : label)} className={isActive ? `${pillBase} ${pillActive}` : `${pillBase} ${pillInactive}`}>
          {isActive && <span className="block h-1.5 w-1.5 rounded-full bg-sky-500 mr-2"></span>}
          {label}
-       </div>)
+       </button>)
     })}
   </div>
 );
@@ -1430,10 +1496,10 @@ const CompanyRecord = ({ company, contact, contacts, roles = [], className, edit
 const ToggleMulti = ({ label, checked, onChange, className, colorClass, title, showDot = true }) => {
     const activeClass = colorClass || pillActive;
     return (
-        <div onClick={onChange} title={title} className={(checked ? `${pillBase} ${activeClass}` : `${pillBase} ${pillInactive}`) + " " + (className||"")}> 
+        <button type="button" onClick={onChange} title={title} aria-pressed={checked} className={(checked ? `${pillBase} ${activeClass}` : `${pillBase} ${pillInactive}`) + " " + (className||"")}> 
             {checked && showDot && <span className="block h-1.5 w-1.5 rounded-full bg-sky-500 mr-2"></span>}
             {label}
-        </div>
+        </button>
     );
 };
 
@@ -1457,6 +1523,9 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
   const [repMenuOpen, setRepMenuOpen] = useState(false);
   const [showSuggestedRoles, setShowSuggestedRoles] = useState(false);
   const [suggestedSelection, setSuggestedSelection] = useState(suggestedReferrerRoles || []);
+  const [suggestedRolesOffsetTop, setSuggestedRolesOffsetTop] = useState(72);
+  const referrerFieldAnchorRef = useRef(null);
+  const suggestedRolesCardRef = useRef(null);
   const referrerRep = getSalesRepForContact && data.referrer ? getSalesRepForContact(data.referrer) : "";
   useEffect(() => setReferrerQuery(data.referrer || ""), [data.referrer]);
   useEffect(() => setSuggestedSelection(suggestedReferrerRoles || []), [suggestedReferrerRoles]);
@@ -1539,6 +1608,57 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
     const best = getBestMatch(combinedContactOptions || [], referrerQuery);
     if (best) applyReferrerValue(best);
   };
+  const updateSuggestedRolesOffset = useCallback(() => {
+    if (!showSuggestedRoles) return;
+    const visualViewport = window.visualViewport;
+    const viewportTop = visualViewport?.offsetTop || 0;
+    const viewportHeight = visualViewport?.height || window.innerHeight || 0;
+    const viewportBottom = viewportTop + viewportHeight;
+    const minTop = viewportTop + 16;
+    const anchorRect = referrerFieldAnchorRef.current?.getBoundingClientRect();
+    const anchorTop = anchorRect ? anchorRect.top + viewportTop : minTop;
+    const anchorBottom = anchorRect ? anchorRect.bottom + viewportTop : minTop;
+    const modalHeight = suggestedRolesCardRef.current?.offsetHeight || Math.min(520, Math.max(280, viewportHeight - 32));
+    const preferredBelow = anchorBottom + 8;
+    const preferredAbove = anchorTop - modalHeight - 8;
+    let nextTop = preferredBelow;
+    if (preferredBelow + modalHeight > viewportBottom - 8) {
+      if (preferredAbove >= minTop) {
+        nextTop = preferredAbove;
+      } else {
+        nextTop = Math.max(minTop, viewportBottom - modalHeight - 8);
+      }
+    }
+    setSuggestedRolesOffsetTop(nextTop);
+  }, [showSuggestedRoles]);
+  useEffect(() => {
+    if (!showSuggestedRoles) return;
+    updateSuggestedRolesOffset();
+    const onViewportShift = () => updateSuggestedRolesOffset();
+    window.addEventListener("resize", onViewportShift);
+    window.addEventListener("scroll", onViewportShift, true);
+    window.visualViewport?.addEventListener("resize", onViewportShift);
+    window.visualViewport?.addEventListener("scroll", onViewportShift);
+    return () => {
+      window.removeEventListener("resize", onViewportShift);
+      window.removeEventListener("scroll", onViewportShift, true);
+      window.visualViewport?.removeEventListener("resize", onViewportShift);
+      window.visualViewport?.removeEventListener("scroll", onViewportShift);
+    };
+  }, [showSuggestedRoles, updateSuggestedRolesOffset]);
+  useEffect(() => {
+    if (!showSuggestedRoles) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const rafId = requestAnimationFrame(() => {
+      const firstFocusable = suggestedRolesCardRef.current?.querySelector("input, button, [tabindex]:not([tabindex='-1'])");
+      firstFocusable?.focus?.();
+    });
+    return () => {
+      cancelAnimationFrame(rafId);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showSuggestedRoles]);
   return (
   <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-6">
       <Field label="Source">
@@ -1556,42 +1676,47 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
 
       {data.leadSourceCategory === "Referral" && (
            <div className="grid gap-4 animate-indigo-fade p-4 rounded-lg bg-sky-50/30 border border-sky-100">
-               <Field
-                 label="Referrer (Contact or Company)"
-                 action={
-                   referrerRep ? (
-                     <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-bold text-sky-700">
-                       <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold">{getRepInitials(referrerRep)}</span>
-                       <span>Rep</span>
-                     </div>
-                   ) : null
-                 }
-               >
-               <div className="max-w-sm">
-                   <SearchSelect
-                     data-audit-key="referrer"
-                     className={auditOn && data.highlightMissing?.referrer ? "audit-missing" : ""}
-                     value={data.referrer}
-                     onChange={(v)=>applyReferrerValue(v)}
-                     onQueryChange={(v)=>setReferrerQuery(v)}
+               <div ref={referrerFieldAnchorRef}>
+                 <Field
+                   label="Referrer (Contact or Company)"
+                   action={
+                     referrerRep ? (
+                       <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-bold text-sky-700">
+                         <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold">{getRepInitials(referrerRep)}</span>
+                         <span>Rep</span>
+                       </div>
+                     ) : null
+                   }
+                 >
+                 <div className="max-w-sm">
+                     <SearchSelect
+                       data-audit-key="referrer"
+                       className={auditOn && data.highlightMissing?.referrer ? "audit-missing" : ""}
+                       value={data.referrer}
+                       onChange={(v)=>applyReferrerValue(v)}
+                       onQueryChange={(v)=>setReferrerQuery(v)}
                      options={combinedContactOptions}
                      placeholder="Type contact or company..."
                      onBlur={() => ensureReferrerFromQuery()}
+                     onKeyDown={(e) => {
+                       if (e.key === "Tab" && referrerBestMatch) e.preventDefault();
+                     }}
                    />
                  </div>
-               {referrerBestMatch && referrerBestMatch !== data.referrer && (
-                 <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-2">
-                   <span>Top match:</span>
-                     <button
-                       onClick={() => applyReferrerValue(referrerBestMatch)}
-                       className="font-semibold text-slate-600 hover:text-sky-700"
-                     >
-                       {referrerBestMatch}
-                     </button>
-                     <span>(press Enter or Tab)</span>
-                   </div>
-                 )}
-               </Field>
+                 {referrerBestMatch && referrerBestMatch !== data.referrer && (
+                   <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-2">
+                     <span>Top match:</span>
+                       <button
+                         onClick={() => applyReferrerValue(referrerBestMatch)}
+                         className="font-semibold text-slate-600 hover:text-sky-700"
+                       >
+                         {referrerBestMatch}
+                       </button>
+                       <span>(press Enter or Tab)</span>
+                     </div>
+                   )}
+                 </Field>
+               </div>
                <div className="flex items-center justify-between text-xs text-slate-500">
                  <span>CRM Log</span>
                  <button
@@ -1653,12 +1778,12 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       </Field>
       {showInlineHelp && <div className="text-[11px] text-slate-400">Employee managing customer relationships/accounts.</div>}
       {showSuggestedRoles && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden fade-in">
+        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[120] flex items-start justify-center bg-slate-900/35 p-4">
+          <div ref={suggestedRolesCardRef} className="w-full max-w-2xl max-h-[calc(100vh-2rem)] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-auto fade-in" style={{ marginTop: `${suggestedRolesOffsetTop}px` }}>
             <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
               <div>
-                <div className="text-xl font-bold text-white">Apply Suggested Roles</div>
-                <div className="text-sm text-sky-100">Choose which roles to apply for this referrer.</div>
+                <div className="text-2xl font-bold text-white">Apply Suggested Roles</div>
+                <div className="text-base text-sky-100">Choose which roles to apply for this referrer.</div>
               </div>
               <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setShowSuggestedRoles(false)}>×</button>
             </div>
@@ -1670,16 +1795,17 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                 { id: "national", label: "National Carrier" },
                 { id: "adjuster", label: "Adjuster" }
               ].map(r => (
-                <label key={r.id} className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <label key={r.id} className="flex items-center gap-3 text-base font-semibold text-slate-700">
                   <input
                     type="checkbox"
+                    className="h-5 w-5"
                     checked={suggestedSelection.includes(r.id)}
                     onChange={(e) => {
                       setSuggestedSelection(prev => e.target.checked ? [...prev, r.id] : prev.filter(x => x !== r.id));
                     }}
                   />
                   <span className="flex-1">{r.label}</span>
-                  <span className="text-[10px] font-semibold text-slate-400">
+                  <span className="text-sm font-semibold text-slate-500">
                     {r.id === "adjuster" ? (data.referrer || "—") : (data.referringCompany || "—")}
                   </span>
                 </label>
@@ -2203,7 +2329,18 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
       {open && (
       <div className="grid gap-4 pl-1 sm:pl-2">
          <div className="w-full sm:w-1/2">
-            <label className="text-xs font-semibold text-slate-500 mb-1 block">Type</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-500">Type</label>
+              {c.type && (
+                <button
+                  type="button"
+                  onClick={() => updateCust(c.id, { type: "" })}
+                  className="text-[10px] font-semibold text-slate-400 hover:text-rose-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <SearchSelect value={c.type || ""} onChange={(v)=>updateCust(c.id,{type:v})} options={CUSTOMER_TYPES} listId={`customer-type-${c.id}`} placeholder="Search relationship..." maxResults={CUSTOMER_TYPES.length} />
          </div>
 
@@ -2892,11 +3029,13 @@ export default function App(){
     try {
       const s = localStorage.getItem("same-day-scope-v52");
       const parsed = s ? JSON.parse(s) : {};
+      const normalizedSdsServices = (parsed.sdsServices || []).map(item => item === "Drying Needed" ? "Drying" : item);
       return { 
         ...DEFAULT_FORM, 
         ...parsed, 
         addresses: parsed.addresses?.length ? parsed.addresses : DEFAULT_FORM.addresses, 
-        customers: parsed.customers?.length ? parsed.customers : DEFAULT_FORM.customers 
+        customers: parsed.customers?.length ? parsed.customers : DEFAULT_FORM.customers,
+        sdsServices: normalizedSdsServices
       };
     } catch(e) { return DEFAULT_FORM; }
   });
@@ -2908,9 +3047,35 @@ export default function App(){
   const [testPresets, setTestPresets] = useState(() => {
     try {
       const raw = localStorage.getItem(TEST_PRESETS_KEY);
-      return raw ? JSON.parse(raw) : [];
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        return [
+          {
+            id: "preset-sample",
+            name: "Sample Order (Auto)",
+            createdAt: new Date().toISOString(),
+            data: SAMPLE_PRESET_DATA()
+          }
+        ];
+      }
+      return [
+        {
+          id: "preset-sample",
+          name: "Sample Order (Auto)",
+          createdAt: new Date().toISOString(),
+          data: SAMPLE_PRESET_DATA()
+        }
+      ];
     } catch {
-      return [];
+      return [
+        {
+          id: "preset-sample",
+          name: "Sample Order (Auto)",
+          createdAt: new Date().toISOString(),
+          data: SAMPLE_PRESET_DATA()
+        }
+      ];
     }
   });
   const [openSections, setOpenSections] = useState({sec1:true, sec2:false, sec3:false, sec4:false, sec5:false}); 
@@ -3162,6 +3327,21 @@ export default function App(){
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    const onFocusIn = (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (document.querySelector("[data-suggested-roles-modal='true']")) return;
+      const isFocusable = target.matches("input, select, textarea, button, [tabindex]");
+      if (!isFocusable) return;
+      requestAnimationFrame(() => {
+        target.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      });
+    };
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, []);
+
   const update = useCallback((k,v) => setData(p=>({...p,[k]:v})), []);
   const updateMany = useCallback((patch) => setData(p => ({ ...p, ...patch })), []);
   const triggerAutoFlash = useCallback((key) => {
@@ -3206,11 +3386,13 @@ export default function App(){
   const loadTestPreset = useCallback((preset) => {
     if (!preset?.data) return;
     const parsed = preset.data;
+    const normalizedSdsServices = (parsed.sdsServices || []).map(item => item === "Drying Needed" ? "Drying" : item);
     setData({
       ...DEFAULT_FORM,
       ...parsed,
       addresses: parsed.addresses?.length ? parsed.addresses : DEFAULT_FORM.addresses,
       customers: parsed.customers?.length ? parsed.customers : DEFAULT_FORM.customers,
+      sdsServices: normalizedSdsServices,
     });
     setToast("Test preset loaded.");
   }, []);
@@ -3269,6 +3451,17 @@ export default function App(){
 
   const toggleMulti=(list,value)=> list.includes(value)? list.filter(v=>v!==value): [...list,value];
   const toggleHandling=(code)=> update("handlingCodes", toggleMulti(data.handlingCodes, code));
+
+  const focusFirstFieldInSection = (sectionKey) => {
+    const section = document.getElementById(sectionKey);
+    if (!section) return;
+    const firstFocusable = section.querySelector(
+      'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    if (firstFocusable instanceof HTMLElement) {
+      firstFocusable.focus();
+    }
+  };
   
   const scrollToSection = (key) => {
     const el = document.getElementById(key);
@@ -3325,10 +3518,11 @@ export default function App(){
 
   const goToNextSection = (currentKey) => {
     const idx = SECTION_ORDER.indexOf(currentKey);
-    if (idx < 0 || idx === SECTION_ORDER.length - 1) return;
-    const nextKey = SECTION_ORDER[idx + 1];
+    if (idx < 0) return null;
+    const nextKey = idx === SECTION_ORDER.length - 1 ? SECTION_ORDER[0] : SECTION_ORDER[idx + 1];
     setOpenSections(prev => ({ ...prev, [currentKey]: false, [nextKey]: true }));
     setVisitedSections(prevV => new Set([...prevV, nextKey]));
+    setActiveSection(nextKey);
     setTimeout(() => {
       const el = document.getElementById(nextKey);
       if (el) {
@@ -3337,7 +3531,16 @@ export default function App(){
         void el.offsetWidth;
         el.classList.add('animate-purple-section-fade');
       }
+      setTimeout(() => focusFirstFieldInSection(nextKey), 120);
     }, 100);
+    return nextKey;
+  };
+
+  const handleNextSectionKeyDown = (e, currentKey) => {
+    if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      goToNextSection(currentKey);
+    }
   };
 
   const toggleLossType = (type) => {
@@ -4921,7 +5124,11 @@ export default function App(){
         onLossSeverityChange={updateLossSeverity}
         orderTypes={data.orderTypes || []}
         severityCodes={data.severityCodes || []}
+        orderName={data.orderName || ""}
         claimNumber={data.claimNumber || ""}
+        insuranceCompany={data.insuranceCompany || ""}
+        insuranceAdjuster={data.insuranceAdjuster || ""}
+        dateOfLoss={data.dateOfLoss || ""}
         addressLabel={addressLabel}
         customers={data.customers || []}
         familyMedicalIssues={data.familyMedicalIssues}
@@ -4929,6 +5136,20 @@ export default function App(){
         sdsConsiderations={data.sdsConsiderations || []}
         sdsObservations={data.sdsObservations || []}
         sdsServices={data.sdsServices || []}
+        sdsRooms={data.sdsRooms || []}
+        onSdsRoomsChange={(list) => update("sdsRooms", list)}
+        sdsProjectFloors={data.sdsProjectFloors || []}
+        onSdsProjectFloorsChange={(list) => update("sdsProjectFloors", list)}
+        sdsApartmentType={data.sdsApartmentType || ""}
+        onSdsApartmentTypeChange={(value) => update("sdsApartmentType", value)}
+        sdsPrebagged={data.sdsPrebagged || ""}
+        onSdsPrebaggedChange={(value) => update("sdsPrebagged", value)}
+        sdsInitialInstructions={data.sdsInitialInstructions || []}
+        onSdsInitialInstructionsChange={(list) => update("sdsInitialInstructions", list)}
+        sdsInstructionAgreement={data.sdsInstructionAgreement}
+        onSdsInstructionAgreementChange={(value) => update("sdsInstructionAgreement", value)}
+        sdsDisagreementNote={data.sdsDisagreementNote}
+        onSdsDisagreementNoteChange={(value) => update("sdsDisagreementNote", value)}
       />
     );
   }
@@ -5044,7 +5265,7 @@ export default function App(){
                                     const attentionForSeverity = (severityGroup === "Water" && attentionWater) || (severityGroup === "Mold" && attentionMold);
                                     return (
                                         <div key={type} className="animate-purple-section-fade rounded-xl border border-sky-100 bg-sky-50/30 overflow-hidden transition-all shadow-sm">
-                                            <div className="flex items-center justify-between px-4 py-3 bg-sky-50/50 cursor-pointer hover:bg-sky-100/50 transition-colors" onClick={() => { toggleMinimizeLoss(type); if (isMinimized) setManualEditLossTypes(p => ({ ...p, [type]: true })); }}>
+                                            <button type="button" className="flex w-full items-center justify-between px-4 py-3 bg-sky-50/50 hover:bg-sky-100/50 transition-colors text-left" onClick={() => { toggleMinimizeLoss(type); if (isMinimized) setManualEditLossTypes(p => ({ ...p, [type]: true })); }}>
                                                 <div className="flex items-center gap-2">
                                                   <span className="font-bold text-sky-700">{type} Details</span>
                                                   {severityShort && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-700">{severityShort}</span>}
@@ -5055,7 +5276,7 @@ export default function App(){
                                                   )}
                                                 </div>
                                                 <div className="text-xs font-bold text-sky-500">{isMinimized ? "Show" : "Minimize"}</div>
-                                            </div>
+                                            </button>
                                             {!isMinimized && (
                                                 <div className="p-4 grid gap-4 border-t border-sky-100 bg-white">
                                                     {hasSeverity && data.restorationType !== "Non-Restoration Project" && (
@@ -5300,7 +5521,7 @@ export default function App(){
                         </div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec1')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
-                          <button onClick={() => goToNextSection('sec1')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
+                          <button onClick={() => goToNextSection('sec1')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec1')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
                         </div>
                     </Section>
 
@@ -5310,7 +5531,7 @@ export default function App(){
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec2')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
-                          <button onClick={() => goToNextSection('sec2')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
+                          <button onClick={() => goToNextSection('sec2')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec2')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
                         </div>
                       </div>
                     </Section>
@@ -5321,7 +5542,7 @@ export default function App(){
                         <div className="pt-2"><button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button></div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec3')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
-                          <button onClick={() => goToNextSection('sec3')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
+                          <button onClick={() => goToNextSection('sec3')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec3')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
                         </div>
                       </div>
                     </Section>
@@ -5580,7 +5801,7 @@ export default function App(){
 
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec4')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
-                          <button onClick={() => goToNextSection('sec4')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
+                          <button onClick={() => goToNextSection('sec4')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec4')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
                         </div>
                       </div>
                     </Section>
@@ -5796,8 +6017,8 @@ export default function App(){
                         </SubSection>
                         <SubSection title="SDS Icon Selections" open={scheduleIconsOpen} onToggle={() => setScheduleIconsOpen(!scheduleIconsOpen)} compact={compactMode}>
                           <div className="space-y-4">
-                            <div>
-                              <div className="text-xs font-bold text-slate-500 mb-2">Considerations</div>
+                            <div className="rounded-xl border border-slate-200 p-4">
+                              <div className="text-xs font-bold text-slate-500 mb-3">Considerations</div>
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                                 {SDS_CONSIDERATIONS.map(item => {
                                   const active = (data.sdsConsiderations || []).includes(item);
@@ -5816,8 +6037,8 @@ export default function App(){
                                 })}
                               </div>
                             </div>
-                            <div>
-                              <div className="text-xs font-bold text-slate-500 mb-2">Observations</div>
+                            <div className="rounded-xl border border-slate-200 p-4">
+                              <div className="text-xs font-bold text-slate-500 mb-3">Observations</div>
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                                 {SDS_OBSERVATIONS.map(item => {
                                   const active = (data.sdsObservations || []).includes(item);
@@ -5836,8 +6057,8 @@ export default function App(){
                                 })}
                               </div>
                             </div>
-                            <div>
-                              <div className="text-xs font-bold text-slate-500 mb-2">Services Requested</div>
+                            <div className="rounded-xl border border-slate-200 p-4">
+                              <div className="text-xs font-bold text-slate-500 mb-3">Services Requested</div>
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                                 {SDS_SERVICES.map(item => {
                                   const active = (data.sdsServices || []).includes(item);
@@ -5859,7 +6080,8 @@ export default function App(){
                           </div>
                         </SubSection>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                          <button onClick={() => handleToggleSection('sec5')} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">Done</button>
+                          <button onClick={() => handleToggleSection('sec5')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
+                          <button onClick={() => goToNextSection('sec5')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec5')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
                         </div>
                       </div>
                     </Section>
