@@ -11,7 +11,14 @@ const BRAND = {
   website: "renewalclaimsolutions.com",
   phone: "(877) 630-6273",
   email: "info@renewalclaims.com",
-  logoSrc: "/renewal-logo.svg",
+  logoSrc: "/renewal-logo-graphics.png",
+  logoFallbackSrc: "/renewal-logo-primary.jpg",
+};
+
+const BRAND_CARES_MEDIA = {
+  fieldTech: "/renewal-cares-field-tech.png",
+  careSpecialist: "/renewal-cares-specialist.png",
+  homeBanner: "/renewal-cares-home-banner.png",
 };
 
 const toAbsoluteAssetUrl = (src) => {
@@ -658,17 +665,62 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     );
   };
 
-  const BrandMark = ({ large = false }) => {
-    const frameClass = large ? "h-24 w-80" : "h-12 w-52";
+  const StableImage = React.memo(({ src, alt, className, fallbackSrc, onFinalError, loading = "eager" }) => {
+    const triedFallbackRef = React.useRef(false);
+    const finalErrorFiredRef = React.useRef(false);
+    const resolvedSrc = toAbsoluteAssetUrl(src);
+    const resolvedFallback = fallbackSrc ? toAbsoluteAssetUrl(fallbackSrc) : "";
+
+    React.useEffect(() => {
+      triedFallbackRef.current = false;
+      finalErrorFiredRef.current = false;
+    }, [resolvedSrc, resolvedFallback]);
+
+    const handleError = (e) => {
+      if (!triedFallbackRef.current && resolvedFallback) {
+        triedFallbackRef.current = true;
+        e.currentTarget.src = resolvedFallback;
+        return;
+      }
+      if (!finalErrorFiredRef.current) {
+        finalErrorFiredRef.current = true;
+        onFinalError?.();
+      }
+    };
+
+    return (
+      <img
+        src={resolvedSrc}
+        alt={alt}
+        className={className}
+        loading={loading}
+        decoding="sync"
+        onError={handleError}
+      />
+    );
+  });
+
+  const BrandMark = ({ large = false, className = "" }) => {
+    const [showTextFallback, setShowTextFallback] = React.useState(false);
+    React.useEffect(() => {
+      setShowTextFallback(false);
+    }, []);
+    const frameClass = large ? "h-24 w-full" : "h-12 w-56";
     const imgClass = large ? "h-24 w-auto max-w-full object-contain" : "h-12 w-auto max-w-full object-contain";
     return (
-      <div className={`${frameClass} flex items-center justify-center`}>
-        <img
-          src={toAbsoluteAssetUrl(BRAND.logoSrc)}
-          alt={BRAND.name}
-          className={imgClass}
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
-        />
+      <div className={`${frameClass} flex items-center justify-center ${className}`}>
+        {!showTextFallback ? (
+          <StableImage
+            src={BRAND.logoSrc}
+            alt={BRAND.name}
+            className={imgClass}
+            fallbackSrc={BRAND.logoFallbackSrc}
+            onFinalError={() => setShowTextFallback(true)}
+          />
+        ) : null}
+        {showTextFallback ? (
+          <div className={`text-slate-700 font-semibold ${large ? "text-2xl" : "text-sm"}`}>{BRAND.name}</div>
+        ) : null}
       </div>
     );
   };
@@ -698,10 +750,30 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     </div>
   );
 
-  const PageBlock = ({ children }) => (
-    <div className="print-page space-y-6">
-      <BrandHeader />
+  const PageMarketingWidget = () => (
+    <div className="print-avoid rounded-xl border border-slate-200 bg-white px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <BrandMark className="h-8 w-36 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold text-slate-700">Renewal cares.</div>
+            <div className="truncate text-[10px] text-slate-500">
+              Compassion-driven service from first call to final delivery.
+            </div>
+          </div>
+        </div>
+        <div className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">
+          fire | smoke | water | mold
+        </div>
+      </div>
+    </div>
+  );
+
+  const PageBlock = ({ children, showHeader = true, showMarketingWidget = true }) => (
+    <div className="print-page space-y-5">
+      {showHeader ? <BrandHeader /> : null}
       {children}
+      {showMarketingWidget ? <PageMarketingWidget /> : null}
       <BrandFooter />
     </div>
   );
@@ -743,39 +815,115 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     </div>
   );
 
-  const BrochurePage = () => (
-    <PageBlock>
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-4">
-            <div className="text-2xl font-bold text-slate-900">Restore. Renew. Restart.</div>
-            <p className="text-sm text-slate-600">
-              We help families recover after fire, water, and mold losses by handling pickup,
-              inventory, cleaning, storage, and delivery of soft goods and belongings.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                "24/7 claim support",
-                "Photo barcoding & inventory",
-                "Specialized cleaning & deodorizing",
-                "Flexible storage & delivery",
-              ].map((item) => (
-                <div key={item} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
-                  {item}
-                </div>
-              ))}
+  const BrandMediaCard = ({ src, alt, className, imageClass }) => {
+    const [imageMissing, setImageMissing] = React.useState(false);
+    React.useEffect(() => {
+      setImageMissing(false);
+    }, [src]);
+
+    return (
+      <div className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white ${className || ""}`}>
+        {!imageMissing ? (
+          <StableImage
+            src={src}
+            alt={alt}
+            className={imageClass || "h-full w-full object-contain object-center"}
+            loading="eager"
+            onFinalError={() => setImageMissing(true)}
+          />
+        ) : null}
+        {imageMissing ? (
+          <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs font-semibold text-slate-500">
+            {`Add image: ${src}`}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const SERVICE_HIGHLIGHTS = [
+    "24/7 claim support",
+    "Photo barcoding & inventory",
+    "Specialized cleaning & deodorizing",
+    "Flexible storage & delivery",
+  ];
+
+  const RestoreStoryPage = () => (
+    <PageBlock showHeader={false}>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="grid min-h-[240px] grid-cols-[170px_1fr] gap-5 items-end">
+            <div className="relative h-full min-h-[200px] overflow-hidden rounded-xl bg-white">
+              <StableImage
+                src={BRAND_CARES_MEDIA.fieldTech}
+                alt="Renewal Cares field specialist"
+                className="absolute bottom-0 left-0 h-full w-full object-cover object-left-bottom"
+                loading="eager"
+              />
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Contact</div>
-              <div className="mt-2 text-sm font-semibold text-slate-800">{BRAND.phone}</div>
-              <div className="text-sm text-slate-600">{BRAND.email}</div>
-              <div className="text-sm text-slate-600">{BRAND.website}</div>
+            <div className="self-center pr-2">
+              <div className="text-[42px] font-bold leading-[1.02] text-slate-900">Restore. Renew. Restart.</div>
+              <p className="mt-3 text-[20px] leading-relaxed text-slate-600">
+                We help families recover after fire, water, and mold losses by handling pickup,
+                inventory, cleaning, storage, and delivery of soft goods and belongings.
+              </p>
             </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 flex flex-col items-center justify-center text-center">
-            <BrandMark large />
-            <div className="mt-4 text-sm font-semibold text-slate-700">Your trusted restoration partner</div>
-            <div className="mt-1 text-xs text-slate-500">Serving Greater NYC and beyond</div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {SERVICE_HIGHLIGHTS.map((item) => (
+            <div key={item} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[15px] font-semibold text-slate-700">
+              {item}
+            </div>
+          ))}
+        </div>
+      </div>
+    </PageBlock>
+  );
+
+  const BrochurePage = () => (
+    <PageBlock showHeader={false}>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="grid min-h-[240px] grid-cols-[122px_1fr] gap-4 items-end">
+              <div className="relative h-full min-h-[196px] overflow-hidden rounded-xl bg-white">
+                <StableImage
+                  src={BRAND_CARES_MEDIA.careSpecialist}
+                  alt="Renewal Cares support specialist"
+                  className="absolute bottom-0 left-0 h-full w-full object-contain object-left-bottom"
+                  loading="eager"
+                />
+              </div>
+              <div className="self-center pr-1">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Contact</div>
+                <div className="mt-1 text-[30px] font-bold leading-tight text-slate-800">{BRAND.phone}</div>
+                <div className="mt-1 text-lg text-slate-600">{BRAND.email}</div>
+                <div className="text-lg text-slate-600">{BRAND.website}</div>
+                <p className="mt-3 text-sm text-slate-500">
+                  Fast response, transparent communication, and claim-ready documentation.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center">
+              <BrandMark large />
+              <div className="mt-2 text-3xl font-semibold text-slate-700">Your trusted restoration partner</div>
+              <div className="mt-1 text-xl text-slate-500">Serving Greater NYC and beyond</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-2">
+              <BrandMediaCard
+                src={BRAND_CARES_MEDIA.homeBanner}
+                alt="Renewal Cares home banner"
+                className="h-24 border-none rounded-xl bg-white"
+                imageClass="h-full w-full object-contain object-center"
+              />
+              <div className="mt-1 text-center text-sm font-medium text-slate-500">
+                Compassion-driven service from first call to final delivery.
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1015,6 +1163,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
               </WidgetSection>
             </PageBlock>
           )}
+          <RestoreStoryPage />
           <BrochurePage />
         </div>
       </div>

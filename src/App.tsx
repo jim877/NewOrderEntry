@@ -1698,9 +1698,6 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                      options={combinedContactOptions}
                      placeholder="Type contact or company..."
                      onBlur={() => ensureReferrerFromQuery()}
-                     onKeyDown={(e) => {
-                       if (e.key === "Tab" && referrerBestMatch) e.preventDefault();
-                     }}
                    />
                  </div>
                  {referrerBestMatch && referrerBestMatch !== data.referrer && (
@@ -1859,6 +1856,7 @@ const LoadListFields = memo(({ data, update, toggleMulti }) => (
 
 const AI_USAGE_GUIDELINES = [
   "Choose the right entry mode: Use Detailed Entry when you have a lot of information (e.g., multiple contacts, insurance details, scheduling) to capture. Use Quick Entry for basic details, location, and scheduling when the information is minimal.",
+  "Recommended AI workflow: In Detailed Entry, tab through the entire form and use Enter as needed to move forward field by field. If a correction is needed, use Shift + Enter to move backward.",
   "Always specify a referrer: The referrer is the person or company that provided the job or assignment. Use the quick entry search—type in the name and select the correct contact/company from the suggestions.",
   "Ensure a Bill‑To is entered: Identify who will pay for the services. If an insurance company is the referrer, that company typically serves as both the Bill‑To and the insurance provider.",
   "Provide an order name: An order name helps identify the job. It will auto‑populate when you enter the customer’s name and address, but verify it before saving.",
@@ -1874,7 +1872,7 @@ const AI_TIME_SAVING_TIPS = [
   "Type times directly into the schedule: If the time picker is hard to use, double‑click in the time field, press Ctrl + A to highlight the existing entry and type the desired time (e.g., 12:00 PM). Press Enter to confirm.",
   "Look for auto‑fill hints: When you enter a customer’s name and address, the order name and other fields may auto‑populate. Accept these suggestions to save time and ensure consistency.",
   "Document thoroughly in notes: Use the Interview and Event Instructions fields to capture details about the job (e.g., site conditions, special handling instructions, pets on site). Detailed notes reduce follow‑up questions later.",
-  "Use keyboard shortcuts: Press Tab to move forward and Shift + Tab to move backward through fields. Keyboard navigation can speed up data entry and reduce reliance on the mouse."
+  "Use keyboard shortcuts: Press Tab or Enter to move forward, and Shift + Tab or Shift + Enter to move backward through fields. Keyboard navigation can speed up data entry and reduce reliance on the mouse."
 ];
 
 // --- START SCREEN ---
@@ -2303,11 +2301,14 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
       {c.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
       {total > 1 && ( <button onClick={() => onRemove(c.id, index)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
       
-      <div className="mb-4 flex flex-col gap-3 pl-1 sm:pl-2 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className="mb-4 flex cursor-pointer flex-col gap-3 pl-1 sm:pl-2 sm:flex-row sm:items-center sm:justify-between"
+        onClick={() => setOpen(true)}
+      >
          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setOpen(v => !v)}
+              onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
               className="text-slate-400 hover:text-slate-600"
               title={open ? "Collapse" : "Expand"}
             >
@@ -3271,6 +3272,8 @@ export default function App(){
   const [saveSummaryLines, setSaveSummaryLines] = useState([]);
   const [saveSummaryMissing, setSaveSummaryMissing] = useState([]);
   const [saveExportLines, setSaveExportLines] = useState([]);
+  const appContentRef = useRef(null);
+  const orderNameInputRef = useRef(null);
   const scheduleDateRef = useRef(null);
   const scheduleTimeRef = useRef(null);
   const eventNoteInputRef = useRef(null);
@@ -3291,6 +3294,18 @@ export default function App(){
     setBillingSubOpen(false);
     setInsuranceSubOpen(false);
     setCompaniesSubOpen(false);
+  }, [entryMode]);
+  useEffect(() => {
+    if (entryMode !== "detailed") return;
+    const modalOpen = document.querySelector("[data-suggested-roles-modal='true']");
+    if (modalOpen) return;
+    const timer = window.setTimeout(() => {
+      const el = orderNameInputRef.current;
+      if (!(el instanceof HTMLElement)) return;
+      el.focus();
+      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    }, 120);
+    return () => window.clearTimeout(timer);
   }, [entryMode]);
   
   const [minimizedLossTypes, setMinimizedLossTypes] = useState({});
@@ -3462,6 +3477,17 @@ export default function App(){
       firstFocusable.focus();
     }
   };
+  const focusLastFieldInSection = (sectionKey) => {
+    const section = document.getElementById(sectionKey);
+    if (!section) return;
+    const focusables = Array.from(section.querySelectorAll(
+      'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ));
+    const last = focusables[focusables.length - 1];
+    if (last instanceof HTMLElement) {
+      last.focus();
+    }
+  };
   
   const scrollToSection = (key) => {
     const el = document.getElementById(key);
@@ -3535,13 +3561,126 @@ export default function App(){
     }, 100);
     return nextKey;
   };
+  const goToPreviousSection = (currentKey) => {
+    const idx = SECTION_ORDER.indexOf(currentKey);
+    if (idx < 0) return null;
+    const prevKey = idx === 0 ? SECTION_ORDER[SECTION_ORDER.length - 1] : SECTION_ORDER[idx - 1];
+    setOpenSections(prev => ({ ...prev, [currentKey]: false, [prevKey]: true }));
+    setVisitedSections(prevV => new Set([...prevV, prevKey]));
+    setActiveSection(prevKey);
+    setTimeout(() => {
+      const el = document.getElementById(prevKey);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.remove('animate-purple-section-fade');
+        void el.offsetWidth;
+        el.classList.add('animate-purple-section-fade');
+      }
+      setTimeout(() => focusLastFieldInSection(prevKey), 120);
+    }, 100);
+    return prevKey;
+  };
 
   const handleNextSectionKeyDown = (e, currentKey) => {
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       goToNextSection(currentKey);
+      return;
+    }
+    if (e.key === "Tab" && e.shiftKey) {
+      e.preventDefault();
+      goToPreviousSection(currentKey);
     }
   };
+
+  useEffect(() => {
+    const collectFocusable = (scope) => {
+      if (!(scope instanceof HTMLElement)) return [];
+      const selector = [
+        'input:not([type="hidden"]):not([disabled])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+        'button:not([disabled])',
+        'a[href]',
+        '[tabindex]:not([tabindex="-1"])'
+      ].join(", ");
+      return Array.from(scope.querySelectorAll(selector)).filter((node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        if (node.closest("[aria-hidden='true']")) return false;
+        const style = window.getComputedStyle(node);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        return node.getClientRects().length > 0;
+      });
+    };
+    const isEnterAdvanceTarget = (target) => {
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.closest("[data-enter-advance='off']")) return false;
+      if (target.isContentEditable) return false;
+      const tag = target.tagName;
+      if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "A") return false;
+      if (tag === "INPUT") {
+        const type = String(target.getAttribute("type") || "text").toLowerCase();
+        if (["button", "submit", "reset", "file", "checkbox", "radio", "range"].includes(type)) return false;
+      }
+      return tag === "INPUT" || tag === "SELECT";
+    };
+
+    const handleKeyboardNavigation = (event) => {
+      const isTab = event.key === "Tab";
+      const isEnter = event.key === "Enter";
+      if ((!isTab && !isEnter) || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.defaultPrevented) return;
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const modalScope = document.querySelector("[data-suggested-roles-modal='true']");
+      if (!(modalScope instanceof HTMLElement) && entryMode !== "detailed") return;
+      const scope = modalScope instanceof HTMLElement ? modalScope : appContentRef.current;
+      if (!(scope instanceof HTMLElement) || !scope.contains(target)) return;
+      if (isEnter && !isEnterAdvanceTarget(target)) return;
+
+      const focusable = collectFocusable(scope);
+      if (!focusable.length) return;
+      const currentIndex = focusable.findIndex((el) => el === target || el.contains(target));
+      if (currentIndex < 0) return;
+
+      const movingBackward = (isTab && event.shiftKey) || (isEnter && event.shiftKey);
+      const nextIndex = currentIndex + (movingBackward ? -1 : 1);
+      if (nextIndex >= 0 && nextIndex < focusable.length) {
+        event.preventDefault();
+        const next = focusable[nextIndex];
+        next.focus();
+        requestAnimationFrame(() => {
+          next.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+        });
+        return;
+      }
+
+      event.preventDefault();
+      if (modalScope instanceof HTMLElement) {
+        const wrapIndex = movingBackward ? focusable.length - 1 : 0;
+        focusable[wrapIndex]?.focus();
+        return;
+      }
+
+      if (entryMode === "detailed") {
+        const sectionEl = target.closest("[id^='sec']");
+        const currentKey = sectionEl?.id || "sec1";
+        if (movingBackward) {
+          goToPreviousSection(currentKey);
+          return;
+        }
+        goToNextSection(currentKey);
+        return;
+      }
+
+      const wrapIndex = movingBackward ? focusable.length - 1 : 0;
+      focusable[wrapIndex]?.focus();
+    };
+
+    document.addEventListener("keydown", handleKeyboardNavigation);
+    return () => document.removeEventListener("keydown", handleKeyboardNavigation);
+  }, [entryMode, goToNextSection, goToPreviousSection]);
 
   const toggleLossType = (type) => {
      setData(prev => {
@@ -5180,7 +5319,7 @@ export default function App(){
             presetCount={testPresets.length}
         />
 
-        <div className={`min-h-screen bg-slate-50 pb-32 font-sans fade-in scale-in ${compactMode ? 'compact-mode' : ''} ${entryMode === 'detailed' ? 'pt-28' : 'pt-24'}`}>
+        <div ref={appContentRef} className={`min-h-screen bg-slate-50 pb-32 font-sans fade-in scale-in ${compactMode ? 'compact-mode' : ''} ${entryMode === 'detailed' ? 'pt-28' : 'pt-24'}`}>
             
             <div className="absolute inset-x-0 top-0 h-[320px] bg-gradient-to-b from-sky-50/50 to-transparent pointer-events-none" />
 
@@ -5209,7 +5348,7 @@ export default function App(){
                             <SubSection title="Order" open={orderSubOpen} onToggle={() => setOrderSubOpen(!orderSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("order") ? "audit-outline" : ""}>
                                 <Field label={<span>Order Name <span className="font-normal text-slate-400 text-xs ml-1">(Auto-generated)</span></span>} missing={data.highlightMissing?.orderName}>
                                   <div className="flex gap-2">
-                                      <Input data-audit-key="orderName" className={auditOn && data.highlightMissing?.orderName ? "audit-missing" : ""} value={data.orderName} onChange={e=>updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })} disabled={!!data.orderNameLocked} placeholder="e.g. Name-TownST" />
+                                      <Input ref={orderNameInputRef} data-audit-key="orderName" className={auditOn && data.highlightMissing?.orderName ? "audit-missing" : ""} value={data.orderName} onChange={e=>updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })} disabled={!!data.orderNameLocked} placeholder="e.g. Name-TownST" />
                                       <button className={`rounded-lg border px-3 text-xs font-bold transition-all ${data.orderNameLocked?"bg-slate-800 text-white":"bg-white hover:bg-slate-50"}`} onClick={()=>updateMany({ orderNameLocked: !data.orderNameLocked, orderNameAuto: data.orderNameLocked ? data.orderNameAuto : false })}>{data.orderNameLocked?"LOCKED":"LOCK"}</button>
                                   </div>
                                 </Field>
@@ -6445,17 +6584,6 @@ export default function App(){
                       setNewCompanyDraft({ contact: "", company: "" });
                       setAddContactExisting({ contact: "", company: "" });
                       setCompanyModalCloseArmed(false);
-                      setAddCompanyQuery("");
-                      setAddCompanyPanel("");
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Tab") {
-                      setAddCompanyModalOpen(false);
-                      setShowTypePicker(false);
-                      setAddCompanyType("");
-                      setNewCompanyDraft({ contact: "", company: "" });
-                      setAddContactExisting({ contact: "", company: "" });
                       setAddCompanyQuery("");
                       setAddCompanyPanel("");
                     }
