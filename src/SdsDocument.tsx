@@ -1,6 +1,5 @@
 // @ts-nocheck
 import React, { useMemo, useRef } from "react";
-import { Droplet, Flame } from "lucide-react";
 import { normalizeScopeBridgeState, nextStepLabel } from "./scopeBridgeUtils";
 
 const MAX_SEVERITY = 3;
@@ -318,6 +317,18 @@ const SdsSummaryField = ({ label, value }) => (
 );
 
 const BLOCKER_ACTION_COPY = {
+  "Wants Everything Replaced": "Confirm replacement-only expectation with customer.",
+  "Not sure if submitting a claim": "Confirm whether a claim will be submitted.",
+  "Customer Wants Estimate": "Awaiting estimate details from customer request.",
+  "Won't Sign Authorization": "Awaiting signed authorization.",
+  "Wants a cash-out": "Confirm cash-out request and eligibility.",
+  "May clean themselves": "Confirm whether customer will self-clean.",
+  "Limit Issue": "Resolve policy limit issue.",
+  "Hasn't approved scope": "Awaiting scope approval.",
+  "Adjuster Wants Estimate": "Awaiting estimate details from adjuster request.",
+  "Hasn't determined coverage": "Awaiting coverage determination.",
+  "Pushing another vendor": "Confirm vendor direction and next decision.",
+  "Waiting on Hygienist Results": "Awaiting hygienist results.",
   "Contacting Customer": "Awaiting contact with the customer.",
   "Authorization": "Awaiting signed authorization.",
   "Scope Approval": "Awaiting scope approval.",
@@ -362,6 +373,35 @@ const buildLossTypeSummary = (orderTypes = [], lossDetails = {}) => {
     .join(", ");
 };
 
+const wrapRoofAddress = (value = "", maxChars = 44, maxLines = 2) => {
+  const text = (value || "").toString().trim();
+  if (!text) return ["Address"];
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+      return;
+    }
+    if (current) lines.push(current);
+    current = word;
+  });
+
+  if (current) lines.push(current);
+  if (lines.length <= maxLines) return lines;
+
+  const kept = lines.slice(0, maxLines);
+  const overflow = lines.slice(maxLines).join(" ");
+  const mergedLast = `${kept[maxLines - 1]} ${overflow}`.trim();
+  const truncated =
+    mergedLast.length > maxChars ? `${mergedLast.slice(0, Math.max(0, maxChars - 1)).trim()}…` : mergedLast;
+  kept[maxLines - 1] = truncated;
+  return kept;
+};
+
 const SdsProjectSummarySection = ({
   orderName,
   primaryCustomerName,
@@ -373,6 +413,7 @@ const SdsProjectSummarySection = ({
   serviceOfferings = [],
   orderTypes = [],
   lossDetails = {},
+  siteInspected = false,
   scopeBridge,
 }) => {
   const scopeSnapshot = normalizeScopeBridgeState(scopeBridge || {});
@@ -386,6 +427,8 @@ const SdsProjectSummarySection = ({
   const hasAuthorizationOnFile = !!authMilestone.authorizationOnFile;
   const authorizationAt = formatPrintableDateTime(authMilestone.authorizationOnFileAt);
   const authorizationBy = (authMilestone.authorizationOnFileBy || "").toString().trim();
+  const statusCardCount = 1 + (hasAuthorizationOnFile ? 1 : 0) + 1;
+  const statusGridClass = statusCardCount >= 3 ? "md:grid-cols-3" : statusCardCount === 2 ? "md:grid-cols-2" : "";
   const summaryBullets = React.useMemo(() => {
     const items = [];
 
@@ -438,7 +481,7 @@ const SdsProjectSummarySection = ({
           <SdsSummaryField label="Claim Number" value={claimNumber} />
         </div>
       </div>
-      <div className={`mt-3 grid gap-3 ${hasAuthorizationOnFile ? "md:grid-cols-2" : ""}`}>
+      <div className={`mt-3 grid gap-3 ${statusGridClass}`}>
         <div className="rounded-xl border border-sky-100 bg-white p-3">
           <div className="text-[11px] font-bold uppercase tracking-wider text-sky-700">Service Offerings</div>
           {normalizedServiceOfferings.length > 0 ? (
@@ -469,6 +512,18 @@ const SdsProjectSummarySection = ({
             ) : null}
           </div>
         ) : null}
+        <div className={`rounded-xl border p-3 ${siteInspected ? "border-emerald-200 bg-emerald-50/70" : "border-slate-200 bg-slate-50/70"}`}>
+          <div className={`text-[11px] font-bold uppercase tracking-wider ${siteInspected ? "text-emerald-700" : "text-slate-600"}`}>
+            Inspection Status
+          </div>
+          <div className={`mt-2 inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold ${
+            siteInspected
+              ? "border-emerald-300 bg-white text-emerald-700"
+              : "border-slate-300 bg-white text-slate-600"
+          }`}>
+            {siteInspected ? "Site Inspected" : "Site Inspection Pending"}
+          </div>
+        </div>
       </div>
       <div className="mt-3 rounded-xl border border-sky-100 bg-white p-3">
         <div className="text-[11px] font-bold uppercase tracking-wider text-sky-700">Loss Type</div>
@@ -814,6 +869,24 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
   };
 
   const buildFloorsFromRooms = (sevCode) => {
+    const scopeSummaryForRoom = (room, affected) => {
+      const tasks = Array.isArray(room?.tasks) ? room.tasks : [];
+      if (!affected) return "No scope needed.";
+      if (!tasks.length) return "Scope not yet documented.";
+      const rendered = tasks
+        .slice(0, 2)
+        .map((task) => {
+          const label = (task?.label || "").toString().trim();
+          if (!label) return "";
+          const qty = Number(task?.quantity || 0) > 1 ? ` x${Number(task.quantity)}` : "";
+          const prefix = task?.type === "take" ? "Pack out" : task?.type === "leave" ? "Leave onsite" : "Task";
+          return `${prefix}: ${label}${qty}`;
+        })
+        .filter(Boolean);
+      if (!rendered.length) return "Scope not yet documented.";
+      return tasks.length > 2 ? `${rendered.join("; ")} +${tasks.length - 2} more.` : `${rendered.join("; ")}.`;
+    };
+
     const byFloor = {};
     (rooms || []).forEach((room) => {
       const floor = room.floorLabel || "Unassigned";
@@ -823,6 +896,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
         name: room.name || "Room",
         affected,
         severity: affected ? sevCode : "none",
+        scope: scopeSummaryForRoom(room, affected),
         origin: false
       });
     });
@@ -839,20 +913,19 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     const floors = buildFloorsFromRooms(sevCode);
     if (!floors.length) return null;
     const perilLabel = peril === "fire" ? "Fire" : "Water";
-    const Icon = peril === "fire" ? Flame : Droplet;
     return (
       <div className="w-full">
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
           <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            {RoofHeader({ peril, addressText: address || "Address" })}
+            {RoofHeader({ addressText: address || "Address" })}
           </div>
           <div className="max-h-[520px] overflow-auto">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-2">Area</th>
-                  <th className="px-4 py-2">Affected</th>
                   <th className="px-4 py-2">Peril</th>
+                  <th className="px-4 py-2">Scope</th>
                   <th className="px-4 py-2">Severity</th>
                 </tr>
               </thead>
@@ -871,16 +944,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                       const sevDisplay = room.severity || "";
                       return (
                         <tr key={`${floor.name}-${room.name}`} className="border-t border-slate-100">
-                          <td className="px-4 py-2 text-slate-700">— {room.name}</td>
-                          <td className="px-4 py-2">
-                            {room.affected ? (
-                              <span className="inline-flex items-center gap-2 text-slate-700">
-                                <span className="h-1.5 w-1.5 rounded-full bg-slate-700" /> Yes
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">No</span>
-                            )}
-                          </td>
+                          <td className="px-4 py-2 text-slate-700">{room.name}</td>
                           <td className="px-4 py-2">
                             {room.affected ? (
                               <span className="inline-flex items-center gap-2 text-slate-700">
@@ -888,9 +952,10 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                                 {perilLabel}
                               </span>
                             ) : (
-                              <span className="text-slate-300">—</span>
+                              <span className="font-medium text-slate-500">None detected</span>
                             )}
                           </td>
+                          <td className="px-4 py-2 text-slate-700">{room.scope || "—"}</td>
                           <td className="px-4 py-2">
                             {room.affected && sevDisplay ? (
                               <span className="inline-flex items-center gap-2 font-semibold text-slate-700">
@@ -928,6 +993,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     "Moth Damage": "/Gemini_Moth_Holes.png",
     "Sun Damage": "/Gemini_Generated_Image_7b5s067b5s067b5s.png",
     "Smoking": "/Gemini_Smoking.png",
+    "Clutter": "/Clutter.png",
     "Fold as Much as Possible": "/Gemini_Fold_AMAP.png",
     "Re-Hanging": "/Gemini_Generated_Image_jv26rcjv26rcjv26.png",
     "Photo Inventory": "/Gemini_Photo_Inventory.png",
@@ -941,7 +1007,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     "Rolling Racks": "/icon-rolling-racks.svg",
     "Total Loss Inventory": "/Total_Loss_Inventory.jpg",
     "Content Manipulation": "/Content_Manipulation.jpg",
-    "High Density": "/High_Density_Parking.jpg",
+    "High Density": "/High_Density_Parking.png",
     "Expert Stain Removal": "/Expert_Stain_Removal.jpg",
   };
   const TILE_SIZE = "1.5in";
@@ -1033,28 +1099,33 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     onChange?.(next);
   };
 
-  const RoofHeader = ({ peril, addressText }) => {
-    const Icon = peril === "fire" ? Flame : Droplet;
+  const RoofHeader = ({ addressText }) => {
+    const addressLines = wrapRoofAddress(addressText || "Address", 46, 2);
+    const twoLines = addressLines.length > 1;
+    const hasLongLine = addressLines.some((line) => line.length > 40);
+    const fontSize = hasLongLine ? 16 : 18;
+    const firstLineY = twoLines ? 70 : 78;
     return (
       <div className="w-full">
-        <svg viewBox="0 0 700 110" className="block h-[90px] w-full">
-          <polygon points="5,100 695,100 350,12" fill="#E5E7EB" stroke="#CBD5E1" />
-          <rect x="540" y="36" width="26" height="30" fill="#D6D3D1" stroke="#A8A29E" />
-          <rect x="536" y="32" width="34" height="6" fill="#A8A29E" stroke="#78716C" />
-          <g>
-            <rect x="180" y="56" width="340" height="40" rx="8" fill="#FFFFFF" stroke="#CBD5E1" />
-            <text x="350" y="81" textAnchor="middle" fontSize="20" fill="#0F172A" fontWeight="700">
-              {addressText || "Address"}
+        <svg viewBox="0 0 700 132" className="block h-[106px] w-full">
+          <polygon points="5,120 695,120 350,14" fill="#E5E7EB" stroke="#CBD5E1" />
+          <rect x="540" y="40" width="26" height="30" fill="#D6D3D1" stroke="#A8A29E" />
+          <rect x="536" y="36" width="34" height="6" fill="#78716C" />
+          <rect x="338" y="16" width="24" height="8" rx="2" fill="#94A3B8" stroke="#64748B" />
+          {addressLines.map((line, idx) => (
+            <text
+              key={`roof-address-${idx}`}
+              x="350"
+              y={firstLineY + idx * 20}
+              textAnchor="middle"
+              fontSize={fontSize}
+              fill="#1E293B"
+              fontWeight="700"
+            >
+              {line}
             </text>
-          </g>
-          <g>
-            <circle cx="350" cy="16" r="10" fill="#FFFFFF" stroke="#CBD5E1" />
-          </g>
+          ))}
         </svg>
-        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 -mt-6">
-          <Icon size={14} className={peril === "fire" ? "text-orange-500" : "text-sky-600"} />
-          <span className="capitalize">{peril}</span>
-        </div>
       </div>
     );
   };
@@ -1451,6 +1522,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
               serviceOfferings={noeServiceOfferings}
               orderTypes={orderTypes}
               lossDetails={lossDetails}
+              siteInspected={(rooms || []).some((room) => room?.affected !== null || (room?.severitySelections || []).length > 0 || (room?.tasks || []).length > 0)}
               scopeBridge={scopeBridge}
             />
           </SdsPageBlock>

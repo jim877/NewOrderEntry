@@ -5,8 +5,6 @@ import SdsDocument from './SdsDocument';
 import {
   buildScopeBridgeSnippet,
   createScopeBridgeState,
-  SCOPE_BRIDGE_NEXT_STEP_OPTIONS,
-  nextStepLabel,
   normalizeScopeBridgeState,
   statusBadgeLabel,
   withScopeBridgeSnippet,
@@ -428,50 +426,57 @@ const SUGGESTED_GROUP_HELP = {
   Dispose: "Items that will not be returned",
   "Storage Only": "Items that will be stored and returned without cleaning"
 };
-const BRIDGE_BLOCKER_SCOPE_OPTIONS = [
-  { id: "pickup", label: "Block Pickup" },
-  { id: "processing", label: "Block Processing" },
-  { id: "delivery", label: "Block Delivery" },
+const BRIDGE_CUSTOMER_BLOCKERS = [
+  "Wants Everything Replaced",
+  "Not sure if submitting a claim",
+  "Customer Wants Estimate",
+  "Won't Sign Authorization",
+  "Wants a cash-out",
+  "May clean themselves",
 ];
-const BRIDGE_REQUIRED_WORKFLOW_BLOCKERS = [
-  "Contacting Customer",
-  "Authorization",
-  "Scope Approval",
-  "Estimate Approval",
+const BRIDGE_INSURANCE_BLOCKERS = [
+  "Limit Issue",
+  "Hasn't approved scope",
+  "Adjuster Wants Estimate",
+  "Hasn't determined coverage",
+  "Pushing another vendor",
+  "Waiting on Hygienist Results",
 ];
-const BRIDGE_INDEPENDENT_BLOCKERS = [
-  "Coverage Determination",
-  "Bill To Determination",
-  "Test Results",
-  "IH Results",
-  "Customer might clean it themselves",
-  "Unsure if submitting a claim",
+const BRIDGE_BLOCKER_GROUPS = [
+  { id: "customer", label: "Customer", issues: BRIDGE_CUSTOMER_BLOCKERS },
+  { id: "insurance_adjuster", label: "Insurance/Adjuster", issues: BRIDGE_INSURANCE_BLOCKERS },
 ];
 const BRIDGE_BLOCKER_ITEMS = [
-  ...BRIDGE_REQUIRED_WORKFLOW_BLOCKERS,
-  ...BRIDGE_INDEPENDENT_BLOCKERS,
+  ...BRIDGE_CUSTOMER_BLOCKERS,
+  ...BRIDGE_INSURANCE_BLOCKERS,
 ];
 const BRIDGE_BLOCKER_ALIASES = {
-  "Awaiting Signed Authorization": "Authorization",
-  "Awaiting Estimate Approval": "Estimate Approval",
-  "Awaiting Hygienist Results": "IH Results",
-  "Awaiting Coverage Determination": "Coverage Determination",
-  "Awaiting Test Group Results": "Test Results",
-  "Deciding Who Will Pay": "Bill To Determination",
+  "Contacting Customer": "Wants Everything Replaced",
+  "Authorization": "Won't Sign Authorization",
+  "Scope Approval": "Hasn't approved scope",
+  "Estimate Approval": "Adjuster Wants Estimate",
+  "Coverage Determination": "Hasn't determined coverage",
+  "IH Results": "Waiting on Hygienist Results",
+  "Awaiting Signed Authorization": "Won't Sign Authorization",
+  "Awaiting Estimate Approval": "Adjuster Wants Estimate",
+  "Awaiting Hygienist Results": "Waiting on Hygienist Results",
+  "Awaiting Coverage Determination": "Hasn't determined coverage",
+  "Awaiting Test Group Results": "Waiting on Hygienist Results",
+  "Deciding Who Will Pay": "Not sure if submitting a claim",
+  "Customer might clean it themselves": "May clean themselves",
+  "Unsure if submitting a claim": "Not sure if submitting a claim",
+  "Limit Issues": "Limit Issue",
 };
 const BRIDGE_AUTO_MANAGED_BLOCKERS = [
-  "Contacting Customer",
-  "Authorization",
-  "Coverage Determination",
-  "Estimate Approval",
-  "Customer might clean it themselves",
-  "Unsure if submitting a claim",
+  "Won't Sign Authorization",
+  "Customer Wants Estimate",
+  "Adjuster Wants Estimate",
 ];
 const BRIDGE_NEXT_STEP_OPTIONS = [
-  { id: "pickup_hold", label: "Pickup is on hold" },
-  { id: "processing_hold", label: "Processing is on hold (tag and hold)" },
-  { id: "delivery_hold", label: "Delivery is on hold" },
-  ...SCOPE_BRIDGE_NEXT_STEP_OPTIONS,
+  { id: "pickup_hold", label: "Pickup on hold" },
+  { id: "processing_hold", label: "Tag and Hold" },
+  { id: "emergency_groups_only", label: "Emergency Groups Only" },
+  { id: "cod", label: "COD" },
 ];
 const BRIDGE_MILESTONE_FIELDS = [
   { id: "authorizationOnFile", atId: "authorizationOnFileAt", byId: "authorizationOnFileBy", label: "Authorization form on file" },
@@ -626,7 +631,7 @@ const COMPANY_TYPES = [
 ];
 
 const SDS_CONSIDERATIONS = ["Elderly", "Pregnancy", "Baby", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"];
-const SDS_OBSERVATIONS = ["Pets", "Fireplace", "Insects", "Moth Damage", "Sun Damage", "Smoking"];
+const SDS_OBSERVATIONS = ["Pets", "Fireplace", "Insects", "Moth Damage", "Sun Damage", "Smoking", "Clutter"];
 const SDS_SERVICES = [
   "Fold as Much as Possible",
   "Re-Hanging",
@@ -658,6 +663,7 @@ const SDS_ICON_MAP = {
   "Moth Damage": "/Gemini_Moth_Holes.png",
   "Sun Damage": "/Gemini_Generated_Image_7b5s067b5s067b5s.png",
   "Smoking": "/Gemini_Smoking.png",
+  "Clutter": "/Clutter.png",
   "Fold as Much as Possible": "/Gemini_Fold_AMAP.png",
   "Re-Hanging": "/Gemini_Generated_Image_jv26rcjv26rcjv26.png",
   "Photo Inventory": "/Gemini_Photo_Inventory.png",
@@ -671,7 +677,7 @@ const SDS_ICON_MAP = {
   "Rolling Racks": "/icon-rolling-racks.svg",
   "Total Loss Inventory": "/Total_Loss_Inventory.jpg",
   "Content Manipulation": "/Content_Manipulation.jpg",
-  "High Density": "/High_Density_Parking.jpg",
+  "High Density": "/High_Density_Parking.png",
   "Expert Stain Removal": "/Expert_Stain_Removal.jpg",
 };
 
@@ -2287,7 +2293,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec5', label: 'Schedule Type', keywords: 'scope pickup in-home' },
     { id: 'sec5', label: 'Date', keywords: 'schedule date' },
     { id: 'sec5', label: 'Time', keywords: 'schedule time' },
-    { id: 'sec5', sub: 'bridge', label: 'Bridge Status and Blockers', keywords: 'scope bridge blockers follow up status green yellow red pickup processing delivery hold' },
+    { id: 'sec5', sub: 'bridge', label: 'Scope Update and Blockers', keywords: 'scope update blockers customer insurance adjuster pickup tag hold cod emergency groups' },
     { id: 'sec5', label: 'Event Instructions', keywords: 'instructions notes load list' },
     { id: 'sec5', label: 'Estimate Requested', keywords: 'estimate requested type' },
     { id: 'sec5', label: 'Requested By', keywords: 'estimate requested by' },
@@ -2422,7 +2428,7 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
         { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
         { id: 'sec3', label: 'Address', subsections: [{ id: "address", label: "Addresses" }] },
         { id: 'sec4', label: 'Billing', subsections: [{ id: "companies", label: "Companies and Contacts" }, { id: "billing", label: "Billing" }, { id: "finance", label: "Finance" }, { id: "insurance", label: "Insurance" }] },
-        { id: 'sec5', label: 'Schedule', subsections: [{ id: "schedule", label: "Schedule" }, { id: "bridge", label: "Bridge Status and Blockers" }] },
+        { id: 'sec5', label: 'Schedule', subsections: [{ id: "schedule", label: "Schedule" }, { id: "bridge", label: "Scope Update and Blockers" }] },
     ];
 
     const getStatus = (stepId) => {
@@ -5754,9 +5760,9 @@ export default function App(){
   }, [data.scopeBridge, data.suggestedGroups]);
   const scopeBridgeSnippet = useMemo(() => buildScopeBridgeSnippet(scopeBridgeState), [scopeBridgeState]);
   const bridgeStatusClass = useMemo(() => {
-    if (scopeBridgeState.projectStatus === "green") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    if (scopeBridgeState.projectStatus === "yellow") return "border-amber-200 bg-amber-50 text-amber-700";
-    if (scopeBridgeState.projectStatus === "red") return "border-rose-200 bg-rose-50 text-rose-700";
+    if (scopeBridgeState.projectStatus === "green") return "border-emerald-300 bg-emerald-50 text-slate-700";
+    if (scopeBridgeState.projectStatus === "yellow") return "border-amber-300 bg-amber-50 text-slate-700";
+    if (scopeBridgeState.projectStatus === "red") return "border-rose-300 bg-rose-50 text-slate-700";
     return "border-slate-200 bg-white text-slate-500";
   }, [scopeBridgeState.projectStatus]);
   const bridgeSectionClass = useMemo(() => {
@@ -5769,8 +5775,11 @@ export default function App(){
   const deriveScopeBridgeStatus = useCallback((bridge) => {
     if ((bridge?.projectStatus || "") === "red") return "red";
     const hasPending = (bridge?.pendingIssues || []).length > 0;
-    const hasBlockingScope = (bridge?.blockerScopes || []).length > 0;
-    return hasPending || hasBlockingScope ? "yellow" : "green";
+    const hasOperationalHold =
+      (bridge?.pickupOption || "") === "wait" ||
+      ["tag_hold", "urgent", "cod"].includes((bridge?.processingOption || "").toString()) ||
+      !!(bridge?.nextStep || "");
+    return hasPending || hasOperationalHold ? "yellow" : "green";
   }, []);
 
   const patchScopeBridge = useCallback((updater, opts = {}) => {
@@ -5791,64 +5800,16 @@ export default function App(){
     applyScopeBridge(next);
   }, [scopeBridgeState, deriveScopeBridgeStatus, applyScopeBridge]);
 
-  const setScopeBridgeManualStatus = useCallback((status) => {
-    patchScopeBridge((prev) => {
-      const next = { ...prev, projectStatus: status };
-      if (status === "green") {
-        next.pendingIssues = [];
-        next.blockerScopes = [];
-        next.blockerFollowUps = {};
-        next.blockerManualState = {};
-        next.statusReason = "Production Authorized";
-      }
-      if (status === "yellow" && next.statusReason === "Production Authorized") {
-        next.statusReason = "";
-      }
-      return next;
-    }, { manualStatus: true });
-  }, [patchScopeBridge]);
-
-  const toggleScopeBridgeBlockerScope = useCallback((scopeId) => {
-    patchScopeBridge((prev) => ({
-      ...prev,
-      blockerScopes: toggleMulti(prev.blockerScopes || [], scopeId)
-    }));
-  }, [patchScopeBridge]);
-
   const toggleScopeBridgeIssue = useCallback((issue) => {
     patchScopeBridge((prev) => {
       const normalizedIssue = canonicalBridgeIssue(issue);
-      const key = normalizeBridgeIssueKey(normalizedIssue);
       const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(normalizedIssue);
+      if (isAutoManaged) return prev;
       const currentPending = Array.from(new Set((prev.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean)));
-      const currentlyActive = currentPending.includes(normalizedIssue);
-      const nextPending = isAutoManaged
-        ? (currentlyActive ? currentPending.filter((entry) => entry !== normalizedIssue) : [...currentPending, normalizedIssue])
-        : toggleMulti(currentPending, normalizedIssue);
-      const nextManualState = { ...(prev.blockerManualState || {}) };
-      if (isAutoManaged) {
-        nextManualState[key] = nextPending.includes(normalizedIssue) ? "on" : "off";
-      }
+      const nextPending = toggleMulti(currentPending, normalizedIssue);
       return {
         ...prev,
         pendingIssues: nextPending,
-        blockerManualState: nextManualState,
-      };
-    });
-  }, [patchScopeBridge]);
-
-  const resolveScopeBridgeIssue = useCallback((issue) => {
-    patchScopeBridge((prev) => {
-      const normalizedIssue = canonicalBridgeIssue(issue);
-      const key = normalizeBridgeIssueKey(normalizedIssue);
-      const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(normalizedIssue);
-      const nextPending = Array.from(new Set((prev.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean))).filter((entry) => entry !== normalizedIssue);
-      const nextManualState = { ...(prev.blockerManualState || {}) };
-      if (isAutoManaged) nextManualState[key] = "off";
-      return {
-        ...prev,
-        pendingIssues: nextPending,
-        blockerManualState: nextManualState,
       };
     });
   }, [patchScopeBridge]);
@@ -5877,60 +5838,24 @@ export default function App(){
       }
     }));
   }, [patchScopeBridge]);
-  const bridgeNextStepOptions = useMemo(() => (
-    Array.from(
-      new Map(BRIDGE_NEXT_STEP_OPTIONS.map((option) => [option.id, option])).values()
-    )
-  ), []);
   const autoBridgeIssues = useMemo(() => {
     const auto = [];
     const milestones = scopeBridgeState.milestones || {};
-    const insuranceStatus = (data.insuranceStatus || "").toUpperCase();
-    const involvesInsurance = data.involvesInsurance || "";
-    const restorationOrder = data.restorationType === "Restoration Project" || data.isRestorationProject === "Y";
-    const insuranceInPlay = involvesInsurance === "Yes" || data.insuranceClaim === "Yes" || data.billingPayer === "Insurance";
-    const moldInOrder = (data.orderTypes || []).includes("Mold");
     const authorizationOnFile = !!milestones.authorizationOnFile;
-    const scopeApproved = !!milestones.scopeApproved || hasMeaningfulValue(data.scopeApprovedAt);
     const estimateApproved = !!milestones.estimateApproved || hasMeaningfulValue(data.estimateApprovedAt);
-    const claimDecisionKnown =
-      involvesInsurance === "Yes" ||
-      involvesInsurance === "No" ||
-      data.insuranceClaim === "Yes" ||
-      data.insuranceClaim === "No";
+    const estimateRequestedBy = (data.estimateRequestedBy || "").toString().trim().toLowerCase();
+    const estimateRequestedByInsurance = /\b(adjuster|insurance|carrier|public adjuster|pa|tpa)\b/.test(estimateRequestedBy);
 
-    if (!data.eventCustomerContacted) auto.push("Contacting Customer");
-    if (!authorizationOnFile) auto.push("Authorization");
-    if (!scopeApproved) auto.push("Scope Approval");
-    if (!!data.estimateRequested && !estimateApproved) auto.push("Estimate Approval");
-    if ((data.selfCleaning || "").toUpperCase() === "Y") auto.push("Customer might clean it themselves");
-
-    const unsureClaim = restorationOrder && !claimDecisionKnown;
-    if (unsureClaim) auto.push("Unsure if submitting a claim");
-
-    const hasCoverageConcern = insuranceInPlay && (
-      insuranceStatus === "TBD" ||
-      !hasMeaningfulValue(data.contentsCoverageLimit) ||
-      (moldInOrder && !hasMeaningfulValue(data.moldLimit))
-    );
-    if (hasCoverageConcern) auto.push("Coverage Determination");
+    if (!authorizationOnFile) auto.push("Won't Sign Authorization");
+    if (!!data.estimateRequested && !estimateApproved) {
+      auto.push(estimateRequestedByInsurance ? "Adjuster Wants Estimate" : "Customer Wants Estimate");
+    }
 
     return Array.from(new Set(auto));
   }, [
     scopeBridgeState.milestones,
-    data.eventCustomerContacted,
     data.estimateRequested,
-    data.selfCleaning,
-    data.insuranceStatus,
-    data.involvesInsurance,
-    data.insuranceClaim,
-    data.billingPayer,
-    data.contentsCoverageLimit,
-    data.orderTypes,
-    data.moldLimit,
-    data.restorationType,
-    data.isRestorationProject,
-    data.scopeApprovedAt,
+    data.estimateRequestedBy,
     data.estimateApprovedAt,
   ]);
   const autoManagedBridgeBlockerSet = useMemo(
@@ -5940,67 +5865,91 @@ export default function App(){
   useEffect(() => {
     const currentPendingRaw = scopeBridgeState.pendingIssues || [];
     const currentPending = Array.from(new Set(currentPendingRaw.map(canonicalBridgeIssue).filter(Boolean)));
-    const currentManualState = scopeBridgeState.blockerManualState || {};
     const autoSet = new Set(autoBridgeIssues);
     const nextPending = currentPending.filter((issue) => !autoManagedBridgeBlockerSet.has(issue));
 
     BRIDGE_AUTO_MANAGED_BLOCKERS.forEach((issue) => {
-      const key = normalizeBridgeIssueKey(issue);
-      const override = (currentManualState[key] || "").toString().toLowerCase();
-      const autoActive = autoSet.has(issue);
-      const effectiveActive = override === "on" ? true : override === "off" ? false : autoActive;
-      if (effectiveActive && !nextPending.includes(issue)) nextPending.push(issue);
-    });
-
-    const nextManualState = { ...currentManualState };
-    let manualStateChanged = false;
-    BRIDGE_AUTO_MANAGED_BLOCKERS.forEach((issue) => {
-      const key = normalizeBridgeIssueKey(issue);
-      const override = (nextManualState[key] || "").toString().toLowerCase();
-      const autoActive = autoSet.has(issue);
-      if ((override === "on" && autoActive) || (override === "off" && !autoActive)) {
-        delete nextManualState[key];
-        manualStateChanged = true;
-      }
+      if (autoSet.has(issue) && !nextPending.includes(issue)) nextPending.push(issue);
     });
 
     const pendingChanged = !stringListMatches(currentPendingRaw, nextPending);
-    if (!pendingChanged && !manualStateChanged) return;
+    if (!pendingChanged) return;
     patchScopeBridge((prev) => ({
       ...prev,
       pendingIssues: nextPending,
-      blockerManualState: nextManualState,
+      blockerManualState: {},
     }));
   }, [
     scopeBridgeState.pendingIssues,
-    scopeBridgeState.blockerManualState,
     autoBridgeIssues,
     autoManagedBridgeBlockerSet,
     patchScopeBridge,
   ]);
-  const requiredBridgeIssueSet = useMemo(() => new Set(BRIDGE_REQUIRED_WORKFLOW_BLOCKERS), []);
   const activeBridgeIssues = useMemo(() => {
     const raw = Array.from(new Set((scopeBridgeState.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean)));
     const orderedKnown = BRIDGE_BLOCKER_ITEMS.filter((issue) => raw.includes(issue));
     const extras = raw.filter((issue) => !BRIDGE_BLOCKER_ITEMS.includes(issue));
     return [...orderedKnown, ...extras];
   }, [scopeBridgeState.pendingIssues]);
-  const requiredActiveBridgeIssues = useMemo(
-    () => activeBridgeIssues.filter((issue) => requiredBridgeIssueSet.has(issue)),
-    [activeBridgeIssues, requiredBridgeIssueSet]
+  const activeBridgeIssueSet = useMemo(() => new Set(activeBridgeIssues), [activeBridgeIssues]);
+  const groupedBridgeIssues = useMemo(
+    () =>
+      BRIDGE_BLOCKER_GROUPS.map((group) => ({
+        ...group,
+        rows: group.issues.map((issue) => ({ issue, active: activeBridgeIssueSet.has(issue) })),
+      })),
+    [activeBridgeIssueSet]
   );
-  const independentActiveBridgeIssues = useMemo(
-    () => activeBridgeIssues.filter((issue) => !requiredBridgeIssueSet.has(issue)),
-    [activeBridgeIssues, requiredBridgeIssueSet]
-  );
-  const availableRequiredBridgeIssues = useMemo(
-    () => BRIDGE_REQUIRED_WORKFLOW_BLOCKERS.filter((issue) => autoBridgeIssues.includes(issue) && !activeBridgeIssues.includes(issue)),
-    [autoBridgeIssues, activeBridgeIssues]
-  );
-  const availableIndependentBridgeIssues = useMemo(
-    () => BRIDGE_INDEPENDENT_BLOCKERS.filter((issue) => !activeBridgeIssues.includes(issue)),
-    [activeBridgeIssues]
-  );
+  const bridgeEstimateDetails = useMemo(() => {
+    const parts = [];
+    if (hasMeaningfulValue(data.estimateType)) parts.push(`Type: ${data.estimateType}`);
+    if (hasMeaningfulValue(data.estimateRequestedBy)) parts.push(`Requested by: ${data.estimateRequestedBy}`);
+    return parts.join(" · ");
+  }, [data.estimateType, data.estimateRequestedBy]);
+  const authorizationOnFile = !!(scopeBridgeState.milestones || {}).authorizationOnFile;
+  const selectedBridgeNextStep = useMemo(() => {
+    const known = (scopeBridgeState.nextStep || "").toString();
+    if (BRIDGE_NEXT_STEP_OPTIONS.some((option) => option.id === known)) return known;
+    if ((scopeBridgeState.processingOption || "") === "cod") return "cod";
+    if ((scopeBridgeState.processingOption || "") === "tag_hold") return "processing_hold";
+    if ((scopeBridgeState.processingOption || "") === "urgent" || (scopeBridgeState.pickupOption || "") === "urgent") return "emergency_groups_only";
+    if ((scopeBridgeState.pickupOption || "") === "wait") return "pickup_hold";
+    return "";
+  }, [scopeBridgeState.nextStep, scopeBridgeState.pickupOption, scopeBridgeState.processingOption]);
+  const toggleBridgeNextStep = useCallback((optionId) => {
+    patchScopeBridge((prev) => {
+      const currentStep = (() => {
+        const known = (prev.nextStep || "").toString();
+        if (BRIDGE_NEXT_STEP_OPTIONS.some((option) => option.id === known)) return known;
+        if ((prev.processingOption || "") === "cod") return "cod";
+        if ((prev.processingOption || "") === "tag_hold") return "processing_hold";
+        if ((prev.processingOption || "") === "urgent" || (prev.pickupOption || "") === "urgent") return "emergency_groups_only";
+        if ((prev.pickupOption || "") === "wait") return "pickup_hold";
+        return "";
+      })();
+      const isTurningOff = currentStep === optionId;
+      if (isTurningOff) {
+        const clearPatch = { nextStep: "" };
+        if (optionId === "pickup_hold" && prev.pickupOption === "wait") clearPatch.pickupOption = "";
+        if (optionId === "processing_hold" && prev.processingOption === "tag_hold") clearPatch.processingOption = "";
+        if (optionId === "emergency_groups_only") {
+          if (prev.pickupOption === "urgent") clearPatch.pickupOption = "";
+          if (prev.processingOption === "urgent") clearPatch.processingOption = "";
+        }
+        if (optionId === "cod" && prev.processingOption === "cod") clearPatch.processingOption = "";
+        return { ...prev, ...clearPatch };
+      }
+      const nextPatch = { nextStep: optionId };
+      if (optionId === "pickup_hold") nextPatch.pickupOption = "wait";
+      if (optionId === "processing_hold") nextPatch.processingOption = "tag_hold";
+      if (optionId === "emergency_groups_only") {
+        nextPatch.pickupOption = "urgent";
+        nextPatch.processingOption = "urgent";
+      }
+      if (optionId === "cod") nextPatch.processingOption = "cod";
+      return { ...prev, ...nextPatch };
+    });
+  }, [patchScopeBridge]);
   const attentionWater = data.damageWasWet === "Y" || data.damageWasWet === true;
   const attentionMold = !!data.damageMoldMildew;
   const highlightStorageFromProcess = data.processType === "Long-Term Storage";
@@ -8215,7 +8164,7 @@ export default function App(){
                           </button>
                         </div>
                         </SubSection>
-                        <SubSection id="sec5-bridge" title="Bridge Status & Blockers" open={scheduleBridgeOpen} onToggle={(nextOpen) => setScheduleBridgeOpen(!!nextOpen)} compact={compactMode} className={bridgeSectionClass}>
+                        <SubSection id="sec5-bridge" title="Scope Update and Blockers" open={scheduleBridgeOpen} onToggle={(nextOpen) => setScheduleBridgeOpen(!!nextOpen)} compact={compactMode} className={bridgeSectionClass}>
                           <div className="space-y-4">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="text-xs text-slate-500">
@@ -8231,244 +8180,96 @@ export default function App(){
                               </button>
                             </div>
 
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                            <div className={`rounded-lg border p-3 space-y-3 ${bridgeStatusClass}`}>
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide ${bridgeStatusClass}`}>
+                                <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-bold tracking-wide text-slate-700">
                                   {statusBadgeLabel(scopeBridgeState.projectStatus)}
                                 </span>
-                                {(scopeBridgeState.pendingIssues || []).length > 0 ? (
-                                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                                    {(scopeBridgeState.pendingIssues || []).length} blocker(s)
+                                <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  {activeBridgeIssues.length} blocker(s)
+                                </span>
+                                {selectedBridgeNextStep ? (
+                                  <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                    {BRIDGE_NEXT_STEP_OPTIONS.find((option) => option.id === selectedBridgeNextStep)?.label || selectedBridgeNextStep}
                                   </span>
                                 ) : null}
-                                {scopeBridgeState.nextStep ? (
-                                  <span className="inline-flex items-center rounded-full border border-sky-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-sky-700">
-                                    {nextStepLabel(scopeBridgeState.nextStep)}
-                                  </span>
-                                ) : null}
                               </div>
-                              <div className="grid gap-2 sm:grid-cols-3">
-                                <button
-                                  type="button"
-                                  onClick={() => setScopeBridgeManualStatus("green")}
-                                  className={`rounded-lg border px-3 py-2 text-xs font-bold ${scopeBridgeState.projectStatus === "green" ? "border-emerald-300 bg-emerald-100 text-emerald-800" : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200"}`}
-                                >
-                                  Approved (Green)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setScopeBridgeManualStatus("yellow")}
-                                  className={`rounded-lg border px-3 py-2 text-xs font-bold ${scopeBridgeState.projectStatus === "yellow" ? "border-amber-300 bg-amber-100 text-amber-800" : "border-slate-200 bg-white text-slate-600 hover:border-amber-200"}`}
-                                >
-                                  Pending / Blockers (Yellow)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setScopeBridgeManualStatus("red")}
-                                  className={`rounded-lg border px-3 py-2 text-xs font-bold ${scopeBridgeState.projectStatus === "red" ? "border-rose-300 bg-rose-100 text-rose-800" : "border-slate-200 bg-white text-slate-600 hover:border-rose-200"}`}
-                                >
-                                  Close / End Project (Red)
-                                </button>
-                              </div>
-                              {scopeBridgeState.projectStatus === "red" ? (
-                                <Input
-                                  value={scopeBridgeState.statusReason || ""}
-                                  onChange={(e) => patchScopeBridge((prev) => ({ ...prev, statusReason: e.target.value }), { manualStatus: true })}
-                                  placeholder="Reason for red/close decision"
-                                />
-                              ) : null}
-                              <div className="text-[11px] text-slate-500">
-                                Green means clear to proceed. Yellow means unresolved blockers. Red means wind-down/close.
-                              </div>
-                            </div>
 
-                            <div className="grid gap-4 lg:grid-cols-2">
-                              <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Blocker Degree</div>
-                                <div className="flex flex-wrap gap-2">
-                                  {BRIDGE_BLOCKER_SCOPE_OPTIONS.map((item) => (
-                                    <ToggleMulti
-                                      key={item.id}
-                                      label={item.label}
-                                      checked={(scopeBridgeState.blockerScopes || []).includes(item.id)}
-                                      onChange={() => toggleScopeBridgeBlockerScope(item.id)}
-                                      colorClass="!bg-amber-50 !border-amber-300 !text-amber-800"
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Next Step</div>
-                                <div className="flex flex-wrap gap-2">
-                                  {bridgeNextStepOptions.map((option) => (
-                                    <button
-                                      key={option.id}
-                                      type="button"
-                                      onClick={() => {
-                                        patchScopeBridge((prev) => {
-                                          const nextStep = prev.nextStep === option.id ? "" : option.id;
-                                          const patch = { nextStep };
-                                          if (nextStep === "pickup_hold") patch.pickupOption = "wait";
-                                          if (nextStep === "processing_hold") patch.processingOption = "tag_hold";
-                                          return { ...prev, ...patch };
-                                        });
-                                      }}
-                                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${scopeBridgeState.nextStep === option.id ? "border-sky-300 bg-sky-100 text-sky-800" : "border-slate-200 bg-white text-slate-600 hover:border-sky-200"}`}
-                                    >
-                                      {option.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="space-y-3">
-                              <div className={`rounded-lg border p-3 space-y-2 ${activeBridgeIssues.length > 0 ? "border-amber-300 bg-amber-50/40" : "border-emerald-300 bg-emerald-50/40"}`}>
-                                <div className={`text-xs font-bold uppercase tracking-wider ${activeBridgeIssues.length > 0 ? "text-amber-700" : "text-emerald-700"}`}>
-                                  Active Blockers
-                                </div>
-                                {activeBridgeIssues.length === 0 ? (
-                                  <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-700 font-semibold">
-                                    No active blockers. Status can remain green.
-                                  </div>
-                                ) : (
-                                  <div className="space-y-3">
-                                    {requiredActiveBridgeIssues.length > 0 ? (
-                                      <div className="rounded-lg border border-amber-200 bg-white p-2">
-                                        <div className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">Required Workflow Steps</div>
-                                        <div className="space-y-2">
-                                          {requiredActiveBridgeIssues.map((issue) => {
-                                            const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
-                                            const stepNum = BRIDGE_REQUIRED_WORKFLOW_BLOCKERS.indexOf(issue) + 1;
-                                            return (
-                                              <div key={issue} className="rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                  <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[10px] font-bold text-amber-700">
-                                                      {stepNum > 0 ? stepNum : "•"}
-                                                    </span>
-                                                    <span className="text-sm font-bold text-amber-800">{issue}</span>
-                                                    <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">ON</span>
-                                                    {isAutoManaged ? (
-                                                      <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">Auto-linked</span>
-                                                    ) : null}
-                                                  </div>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => resolveScopeBridgeIssue(issue)}
-                                                    className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:border-amber-300 hover:text-amber-700"
-                                                  >
-                                                    Resolve
-                                                  </button>
-                                                </div>
+                              <div className="grid gap-3 lg:grid-cols-2">
+                                {groupedBridgeIssues.map((group) => (
+                                  <div key={group.id} className="rounded-lg border border-slate-200 bg-white p-2">
+                                    <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-slate-500">{group.label}</div>
+                                    <div className="space-y-1.5">
+                                      {group.rows.map(({ issue, active }) => {
+                                        const isAuto = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
+                                        const isEstimateIssue = issue === "Customer Wants Estimate" || issue === "Adjuster Wants Estimate";
+                                        const showEstimateDetails = active && isEstimateIssue && !!data.estimateRequested;
+                                        const showAuthDetails = active && issue === "Won't Sign Authorization";
+                                        return (
+                                          <button
+                                            key={issue}
+                                            type="button"
+                                            onClick={() => {
+                                              if (!isAuto) toggleScopeBridgeIssue(issue);
+                                            }}
+                                            disabled={isAuto}
+                                            className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                                              active
+                                                ? "border-sky-300 bg-sky-50"
+                                                : isAuto
+                                                  ? "border-slate-200 bg-slate-50"
+                                                  : "border-slate-200 bg-white hover:border-sky-200"
+                                            }`}
+                                          >
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className="text-xs font-semibold text-slate-700">--- {issue.replace("Customer Wants Estimate", "Wants Estimate").replace("Adjuster Wants Estimate", "Wants estimate")}</span>
+                                              <span className={`text-[10px] font-bold ${active ? "text-sky-700" : "text-slate-400"}`}>{active ? "ON" : "OFF"}</span>
+                                            </div>
+                                            {isAuto ? (
+                                              <div className="mt-1 text-[10px] font-semibold text-slate-500">Auto-linked</div>
+                                            ) : null}
+                                            {showAuthDetails ? (
+                                              <div className="mt-1 text-[10px] text-slate-500">
+                                                {authorizationOnFile ? "Authorization marked as blocker." : "Auto-on until authorization is on file."}
                                               </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    ) : null}
-
-                                    {independentActiveBridgeIssues.length > 0 ? (
-                                      <div className="rounded-lg border border-amber-200 bg-white p-2">
-                                        <div className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">Independent Blockers</div>
-                                        <div className="space-y-2">
-                                          {independentActiveBridgeIssues.map((issue) => {
-                                            const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
-                                            return (
-                                              <div key={issue} className="rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                  <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="text-sm font-bold text-amber-800">{issue}</span>
-                                                    <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">ON</span>
-                                                    {isAutoManaged ? (
-                                                      <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">Auto-linked</span>
-                                                    ) : null}
-                                                  </div>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => resolveScopeBridgeIssue(issue)}
-                                                    className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:border-amber-300 hover:text-amber-700"
-                                                  >
-                                                    Resolve
-                                                  </button>
-                                                </div>
+                                            ) : null}
+                                            {showEstimateDetails ? (
+                                              <div className="mt-1 text-[10px] text-slate-500">
+                                                {bridgeEstimateDetails || "Estimate required."}
                                               </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    ) : null}
+                                            ) : null}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                )}
+                                ))}
                               </div>
 
-                              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
-                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                                  Possible Blockers
+                              <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Next Steps</div>
+                                <div className="space-y-1.5">
+                                  {BRIDGE_NEXT_STEP_OPTIONS.map((option) => {
+                                    const active = selectedBridgeNextStep === option.id;
+                                    return (
+                                      <button
+                                        key={option.id}
+                                        type="button"
+                                        onClick={() => toggleBridgeNextStep(option.id)}
+                                        className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                                          active
+                                            ? "border-sky-300 bg-sky-50"
+                                            : "border-slate-200 bg-white hover:border-sky-200"
+                                        }`}
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-xs font-semibold text-slate-700">--- {option.label}</span>
+                                          <span className={`text-[10px] font-bold ${active ? "text-sky-700" : "text-slate-400"}`}>{active ? "ON" : "OFF"}</span>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
-                                {availableRequiredBridgeIssues.length === 0 && availableIndependentBridgeIssues.length === 0 ? (
-                                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                                    All listed blockers are already active.
-                                  </div>
-                                ) : (
-                                  <div className="space-y-3">
-                                    {availableRequiredBridgeIssues.length > 0 ? (
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                                        <div className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Required Workflow (currently off)</div>
-                                        <div className="space-y-2">
-                                          {availableRequiredBridgeIssues.map((issue) => {
-                                            const stepNum = BRIDGE_REQUIRED_WORKFLOW_BLOCKERS.indexOf(issue) + 1;
-                                            return (
-                                              <button
-                                                key={issue}
-                                                type="button"
-                                                onClick={() => toggleScopeBridgeIssue(issue)}
-                                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:border-amber-300 hover:bg-amber-50/40"
-                                              >
-                                                <div className="flex items-center justify-between gap-2">
-                                                  <span className="flex items-center gap-2">
-                                                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold text-slate-600">
-                                                      {stepNum > 0 ? stepNum : "•"}
-                                                    </span>
-                                                    {issue}
-                                                  </span>
-                                                  <span className="text-[10px] font-bold text-slate-400">OFF</span>
-                                                </div>
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    ) : null}
-
-                                    {availableIndependentBridgeIssues.length > 0 ? (
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                                        <div className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Independent Blockers</div>
-                                        <div className="grid gap-2 sm:grid-cols-2">
-                                          {availableIndependentBridgeIssues.map((issue) => {
-                                            const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
-                                            return (
-                                              <button
-                                                key={issue}
-                                                type="button"
-                                                onClick={() => toggleScopeBridgeIssue(issue)}
-                                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:border-amber-300 hover:bg-amber-50/40"
-                                              >
-                                                <div className="flex items-center justify-between gap-2">
-                                                  <span>{issue}</span>
-                                                  <span className="text-[10px] font-bold text-slate-400">OFF</span>
-                                                </div>
-                                                {isAutoManaged ? (
-                                                  <div className="mt-1 text-[10px] font-semibold text-sky-700">Auto-linked</div>
-                                                ) : null}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                )}
                               </div>
                             </div>
 
@@ -8520,9 +8321,14 @@ export default function App(){
                                         type="button"
                                         title={item}
                                         onClick={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], item))}
-                                        className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex items-center justify-center border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
+                                        className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
-                                        <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                        <div className="h-[4.9rem] w-full flex items-center justify-center">
+                                          <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                        </div>
+                                        <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
+                                          {item}
+                                        </div>
                                       </button>
                                     );
                                   })}
@@ -8540,9 +8346,14 @@ export default function App(){
                                         type="button"
                                         title={item}
                                         onClick={() => update("sdsObservations", toggleMulti(data.sdsObservations || [], item))}
-                                        className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex items-center justify-center border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
+                                        className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
-                                        <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                        <div className="h-[4.9rem] w-full flex items-center justify-center">
+                                          <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                        </div>
+                                        <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
+                                          {item}
+                                        </div>
                                       </button>
                                     );
                                   })}
@@ -8560,9 +8371,14 @@ export default function App(){
                                         type="button"
                                         title={item}
                                         onClick={() => update("sdsServices", toggleMulti(data.sdsServices || [], item))}
-                                        className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex items-center justify-center border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
+                                        className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
-                                        <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                        <div className="h-[4.9rem] w-full flex items-center justify-center">
+                                          <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                        </div>
+                                        <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
+                                          {item}
+                                        </div>
                                       </button>
                                     );
                                   })}

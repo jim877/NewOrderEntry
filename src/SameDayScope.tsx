@@ -1256,7 +1256,7 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
     { id: "Drying", icon: "/Drying.jpg" },
     { id: "Total Loss Inventory", icon: "/Total_Loss_Inventory.jpg" },
     { id: "Content Manipulation", icon: "/Content_Manipulation.jpg" },
-    { id: "High Density", icon: "/High_Density_Parking.jpg" },
+    { id: "High Density", icon: "/High_Density_Parking.png" },
     { id: "Expert Stain Removal", icon: "/Expert_Stain_Removal.jpg" }
   ];
 

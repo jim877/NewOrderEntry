@@ -1,4 +1,16 @@
 export const SCOPE_BRIDGE_PENDING_ISSUES = [
+  'Wants Everything Replaced',
+  'Not sure if submitting a claim',
+  'Customer Wants Estimate',
+  "Won't Sign Authorization",
+  'Wants a cash-out',
+  'May clean themselves',
+  'Limit Issue',
+  "Hasn't approved scope",
+  'Adjuster Wants Estimate',
+  "Hasn't determined coverage",
+  'Pushing another vendor',
+  'Waiting on Hygienist Results',
   'Contacting Customer',
   'Authorization',
   'Test Results',
@@ -60,9 +72,11 @@ export const SCOPE_BRIDGE_PROCESSING_OPTIONS = [
 ];
 
 export const SCOPE_BRIDGE_NEXT_STEP_OPTIONS = [
-  { id: 'pickup_hold', label: 'Pickup is on hold' },
-  { id: 'processing_hold', label: 'Processing is on hold (tag and hold)' },
-  { id: 'delivery_hold', label: 'Delivery is on hold' },
+  { id: 'pickup_hold', label: 'Pickup on hold' },
+  { id: 'processing_hold', label: 'Tag and Hold' },
+  { id: 'emergency_groups_only', label: 'Emergency Groups Only' },
+  { id: 'cod', label: 'COD' },
+  { id: 'delivery_hold', label: 'Delivery on hold' },
   { id: 'schedule', label: 'Ready to schedule final retrieval' },
   { id: 'wait_approval', label: 'Awaiting adjuster approval' },
   { id: 'wait_test', label: 'Awaiting test results' }
@@ -224,9 +238,11 @@ export const buildScopeBridgeSnippet = (rawFormData = {}) => {
 
   if (formData.nextStep) {
     const logiMap = {
-      pickup_hold: 'Pickup is on hold.',
-      processing_hold: 'Processing is on hold (tag and hold).',
-      delivery_hold: 'Delivery is on hold.',
+      pickup_hold: 'Pickup on hold.',
+      processing_hold: 'Tag and Hold.',
+      emergency_groups_only: 'Emergency groups only.',
+      cod: 'COD.',
+      delivery_hold: 'Delivery on hold.',
       schedule: 'Ready for final retrieval.',
       wait_approval: 'Awaiting Adjuster Approval.',
       wait_test: 'Awaiting test results.',
