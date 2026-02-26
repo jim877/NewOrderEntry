@@ -2,6 +2,18 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Camera, MessageSquare, Trash2, ChevronDown, Check, CheckCircle2, AlertTriangle, FilePenLine, X, Info, ArrowLeft, Copy, Settings } from 'lucide-react';
 import SdsDocument from "./SdsDocument";
+import {
+  buildScopeBridgeSnippet,
+  createScopeBridgeState,
+  nextStepLabel,
+  normalizeScopeBridgeState,
+  SCOPE_BRIDGE_GROUP_OPTIONS,
+  SCOPE_BRIDGE_NEXT_STEP_OPTIONS,
+  SCOPE_BRIDGE_PENDING_ISSUES,
+  SCOPE_BRIDGE_PROCESSING_OPTIONS,
+  SCOPE_BRIDGE_RED_REASONS,
+  statusBadgeLabel,
+} from "./scopeBridgeUtils";
 
 // --- Helper Components (defined at top level) ---
 
@@ -832,8 +844,335 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
     );
 };
 
+const ScopeBridgeModal = ({ open, value, onClose, onApply, suggestedGroups = [] }) => {
+  const [draft, setDraft] = useState(() => normalizeScopeBridgeState(value || createScopeBridgeState()));
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(normalizeScopeBridgeState(value || createScopeBridgeState()));
+  }, [open]);
+
+  const availableGroups = useMemo(() => {
+    return Array.from(new Set([...(Array.isArray(suggestedGroups) ? suggestedGroups : []), ...SCOPE_BRIDGE_GROUP_OPTIONS]));
+  }, [suggestedGroups]);
+
+  const snippet = useMemo(() => buildScopeBridgeSnippet(draft), [draft]);
+
+  const toggleList = (field, val) => {
+    setDraft((prev) => {
+      const nextList = (prev[field] || []).includes(val)
+        ? (prev[field] || []).filter((v) => v !== val)
+        : [...(prev[field] || []), val];
+      return { ...prev, [field]: nextList };
+    });
+  };
+
+  const updateCleaningNote = (issue, note) => {
+    setDraft((prev) => ({
+      ...prev,
+      cleaningPreferenceNotes: {
+        ...(prev.cleaningPreferenceNotes || {}),
+        [issue]: note,
+      },
+    }));
+  };
+
+  const setStatus = (status) => {
+    setDraft((prev) => {
+      const next = {
+        ...prev,
+        projectStatus: status,
+      };
+      if (status === "green") {
+        next.pendingIssues = [];
+        next.statusReason = "Production Authorized";
+      } else if (status === "yellow") {
+        next.statusReason = "";
+      } else if (status === "red") {
+        next.pendingIssues = [];
+      }
+      return next;
+    });
+  };
+
+  const handleApply = () => {
+    onApply?.({
+      ...draft,
+      snippet,
+    });
+    onClose?.();
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-4xl rounded-2xl border border-slate-200 bg-white shadow-2xl max-h-[88vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between bg-sky-500 px-5 py-4">
+          <div>
+            <div className="text-xl font-bold text-white">Scope Bridge</div>
+            <div className="text-sm text-sky-100">Sync status, pickup, processing, and logistics across Scope, SDS, and NOE.</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/40 bg-white/10 p-2 text-white hover:bg-white/20"
+            aria-label="Close Scope Bridge"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto p-5 space-y-5">
+          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <div className="text-xs font-bold uppercase tracking-widest text-slate-500">1. Project Health State</div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {[
+                { id: "green", label: "Proceed / Clear", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+                { id: "yellow", label: "Caution / Pending", className: "border-amber-200 bg-amber-50 text-amber-700" },
+                { id: "red", label: "Stop / Closed", className: "border-rose-200 bg-rose-50 text-rose-700" },
+              ].map((status) => {
+                const active = draft.projectStatus === status.id;
+                return (
+                  <button
+                    key={status.id}
+                    type="button"
+                    onClick={() => setStatus(status.id)}
+                    className={`rounded-xl border-2 px-3 py-3 text-sm font-semibold transition ${
+                      active ? status.className : "border-slate-200 bg-white text-slate-600 hover:border-sky-200"
+                    }`}
+                  >
+                    {status.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {draft.projectStatus === "yellow" ? (
+              <div className="space-y-2">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Pending Issues</div>
+                <div className="flex flex-wrap gap-2">
+                  {SCOPE_BRIDGE_PENDING_ISSUES.map((issue) => {
+                    const active = (draft.pendingIssues || []).includes(issue);
+                    return (
+                      <button
+                        key={issue}
+                        type="button"
+                        onClick={() => toggleList("pendingIssues", issue)}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                          active
+                            ? "border-amber-300 bg-amber-100 text-amber-800"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-amber-200"
+                        }`}
+                      >
+                        {issue}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {(draft.pendingIssues || []).includes("Awaiting Estimate Approval") ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      value={draft.estimateBlockerBy || ""}
+                      onChange={(e) => setDraft((prev) => ({ ...prev, estimateBlockerBy: e.target.value }))}
+                      placeholder="Estimate requested by..."
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                    />
+                    <select
+                      value={draft.estimateBlockerType || ""}
+                      onChange={(e) => setDraft((prev) => ({ ...prev, estimateBlockerType: e.target.value }))}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                    >
+                      <option value="">Estimate type</option>
+                      {["Ballpark", "NTE", "Tag & Hold", "Final"].map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
+                {(draft.pendingIssues || []).includes("Awaiting Signed Authorization") ? (
+                  <input
+                    value={draft.authBlockerBy || ""}
+                    onChange={(e) => setDraft((prev) => ({ ...prev, authBlockerBy: e.target.value }))}
+                    placeholder="Authorization needed from..."
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                  />
+                ) : null}
+
+                {["Customer is not open to cleaning", "PA is not open to cleaning"].map((issue) => (
+                  (draft.pendingIssues || []).includes(issue) ? (
+                    <select
+                      key={issue}
+                      value={(draft.cleaningPreferenceNotes || {})[issue] || ""}
+                      onChange={(e) => updateCleaningNote(issue, e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                    >
+                      <option value="">{issue}: choose action</option>
+                      {["On Hold", "Tag and Hold", "Only process Rush, Wet/Damp, Test"].map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : null
+                ))}
+              </div>
+            ) : null}
+
+            {draft.projectStatus === "red" ? (
+              <div className="space-y-2">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Primary Reason</div>
+                <div className="flex flex-wrap gap-2">
+                  {SCOPE_BRIDGE_RED_REASONS.map((reason) => {
+                    const active = draft.statusReason === reason;
+                    return (
+                      <button
+                        key={reason}
+                        type="button"
+                        onClick={() => setDraft((prev) => ({ ...prev, statusReason: reason }))}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                          active
+                            ? "border-rose-300 bg-rose-100 text-rose-800"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-rose-200"
+                        }`}
+                      >
+                        {reason}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="grid gap-5 lg:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+              <div className="text-xs font-bold uppercase tracking-widest text-slate-500">2. Pickup</div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "wait", label: "Wait to schedule" },
+                  { id: "urgent", label: "Urgent groups only" },
+                ].map((option) => {
+                  const active = draft.pickupOption === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setDraft((prev) => ({ ...prev, pickupOption: prev.pickupOption === option.id ? "" : option.id }))}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                        active ? "border-sky-300 bg-sky-100 text-sky-800" : "border-slate-200 bg-white text-slate-600 hover:border-sky-200"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+              <div className="text-xs font-bold uppercase tracking-widest text-slate-500">3. Processing</div>
+              <div className="flex flex-wrap gap-2">
+                {SCOPE_BRIDGE_PROCESSING_OPTIONS.map((option) => {
+                  const active = draft.processingOption === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setDraft((prev) => ({ ...prev, processingOption: prev.processingOption === option.id ? "" : option.id }))}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                        active ? "border-sky-300 bg-sky-100 text-sky-800" : "border-slate-200 bg-white text-slate-600 hover:border-sky-200"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          {(draft.pickupOption === "urgent" || draft.processingOption === "urgent" || draft.processingOption === "specific") ? (
+            <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+              <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Groups in scope</div>
+              <div className="flex flex-wrap gap-2">
+                {availableGroups.map((group) => {
+                  const active = (draft.selectedGroups || []).includes(group);
+                  return (
+                    <button
+                      key={group}
+                      type="button"
+                      onClick={() => toggleList("selectedGroups", group)}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                        active ? "border-sky-500 bg-sky-500 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-sky-200"
+                      }`}
+                    >
+                      {group}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+            <div className="text-xs font-bold uppercase tracking-widest text-slate-500">4. Logistics</div>
+            <div className="flex flex-wrap gap-2">
+              {SCOPE_BRIDGE_NEXT_STEP_OPTIONS.map((option) => {
+                const active = draft.nextStep === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setDraft((prev) => ({ ...prev, nextStep: prev.nextStep === option.id ? "" : option.id }))}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      active ? "border-sky-300 bg-sky-100 text-sky-800" : "border-slate-200 bg-white text-slate-600 hover:border-sky-200"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-slate-900 p-4 text-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-bold uppercase tracking-widest text-sky-200">Generated Snippet</div>
+              <div className="text-[11px] font-semibold text-sky-100">
+                {statusBadgeLabel(draft.projectStatus)}
+                {draft.nextStep ? ` | ${nextStepLabel(draft.nextStep)}` : ""}
+              </div>
+            </div>
+            <div className="mt-2 rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-xs leading-relaxed">
+              {snippet || "Set project status and logistics to generate the summary snippet."}
+            </div>
+          </section>
+        </div>
+
+        <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleApply}
+            className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"
+          >
+            Apply to Order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App Component ---
-export default function SameDayScope({ onExit, eventInstructions, onEventInstructionsChange, serviceOfferings, onServiceOfferingsChange, suggestedGroups, onSuggestedGroupsChange, lossSeverity, onLossSeverityChange, orderTypes = [], severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", addressLabel = "", customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsRooms = [], onSdsRoomsChange, sdsProjectFloors = [], onSdsProjectFloorsChange, sdsApartmentType = "", onSdsApartmentTypeChange, sdsPrebagged = "", onSdsPrebaggedChange, sdsInitialInstructions = [], onSdsInitialInstructionsChange, sdsInstructionAgreement = null, onSdsInstructionAgreementChange, sdsDisagreementNote = "", onSdsDisagreementNoteChange }) {
+export default function SameDayScope({ onExit, eventInstructions, onEventInstructionsChange, serviceOfferings, onServiceOfferingsChange, suggestedGroups, onSuggestedGroupsChange, scopeBridge = createScopeBridgeState(), onScopeBridgeChange, lossSeverity, onLossSeverityChange, orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", addressLabel = "", customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsRooms = [], onSdsRoomsChange, sdsProjectFloors = [], onSdsProjectFloorsChange, sdsApartmentType = "", onSdsApartmentTypeChange, sdsPrebagged = "", onSdsPrebaggedChange, sdsInitialInstructions = [], onSdsInitialInstructionsChange, sdsInstructionAgreement = null, onSdsInstructionAgreementChange, sdsDisagreementNote = "", onSdsDisagreementNoteChange }) {
   const [rooms, setRooms] = useState(Array.isArray(sdsRooms) ? sdsRooms : []);
   const [mode, setMode] = useState("scope");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -868,6 +1207,7 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
   const [viewAsList, setViewAsList] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showSdsDoc, setShowSdsDoc] = useState(false);
+  const [showScopeBridge, setShowScopeBridge] = useState(false);
   const [showSdsSetup, setShowSdsSetup] = useState(false);
   const [sdsSelectedServices, setSdsSelectedServices] = useState([]);
   const [selectedRoomFloors, setSelectedRoomFloors] = useState([]);
@@ -894,6 +1234,8 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
   const settingsRef = useRef(null);
   const bulkEditCardRef = useRef(null);
   const roomListContainerRef = useRef(null);
+  const scopeBridgeSnapshot = useMemo(() => normalizeScopeBridgeState(scopeBridge || createScopeBridgeState()), [scopeBridge]);
+  const scopeBridgeSnippet = useMemo(() => buildScopeBridgeSnippet(scopeBridgeSnapshot), [scopeBridgeSnapshot]);
 
   const setServicesAndSync = (updater) => {
     setSelectedServices(prev => {
@@ -910,7 +1252,7 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
     { id: "Premium Brands", icon: "/Gemini_Premium_Brands.png" },
     { id: "Anti-Microbial", icon: "/Gemini_Anti_Microbial.png" },
     { id: "Fold ASAP", icon: "/Gemini_Fold_AMAP.png" },
-    { id: "Re-Hanging", icon: "/Gemini_Generated_Image_jnzpynjnzpynjnzp.png" },
+    { id: "Re-Hanging", icon: "/Gemini_Generated_Image_jv26rcjv26rcjv26.png" },
     { id: "Drying", icon: "/Drying.jpg" },
     { id: "Total Loss Inventory", icon: "/Total_Loss_Inventory.jpg" },
     { id: "Content Manipulation", icon: "/Content_Manipulation.jpg" },
@@ -1884,6 +2226,14 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
           <div className="text-lg font-bold text-slate-800">Same Day Scope</div>
           <button
             type="button"
+            onClick={() => setShowScopeBridge(true)}
+            className="rounded-full border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+            title="Open Scope Bridge mini-form"
+          >
+            Scope Bridge
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setSdsSelectedServices(selectedServices || []);
               setShowSdsSetup(true);
@@ -1938,6 +2288,43 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
         </button>
         <button onClick={() => setShowHelp(true)} className="ml-2 p-2 text-slate-500 bg-white border border-slate-200 rounded-full font-semibold hover:bg-slate-100"><Info size={20}/></button>
         <button onClick={() => setShowClearConfirm(true)} className="ml-2 p-2 bg-rose-500 text-white rounded-full font-semibold hover:bg-rose-600"><Trash2 size={20} /></button>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide ${
+                scopeBridgeSnapshot.projectStatus === "green"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : scopeBridgeSnapshot.projectStatus === "yellow"
+                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                    : scopeBridgeSnapshot.projectStatus === "red"
+                      ? "border-rose-200 bg-rose-50 text-rose-700"
+                      : "border-slate-200 bg-slate-50 text-slate-500"
+              }`}
+            >
+              Scope Bridge: {statusBadgeLabel(scopeBridgeSnapshot.projectStatus)}
+            </span>
+            {scopeBridgeSnapshot.nextStep ? (
+              <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
+                {nextStepLabel(scopeBridgeSnapshot.nextStep)}
+              </span>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowScopeBridge(true)}
+            className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-sky-300 hover:text-sky-700"
+          >
+            Edit
+          </button>
+        </div>
+        {scopeBridgeSnippet ? (
+          <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-700 leading-relaxed">
+            {scopeBridgeSnippet}
+          </div>
+        ) : null}
       </div>
       
       {mode === 'scope' && (
@@ -2368,6 +2755,14 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
             </>
       )}</div></div>}
 
+      <ScopeBridgeModal
+        open={showScopeBridge}
+        value={scopeBridgeSnapshot}
+        suggestedGroups={suggestedGroups}
+        onClose={() => setShowScopeBridge(false)}
+        onApply={(next) => onScopeBridgeChange?.(next)}
+      />
+
       {showSdsSetup && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
@@ -2420,6 +2815,7 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
           onClose={() => setShowSdsDoc(false)}
           rooms={rooms}
           orderTypes={orderTypes}
+          lossDetails={lossDetails}
           severityCodes={severityCodes}
           orderName={orderName}
           claimNumber={claimNumber}
@@ -2428,12 +2824,14 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
           dateOfLoss={dateOfLoss}
           address={addressLabel}
           selectedServices={sdsSelectedServices}
+          noeServiceOfferings={serviceOfferings || []}
           customers={customers}
           familyMedicalIssues={familyMedicalIssues}
           soapFragAllergies={soapFragAllergies}
           sdsConsiderations={sdsConsiderations}
           sdsObservations={sdsObservations}
           sdsServices={sdsServices}
+          scopeBridge={scopeBridgeSnapshot}
         />
       )}
     </div>

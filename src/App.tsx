@@ -2,6 +2,15 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import SameDayScope from './SameDayScope';
 import SdsDocument from './SdsDocument';
+import {
+  buildScopeBridgeSnippet,
+  createScopeBridgeState,
+  SCOPE_BRIDGE_NEXT_STEP_OPTIONS,
+  nextStepLabel,
+  normalizeScopeBridgeState,
+  statusBadgeLabel,
+  withScopeBridgeSnippet,
+} from './scopeBridgeUtils';
 
 // --- STYLES ---
 const STYLES = `
@@ -59,6 +68,24 @@ const STYLES = `
   @keyframes outlineFadePurple {
       0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6); }
       100% { box-shadow: 0 0 0 8px rgba(56, 189, 248, 0); }
+  }
+
+  .animate-nav-focus {
+      animation: navFocusGlow 1s ease-out forwards;
+  }
+  @keyframes navFocusGlow {
+      0% {
+        box-shadow:
+          0 0 0 2px rgba(14, 165, 233, 0.45),
+          inset 0 0 0 1px rgba(14, 165, 233, 0.65),
+          0 0 18px rgba(14, 165, 233, 0.22);
+      }
+      100% {
+        box-shadow:
+          0 0 0 0 rgba(14, 165, 233, 0),
+          inset 0 0 0 0 rgba(14, 165, 233, 0),
+          0 0 0 rgba(14, 165, 233, 0);
+      }
   }
   
   /* --- ORANGE HIGHLIGHT (Smart Fields) --- */
@@ -163,6 +190,28 @@ const createPlaceholderFlag = (kind, reason = "") => ({
 const isPlaceholderFlagActive = (flag) => !!flag && flag.active !== false;
 
 const hasMeaningfulValue = (value) => !!(value || "").toString().trim();
+
+const hasCustomerDetails = (customer = {}) =>
+  [
+    customer.first,
+    customer.last,
+    customer.phone,
+    customer.email,
+    customer.type
+  ].some(hasMeaningfulValue);
+
+const isHeaderToggleIgnoredTarget = (target) => {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest('button, input, select, textarea, a, [role="button"], [data-header-toggle-ignore="true"]');
+};
+
+const normalizeBridgeIssueKey = (value = "") =>
+  (value || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 const normalizePlaceholderKeyPart = (value = "") =>
   (value || "")
@@ -379,6 +428,57 @@ const SUGGESTED_GROUP_HELP = {
   Dispose: "Items that will not be returned",
   "Storage Only": "Items that will be stored and returned without cleaning"
 };
+const BRIDGE_BLOCKER_SCOPE_OPTIONS = [
+  { id: "pickup", label: "Block Pickup" },
+  { id: "processing", label: "Block Processing" },
+  { id: "delivery", label: "Block Delivery" },
+];
+const BRIDGE_REQUIRED_WORKFLOW_BLOCKERS = [
+  "Contacting Customer",
+  "Authorization",
+  "Scope Approval",
+  "Estimate Approval",
+];
+const BRIDGE_INDEPENDENT_BLOCKERS = [
+  "Coverage Determination",
+  "Bill To Determination",
+  "Test Results",
+  "IH Results",
+  "Customer might clean it themselves",
+  "Unsure if submitting a claim",
+];
+const BRIDGE_BLOCKER_ITEMS = [
+  ...BRIDGE_REQUIRED_WORKFLOW_BLOCKERS,
+  ...BRIDGE_INDEPENDENT_BLOCKERS,
+];
+const BRIDGE_BLOCKER_ALIASES = {
+  "Awaiting Signed Authorization": "Authorization",
+  "Awaiting Estimate Approval": "Estimate Approval",
+  "Awaiting Hygienist Results": "IH Results",
+  "Awaiting Coverage Determination": "Coverage Determination",
+  "Awaiting Test Group Results": "Test Results",
+  "Deciding Who Will Pay": "Bill To Determination",
+};
+const BRIDGE_AUTO_MANAGED_BLOCKERS = [
+  "Contacting Customer",
+  "Authorization",
+  "Coverage Determination",
+  "Estimate Approval",
+  "Customer might clean it themselves",
+  "Unsure if submitting a claim",
+];
+const BRIDGE_NEXT_STEP_OPTIONS = [
+  { id: "pickup_hold", label: "Pickup is on hold" },
+  { id: "processing_hold", label: "Processing is on hold (tag and hold)" },
+  { id: "delivery_hold", label: "Delivery is on hold" },
+  ...SCOPE_BRIDGE_NEXT_STEP_OPTIONS,
+];
+const BRIDGE_MILESTONE_FIELDS = [
+  { id: "authorizationOnFile", atId: "authorizationOnFileAt", byId: "authorizationOnFileBy", label: "Authorization form on file" },
+  { id: "scopeApproved", atId: "scopeApprovedAt", byId: "scopeApprovedBy", label: "Scope approved" },
+  { id: "estimateApproved", atId: "estimateApprovedAt", byId: "estimateApprovedBy", label: "Estimate approved" },
+];
+const canonicalBridgeIssue = (issue = "") => BRIDGE_BLOCKER_ALIASES[issue] || issue;
 const SERVICE_OFFERING_HELP = {
   Appliance: "Large items requiring specialized handling (refrigerators, ranges, etc.).",
   Art: "Items valued for artistic/aesthetic merit.",
@@ -554,21 +654,21 @@ const SDS_ICON_MAP = {
   "Skin Sensitivity": "/Gemini_Skin_Sensitivity.png",
   "Pets": "/Gemini_Pets.png",
   "Fireplace": "/Gemini_Fireplace.png",
-  "Insects": "/Gemini_Generated_Image_n42bx9n42bx9n42b.png",
+  "Insects": "/Gemini_Generated_Image_b58khsb58khsb58k.png",
   "Moth Damage": "/Gemini_Moth_Holes.png",
-  "Sun Damage": "/Gemini_Generated_Image_bvveb5bvveb5bvve.png",
+  "Sun Damage": "/Gemini_Generated_Image_7b5s067b5s067b5s.png",
   "Smoking": "/Gemini_Smoking.png",
   "Fold as Much as Possible": "/Gemini_Fold_AMAP.png",
-  "Re-Hanging": "/Gemini_Generated_Image_jnzpynjnzpynjnzp.png",
+  "Re-Hanging": "/Gemini_Generated_Image_jv26rcjv26rcjv26.png",
   "Photo Inventory": "/Gemini_Photo_Inventory.png",
   "Unpacking": "/Gemini_Unpacking.png",
   "Anti-Microbial": "/Gemini_Anti_Microbial.png",
   "Drying Needed": "/Drying.jpg",
   "Drying": "/Drying.jpg",
-  "Disposal": "/Gemini_Generated_Image_b58khsb58khsb58k.png",
+  "Disposal": "/Gemini_Generated_Image_tydpketydpketydp.png",
   "Fiber Protection": "/Gemini_Fiber_Protection.png",
-  "Moving": "/Gemini_Generated_Image_wqmls4wqmls4wqml.png",
-  "Rolling Racks": "/Gemini_Generated_Image_bxkqrbxkqrbxkqrb.png",
+  "Moving": "/icon-moving.svg",
+  "Rolling Racks": "/icon-rolling-racks.svg",
   "Total Loss Inventory": "/Total_Loss_Inventory.jpg",
   "Content Manipulation": "/Content_Manipulation.jpg",
   "High Density": "/High_Density_Parking.jpg",
@@ -758,6 +858,7 @@ function initCustomer(overrides={}){
     householdCount: "",
     householdAnimals: "",
     householdMembers: [],
+    placeholder: null,
     ...overrides 
   }; 
 }
@@ -790,6 +891,13 @@ function initLossSeverity(overrides = {}) {
     ...overrides
   };
 }
+
+const stringListMatches = (a = [], b = []) => {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  const right = new Set(b.map((item) => `${item}`));
+  return a.every((item) => right.has(`${item}`));
+};
 
 const DEFAULT_FORM={
   isLead: null,
@@ -899,6 +1007,7 @@ const DEFAULT_FORM={
   },
   additionalObservations:[], whoAtPickup:[], storageNeeded:"", storageMonths:"", highlightMissing:{},
   suggestedGroups: [],
+  scopeBridge: createScopeBridgeState(),
 };
 
 // --- UI PRIMITIVES ---
@@ -1642,18 +1751,29 @@ const ToggleMulti = ({ label, checked, onChange, className, colorClass, title, s
     );
 };
 
-const SubSection = ({ title, open, onToggle, children, compact, className, action }) => (
-  <div className={`rounded-xl border border-slate-200 bg-white ${compact ? "p-3" : "p-5"} shadow-sm ${className || ""}`}>
-    <div className="flex items-center justify-between gap-2">
-      <button onClick={onToggle} className="flex flex-1 items-center justify-between text-left">
-        <span className="text-xs font-extrabold uppercase tracking-widest text-sky-700">{title}</span>
-        <span className="text-slate-400 text-lg">{open ? "▾" : "›"}</span>
-      </button>
-      {action && <div onClick={(e) => e.stopPropagation()}>{action}</div>}
+const SubSection = ({ id, title, open, onToggle, children, compact, className, action }) => {
+  const handleToggle = () => onToggle?.(!open);
+  return (
+    <div id={id} className={`rounded-xl border border-slate-200 bg-white ${compact ? "p-3" : "p-5"} shadow-sm scroll-mt-28 ${className || ""}`}>
+      <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={handleToggle}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleToggle();
+          }}
+          className="flex flex-1 items-center justify-between text-left"
+          aria-expanded={open}
+        >
+          <span className="text-xs font-extrabold uppercase tracking-widest text-sky-700">{title}</span>
+          <span className="text-slate-400 text-lg">{open ? "▾" : "›"}</span>
+        </button>
+        {action && <div data-subsection-action="true" onClick={(e) => e.stopPropagation()}>{action}</div>}
+      </div>
+      {open && <div className={`mt-4 ${compact ? "space-y-3" : "space-y-4"} fade-in`}>{children}</div>}
     </div>
-    {open && <div className={`mt-4 ${compact ? "space-y-3" : "space-y-4"} fade-in`}>{children}</div>}
-  </div>
-);
+  );
+};
 
 // --- SHARED FIELD COMPONENTS ---
 
@@ -2084,11 +2204,16 @@ const StartScreen = ({ onSelect }) => {
 // --- SEARCH COMPONENT ---
 const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef(null);
+  const listRef = useRef(null);
+  const resultRefs = useRef([]);
 
   useEffect(() => {
     if(show) {
       setQuery("");
+      setActiveIndex(0);
+      resultRefs.current = [];
       if (inputRef.current) inputRef.current.focus();
     }
   }, [show]);
@@ -2162,6 +2287,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec5', label: 'Schedule Type', keywords: 'scope pickup in-home' },
     { id: 'sec5', label: 'Date', keywords: 'schedule date' },
     { id: 'sec5', label: 'Time', keywords: 'schedule time' },
+    { id: 'sec5', sub: 'bridge', label: 'Bridge Status and Blockers', keywords: 'scope bridge blockers follow up status green yellow red pickup processing delivery hold' },
     { id: 'sec5', label: 'Event Instructions', keywords: 'instructions notes load list' },
     { id: 'sec5', label: 'Estimate Requested', keywords: 'estimate requested type' },
     { id: 'sec5', label: 'Requested By', keywords: 'estimate requested by' },
@@ -2175,11 +2301,49 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     s.keywords.toLowerCase().includes(query.toLowerCase())
   );
 
+  useEffect(() => {
+    if (!filtered.length) {
+      setActiveIndex(-1);
+      return;
+    }
+    setActiveIndex(prev => {
+      if (prev < 0) return 0;
+      if (prev >= filtered.length) return filtered.length - 1;
+      return prev;
+    });
+  }, [filtered.length, query]);
+
+  useEffect(() => {
+    if (activeIndex < 0) return;
+    const item = resultRefs.current[activeIndex];
+    if (item instanceof HTMLElement) {
+      item.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } else if (listRef.current instanceof HTMLElement) {
+      listRef.current.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [activeIndex, filtered.length]);
+
   if (!show) return null;
 
   const handleClose = () => {
     setQuery("");
+    setActiveIndex(0);
     onClose();
+  };
+
+  const commitItem = (item) => {
+    if (!item) return;
+    if (item.action) item.action();
+    onNavigate(item);
+    handleClose();
+  };
+
+  const moveActive = (direction) => {
+    if (!filtered.length) return;
+    setActiveIndex(prev => {
+      const base = prev < 0 ? 0 : prev;
+      return (base + direction + filtered.length) % filtered.length;
+    });
   };
 
   return (
@@ -2189,35 +2353,59 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
              <span className="text-slate-500 text-xl">🔍</span>
              <input 
                ref={inputRef}
-               className="flex-1 bg-transparent text-xl font-medium outline-none placeholder:text-slate-400 text-slate-800"
+                className="flex-1 bg-transparent text-xl font-medium outline-none placeholder:text-slate-400 text-slate-800"
                placeholder="Search fields, sections..."
                value={query}
-               onChange={e=>setQuery(e.target.value)}
-               onKeyDown={e => {
-                  if(e.key === 'Enter' && filtered.length > 0) {
-                      const item = filtered[0];
-                      if(item.action) item.action();
-                      onNavigate(item);
-                      handleClose();
-                  }
-                  if(e.key === 'Escape') handleClose();
+               onChange={e => {
+                 setQuery(e.target.value);
+                 setActiveIndex(0);
                }}
+               onKeyDown={e => {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    moveActive(1);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    moveActive(-1);
+                    return;
+                  }
+                  if (e.key === "Tab") {
+                    if (filtered.length > 0) {
+                      e.preventDefault();
+                      moveActive(e.shiftKey ? -1 : 1);
+                    }
+                    return;
+                  }
+                  if (e.key === "Enter" && filtered.length > 0) {
+                    e.preventDefault();
+                    const idx = activeIndex >= 0 ? activeIndex : 0;
+                    commitItem(filtered[idx]);
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    handleClose();
+                  }
+               }}
+               aria-activedescendant={activeIndex >= 0 ? `global-search-item-${activeIndex}` : undefined}
              />
              <span className="text-[10px] font-bold text-slate-400 border border-slate-300 rounded px-1.5 py-0.5 bg-slate-50">ESC</span>
           </div>
-          <div className="space-y-1 max-h-[400px] overflow-y-auto custom-scroll">
+          <div ref={listRef} className="space-y-1 max-h-[400px] overflow-y-auto custom-scroll">
              {filtered.map((s, idx) => (
                <button 
                  key={idx}
-                 onClick={() => { 
-                     if(s.action) s.action();
-                     onNavigate(s); 
-                     handleClose(); 
-                 }}
-                 className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all group ${idx === 0 ? 'bg-gradient-to-r from-sky-50 to-sky-50 border border-sky-100' : 'hover:bg-white/50 hover:shadow-sm'}`}
+                 id={`global-search-item-${idx}`}
+                 ref={(el) => { resultRefs.current[idx] = el; }}
+                 onMouseEnter={() => setActiveIndex(idx)}
+                 onFocus={() => setActiveIndex(idx)}
+                 onClick={() => commitItem(s)}
+                 className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all group ${idx === activeIndex ? 'bg-gradient-to-r from-sky-50 to-sky-50 border border-sky-100' : 'hover:bg-white/50 hover:shadow-sm'}`}
                >
-                  <span className={`font-semibold ${idx === 0 ? 'text-sky-700' : 'text-slate-700'}`}>{s.label}</span>
-                  {idx === 0 && <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider group-hover:text-sky-600">Hit Enter</span>}
+                  <span className={`font-semibold ${idx === activeIndex ? 'text-sky-700' : 'text-slate-700'}`}>{s.label}</span>
+                  {idx === activeIndex && <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider group-hover:text-sky-600">Hit Enter</span>}
                </button>
              ))}
              {filtered.length === 0 && <div className="text-center py-4 text-slate-500 text-sm">No results found.</div>}
@@ -2228,18 +2416,21 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 };
 
 // --- UNIFIED FLOATING HEADER (PROGRESS HEADER) ---
-const Header = ({ activeSection, visitedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
+const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
     const steps = [
         { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }, { id: "interview", label: "Interview" }, { id: "codes", label: "Codes" }] },
         { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
         { id: 'sec3', label: 'Address', subsections: [{ id: "address", label: "Addresses" }] },
         { id: 'sec4', label: 'Billing', subsections: [{ id: "companies", label: "Companies and Contacts" }, { id: "billing", label: "Billing" }, { id: "finance", label: "Finance" }, { id: "insurance", label: "Insurance" }] },
-        { id: 'sec5', label: 'Schedule', subsections: [{ id: "schedule", label: "Schedule" }, { id: "sds-icons", label: "SDS Icon Selections" }] },
+        { id: 'sec5', label: 'Schedule', subsections: [{ id: "schedule", label: "Schedule" }, { id: "bridge", label: "Bridge Status and Blockers" }] },
     ];
 
     const getStatus = (stepId) => {
         if (stepId === activeSection) return 'active';
-        if (visitedSections.has(stepId)) return 'visited';
+        if (visitedSections.has(stepId)) {
+          if (completedSections?.has(stepId)) return 'done';
+          return 'visited';
+        }
         return 'future';
     };
 
@@ -2328,6 +2519,7 @@ const Header = ({ activeSection, visitedSections, onJump, onJumpSub, title, vers
                                 const hasSubsections = !!step.subsections?.length;
                                 let circleClass = "bg-white border-slate-300 text-slate-400 group-hover:border-slate-400";
                                 if (status === 'active') circleClass = "bg-sky-500 border-sky-500 text-white shadow-md scale-110";
+                                else if (status === 'done') circleClass = "bg-sky-50 border-2 border-sky-500 text-sky-700 shadow-sm";
                                 else if (status === 'visited') circleClass = "bg-white border-2 border-sky-500 text-sky-600";
 
                                 return (
@@ -2345,9 +2537,9 @@ const Header = ({ activeSection, visitedSections, onJump, onJumpSub, title, vers
                                                 title={hasSubsections ? "Click once for section menu, click again for first subsection" : "Go to section"}
                                               >
                                                   <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 border ${circleClass}`}>
-                                                      {status === 'visited' && status !== 'active' ? '✓' : idx + 1}
+                                                      {status === 'done' ? '✓' : idx + 1}
                                                   </div>
-                                                  <span className={`absolute top-9 text-[9px] font-bold uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${status === 'active' ? 'text-sky-700 opacity-100' : 'text-slate-400 opacity-100 block'}`}>
+                                                  <span className={`absolute top-9 text-[9px] font-bold uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${status === 'active' ? 'text-sky-700 opacity-100' : status === 'done' ? 'text-sky-600 opacity-100 block' : 'text-slate-400 opacity-100 block'}`}>
                                                       {step.label}
                                                   </span>
                                               </button>
@@ -2377,7 +2569,7 @@ const Header = ({ activeSection, visitedSections, onJump, onJumpSub, title, vers
                                             </div>
                                             {!isLast && (
                                                 <div className="flex-1 h-[2px] bg-slate-200 mx-2 rounded relative overflow-hidden">
-                                                    <div className={`absolute left-0 top-0 h-full bg-sky-500 transition-all duration-500`} style={{ width: status === 'visited' || status === 'active' ? '100%' : '0%' }}></div>
+                                                    <div className={`absolute left-0 top-0 h-full bg-sky-500 transition-all duration-500`} style={{ width: status === 'visited' || status === 'done' || status === 'active' ? '100%' : '0%' }}></div>
                                                 </div>
                                             )}
                                         </div>
@@ -2515,11 +2707,17 @@ const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaret
   };
   return (
     <div id={id} className={`mb-0 overflow-hidden rounded-none border-y border-slate-200 bg-white shadow-sm transition-shadow duration-300 scroll-mt-28 sm:mb-4 sm:rounded-xl sm:border ${isOpen ? 'ring-1 ring-sky-500/20 shadow-md' : ''} ${className||""}`}>
-      <div className={`flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5 text-left font-semibold text-slate-800 transition-colors ${compact ? "section-header-tight" : ""} ${isOpen ? "bg-white" : "bg-slate-50/50 hover:bg-slate-50"}`}>
+      <div
+        className={`flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5 text-left font-semibold text-slate-800 transition-colors cursor-pointer ${compact ? "section-header-tight" : ""} ${isOpen ? "bg-white" : "bg-slate-50/50 hover:bg-slate-50"}`}
+        onClick={handleHeaderClick}
+      >
         <button
           type="button"
           className="flex flex-1 cursor-pointer items-center text-left"
-          onClick={handleHeaderClick}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleHeaderClick();
+          }}
           aria-expanded={isOpen}
         >
           <div className="flex flex-col items-start">
@@ -2532,7 +2730,10 @@ const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaret
         </button>
         <button
           type="button"
-          onClick={handleCaretClick}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCaretClick();
+          }}
           className="ml-2 rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-sky-700"
           aria-label={isOpen ? "Collapse section" : "Expand section"}
         >
@@ -2549,6 +2750,9 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
   const toggleList = (list, value) => list.includes(value) ? list.filter(v=>v!==value) : [...list, value];
   const [householdName, setHouseholdName] = useState("");
   const [open, setOpen] = useState(false);
+  const customerDisplayName = [c.first, c.last].filter(hasMeaningfulValue).join(" ").trim();
+  const customerPlaceholder = isPlaceholderFlagActive(c.placeholder);
+  const customerRoleLabel = hasMeaningfulValue(c.type) ? c.type : (c.isPrimary ? "Primary" : "Relationship");
   const hasMobile = (c.phone || "").replace(/[^\d]/g, "").length >= 10;
   const canSendWelcome = hasMobile && !c.doNotContact;
   const toggleQuickNote = (noteLabel) => {
@@ -2561,31 +2765,40 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
     updateCust(c.id, { quickNotes: nextNotes, note: nextNoteText });
   };
   return (
-    <div className={`group relative rounded-lg sm:rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-sky-300 hover:shadow-md ${c.isPrimary ? "border-sky-400 ring-1 ring-sky-50" : "border-slate-200"}`}>
+    <div
+      data-audit-key={customerPlaceholder ? `placeholder-customer-${c.id}` : undefined}
+      className={`group relative rounded-lg sm:rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-sky-300 hover:shadow-md ${customerPlaceholder ? "placeholder-shell" : (c.isPrimary ? "border-sky-400 ring-1 ring-sky-50" : "border-slate-200")}`}
+    >
       {c.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
       {total > 1 && ( <button onClick={() => onRemove(c.id, index)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
       
       <div
         className="mb-4 flex cursor-pointer flex-col gap-3 pl-1 sm:pl-2 sm:flex-row sm:items-center sm:justify-between"
-        onClick={() => setOpen(true)}
+        onClick={(e) => {
+          if (isHeaderToggleIgnoredTarget(e.target)) return;
+          setOpen(v => !v);
+        }}
       >
-         <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
-              className="text-slate-400 hover:text-slate-600"
-              title={open ? "Collapse" : "Expand"}
-            >
+	         <div className="flex items-center gap-2">
+	            <button
+	              type="button"
+	              onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
+	              className="text-slate-400 hover:text-slate-600"
+	              title={open ? "Collapse" : "Expand"}
+	            >
               <Chevron open={open} />
             </button>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-600">{index + 1}</div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-slate-800">{c.first && c.last ? `${c.first} ${c.last}` : "Customer"}</span>
-              <span className="text-[10px] text-slate-500">{c.type || "Relationship"}</span>
-            </div>
-         </div>
-         <div className="flex flex-wrap gap-2">
-            <ToggleMulti className="!py-1 !px-3 sm:!px-3 !text-xs" label="Primary" checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: true })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
+	            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-600">{index + 1}</div>
+	            <div className="flex flex-col">
+	              <span className={`text-sm font-semibold ${customerDisplayName ? "text-slate-800" : (customerPlaceholder ? "placeholder-text" : "text-slate-800")}`}>{customerDisplayName || "Customer"}</span>
+	              <span className={`text-[10px] ${customerPlaceholder ? "placeholder-text" : "text-slate-500"}`}>{customerRoleLabel}</span>
+	            </div>
+              {customerPlaceholder && (
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>
+              )}
+	         </div>
+	         <div className="flex flex-wrap gap-2">
+	            <ToggleMulti className="!py-1 !px-3 sm:!px-3 !text-xs" label="Primary" checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: true })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
             <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Policy Holder" checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder, type: !c.policyHolder ? "Policyholder" : c.type })} />
             <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay, type: !c.selfPay ? "Owner" : c.type })} />
          </div>
@@ -2802,10 +3015,19 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
     >
       {addr.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
       {total > 1 && ( <button onClick={()=>onRemove(addr.id)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
-      <div className="mb-4 pl-1 sm:pl-2 flex items-center gap-2">
+      <div
+        className="mb-4 pl-1 sm:pl-2 flex items-center gap-2 cursor-pointer"
+        onClick={(e) => {
+          if (isHeaderToggleIgnoredTarget(e.target)) return;
+          setOpen(v => !v);
+        }}
+      >
          <button
            type="button"
-           onClick={() => setOpen(v => !v)}
+           onClick={(e) => {
+             e.stopPropagation();
+             setOpen(v => !v);
+           }}
            className="text-slate-400 hover:text-slate-600"
            title={open ? "Collapse" : "Expand"}
          >
@@ -3352,12 +3574,21 @@ export default function App(){
       const s = localStorage.getItem("same-day-scope-v52");
       const parsed = s ? JSON.parse(s) : {};
       const normalizedSdsServices = (parsed.sdsServices || []).map(item => item === "Drying Needed" ? "Drying" : item);
+      const parsedScopeBridge = normalizeScopeBridgeState(parsed.scopeBridge || {});
+      const mergedSelectedGroups = Array.isArray(parsed.suggestedGroups) && parsed.suggestedGroups.length
+        ? parsed.suggestedGroups
+        : (parsedScopeBridge.selectedGroups || []);
       return { 
         ...DEFAULT_FORM, 
         ...parsed, 
         addresses: parsed.addresses?.length ? parsed.addresses : DEFAULT_FORM.addresses, 
         customers: parsed.customers?.length ? parsed.customers : DEFAULT_FORM.customers,
-        sdsServices: normalizedSdsServices
+        sdsServices: normalizedSdsServices,
+        suggestedGroups: mergedSelectedGroups,
+        scopeBridge: withScopeBridgeSnippet({
+          ...parsedScopeBridge,
+          selectedGroups: mergedSelectedGroups,
+        }),
       };
     } catch(e) { return DEFAULT_FORM; }
   });
@@ -3483,7 +3714,6 @@ export default function App(){
   const [livingAddressPrompt, setLivingAddressPrompt] = useState({ open: false, type: "" });
   const addCompanyInputRef = useRef(null);
   const [autoFlash, setAutoFlash] = useState({ key: "", ts: 0 });
-  const [scheduleIconsOpen, setScheduleIconsOpen] = useState(false);
 
   useEffect(() => {
     if (entryMode === "quick") {
@@ -3616,6 +3846,7 @@ export default function App(){
   const [interviewSubOpen, setInterviewSubOpen] = useState(false);
   const [codesSubOpen, setCodesSubOpen] = useState(false);
   const [scheduleSubOpen, setScheduleSubOpen] = useState(true);
+  const [scheduleBridgeOpen, setScheduleBridgeOpen] = useState(false);
 
   useEffect(() => {
     if (entryMode !== "detailed") return;
@@ -3626,6 +3857,7 @@ export default function App(){
     setBillingSubOpen(false);
     setInsuranceSubOpen(false);
     setCompaniesSubOpen(false);
+    setScheduleBridgeOpen(false);
   }, [entryMode]);
   useEffect(() => {
     if (entryMode !== "detailed") return;
@@ -3691,6 +3923,68 @@ export default function App(){
 
   const update = useCallback((k,v) => setData(p=>({...p,[k]:v})), []);
   const updateMany = useCallback((patch) => setData(p => ({ ...p, ...patch })), []);
+  const setSuggestedGroupsAndSync = useCallback((list) => {
+    const safeList = Array.isArray(list) ? list : [];
+    setData((prev) => {
+      const prevScope = normalizeScopeBridgeState(prev.scopeBridge || {});
+      const groupsUnchanged = stringListMatches(prev.suggestedGroups || [], safeList);
+      const scopeGroupsUnchanged = stringListMatches(prevScope.selectedGroups || [], safeList);
+      if (groupsUnchanged && scopeGroupsUnchanged) return prev;
+      return {
+        ...prev,
+        suggestedGroups: safeList,
+        scopeBridge: withScopeBridgeSnippet({
+          ...prevScope,
+          selectedGroups: safeList,
+        }),
+      };
+    });
+  }, []);
+  const applyScopeBridge = useCallback((rawBridge) => {
+    setData((prev) => {
+      const prevScope = normalizeScopeBridgeState(prev.scopeBridge || {});
+      const incoming = normalizeScopeBridgeState(rawBridge || {});
+      const mergedSelectedGroups = Array.isArray(incoming.selectedGroups) && incoming.selectedGroups.length
+        ? incoming.selectedGroups
+        : (prev.suggestedGroups || []);
+      const nextScope = withScopeBridgeSnippet({
+        ...prevScope,
+        ...incoming,
+        selectedGroups: mergedSelectedGroups,
+      });
+
+      const patch = {
+        scopeBridge: nextScope,
+      };
+
+      if (!stringListMatches(prev.suggestedGroups || [], mergedSelectedGroups)) {
+        patch.suggestedGroups = mergedSelectedGroups;
+      }
+
+      if (incoming.pickupOption === "wait") {
+        patch.pickupBeforeApproval = "No";
+        patch.pickupBeforeApprovalNote = "Hold pickup until schedule authorization.";
+      } else if (incoming.pickupOption === "urgent") {
+        patch.pickupBeforeApproval = "Yes";
+        patch.pickupBeforeApprovalNote = mergedSelectedGroups.length
+          ? `Urgent pickup groups only: ${mergedSelectedGroups.join(", ")}.`
+          : "Urgent pickup groups only.";
+      }
+
+      if (incoming.processingOption) {
+        const processMap = {
+          tag_hold: "Tag & Hold",
+          urgent: "Urgent Groups Only",
+          cod: "COD",
+          all: "Process All",
+          specific: "Specific Groups Only",
+        };
+        patch.processType = processMap[incoming.processingOption] || prev.processType;
+      }
+
+      return { ...prev, ...patch };
+    });
+  }, []);
   const triggerAutoFlash = useCallback((key) => {
     setAutoFlash({ key, ts: Date.now() });
     setTimeout(() => setAutoFlash({ key: "", ts: 0 }), 1400);
@@ -3710,7 +4004,20 @@ export default function App(){
       return next;
     })
   })), []);
-  const updateCust = useCallback((id,patch) => setData(p => ({...p, customers: p.customers.map(c=>c.id===id?{...c,...patch}:c)})), []);
+  const updateCust = useCallback((id, patch) => setData(prev => ({
+    ...prev,
+    customers: prev.customers.map(customer => {
+      if (customer.id !== id) return customer;
+      const next = { ...customer, ...patch };
+      const shouldClearPlaceholder = isPlaceholderFlagActive(next.placeholder) && hasCustomerDetails(next);
+      if (shouldClearPlaceholder) {
+        next.placeholder = null;
+      } else if (!hasCustomerDetails(next) && !next.isPrimary && !isPlaceholderFlagActive(next.placeholder)) {
+        next.placeholder = createPlaceholderFlag("customer", "Customer details needed");
+      }
+      return next;
+    })
+  })), []);
 
   useEffect(() => {
     try {
@@ -3747,12 +4054,21 @@ export default function App(){
     if (!preset?.data) return;
     const parsed = preset.data;
     const normalizedSdsServices = (parsed.sdsServices || []).map(item => item === "Drying Needed" ? "Drying" : item);
+    const parsedScopeBridge = normalizeScopeBridgeState(parsed.scopeBridge || {});
+    const mergedSelectedGroups = Array.isArray(parsed.suggestedGroups) && parsed.suggestedGroups.length
+      ? parsed.suggestedGroups
+      : (parsedScopeBridge.selectedGroups || []);
     setData({
       ...DEFAULT_FORM,
       ...parsed,
       addresses: parsed.addresses?.length ? parsed.addresses : DEFAULT_FORM.addresses,
       customers: parsed.customers?.length ? parsed.customers : DEFAULT_FORM.customers,
       sdsServices: normalizedSdsServices,
+      suggestedGroups: mergedSelectedGroups,
+      scopeBridge: withScopeBridgeSnippet({
+        ...parsedScopeBridge,
+        selectedGroups: mergedSelectedGroups,
+      }),
     });
     setToast("Test preset loaded.");
   }, []);
@@ -3841,6 +4157,13 @@ export default function App(){
     window.scrollTo({ top: y, behavior: "smooth" });
   };
 
+  const animateNavigationFocus = (el) => {
+    if (!(el instanceof HTMLElement)) return;
+    el.classList.remove("animate-nav-focus");
+    void el.offsetWidth;
+    el.classList.add("animate-nav-focus");
+  };
+
   const resetOpenSubSections = () => {
     setBillingSubOpen(false);
     setInsuranceSubOpen(false);
@@ -3875,7 +4198,8 @@ export default function App(){
     });
   };
 
-  const jumpToSection = (key) => {
+  const jumpToSection = (key, options = {}) => {
+      const shouldScroll = options.scroll !== false;
       resetOpenSubSections();
       // Collapse other sections for a clean view
       setOpenSections(prev => ({
@@ -3887,13 +4211,12 @@ export default function App(){
       })); 
       setVisitedSections(prevV => new Set([...prevV, key]));
       setActiveSection(key);
+      if (!shouldScroll) return;
       setTimeout(() => {
           const el = document.getElementById(key);
           if(el) {
               scrollToSection(key);
-              el.classList.remove('animate-purple-section-fade'); 
-              void el.offsetWidth;
-              el.classList.add('animate-purple-section-fade');
+              animateNavigationFocus(el);
           }
       }, 100);
   };
@@ -4608,24 +4931,130 @@ export default function App(){
       }
   };
 
-  const openSearchSubsection = (key) => {
-    if (!key) return;
-    if (key === "order") setOrderSubOpen(true);
-    if (key === "source") setSourceSubOpen(true);
-    if (key === "interview") setInterviewSubOpen(true);
-    if (key === "codes") { setCodesSubOpen(true); setOpenCodes(true); }
-    if (key === "customer") {}
-    if (key === "address") {}
-    if (key === "billing") setBillingSubOpen(true);
-    if (key === "insurance") setInsuranceSubOpen(true);
-    if (key === "companies") setCompaniesSubOpen(true);
-    if (key === "finance") setFinanceSubOpen(true);
-    if (key === "schedule") setScheduleSubOpen(true);
-    if (key === "sds-icons") {
-      setScheduleSubOpen(true);
-      setScheduleIconsOpen(true);
-    }
+  const SUBSECTION_TO_SECTION = {
+    order: "sec1",
+    source: "sec1",
+    interview: "sec1",
+    codes: "sec1",
+    customer: "sec2",
+    address: "sec3",
+    companies: "sec4",
+    billing: "sec4",
+    finance: "sec4",
+    insurance: "sec4",
+    schedule: "sec5",
+    bridge: "sec5",
+    "sds-icons": "sec5",
   };
+
+  const DEFAULT_SUBSECTION_BY_SECTION = {
+    sec1: "order",
+    sec2: "customer",
+    sec3: "address",
+    sec4: "companies",
+    sec5: "schedule",
+  };
+
+  const SUBSECTION_DOM_ID = {
+    order: "sec1-order",
+    source: "sec1-source",
+    interview: "sec1-interview",
+    codes: "sec1-codes",
+    companies: "sec4-companies",
+    billing: "sec4-billing",
+    finance: "sec4-finance",
+    insurance: "sec4-insurance",
+    schedule: "sec5-schedule",
+    bridge: "sec5-bridge",
+    "sds-icons": "sec5-bridge",
+    customer: "sec2",
+    address: "sec3",
+  };
+
+  const closeSubsectionsForSection = useCallback((sectionId) => {
+    if (sectionId === "sec1") {
+      setOrderSubOpen(false);
+      setSourceSubOpen(false);
+      setInterviewSubOpen(false);
+      setCodesSubOpen(false);
+      setOpenCodes(false);
+      return;
+    }
+    if (sectionId === "sec4") {
+      setCompaniesSubOpen(false);
+      setBillingSubOpen(false);
+      setFinanceSubOpen(false);
+      setInsuranceSubOpen(false);
+      return;
+    }
+    if (sectionId === "sec5") {
+      setScheduleSubOpen(false);
+      setScheduleBridgeOpen(false);
+    }
+  }, []);
+
+  const openSearchSubsection = useCallback((key, sectionId) => {
+    const resolvedSection = sectionId || SUBSECTION_TO_SECTION[key];
+    if (!resolvedSection) return;
+    const resolvedKey = key || DEFAULT_SUBSECTION_BY_SECTION[resolvedSection];
+    closeSubsectionsForSection(resolvedSection);
+
+    if (resolvedSection === "sec1") {
+      if (resolvedKey === "source") setSourceSubOpen(true);
+      else if (resolvedKey === "interview") setInterviewSubOpen(true);
+      else if (resolvedKey === "codes") {
+        setCodesSubOpen(true);
+        setOpenCodes(true);
+      } else {
+        setOrderSubOpen(true);
+      }
+      return;
+    }
+
+    if (resolvedSection === "sec4") {
+      if (resolvedKey === "billing") setBillingSubOpen(true);
+      else if (resolvedKey === "finance") setFinanceSubOpen(true);
+      else if (resolvedKey === "insurance") setInsuranceSubOpen(true);
+      else setCompaniesSubOpen(true);
+      return;
+    }
+
+    if (resolvedSection === "sec5") {
+      if (resolvedKey === "bridge" || resolvedKey === "sds-icons") {
+        setScheduleBridgeOpen(true);
+      } else {
+        setScheduleSubOpen(true);
+      }
+    }
+  }, [closeSubsectionsForSection]);
+
+  const scrollToSubsection = useCallback((key, sectionId) => {
+    const resolvedSection = sectionId || SUBSECTION_TO_SECTION[key];
+    const resolvedKey = key || DEFAULT_SUBSECTION_BY_SECTION[resolvedSection];
+    const targetId = SUBSECTION_DOM_ID[resolvedKey] || resolvedSection;
+    const scrollWithRetry = (triesRemaining = 10) => {
+      const el = targetId ? document.getElementById(targetId) : null;
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+        animateNavigationFocus(el);
+        return;
+      }
+      if (triesRemaining <= 0) {
+        if (resolvedSection) scrollToSection(resolvedSection);
+        return;
+      }
+      requestAnimationFrame(() => scrollWithRetry(triesRemaining - 1));
+    };
+    scrollWithRetry();
+  }, []);
+
+  const jumpToSectionAndSubsection = useCallback((sectionId, subId) => {
+    jumpToSection(sectionId, { scroll: false });
+    openSearchSubsection(subId, sectionId);
+    requestAnimationFrame(() => {
+      scrollToSubsection(subId, sectionId);
+    });
+  }, [jumpToSection, openSearchSubsection, scrollToSubsection]);
 
   const focusSearchLabel = (label) => {
     if (!label) return;
@@ -4648,9 +5077,12 @@ export default function App(){
 
   const handleSearchNavigate = (item) => {
     if (!item) return;
-    if (item.id) jumpToSection(item.id);
+    if (item.id) jumpToSection(item.id, { scroll: !item.sub });
     setTimeout(() => {
-      if (item.sub) openSearchSubsection(item.sub);
+      if (item.sub) {
+        openSearchSubsection(item.sub, item.id);
+        requestAnimationFrame(() => scrollToSubsection(item.sub, item.id));
+      }
     }, 80);
     setTimeout(() => {
       if (item.label) focusSearchLabel(item.label);
@@ -4738,7 +5170,18 @@ export default function App(){
   }, [setToast]);
   
   const addNewCustomer = useCallback(() => {
-    setData(p => ({ ...p, customers: [...p.customers, initCustomer({ type: "", policyHolder: false, isPrimary: false })] }));
+    setData(p => ({
+      ...p,
+      customers: [
+        ...p.customers,
+        initCustomer({
+          type: "",
+          policyHolder: false,
+          isPrimary: false,
+          placeholder: createPlaceholderFlag("customer", "Customer details needed")
+        })
+      ]
+    }));
   }, []);
 
   const handleAddressTypePromptFocused = useCallback((addressId) => {
@@ -4869,6 +5312,7 @@ export default function App(){
     setCompaniesSubOpen(false);
     setInsuranceSubOpen(false);
     setFinanceSubOpen(false);
+    setScheduleBridgeOpen(false);
     setToast("Reset complete");
   }, [entryMode]);
 
@@ -5050,6 +5494,18 @@ export default function App(){
     if(!primaryCustomer.phone) missing.push({ id: "sec2", label: "Customer Phone", section: "sec2", key: "custPhone" });
     if(!primaryCustomer.email) missing.push({ id: "sec2", label: "Customer Email", section: "sec2", key: "custEmail" });
 
+    (data.customers || []).forEach((customer, idx) => {
+      if (!isPlaceholderFlagActive(customer?.placeholder)) return;
+      const customerLabel = [customer?.first, customer?.last].filter(hasMeaningfulValue).join(" ").trim() || `Customer ${idx + 1}`;
+      missing.push({
+        id: "sec2",
+        label: `Resolve Placeholder: ${customerLabel}`,
+        section: "sec2",
+        key: `placeholder-customer-${customer?.id || idx}`,
+        category: "placeholders"
+      });
+    });
+
     if(!primaryAddress.street) missing.push({ id: "sec3", label: "Street Address", section: "sec3", key: "addrStreet" });
     if(!primaryAddress.city) missing.push({ id: "sec3", label: "City", section: "sec3", key: "addrCity" });
     if(!primaryAddress.state) missing.push({ id: "sec3", label: "State", section: "sec3", key: "addrState" });
@@ -5150,6 +5606,7 @@ export default function App(){
       total += 4; // pricePlatform, priceList, multiplier, estimateRequested
     }
     total += (data.addresses || []).filter(addr => isAddressPlaceholder(addr)).length;
+    total += (data.customers || []).filter((customer) => isPlaceholderFlagActive(customer?.placeholder)).length;
     total += Object.values(data.additionalCompanies || {}).reduce((acc, rawEntry) => {
       const entry = syncCompanyEntryPlaceholders(rawEntry || {});
       let count = acc;
@@ -5160,6 +5617,71 @@ export default function App(){
     }, 0);
     return total;
   };
+
+  const sectionAuditStatus = useMemo(() => {
+    const missing = computeAuditMissing();
+    const missingBySection = missing.reduce((acc, item) => {
+      const section = item.section || item.id;
+      if (!section) return acc;
+      acc[section] = (acc[section] || 0) + 1;
+      return acc;
+    }, {});
+
+    const requiredBySection = { sec1: 0, sec2: 0, sec3: 0, sec4: 0, sec5: 0 };
+
+    requiredBySection.sec1 += 3; // orderName, orderTypes, leadSourceCategory
+    if (data.leadSourceCategory === "Referral") requiredBySection.sec1 += 2;
+    if (data.leadSourceCategory === "Marketing" || data.leadSourceCategory === "Internal") requiredBySection.sec1 += 1;
+    if ((data.orderTypes || []).includes("Mold")) requiredBySection.sec1 += 1;
+
+    requiredBySection.sec2 += 4; // primary customer fields
+    requiredBySection.sec3 += 6; // primary address fields
+    requiredBySection.sec4 += 1; // billingPayer
+
+    if (data.rentOrOwn === "Rent") requiredBySection.sec3 += 1;
+
+    const needsPickupAudit = ["Pickup Complete","Ready to Bill"].includes(data.orderStatus);
+    const needsFinanceAudit = ["Intake Complete","Ready to Bill"].includes(data.orderStatus);
+
+    if (needsPickupAudit) {
+      const severityGroupsNeeded = (data.orderTypes || []).reduce((acc, t) => {
+        const group = t === "Dust/Debris" ? "Dust" : t;
+        if (SEVERITY_GROUPS.includes(group)) acc.add(group);
+        return acc;
+      }, new Set());
+      requiredBySection.sec1 += severityGroupsNeeded.size;
+      requiredBySection.sec1 += 2; // interview + codes
+    }
+
+    if (needsFinanceAudit) {
+      requiredBySection.sec4 += 4; // pricing + estimate
+    }
+
+    requiredBySection.sec3 += (data.addresses || []).filter(addr => isAddressPlaceholder(addr)).length;
+    requiredBySection.sec2 += (data.customers || []).filter((customer) => isPlaceholderFlagActive(customer?.placeholder)).length;
+    requiredBySection.sec4 += Object.values(data.additionalCompanies || {}).reduce((acc, rawEntry) => {
+      const entry = syncCompanyEntryPlaceholders(rawEntry || {});
+      const companyPending = isCompanyPlaceholder(entry);
+      if (companyPending) return acc + 1;
+      if (isContactPlaceholder(entry)) return acc + 1;
+      return acc;
+    }, 0);
+
+    return SECTION_ORDER.reduce((acc, sectionId) => {
+      const required = requiredBySection[sectionId] || 0;
+      const missingCount = missingBySection[sectionId] || 0;
+      acc[sectionId] = {
+        required,
+        missing: missingCount,
+        complete: required > 0 && missingCount === 0
+      };
+      return acc;
+    }, {});
+  }, [data]);
+
+  const completedSections = useMemo(() => {
+    return new Set(SECTION_ORDER.filter(sectionId => sectionAuditStatus?.[sectionId]?.complete));
+  }, [sectionAuditStatus]);
 
   const runAudit = () => {
     const missing = computeAuditMissing();
@@ -5176,6 +5698,7 @@ export default function App(){
       if (["moldCoverageConfirm","orderTypes"].includes(m.key)) subsections.add("order");
       if (["rentCoverageLimit"].includes(m.key)) subsections.add("address");
       if (["pricePlatform","priceList","multiplier","estimateRequested"].includes(m.key)) subsections.add("finance");
+      if ((m.key || "").startsWith("placeholder-customer-")) subsections.add("customer");
       if ((m.key || "").startsWith("placeholder-company-") || (m.key || "").startsWith("placeholder-contact-")) subsections.add("companies");
       if ((m.key || "").startsWith("placeholder-address-")) subsections.add("address");
       if (m.key === "interview") subsections.add("interview");
@@ -5221,6 +5744,263 @@ export default function App(){
     const system = (eventSystemLines || "").trim();
     return !!(manual || system || eventSystemEntries.length);
   }, [data.eventInstructions, eventSystemLines, eventSystemEntries]);
+  const scopeBridgeState = useMemo(() => {
+    const normalized = normalizeScopeBridgeState(data.scopeBridge || {});
+    if (normalized.selectedGroups.length) return normalized;
+    return {
+      ...normalized,
+      selectedGroups: data.suggestedGroups || [],
+    };
+  }, [data.scopeBridge, data.suggestedGroups]);
+  const scopeBridgeSnippet = useMemo(() => buildScopeBridgeSnippet(scopeBridgeState), [scopeBridgeState]);
+  const bridgeStatusClass = useMemo(() => {
+    if (scopeBridgeState.projectStatus === "green") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    if (scopeBridgeState.projectStatus === "yellow") return "border-amber-200 bg-amber-50 text-amber-700";
+    if (scopeBridgeState.projectStatus === "red") return "border-rose-200 bg-rose-50 text-rose-700";
+    return "border-slate-200 bg-white text-slate-500";
+  }, [scopeBridgeState.projectStatus]);
+  const bridgeSectionClass = useMemo(() => {
+    if (scopeBridgeState.projectStatus === "green") return "border-emerald-300 bg-emerald-50/20 ring-1 ring-emerald-100";
+    if (scopeBridgeState.projectStatus === "yellow") return "border-amber-300 bg-amber-50/20 ring-1 ring-amber-100";
+    if (scopeBridgeState.projectStatus === "red") return "border-rose-300 bg-rose-50/20 ring-1 ring-rose-100";
+    return "";
+  }, [scopeBridgeState.projectStatus]);
+
+  const deriveScopeBridgeStatus = useCallback((bridge) => {
+    if ((bridge?.projectStatus || "") === "red") return "red";
+    const hasPending = (bridge?.pendingIssues || []).length > 0;
+    const hasBlockingScope = (bridge?.blockerScopes || []).length > 0;
+    return hasPending || hasBlockingScope ? "yellow" : "green";
+  }, []);
+
+  const patchScopeBridge = useCallback((updater, opts = {}) => {
+    const options = opts || {};
+    const current = normalizeScopeBridgeState(scopeBridgeState || {});
+    const candidate = typeof updater === "function"
+      ? updater(current)
+      : { ...current, ...(updater || {}) };
+    let next = normalizeScopeBridgeState(candidate);
+    if (!options.manualStatus && next.projectStatus !== "red") {
+      next.projectStatus = deriveScopeBridgeStatus(next);
+      if (next.projectStatus === "green") {
+        next.statusReason = "Production Authorized";
+      } else if (next.statusReason === "Production Authorized") {
+        next.statusReason = "";
+      }
+    }
+    applyScopeBridge(next);
+  }, [scopeBridgeState, deriveScopeBridgeStatus, applyScopeBridge]);
+
+  const setScopeBridgeManualStatus = useCallback((status) => {
+    patchScopeBridge((prev) => {
+      const next = { ...prev, projectStatus: status };
+      if (status === "green") {
+        next.pendingIssues = [];
+        next.blockerScopes = [];
+        next.blockerFollowUps = {};
+        next.blockerManualState = {};
+        next.statusReason = "Production Authorized";
+      }
+      if (status === "yellow" && next.statusReason === "Production Authorized") {
+        next.statusReason = "";
+      }
+      return next;
+    }, { manualStatus: true });
+  }, [patchScopeBridge]);
+
+  const toggleScopeBridgeBlockerScope = useCallback((scopeId) => {
+    patchScopeBridge((prev) => ({
+      ...prev,
+      blockerScopes: toggleMulti(prev.blockerScopes || [], scopeId)
+    }));
+  }, [patchScopeBridge]);
+
+  const toggleScopeBridgeIssue = useCallback((issue) => {
+    patchScopeBridge((prev) => {
+      const normalizedIssue = canonicalBridgeIssue(issue);
+      const key = normalizeBridgeIssueKey(normalizedIssue);
+      const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(normalizedIssue);
+      const currentPending = Array.from(new Set((prev.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean)));
+      const currentlyActive = currentPending.includes(normalizedIssue);
+      const nextPending = isAutoManaged
+        ? (currentlyActive ? currentPending.filter((entry) => entry !== normalizedIssue) : [...currentPending, normalizedIssue])
+        : toggleMulti(currentPending, normalizedIssue);
+      const nextManualState = { ...(prev.blockerManualState || {}) };
+      if (isAutoManaged) {
+        nextManualState[key] = nextPending.includes(normalizedIssue) ? "on" : "off";
+      }
+      return {
+        ...prev,
+        pendingIssues: nextPending,
+        blockerManualState: nextManualState,
+      };
+    });
+  }, [patchScopeBridge]);
+
+  const resolveScopeBridgeIssue = useCallback((issue) => {
+    patchScopeBridge((prev) => {
+      const normalizedIssue = canonicalBridgeIssue(issue);
+      const key = normalizeBridgeIssueKey(normalizedIssue);
+      const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(normalizedIssue);
+      const nextPending = Array.from(new Set((prev.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean))).filter((entry) => entry !== normalizedIssue);
+      const nextManualState = { ...(prev.blockerManualState || {}) };
+      if (isAutoManaged) nextManualState[key] = "off";
+      return {
+        ...prev,
+        pendingIssues: nextPending,
+        blockerManualState: nextManualState,
+      };
+    });
+  }, [patchScopeBridge]);
+
+  const toggleScopeBridgeMilestone = useCallback((milestoneId, atId) => {
+    patchScopeBridge((prev) => {
+      const currentMilestones = prev.milestones || {};
+      const nextEnabled = !currentMilestones[milestoneId];
+      return {
+        ...prev,
+        milestones: {
+          ...currentMilestones,
+          [milestoneId]: nextEnabled,
+          [atId]: nextEnabled ? new Date().toISOString() : "",
+        }
+      };
+    });
+  }, [patchScopeBridge]);
+
+  const updateScopeBridgeMilestone = useCallback((milestoneKey, value) => {
+    patchScopeBridge((prev) => ({
+      ...prev,
+      milestones: {
+        ...(prev.milestones || {}),
+        [milestoneKey]: value
+      }
+    }));
+  }, [patchScopeBridge]);
+  const bridgeNextStepOptions = useMemo(() => (
+    Array.from(
+      new Map(BRIDGE_NEXT_STEP_OPTIONS.map((option) => [option.id, option])).values()
+    )
+  ), []);
+  const autoBridgeIssues = useMemo(() => {
+    const auto = [];
+    const milestones = scopeBridgeState.milestones || {};
+    const insuranceStatus = (data.insuranceStatus || "").toUpperCase();
+    const involvesInsurance = data.involvesInsurance || "";
+    const restorationOrder = data.restorationType === "Restoration Project" || data.isRestorationProject === "Y";
+    const insuranceInPlay = involvesInsurance === "Yes" || data.insuranceClaim === "Yes" || data.billingPayer === "Insurance";
+    const moldInOrder = (data.orderTypes || []).includes("Mold");
+    const authorizationOnFile = !!milestones.authorizationOnFile;
+    const scopeApproved = !!milestones.scopeApproved || hasMeaningfulValue(data.scopeApprovedAt);
+    const estimateApproved = !!milestones.estimateApproved || hasMeaningfulValue(data.estimateApprovedAt);
+    const claimDecisionKnown =
+      involvesInsurance === "Yes" ||
+      involvesInsurance === "No" ||
+      data.insuranceClaim === "Yes" ||
+      data.insuranceClaim === "No";
+
+    if (!data.eventCustomerContacted) auto.push("Contacting Customer");
+    if (!authorizationOnFile) auto.push("Authorization");
+    if (!scopeApproved) auto.push("Scope Approval");
+    if (!!data.estimateRequested && !estimateApproved) auto.push("Estimate Approval");
+    if ((data.selfCleaning || "").toUpperCase() === "Y") auto.push("Customer might clean it themselves");
+
+    const unsureClaim = restorationOrder && !claimDecisionKnown;
+    if (unsureClaim) auto.push("Unsure if submitting a claim");
+
+    const hasCoverageConcern = insuranceInPlay && (
+      insuranceStatus === "TBD" ||
+      !hasMeaningfulValue(data.contentsCoverageLimit) ||
+      (moldInOrder && !hasMeaningfulValue(data.moldLimit))
+    );
+    if (hasCoverageConcern) auto.push("Coverage Determination");
+
+    return Array.from(new Set(auto));
+  }, [
+    scopeBridgeState.milestones,
+    data.eventCustomerContacted,
+    data.estimateRequested,
+    data.selfCleaning,
+    data.insuranceStatus,
+    data.involvesInsurance,
+    data.insuranceClaim,
+    data.billingPayer,
+    data.contentsCoverageLimit,
+    data.orderTypes,
+    data.moldLimit,
+    data.restorationType,
+    data.isRestorationProject,
+    data.scopeApprovedAt,
+    data.estimateApprovedAt,
+  ]);
+  const autoManagedBridgeBlockerSet = useMemo(
+    () => new Set(BRIDGE_AUTO_MANAGED_BLOCKERS),
+    []
+  );
+  useEffect(() => {
+    const currentPendingRaw = scopeBridgeState.pendingIssues || [];
+    const currentPending = Array.from(new Set(currentPendingRaw.map(canonicalBridgeIssue).filter(Boolean)));
+    const currentManualState = scopeBridgeState.blockerManualState || {};
+    const autoSet = new Set(autoBridgeIssues);
+    const nextPending = currentPending.filter((issue) => !autoManagedBridgeBlockerSet.has(issue));
+
+    BRIDGE_AUTO_MANAGED_BLOCKERS.forEach((issue) => {
+      const key = normalizeBridgeIssueKey(issue);
+      const override = (currentManualState[key] || "").toString().toLowerCase();
+      const autoActive = autoSet.has(issue);
+      const effectiveActive = override === "on" ? true : override === "off" ? false : autoActive;
+      if (effectiveActive && !nextPending.includes(issue)) nextPending.push(issue);
+    });
+
+    const nextManualState = { ...currentManualState };
+    let manualStateChanged = false;
+    BRIDGE_AUTO_MANAGED_BLOCKERS.forEach((issue) => {
+      const key = normalizeBridgeIssueKey(issue);
+      const override = (nextManualState[key] || "").toString().toLowerCase();
+      const autoActive = autoSet.has(issue);
+      if ((override === "on" && autoActive) || (override === "off" && !autoActive)) {
+        delete nextManualState[key];
+        manualStateChanged = true;
+      }
+    });
+
+    const pendingChanged = !stringListMatches(currentPendingRaw, nextPending);
+    if (!pendingChanged && !manualStateChanged) return;
+    patchScopeBridge((prev) => ({
+      ...prev,
+      pendingIssues: nextPending,
+      blockerManualState: nextManualState,
+    }));
+  }, [
+    scopeBridgeState.pendingIssues,
+    scopeBridgeState.blockerManualState,
+    autoBridgeIssues,
+    autoManagedBridgeBlockerSet,
+    patchScopeBridge,
+  ]);
+  const requiredBridgeIssueSet = useMemo(() => new Set(BRIDGE_REQUIRED_WORKFLOW_BLOCKERS), []);
+  const activeBridgeIssues = useMemo(() => {
+    const raw = Array.from(new Set((scopeBridgeState.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean)));
+    const orderedKnown = BRIDGE_BLOCKER_ITEMS.filter((issue) => raw.includes(issue));
+    const extras = raw.filter((issue) => !BRIDGE_BLOCKER_ITEMS.includes(issue));
+    return [...orderedKnown, ...extras];
+  }, [scopeBridgeState.pendingIssues]);
+  const requiredActiveBridgeIssues = useMemo(
+    () => activeBridgeIssues.filter((issue) => requiredBridgeIssueSet.has(issue)),
+    [activeBridgeIssues, requiredBridgeIssueSet]
+  );
+  const independentActiveBridgeIssues = useMemo(
+    () => activeBridgeIssues.filter((issue) => !requiredBridgeIssueSet.has(issue)),
+    [activeBridgeIssues, requiredBridgeIssueSet]
+  );
+  const availableRequiredBridgeIssues = useMemo(
+    () => BRIDGE_REQUIRED_WORKFLOW_BLOCKERS.filter((issue) => autoBridgeIssues.includes(issue) && !activeBridgeIssues.includes(issue)),
+    [autoBridgeIssues, activeBridgeIssues]
+  );
+  const availableIndependentBridgeIssues = useMemo(
+    () => BRIDGE_INDEPENDENT_BLOCKERS.filter((issue) => !activeBridgeIssues.includes(issue)),
+    [activeBridgeIssues]
+  );
   const attentionWater = data.damageWasWet === "Y" || data.damageWasWet === true;
   const attentionMold = !!data.damageMoldMildew;
   const highlightStorageFromProcess = data.processType === "Long-Term Storage";
@@ -5375,6 +6155,23 @@ export default function App(){
     data.estimateRequestedBy,
     data.eventInstructions
   ]);
+  useEffect(() => {
+    const scopeGroups = scopeBridgeState.selectedGroups || [];
+    const orderGroups = data.suggestedGroups || [];
+    if (stringListMatches(scopeGroups, orderGroups)) return;
+    setData((prev) => {
+      const current = normalizeScopeBridgeState(prev.scopeBridge || {});
+      const nextGroups = prev.suggestedGroups || [];
+      if (stringListMatches(current.selectedGroups || [], nextGroups)) return prev;
+      return {
+        ...prev,
+        scopeBridge: withScopeBridgeSnippet({
+          ...current,
+          selectedGroups: nextGroups,
+        }),
+      };
+    });
+  }, [data.suggestedGroups, scopeBridgeState.selectedGroups]);
   const recordTypeLabel = data.isLead === true ? "Lead" : data.isLead === false ? "Order" : "Select Type";
   const knownPeople = useMemo(()=>{
     const s=new Set();
@@ -6429,10 +7226,13 @@ export default function App(){
         serviceOfferings={data.serviceOfferings || []}
         onServiceOfferingsChange={(list) => update("serviceOfferings", list)}
         suggestedGroups={data.suggestedGroups || []}
-        onSuggestedGroupsChange={(list) => update("suggestedGroups", list)}
+        onSuggestedGroupsChange={setSuggestedGroupsAndSync}
+        scopeBridge={scopeBridgeState}
+        onScopeBridgeChange={applyScopeBridge}
         lossSeverity={data.lossSeverity}
         onLossSeverityChange={updateLossSeverity}
         orderTypes={data.orderTypes || []}
+        lossDetails={data.lossDetails || {}}
         severityCodes={data.severityCodes || []}
         orderName={data.orderName || ""}
         claimNumber={data.claimNumber || ""}
@@ -6473,13 +7273,9 @@ export default function App(){
         <Header 
             activeSection={activeSectionId} 
             visitedSections={visitedSections} 
+            completedSections={completedSections}
             onJump={jumpToSection} 
-            onJumpSub={(sectionId, subId) => {
-              jumpToSection(sectionId);
-              if (subId) {
-                setTimeout(() => openSearchSubsection(subId), 160);
-              }
-            }}
+            onJumpSub={jumpToSectionAndSubsection}
             title={entryMode === 'quick' ? 'Quick Entry' : 'New Order'} 
             version="v55"
             entryMode={entryMode}
@@ -6511,7 +7307,7 @@ export default function App(){
                       title="1. Order & Interview"
                       helpText="Enter job basics + call details (source, scope/needs, internal codes if known)."
                       isOpen={openSections.sec1}
-                      onHeaderClick={()=>handleOpenSection('sec1')}
+                      onHeaderClick={()=>handleToggleSection('sec1')}
                       onCaretClick={()=>handleToggleSection('sec1')}
                       badges={
                         <div className="flex items-center gap-2">
@@ -6523,7 +7319,7 @@ export default function App(){
                       className={auditOn && auditTargets.sections.has("sec1") ? "audit-outline" : ""}
                     >
                         <div className={`grid ${compactMode ? 'gap-3' : 'gap-5'}`}>
-                            <SubSection title="Order" open={orderSubOpen} onToggle={() => setOrderSubOpen(!orderSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("order") ? "audit-outline" : ""}>
+                            <SubSection id="sec1-order" title="Order" open={orderSubOpen} onToggle={(nextOpen) => setOrderSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("order") ? "audit-outline" : ""}>
                                 <Field label={<span>Order Name <span className="font-normal text-slate-400 text-xs ml-1">(Auto-generated)</span></span>} missing={data.highlightMissing?.orderName}>
                                   <div className="flex gap-2">
                                       <Input
@@ -6651,11 +7447,11 @@ export default function App(){
                                 </Field>
                             </SubSection>
 
-                            <SubSection title="Source" open={sourceSubOpen} onToggle={() => setSourceSubOpen(!sourceSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("source") ? "audit-outline" : ""}>
+                            <SubSection id="sec1-source" title="Source" open={sourceSubOpen} onToggle={(nextOpen) => setSourceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("source") ? "audit-outline" : ""}>
                             <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} onPromptRoleAssignment={openRoleAssignmentPrompt} />
                             </SubSection>
 
-                            <SubSection title="Interview" open={interviewSubOpen} onToggle={() => setInterviewSubOpen(!interviewSubOpen)} compact={compactMode}>
+                            <SubSection id="sec1-interview-panel" title="Interview" open={interviewSubOpen} onToggle={(nextOpen) => setInterviewSubOpen(!!nextOpen)} compact={compactMode}>
                                 <div id="sec1-interview">
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4 space-y-4">
                                       <label className="text-xs font-bold text-sky-600 uppercase flex items-center gap-1">Conditions <span className="text-orange-500">⚡</span></label>
@@ -6860,7 +7656,7 @@ export default function App(){
                                 </div>
                             </SubSection>
 
-                            <SubSection title="Codes" open={codesSubOpen} onToggle={() => { const next = !codesSubOpen; setCodesSubOpen(next); if(next) setOpenCodes(true); }} compact={compactMode}>
+                            <SubSection id="sec1-codes-panel" title="Codes" open={codesSubOpen} onToggle={(nextOpen) => { const next = !!nextOpen; setCodesSubOpen(next); if(next) setOpenCodes(true); }} compact={compactMode}>
                                 <div id="sec1-codes">
                                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:border-sky-300">
                                       <button className="flex w-full justify-between bg-slate-50/50 px-4 py-3 text-left transition-colors hover:bg-slate-50" onClick={()=>setOpenCodes(!openCodes)}>
@@ -6913,7 +7709,7 @@ export default function App(){
                         </div>
                     </Section>
 
-                    <Section id="sec2" title="2. Customer" helpText="Add the customer + any key contacts (spouse, tenant, neighbor, PM)." isOpen={openSections.sec2} onHeaderClick={()=>handleOpenSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}>
+                    <Section id="sec2" title="2. Customer" helpText="Add the customer + any key contacts (spouse, tenant, neighbor, PM)." isOpen={openSections.sec2} onHeaderClick={()=>handleToggleSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}>
                       <div className="space-y-4">
                         {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
@@ -6924,7 +7720,7 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec3" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onHeaderClick={()=>handleOpenSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}>
+                    <Section id="sec3" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onHeaderClick={()=>handleToggleSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}>
                       <div className="space-y-4">
                         {data.addresses.map((a,i)=><AddressItem key={a.id} addr={a} total={data.addresses.length} updateAddr={updateAddr} onRemove={removeAddr} index={i} highlightMissing={data.highlightMissing} auditOn={auditOn} onVerify={verifyAddressDemo} ToggleMulti={ToggleMulti} rentOrOwn={data.rentOrOwn} rentCoverageLimit={data.rentCoverageLimit} onRentOrOwnChange={(v)=>update("rentOrOwn", v)} onRentCoverageChange={(v)=>update("rentCoverageLimit", v)} forceShowCoords={i===0 ? showPrimaryCoords : false} autoOpenForTypePrompt={pendingAddressTypePromptId === a.id} autoFocusTypePrompt={pendingAddressTypePromptId === a.id} onTypePromptFocused={handleAddressTypePromptFocused} />)}
                         <div className="pt-2"><button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button></div>
@@ -6935,12 +7731,13 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec4" title="4. Billing & Companies" helpText="Who pays + who’s involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onHeaderClick={()=>handleOpenSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
+                    <Section id="sec4" title="4. Billing & Companies" helpText="Who pays + who’s involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onHeaderClick={()=>handleToggleSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
                       <div className="grid gap-6">
                         <SubSection
+                          id="sec4-companies"
                           title="Companies & Contacts"
                           open={companiesSubOpen}
-                          onToggle={() => setCompaniesSubOpen(!companiesSubOpen)}
+                          onToggle={(nextOpen) => setCompaniesSubOpen(!!nextOpen)}
                           compact={compactMode}
                           className={auditOn && auditTargets.subsections.has("companies") ? "audit-outline" : ""}
                           action={
@@ -7097,7 +7894,7 @@ export default function App(){
                             </div>
                           </div>
                         </SubSection>
-                        <SubSection title="Billing" open={billingSubOpen} onToggle={() => setBillingSubOpen(!billingSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("billing") ? "audit-outline" : ""}>
+                        <SubSection id="sec4-billing" title="Billing" open={billingSubOpen} onToggle={(nextOpen) => setBillingSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("billing") ? "audit-outline" : ""}>
                           <Field label="Bill To"><div data-audit-key="billingPayer" className={auditOn && data.highlightMissing?.billingPayer ? "audit-missing rounded-lg p-1" : ""}><ToggleGroup options={["Insurance","Customer","Referrer","Public Adjuster","Building","Contractor","Other"]} value={data.billingPayer} onChange={v=>update("billingPayer",v)} /></div></Field>
                           {!(data.billingPayer === "Customer" || data.payorQuick === "Self-pay") && (
                             <div className="grid sm:grid-cols-2 gap-4">
@@ -7116,7 +7913,7 @@ export default function App(){
                           )}
                           <Field label="Billing Note"><Textarea value={data.billingNote} onChange={e=>update("billingNote",e.target.value)} /></Field>
                         </SubSection>
-                        <SubSection title="Finance" open={financeSubOpen} onToggle={() => setFinanceSubOpen(!financeSubOpen)} compact={compactMode}>
+                        <SubSection id="sec4-finance" title="Finance" open={financeSubOpen} onToggle={(nextOpen) => setFinanceSubOpen(!!nextOpen)} compact={compactMode}>
                           <div className="grid sm:grid-cols-3 gap-4">
                             <Field label="Pricing Platform">
                               <Select data-audit-key="pricePlatform" value={data.pricePlatform} onChange={e=>update("pricePlatform", e.target.value)}>
@@ -7149,7 +7946,7 @@ export default function App(){
                             )}
                           </div>
                         </SubSection>
-                        <SubSection title="Insurance" open={insuranceSubOpen} onToggle={() => setInsuranceSubOpen(!insuranceSubOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
+                        <SubSection id="sec4-insurance" title="Insurance" open={insuranceSubOpen} onToggle={(nextOpen) => setInsuranceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
                           <Field label="Insurance Claim?" smart action={<ToggleGroup options={["Yes","No"]} value={data.insuranceClaim} onChange={v=>update("insuranceClaim",v)} />} />
                           <Field label="Direction of Payment"><ToggleGroup options={["Direct from Insurance","Check","Credit Card","Other"]} value={data.directionOfPayment} onChange={v=>update("directionOfPayment",v)} /></Field>
                           {data.insuranceClaim==="Yes" && (
@@ -7209,9 +8006,9 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec5" title="5. Schedule" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onHeaderClick={()=>handleOpenSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}>
+                    <Section id="sec5" title="5. Schedule" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}>
                       <div className="space-y-6">
-                        <SubSection title="Schedule" open={scheduleSubOpen} onToggle={() => setScheduleSubOpen(!scheduleSubOpen)} compact={compactMode}>
+                        <SubSection id="sec5-schedule" title="Schedule" open={scheduleSubOpen} onToggle={(nextOpen) => setScheduleSubOpen(!!nextOpen)} compact={compactMode}>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                           <button onClick={() => update('scheduleType', 'Scope')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Scope' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">📋</span><span className="font-bold text-xs">Scope Only</span></button>
                           <button onClick={() => update('scheduleType', 'Pickup')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Pickup' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🚚</span><span className="font-bold text-xs">Pickup</span></button>
@@ -7418,66 +8215,365 @@ export default function App(){
                           </button>
                         </div>
                         </SubSection>
-                        <SubSection title="SDS Icon Selections" open={scheduleIconsOpen} onToggle={() => setScheduleIconsOpen(!scheduleIconsOpen)} compact={compactMode}>
+                        <SubSection id="sec5-bridge" title="Bridge Status & Blockers" open={scheduleBridgeOpen} onToggle={(nextOpen) => setScheduleBridgeOpen(!!nextOpen)} compact={compactMode} className={bridgeSectionClass}>
                           <div className="space-y-4">
-                            <div className="rounded-xl border border-slate-200 p-4">
-                              <div className="text-xs font-bold text-slate-500 mb-3">Considerations</div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                                {SDS_CONSIDERATIONS.map(item => {
-                                  const active = (data.sdsConsiderations || []).includes(item);
-                                  const iconSrc = SDS_ICON_MAP[item] || "/Icons_Copilot.png";
-                                  return (
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-xs text-slate-500">
+                                Shared NOE/Scope/SDS status center for approvals, blockers, and next-step decisions.
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setEntryMode("same-day-scope")}
+                                className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                                title="Open Same Day Scope"
+                              >
+                                Open in Scope
+                              </button>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide ${bridgeStatusClass}`}>
+                                  {statusBadgeLabel(scopeBridgeState.projectStatus)}
+                                </span>
+                                {(scopeBridgeState.pendingIssues || []).length > 0 ? (
+                                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                                    {(scopeBridgeState.pendingIssues || []).length} blocker(s)
+                                  </span>
+                                ) : null}
+                                {scopeBridgeState.nextStep ? (
+                                  <span className="inline-flex items-center rounded-full border border-sky-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-sky-700">
+                                    {nextStepLabel(scopeBridgeState.nextStep)}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="grid gap-2 sm:grid-cols-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setScopeBridgeManualStatus("green")}
+                                  className={`rounded-lg border px-3 py-2 text-xs font-bold ${scopeBridgeState.projectStatus === "green" ? "border-emerald-300 bg-emerald-100 text-emerald-800" : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200"}`}
+                                >
+                                  Approved (Green)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setScopeBridgeManualStatus("yellow")}
+                                  className={`rounded-lg border px-3 py-2 text-xs font-bold ${scopeBridgeState.projectStatus === "yellow" ? "border-amber-300 bg-amber-100 text-amber-800" : "border-slate-200 bg-white text-slate-600 hover:border-amber-200"}`}
+                                >
+                                  Pending / Blockers (Yellow)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setScopeBridgeManualStatus("red")}
+                                  className={`rounded-lg border px-3 py-2 text-xs font-bold ${scopeBridgeState.projectStatus === "red" ? "border-rose-300 bg-rose-100 text-rose-800" : "border-slate-200 bg-white text-slate-600 hover:border-rose-200"}`}
+                                >
+                                  Close / End Project (Red)
+                                </button>
+                              </div>
+                              {scopeBridgeState.projectStatus === "red" ? (
+                                <Input
+                                  value={scopeBridgeState.statusReason || ""}
+                                  onChange={(e) => patchScopeBridge((prev) => ({ ...prev, statusReason: e.target.value }), { manualStatus: true })}
+                                  placeholder="Reason for red/close decision"
+                                />
+                              ) : null}
+                              <div className="text-[11px] text-slate-500">
+                                Green means clear to proceed. Yellow means unresolved blockers. Red means wind-down/close.
+                              </div>
+                            </div>
+
+                            <div className="grid gap-4 lg:grid-cols-2">
+                              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Blocker Degree</div>
+                                <div className="flex flex-wrap gap-2">
+                                  {BRIDGE_BLOCKER_SCOPE_OPTIONS.map((item) => (
+                                    <ToggleMulti
+                                      key={item.id}
+                                      label={item.label}
+                                      checked={(scopeBridgeState.blockerScopes || []).includes(item.id)}
+                                      onChange={() => toggleScopeBridgeBlockerScope(item.id)}
+                                      colorClass="!bg-amber-50 !border-amber-300 !text-amber-800"
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Next Step</div>
+                                <div className="flex flex-wrap gap-2">
+                                  {bridgeNextStepOptions.map((option) => (
                                     <button
-                                      key={item}
+                                      key={option.id}
                                       type="button"
-                                      title={item}
-                                      onClick={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], item))}
-                                      className={`h-[13rem] w-[13rem] flex items-center justify-center border-2 ${active ? "border-sky-400" : "border-transparent"} hover:border-sky-200`}
+                                      onClick={() => {
+                                        patchScopeBridge((prev) => {
+                                          const nextStep = prev.nextStep === option.id ? "" : option.id;
+                                          const patch = { nextStep };
+                                          if (nextStep === "pickup_hold") patch.pickupOption = "wait";
+                                          if (nextStep === "processing_hold") patch.processingOption = "tag_hold";
+                                          return { ...prev, ...patch };
+                                        });
+                                      }}
+                                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${scopeBridgeState.nextStep === option.id ? "border-sky-300 bg-sky-100 text-sky-800" : "border-slate-200 bg-white text-slate-600 hover:border-sky-200"}`}
                                     >
-                                      <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                      {option.label}
                                     </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className={`rounded-lg border p-3 space-y-2 ${activeBridgeIssues.length > 0 ? "border-amber-300 bg-amber-50/40" : "border-emerald-300 bg-emerald-50/40"}`}>
+                                <div className={`text-xs font-bold uppercase tracking-wider ${activeBridgeIssues.length > 0 ? "text-amber-700" : "text-emerald-700"}`}>
+                                  Active Blockers
+                                </div>
+                                {activeBridgeIssues.length === 0 ? (
+                                  <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-700 font-semibold">
+                                    No active blockers. Status can remain green.
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {requiredActiveBridgeIssues.length > 0 ? (
+                                      <div className="rounded-lg border border-amber-200 bg-white p-2">
+                                        <div className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">Required Workflow Steps</div>
+                                        <div className="space-y-2">
+                                          {requiredActiveBridgeIssues.map((issue) => {
+                                            const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
+                                            const stepNum = BRIDGE_REQUIRED_WORKFLOW_BLOCKERS.indexOf(issue) + 1;
+                                            return (
+                                              <div key={issue} className="rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                  <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[10px] font-bold text-amber-700">
+                                                      {stepNum > 0 ? stepNum : "•"}
+                                                    </span>
+                                                    <span className="text-sm font-bold text-amber-800">{issue}</span>
+                                                    <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">ON</span>
+                                                    {isAutoManaged ? (
+                                                      <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">Auto-linked</span>
+                                                    ) : null}
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => resolveScopeBridgeIssue(issue)}
+                                                    className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:border-amber-300 hover:text-amber-700"
+                                                  >
+                                                    Resolve
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ) : null}
+
+                                    {independentActiveBridgeIssues.length > 0 ? (
+                                      <div className="rounded-lg border border-amber-200 bg-white p-2">
+                                        <div className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">Independent Blockers</div>
+                                        <div className="space-y-2">
+                                          {independentActiveBridgeIssues.map((issue) => {
+                                            const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
+                                            return (
+                                              <div key={issue} className="rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                  <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-sm font-bold text-amber-800">{issue}</span>
+                                                    <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">ON</span>
+                                                    {isAutoManaged ? (
+                                                      <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">Auto-linked</span>
+                                                    ) : null}
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => resolveScopeBridgeIssue(issue)}
+                                                    className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:border-amber-300 hover:text-amber-700"
+                                                  >
+                                                    Resolve
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                  Possible Blockers
+                                </div>
+                                {availableRequiredBridgeIssues.length === 0 && availableIndependentBridgeIssues.length === 0 ? (
+                                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                    All listed blockers are already active.
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {availableRequiredBridgeIssues.length > 0 ? (
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                                        <div className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Required Workflow (currently off)</div>
+                                        <div className="space-y-2">
+                                          {availableRequiredBridgeIssues.map((issue) => {
+                                            const stepNum = BRIDGE_REQUIRED_WORKFLOW_BLOCKERS.indexOf(issue) + 1;
+                                            return (
+                                              <button
+                                                key={issue}
+                                                type="button"
+                                                onClick={() => toggleScopeBridgeIssue(issue)}
+                                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:border-amber-300 hover:bg-amber-50/40"
+                                              >
+                                                <div className="flex items-center justify-between gap-2">
+                                                  <span className="flex items-center gap-2">
+                                                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold text-slate-600">
+                                                      {stepNum > 0 ? stepNum : "•"}
+                                                    </span>
+                                                    {issue}
+                                                  </span>
+                                                  <span className="text-[10px] font-bold text-slate-400">OFF</span>
+                                                </div>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ) : null}
+
+                                    {availableIndependentBridgeIssues.length > 0 ? (
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                                        <div className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Independent Blockers</div>
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                          {availableIndependentBridgeIssues.map((issue) => {
+                                            const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
+                                            return (
+                                              <button
+                                                key={issue}
+                                                type="button"
+                                                onClick={() => toggleScopeBridgeIssue(issue)}
+                                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:border-amber-300 hover:bg-amber-50/40"
+                                              >
+                                                <div className="flex items-center justify-between gap-2">
+                                                  <span>{issue}</span>
+                                                  <span className="text-[10px] font-bold text-slate-400">OFF</span>
+                                                </div>
+                                                {isAutoManaged ? (
+                                                  <div className="mt-1 text-[10px] font-semibold text-sky-700">Auto-linked</div>
+                                                ) : null}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Completion Flags (timestamped)</div>
+                              <div className="grid gap-2">
+                                {BRIDGE_MILESTONE_FIELDS.map((field) => {
+                                  const milestone = scopeBridgeState.milestones || {};
+                                  const active = !!milestone[field.id];
+                                  return (
+                                    <div key={field.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="text-sm font-semibold text-slate-700">{field.label}</div>
+                                        <Switch
+                                          checked={active}
+                                          onChange={() => toggleScopeBridgeMilestone(field.id, field.atId)}
+                                        />
+                                      </div>
+                                      {active ? (
+                                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                          <Input
+                                            value={milestone[field.byId] || ""}
+                                            onChange={(e) => updateScopeBridgeMilestone(field.byId, e.target.value)}
+                                            placeholder="Completed by"
+                                            className="!py-1.5 !text-xs"
+                                          />
+                                          <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600">
+                                            {milestone[field.atId] ? `Completed ${formatShortTimestamp(new Date(milestone[field.atId]))}` : "Completed now"}
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </div>
                                   );
                                 })}
                               </div>
                             </div>
-                            <div className="rounded-xl border border-slate-200 p-4">
-                              <div className="text-xs font-bold text-slate-500 mb-3">Observations</div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                                {SDS_OBSERVATIONS.map(item => {
-                                  const active = (data.sdsObservations || []).includes(item);
-                                  const iconSrc = SDS_ICON_MAP[item] || "/Icons_Copilot.png";
-                                  return (
-                                    <button
-                                      key={item}
-                                      type="button"
-                                      title={item}
-                                      onClick={() => update("sdsObservations", toggleMulti(data.sdsObservations || [], item))}
-                                      className={`h-[13rem] w-[13rem] flex items-center justify-center border-2 ${active ? "border-sky-400" : "border-transparent"} hover:border-sky-200`}
-                                    >
-                                      <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
-                                    </button>
-                                  );
-                                })}
+
+                            <div className="rounded-lg border border-slate-200 bg-white p-2 space-y-3">
+                              <div className="px-1 text-xs font-bold uppercase tracking-wider text-slate-500">SDS Icon Selections</div>
+                              <div className="rounded-lg border border-slate-200 p-2">
+                                <div className="text-xs font-bold text-slate-500 mb-2">Considerations</div>
+                                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                  {SDS_CONSIDERATIONS.map(item => {
+                                    const active = (data.sdsConsiderations || []).includes(item);
+                                    const iconSrc = SDS_ICON_MAP[item] || "/Icons_Copilot.png";
+                                    return (
+                                      <button
+                                        key={item}
+                                        type="button"
+                                        title={item}
+                                        onClick={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], item))}
+                                        className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex items-center justify-center border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
+                                      >
+                                        <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 p-2">
+                                <div className="text-xs font-bold text-slate-500 mb-2">Observations</div>
+                                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                  {SDS_OBSERVATIONS.map(item => {
+                                    const active = (data.sdsObservations || []).includes(item);
+                                    const iconSrc = SDS_ICON_MAP[item] || "/Icons_Copilot.png";
+                                    return (
+                                      <button
+                                        key={item}
+                                        type="button"
+                                        title={item}
+                                        onClick={() => update("sdsObservations", toggleMulti(data.sdsObservations || [], item))}
+                                        className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex items-center justify-center border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
+                                      >
+                                        <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 p-2">
+                                <div className="text-xs font-bold text-slate-500 mb-2">Services Requested</div>
+                                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                  {SDS_SERVICES.map(item => {
+                                    const active = (data.sdsServices || []).includes(item);
+                                    const iconSrc = SDS_ICON_MAP[item] || "/Icons_Copilot.png";
+                                    return (
+                                      <button
+                                        key={item}
+                                        type="button"
+                                        title={item}
+                                        onClick={() => update("sdsServices", toggleMulti(data.sdsServices || [], item))}
+                                        className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex items-center justify-center border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
+                                      >
+                                        <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             </div>
-                            <div className="rounded-xl border border-slate-200 p-4">
-                              <div className="text-xs font-bold text-slate-500 mb-3">Services Requested</div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                                {SDS_SERVICES.map(item => {
-                                  const active = (data.sdsServices || []).includes(item);
-                                  const iconSrc = SDS_ICON_MAP[item] || "/Icons_Copilot.png";
-                                  return (
-                                    <button
-                                      key={item}
-                                      type="button"
-                                      title={item}
-                                      onClick={() => update("sdsServices", toggleMulti(data.sdsServices || [], item))}
-                                      className={`h-[13rem] w-[13rem] flex items-center justify-center border-2 ${active ? "border-sky-400" : "border-transparent"} hover:border-sky-200`}
-                                    >
-                                      <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
-                                    </button>
-                                  );
-                                })}
+
+                            <div className="rounded-lg border border-slate-200 bg-slate-900 px-3 py-3">
+                              <div className="text-[10px] font-bold uppercase tracking-widest text-sky-200 mb-2">Bridge Summary</div>
+                              <div className="rounded-md border border-white/15 bg-white/5 px-2 py-2 text-xs leading-relaxed text-slate-100">
+                                {scopeBridgeSnippet || "Set status and blockers to generate the bridge summary."}
                               </div>
                             </div>
                           </div>

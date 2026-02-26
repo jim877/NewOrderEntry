@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useMemo, useRef } from "react";
 import { Droplet, Flame } from "lucide-react";
+import { normalizeScopeBridgeState, nextStepLabel } from "./scopeBridgeUtils";
 
 const MAX_SEVERITY = 3;
 const valueMap = [0, 1, 2, 3];
@@ -11,13 +12,15 @@ const BRAND = {
   website: "renewalclaimsolutions.com",
   phone: "(877) 630-6273",
   email: "info@renewalclaims.com",
-  logoSrc: "/renewal-logo-graphics.png",
-  logoFallbackSrc: "/renewal-logo-primary.jpg",
+  logoSrc: "/renewal-logo-transparent.png",
+  logoFallbackSrc: "/renewal-logo-graphics.png",
 };
+
+const BRAND_LOGO_TERTIARY_FALLBACK = "/renewal-logo-primary.jpg";
 
 const BRAND_CARES_MEDIA = {
   fieldTech: "/renewal-cares-field-tech.png",
-  careSpecialist: "/renewal-cares-specialist.png",
+  careSpecialist: "/renewal-cares-specialist-female-partial.png",
   homeBanner: "/renewal-cares-home-banner.png",
 };
 
@@ -70,6 +73,7 @@ const LOSS_SEVERITY_CONFIG = [
     border: "border-gradient-fire",
     colorStart: "#fef3c7",
     colorEnd: "#f97316",
+    seedField: "Heat",
     fields: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"],
   },
   {
@@ -78,6 +82,7 @@ const LOSS_SEVERITY_CONFIG = [
     border: "border-gradient-water",
     colorStart: "#dbeafe",
     colorEnd: "#3b82f6",
+    seedField: "Water",
     fields: [
       "Water",
       "Humidity",
@@ -104,7 +109,485 @@ const Slider = ({ value, onChange, colorStart, colorEnd, disabled }) => (
   />
 );
 
-export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", address = "", selectedServices = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [] }) {
+const SERVICE_HIGHLIGHTS = [
+  "24/7 claim support",
+  "Photo barcoding & inventory",
+  "Specialized cleaning & deodorizing",
+  "Flexible storage & delivery",
+];
+
+const SdsStableImage = React.memo(function SdsStableImage({
+  src,
+  alt,
+  className,
+  fallbackSrc,
+  tertiaryFallbackSrc,
+  onFinalError,
+  loading = "lazy",
+  fetchPriority = "auto",
+  decoding = "async",
+}) {
+  const fallbackIndexRef = React.useRef(0);
+  const finalErrorFiredRef = React.useRef(false);
+  const resolvedSrc = toAbsoluteAssetUrl(src);
+  const fallbackCandidates = React.useMemo(
+    () => [fallbackSrc, tertiaryFallbackSrc].filter(Boolean).map(toAbsoluteAssetUrl),
+    [fallbackSrc, tertiaryFallbackSrc]
+  );
+
+  React.useEffect(() => {
+    fallbackIndexRef.current = 0;
+    finalErrorFiredRef.current = false;
+  }, [resolvedSrc, fallbackCandidates.join("|")]);
+
+  const handleError = (e) => {
+    while (fallbackIndexRef.current < fallbackCandidates.length) {
+      const candidate = fallbackCandidates[fallbackIndexRef.current++];
+      if (!candidate) continue;
+      if (candidate === e.currentTarget.getAttribute("src")) continue;
+      e.currentTarget.src = candidate;
+      return;
+    }
+
+    if (!finalErrorFiredRef.current) {
+      finalErrorFiredRef.current = true;
+      onFinalError?.();
+    }
+  };
+
+  return (
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      className={className}
+      loading={loading}
+      decoding={decoding}
+      fetchPriority={fetchPriority}
+      onError={handleError}
+    />
+  );
+});
+
+SdsStableImage.displayName = "SdsStableImage";
+
+const SdsBrandMark = React.memo(function SdsBrandMark({
+  brand = BRAND,
+  large = false,
+  className = "",
+  loading = "eager",
+}) {
+  const [showTextFallback, setShowTextFallback] = React.useState(false);
+  const frameClass = large ? "h-24 w-full" : "h-[4.05rem] w-[18.9rem]";
+  const imgClass = large ? "h-24 w-auto max-w-full object-contain" : "h-[4.05rem] w-auto max-w-full object-contain";
+
+  React.useEffect(() => {
+    setShowTextFallback(false);
+  }, [brand.logoSrc, brand.logoFallbackSrc]);
+
+  return (
+    <div className={`${frameClass} flex items-center justify-center ${className}`}>
+      {!showTextFallback ? (
+        <SdsStableImage
+          src={brand.logoSrc}
+          alt={brand.name}
+          className={imgClass}
+          fallbackSrc={brand.logoFallbackSrc}
+          tertiaryFallbackSrc={BRAND_LOGO_TERTIARY_FALLBACK}
+          loading={loading}
+          fetchPriority={loading === "eager" ? "high" : "auto"}
+          decoding="sync"
+          onFinalError={() => setShowTextFallback(true)}
+        />
+      ) : null}
+      {showTextFallback ? (
+        <div className={`text-slate-700 font-semibold ${large ? "text-2xl" : "text-sm"}`}>{brand.name}</div>
+      ) : null}
+    </div>
+  );
+});
+
+SdsBrandMark.displayName = "SdsBrandMark";
+
+const SdsBrandMediaCard = React.memo(function SdsBrandMediaCard({
+  src,
+  alt,
+  className,
+  imageClass,
+  fallbackSrc,
+  tertiaryFallbackSrc,
+  loading = "lazy",
+}) {
+  const [imageMissing, setImageMissing] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageMissing(false);
+  }, [src, fallbackSrc, tertiaryFallbackSrc]);
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white ${className || ""}`}>
+      {!imageMissing ? (
+        <SdsStableImage
+          src={src}
+          alt={alt}
+          className={imageClass || "h-full w-full object-contain object-center"}
+          fallbackSrc={fallbackSrc}
+          tertiaryFallbackSrc={tertiaryFallbackSrc}
+          loading={loading}
+          onFinalError={() => setImageMissing(true)}
+        />
+      ) : null}
+      {imageMissing ? (
+        <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs font-semibold text-slate-500">
+          {`Add image: ${src}`}
+        </div>
+      ) : null}
+    </div>
+  );
+});
+
+SdsBrandMediaCard.displayName = "SdsBrandMediaCard";
+
+const SdsWidgetSection = ({ title, subtitle, children, className }) => (
+  <div className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${className || ""}`}>
+    <div className="flex flex-col gap-1 mb-3">
+      <div className="text-sm font-bold text-sky-600">{title}</div>
+      {subtitle && <div className="text-xs text-slate-500">{subtitle}</div>}
+    </div>
+    {children}
+  </div>
+);
+
+const SdsBrandHeader = ({ brand = BRAND }) => (
+  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+    <div className="flex items-center gap-3">
+      <SdsBrandMark brand={brand} loading="eager" />
+    </div>
+    <div className="text-xs text-slate-500 text-right">
+      <div>{brand.website}</div>
+      {(brand.phone || brand.email) && (
+        <div>{[brand.phone, brand.email].filter(Boolean).join(" • ")}</div>
+      )}
+    </div>
+  </div>
+);
+
+const SdsBrandFooter = ({ brand = BRAND }) => (
+  <div className="border-t border-slate-200 pt-3 text-[11px] text-slate-500 flex justify-between">
+    <span>{brand.name}</span>
+    <span>{brand.website}</span>
+  </div>
+);
+
+const SdsPageMarketingWidget = ({ brand = BRAND }) => (
+  <div className="print-avoid rounded-xl border border-slate-200 bg-white px-3 py-2">
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
+          <span className="h-3 w-3 rounded-full bg-emerald-500" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700">RCS</span>
+        </div>
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold text-slate-700">{brand.name}</div>
+          <div className="truncate text-[10px] text-slate-500">
+            Compassion-driven service from first call to final delivery.
+          </div>
+        </div>
+      </div>
+      <div className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">
+        fire | smoke | water | mold
+      </div>
+    </div>
+  </div>
+);
+
+const SdsPageBlock = ({ children, brand = BRAND, showHeader = true, showMarketingWidget = true }) => (
+  <div className="print-page space-y-5">
+    <div className="h-[3px] w-full rounded-full bg-[linear-gradient(90deg,#06b6d4_0%,#0ea5e9_45%,#22c55e_100%)]" aria-hidden />
+    {showHeader ? <SdsBrandHeader brand={brand} /> : null}
+    {children}
+    {showMarketingWidget ? <SdsPageMarketingWidget brand={brand} /> : null}
+    <SdsBrandFooter brand={brand} />
+  </div>
+);
+
+const SdsSummaryField = ({ label, value }) => (
+  <div className="rounded-xl border border-sky-100 bg-white px-3 py-2">
+    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</div>
+    <div className="mt-1 text-sm font-semibold text-slate-800">{value || "—"}</div>
+  </div>
+);
+
+const BLOCKER_ACTION_COPY = {
+  "Contacting Customer": "Awaiting contact with the customer.",
+  "Authorization": "Awaiting signed authorization.",
+  "Scope Approval": "Awaiting scope approval.",
+  "Estimate Approval": "Awaiting estimate approval.",
+  "Test Results": "Awaiting test results.",
+  "IH Results": "Awaiting results from hygienist.",
+  "Coverage Determination": "Awaiting coverage determination.",
+  "Bill To Determination": "Awaiting bill-to determination.",
+  "Customer might clean it themselves": "Confirm whether the customer will self-clean.",
+  "Unsure if submitting a claim": "Confirm whether a claim will be submitted.",
+  "Limit Issues": "Resolve policy limit issues.",
+};
+
+const toActionOrientedBlockerText = (issue = "") => {
+  const trimmed = (issue || "").toString().trim();
+  if (!trimmed) return "";
+  return BLOCKER_ACTION_COPY[trimmed] || `Action required: ${trimmed}.`;
+};
+
+const formatPrintableDateTime = (value = "") => {
+  const text = (value || "").toString().trim();
+  if (!text) return "";
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return text;
+  return parsed.toLocaleString();
+};
+
+const buildLossTypeSummary = (orderTypes = [], lossDetails = {}) => {
+  const types = Array.from(
+    new Set((orderTypes || []).map((type) => (type || "").toString().trim()).filter(Boolean))
+  );
+  if (!types.length) return "";
+  return types
+    .map((type) => {
+      const details = (lossDetails && lossDetails[type]) || {};
+      const causes = Array.isArray(details.causes) ? details.causes.filter(Boolean) : [];
+      const origins = Array.isArray(details.origins) ? details.origins.filter(Boolean) : [];
+      const detailParts = [...causes, ...origins].map((item) => (item || "").toString().trim().toLowerCase()).filter(Boolean);
+      if (!detailParts.length) return type;
+      return `${type} (${detailParts.join(", ")})`;
+    })
+    .join(", ");
+};
+
+const SdsProjectSummarySection = ({
+  orderName,
+  primaryCustomerName,
+  address,
+  insuranceCompany,
+  insuranceAdjuster,
+  formattedDateOfLoss,
+  claimNumber,
+  serviceOfferings = [],
+  orderTypes = [],
+  lossDetails = {},
+  scopeBridge,
+}) => {
+  const scopeSnapshot = normalizeScopeBridgeState(scopeBridge || {});
+  const scopeNext = nextStepLabel(scopeSnapshot.nextStep);
+  const activeIssues = Array.isArray(scopeSnapshot.pendingIssues) ? scopeSnapshot.pendingIssues : [];
+  const normalizedServiceOfferings = Array.from(
+    new Set((serviceOfferings || []).map((item) => (item || "").toString().trim()).filter(Boolean))
+  );
+  const lossTypeSummary = buildLossTypeSummary(orderTypes, lossDetails);
+  const authMilestone = scopeSnapshot.milestones || {};
+  const hasAuthorizationOnFile = !!authMilestone.authorizationOnFile;
+  const authorizationAt = formatPrintableDateTime(authMilestone.authorizationOnFileAt);
+  const authorizationBy = (authMilestone.authorizationOnFileBy || "").toString().trim();
+  const summaryBullets = React.useMemo(() => {
+    const items = [];
+
+    if (activeIssues.length > 0) {
+      activeIssues.forEach((issue) => {
+        const line = toActionOrientedBlockerText(issue);
+        if (line) items.push(line);
+      });
+    } else {
+      items.push("No active blockers at this time.");
+    }
+
+    if (scopeNext) {
+      items.push(`Next step: ${scopeNext}.`);
+    } else if (activeIssues.length > 0) {
+      items.push("Next step: Resolve active blockers before proceeding.");
+    } else {
+      items.push("Next step: Proceed with project execution.");
+    }
+
+    if (scopeSnapshot.projectStatus === "red" && scopeSnapshot.statusReason) {
+      items.push(`Status reason: ${scopeSnapshot.statusReason}.`);
+    }
+
+    return items;
+  }, [activeIssues, scopeNext, scopeSnapshot.projectStatus, scopeSnapshot.statusReason]);
+  const hasScopeSnapshot =
+    !!scopeSnapshot.projectStatus ||
+    (scopeSnapshot.pendingIssues || []).length > 0 ||
+    !!scopeSnapshot.pickupOption ||
+    !!scopeSnapshot.processingOption ||
+    (scopeSnapshot.selectedGroups || []).length > 0 ||
+    !!scopeSnapshot.nextStep;
+
+  return (
+    <div className="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-sky-50 p-4 shadow-sm">
+      <div className="mb-3 border-b border-sky-100 pb-2">
+        <div className="text-sm font-bold text-sky-600">Project Summary</div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-2">
+          <SdsSummaryField label="Order Name" value={orderName} />
+          <SdsSummaryField label="Customer" value={primaryCustomerName} />
+          <SdsSummaryField label="Address" value={address} />
+        </div>
+        <div className="space-y-2">
+          <SdsSummaryField label="Insurance Company" value={insuranceCompany} />
+          <SdsSummaryField label="Adjuster" value={insuranceAdjuster} />
+          <SdsSummaryField label="Date of Loss" value={formattedDateOfLoss} />
+          <SdsSummaryField label="Claim Number" value={claimNumber} />
+        </div>
+      </div>
+      <div className={`mt-3 grid gap-3 ${hasAuthorizationOnFile ? "md:grid-cols-2" : ""}`}>
+        <div className="rounded-xl border border-sky-100 bg-white p-3">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-sky-700">Service Offerings</div>
+          {normalizedServiceOfferings.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {normalizedServiceOfferings.map((service) => (
+                <span
+                  key={service}
+                  className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700"
+                >
+                  {service}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-2 text-xs text-slate-500">No services selected yet.</div>
+          )}
+        </div>
+        {hasAuthorizationOnFile ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Authorization Status</div>
+            <div className="mt-2 inline-flex items-center rounded-full border border-emerald-300 bg-white px-3 py-1 text-xs font-bold text-emerald-700">
+              Signed Authorization On File
+            </div>
+            {authorizationBy || authorizationAt ? (
+              <div className="mt-2 text-xs text-emerald-800">
+                {[authorizationBy ? `By ${authorizationBy}` : "", authorizationAt].filter(Boolean).join(" • ")}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-3 rounded-xl border border-sky-100 bg-white p-3">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-sky-700">Loss Type</div>
+        <div className="mt-2 text-xs leading-relaxed text-slate-700">
+          {lossTypeSummary || "No loss types selected yet."}
+        </div>
+      </div>
+      {hasScopeSnapshot ? (
+        <div className="mt-4 rounded-xl border border-sky-100 bg-white p-3 space-y-2">
+          <div className="rounded-lg border border-sky-100 bg-sky-50/40 px-3 py-2">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-sky-700">Summary & Next Steps</div>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs leading-relaxed text-slate-700">
+              {summaryBullets.map((line, idx) => (
+                <li key={`scope-summary-${idx}`}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
+      <div className="mt-4 rounded-xl border border-sky-100 bg-white p-3">
+        <div className="flex justify-center">
+          <div className="inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-5 py-2 text-sm font-bold text-sky-700">
+            Approve
+          </div>
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-slate-600 text-center">
+          Simply reply 'Approve' if this looks good to you. If we haven&apos;t heard back within 3 days, we&apos;ll assume your approval and move forward with the project as outlined.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const SdsRestoreStoryPage = ({ brand = BRAND, media = BRAND_CARES_MEDIA, serviceHighlights = SERVICE_HIGHLIGHTS }) => (
+  <SdsPageBlock brand={brand} showHeader={false}>
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="grid min-h-[240px] grid-cols-[170px_1fr] gap-5 items-end">
+          <div className="relative h-full min-h-[200px] overflow-hidden rounded-xl bg-white">
+            <SdsStableImage
+              src={media.fieldTech}
+              alt="Renewal Cares field specialist"
+              className="absolute bottom-0 left-0 h-full w-full object-cover object-left-bottom"
+              loading="lazy"
+            />
+          </div>
+          <div className="self-center pr-2">
+            <div className="text-[42px] font-bold leading-[1.02] text-slate-900">Restore. Renew. Restart.</div>
+            <p className="mt-3 text-[20px] leading-relaxed text-slate-600">
+              We help families recover after fire, water, and mold losses by handling pickup,
+              inventory, cleaning, storage, and delivery of soft goods and belongings.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {serviceHighlights.map((item) => (
+          <div key={item} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[15px] font-semibold text-slate-700">
+            {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  </SdsPageBlock>
+);
+
+const SdsBrochurePage = ({ brand = BRAND, media = BRAND_CARES_MEDIA }) => (
+  <SdsPageBlock brand={brand} showHeader={false}>
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-start">
+        <div className="self-start rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="grid min-h-[210px] grid-cols-[108px_1fr] gap-4 items-end">
+            <div className="relative h-full min-h-[168px] overflow-hidden rounded-xl bg-white">
+              <SdsStableImage
+                src={media.careSpecialist}
+                alt="Renewal Cares support specialist"
+                className="absolute bottom-0 left-0 h-full w-full object-contain object-left-bottom"
+                loading="lazy"
+              />
+            </div>
+            <div className="self-center pr-1">
+              <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Contact</div>
+              <div className="mt-1 text-[30px] font-bold leading-tight text-slate-800">{brand.phone}</div>
+              <div className="mt-1 text-lg text-slate-600">{brand.email}</div>
+              <div className="text-lg text-slate-600">{brand.website}</div>
+              <p className="mt-3 text-sm text-slate-500">
+                Fast response, transparent communication, and claim-ready documentation.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center">
+            <SdsBrandMark brand={brand} large loading="lazy" />
+            <div className="mt-2 text-3xl font-semibold text-slate-700">Your trusted restoration partner</div>
+            <div className="mt-1 text-xl text-slate-500">Serving Greater NYC and beyond</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-2">
+            <SdsBrandMediaCard
+              src={media.homeBanner}
+              alt="Renewal Cares home banner"
+              className="h-28 border-none rounded-xl bg-white"
+              imageClass="h-full w-full object-contain object-center"
+              fallbackSrc={brand.logoSrc}
+              tertiaryFallbackSrc={BRAND_LOGO_TERTIARY_FALLBACK}
+              loading="lazy"
+            />
+            <div className="mt-1 text-center text-sm font-medium text-slate-500">
+              Compassion-driven service from first call to final delivery.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </SdsPageBlock>
+);
+
+export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], scopeBridge = {} }) {
   const docSeverity = lossSeverity || {};
   const printRootRef = useRef(null);
 
@@ -126,12 +609,14 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     const touched = Boolean(docSeverity?.touched);
     const values = { ...(base.values || {}) };
 
-    // Seed default field values from order-level severity codes until user edits.
+    // Seed one representative row from order-level severity until user edits in SDS.
+    // This keeps non-selected rows hidden in the PDF.
     if (!touched && level >= 1) {
-      section.fields.forEach((field) => {
-        const raw = Number(values[field] ?? 0);
-        if (raw <= 0) values[field] = level;
-      });
+      const hasAnyExplicitValue = section.fields.some((field) => Number(values[field] ?? 0) > 0);
+      if (!hasAnyExplicitValue) {
+        const seedField = section.seedField || section.fields[0];
+        if (seedField) values[seedField] = level;
+      }
     }
 
     return {
@@ -359,7 +844,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
       <div className="w-full">
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
           <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <RoofHeader peril={peril} addressText={address || "Address"} />
+            {RoofHeader({ peril, addressText: address || "Address" })}
           </div>
           <div className="max-h-[520px] overflow-auto">
             <table className="w-full text-xs">
@@ -429,109 +914,57 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     );
   };
 
-  const showDustWidget = (orderTypes || []).some(t => String(t).toLowerCase().includes("dust"));
-  const unpackingIcon = "/Gemini_Unpacking.png";
-  const LOSS_ICON_MAP = {
-    Fire: "/Gemini_Fireplace.png",
-    Water: "/Copilot_Dust_Cloud.png",
-    Mold: "/Gemini_Health_Concerns.png",
-    "Dust/Debris": "/Copilot_Dust_Cloud.png",
-    Puffback: "/Copilot_Puffback.png",
-    Oil: "/Copilot_Oil.png",
-  };
-  const SERVICE_ICON_MAP = {
-    Unpacking: "/Gemini_Unpacking.png",
-    "Photo Inventory": "/Gemini_Photo_Inventory.png",
-    "Fiber Protection": "/Gemini_Fiber_Protection.png",
-    "Premium Brands": "/Gemini_Premium_Brands.png",
-    "Anti-Microbial": "/Gemini_Anti_Microbial.png",
-    "Fold ASAP": "/Gemini_Fold_AMAP.png",
-    "Re-Hanging": "/Gemini_Generated_Image_jnzpynjnzpynjnzp.png",
-    "Drying": "/Drying.jpg",
-    "Total Loss Inventory": "/Total_Loss_Inventory.jpg",
-    "Content Manipulation": "/Content_Manipulation.jpg",
-    "High Density": "/High_Density_Parking.jpg",
-    "Expert Stain Removal": "/Expert_Stain_Removal.jpg"
-  };
   const SDS_ICON_MAP = {
     "Elderly": "/Gemini_Elderly.png",
     "Pregnancy": "/Gemini_Pregnancy.png",
     "Baby": "/Gemini_Baby.png",
     "Needs Assistance": "/Gemini_Needs_Assistance.png",
+    "Respiratory Concerns": "/Gemini_Health_Concerns.png",
     "Premium Brands": "/Gemini_Premium_Brands.png",
     "Skin Sensitivity": "/Gemini_Skin_Sensitivity.png",
     "Pets": "/Gemini_Pets.png",
     "Fireplace": "/Gemini_Fireplace.png",
-    "Insects": "/Gemini_Generated_Image_n42bx9n42bx9n42b.png",
+    "Insects": "/Gemini_Generated_Image_b58khsb58khsb58k.png",
     "Moth Damage": "/Gemini_Moth_Holes.png",
-    "Sun Damage": "/Gemini_Generated_Image_bvveb5bvveb5bvve.png",
+    "Sun Damage": "/Gemini_Generated_Image_7b5s067b5s067b5s.png",
     "Smoking": "/Gemini_Smoking.png",
     "Fold as Much as Possible": "/Gemini_Fold_AMAP.png",
-    "Re-Hanging": "/Gemini_Generated_Image_jnzpynjnzpynjnzp.png",
+    "Re-Hanging": "/Gemini_Generated_Image_jv26rcjv26rcjv26.png",
     "Photo Inventory": "/Gemini_Photo_Inventory.png",
     "Unpacking": "/Gemini_Unpacking.png",
     "Anti-Microbial": "/Gemini_Anti_Microbial.png",
     "Drying Needed": "/Drying.jpg",
     "Drying": "/Drying.jpg",
-    "Disposal": "/Gemini_Generated_Image_b58khsb58khsb58k.png",
+    "Disposal": "/Gemini_Generated_Image_tydpketydpketydp.png",
     "Fiber Protection": "/Gemini_Fiber_Protection.png",
-    "Moving": "/Gemini_Generated_Image_wqmls4wqmls4wqml.png",
-    "Rolling Racks": "/Gemini_Generated_Image_bxkqrbxkqrbxkqrb.png",
+    "Moving": "/icon-moving.svg",
+    "Rolling Racks": "/icon-rolling-racks.svg",
     "Total Loss Inventory": "/Total_Loss_Inventory.jpg",
     "Content Manipulation": "/Content_Manipulation.jpg",
     "High Density": "/High_Density_Parking.jpg",
     "Expert Stain Removal": "/Expert_Stain_Removal.jpg",
   };
-  const TILE_SIZE = "2in";
-
-  const ServiceRequestsWidget = () => (
-    <div className="flex items-center gap-3">
-      <div className="sds-icon-tile">
-        <img
-          src={unpackingIcon}
-          alt="Unpacking"
-          className="sds-icon-img"
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
-        />
-      </div>
-      <div>
-        <div className="text-sm font-semibold text-slate-800">Unpacking</div>
-        <div className="text-xs text-slate-500">Dust order request</div>
-      </div>
-    </div>
-  );
-
-  const LossTypeIconsWidget = () => {
-    const active = (orderTypes || []).filter(t => LOSS_ICON_MAP[t]);
-    if (!active.length) return null;
-    return (
-      <div className="flex flex-wrap gap-3">
-        {active.map(type => (
-          <div key={type} className="flex flex-col items-center gap-2">
-            <div className="sds-icon-tile">
-              <img src={LOSS_ICON_MAP[type]} alt={type} className="sds-icon-img" />
-            </div>
-            <div className="text-[11px] font-semibold text-slate-600">{type}</div>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  const TILE_SIZE = "1.5in";
 
   const SdsIconSelectionsWidget = () => {
     const mergedServices = Array.from(new Set([...(sdsServices || []), ...(selectedServices || [])]));
-    const hasAny = (sdsConsiderations || []).length || (sdsObservations || []).length || mergedServices.length;
+    const considerationIconItems = (sdsConsiderations || []).filter((item) => !!SDS_ICON_MAP[item]);
+    const observationIconItems = (sdsObservations || []).filter((item) => !!SDS_ICON_MAP[item]);
+    const serviceIconItems = mergedServices.filter((item) => !!SDS_ICON_MAP[item]);
+    const hasAny = considerationIconItems.length || observationIconItems.length || serviceIconItems.length;
     if (!hasAny) return null;
-    const renderGroup = (title, items) => {
-      if (!items || !items.length) return null;
+    const renderGroup = (title, description, items) => {
+      const iconItems = (items || []).filter((item) => !!SDS_ICON_MAP[item]);
+      if (!iconItems.length) return null;
       return (
         <div className="rounded-xl border border-slate-200 p-3">
-          <div className="text-xs font-bold text-slate-500 mb-2">{title}</div>
+          <div className="text-xs font-bold text-slate-700 mb-0.5">{title}</div>
+          <div className="text-[10px] text-slate-500 mb-2">{description}</div>
           <div className="flex flex-wrap gap-3">
-            {items.map(item => (
+            {iconItems.map(item => (
               <div key={item} className="flex flex-col items-center gap-1">
                 <div className="sds-icon-tile">
-                  <img src={SDS_ICON_MAP[item] || "/Icons_Copilot.png"} alt={item} className="sds-icon-img" />
+                  <img src={SDS_ICON_MAP[item]} alt={item} className="sds-icon-img" />
                 </div>
                 <div className="text-[11px] font-semibold text-slate-600 text-center max-w-[120px]">{item}</div>
               </div>
@@ -542,73 +975,34 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     };
     return (
       <div className="space-y-3">
-        {renderGroup("Considerations", sdsConsiderations)}
-        {renderGroup("Observations", sdsObservations)}
-        {renderGroup("Services Requested", mergedServices)}
+        {renderGroup(
+          "Considerations",
+          "Factors to consider when building a scope.",
+          considerationIconItems
+        )}
+        {renderGroup(
+          "Observations",
+          "Potential complications to be aware of.",
+          observationIconItems
+        )}
+        {renderGroup(
+          "Services Requested",
+          "Customized services requested for this project.",
+          serviceIconItems
+        )}
       </div>
     );
   };
 
-  const SpecialConsiderationsWidget = () => {
-    const collected = new Set();
-    (customers || []).forEach(c => {
-      (c.quickNotes || []).forEach(n => collected.add(n));
-      if ((c.householdAnimals || "").trim()) collected.add("Pets");
-      if (c.doNotContact) collected.add("Do Not Contact");
-    });
-    if (familyMedicalIssues === "Y") collected.add("Medical Issues");
-    if (soapFragAllergies === "Y") collected.add("Skin Sensitivity");
-    const items = Array.from(collected);
-    if (!items.length) return null;
-    const ICON_MAP = {
-      "Elderly": "/Gemini_Elderly.png",
-      "Hearing Impaired": "/Gemini_Needs_Assistance.png",
-      "Spanish Only": "/Gemini_Needs_Assistance.png",
-      "Medical Issues": "/Gemini_Health_Concerns.png",
-      "Skin Sensitivity": "/Gemini_Skin_Sensitivity.png",
-      "Pets": "/Gemini_Pets.png",
-      "Do Not Contact": "/Gemini_Needs_Assistance.png"
-    };
-    return (
-      <div className="flex flex-wrap gap-3">
-        {items.map(item => (
-          <div key={item} className="flex flex-col items-center gap-2">
-            <div className="sds-icon-tile">
-              {ICON_MAP[item] ? (
-                <img src={ICON_MAP[item]} alt={item} className="sds-icon-img" />
-              ) : (
-                <div className="text-xs font-semibold text-slate-500 px-2 text-center">{item}</div>
-              )}
-            </div>
-            <div className="text-xs font-semibold text-slate-600">{item}</div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const hasLossIcons = (orderTypes || []).some(t => LOSS_ICON_MAP[t]);
   const hasSdsIconSelections =
-    (sdsConsiderations || []).length > 0 ||
-    (sdsObservations || []).length > 0 ||
-    (sdsServices || []).length > 0 ||
-    (selectedServices || []).length > 0;
-  const hasSpecialConsiderations = (() => {
-    const collected = new Set();
-    (customers || []).forEach(c => {
-      (c.quickNotes || []).forEach(n => collected.add(n));
-      if ((c.householdAnimals || "").trim()) collected.add("Pets");
-      if (c.doNotContact) collected.add("Do Not Contact");
-    });
-    if (familyMedicalIssues === "Y") collected.add("Medical Issues");
-    if (soapFragAllergies === "Y") collected.add("Skin Sensitivity");
-    return collected.size > 0;
-  })();
+    (sdsConsiderations || []).some((item) => !!SDS_ICON_MAP[item]) ||
+    (sdsObservations || []).some((item) => !!SDS_ICON_MAP[item]) ||
+    Array.from(new Set([...(sdsServices || []), ...(selectedServices || [])])).some((item) => !!SDS_ICON_MAP[item]);
 
   const WidgetSection = ({ title, subtitle, children, className }) => (
     <div className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${className || ""}`}>
       <div className="flex flex-col gap-1 mb-3">
-        <div className="text-sm font-bold text-slate-900">{title}</div>
+        <div className="text-sm font-bold text-sky-600">{title}</div>
         {subtitle && <div className="text-xs text-slate-500">{subtitle}</div>}
       </div>
       {children}
@@ -729,10 +1123,6 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
       <div className="flex items-center gap-3">
         <BrandMark />
-        <div>
-          <div className="text-lg font-bold text-slate-900">{BRAND.name}</div>
-          <div className="text-xs text-slate-500">{BRAND.tagline}</div>
-        </div>
       </div>
       <div className="text-xs text-slate-500 text-right">
         <div>{BRAND.website}</div>
@@ -791,8 +1181,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
   const ProjectSummarySection = () => (
     <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <div className="text-sm font-bold text-slate-900">Project Summary</div>
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-sky-600">NOE + Scope Snapshot</div>
+        <div className="text-sm font-bold text-sky-600">Project Summary</div>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-2">
@@ -808,21 +1197,23 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
         </div>
       </div>
       <div className="mt-4 rounded-xl border border-sky-100 bg-white p-3">
-        <div className="inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
-          Approve
+        <div className="flex justify-center">
+          <div className="inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-5 py-2 text-sm font-bold text-sky-700">
+            Approve
+          </div>
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-slate-600">
+        <p className="mt-3 text-xs leading-relaxed text-slate-600 text-center">
           Simply reply 'Approve' if this looks good to you. If we haven&apos;t heard back within 3 days, we&apos;ll assume your approval and move forward with the project as outlined.
         </p>
       </div>
     </div>
   );
 
-  const BrandMediaCard = ({ src, alt, className, imageClass }) => {
+  const BrandMediaCard = ({ src, alt, className, imageClass, fallbackSrc }) => {
     const [imageMissing, setImageMissing] = React.useState(false);
     React.useEffect(() => {
       setImageMissing(false);
-    }, [src]);
+    }, [src, fallbackSrc]);
 
     return (
       <div className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white ${className || ""}`}>
@@ -831,6 +1222,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
             src={src}
             alt={alt}
             className={imageClass || "h-full w-full object-contain object-center"}
+            fallbackSrc={fallbackSrc}
             loading="eager"
             onFinalError={() => setImageMissing(true)}
           />
@@ -920,8 +1312,9 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
               <BrandMediaCard
                 src={BRAND_CARES_MEDIA.homeBanner}
                 alt="Renewal Cares home banner"
-                className="h-24 border-none rounded-xl bg-white"
+                className="h-28 border-none rounded-xl bg-white"
                 imageClass="h-full w-full object-contain object-center"
+                fallbackSrc={BRAND.logoSrc}
               />
               <div className="mt-1 text-center text-sm font-medium text-slate-500">
                 Compassion-driven service from first call to final delivery.
@@ -1046,26 +1439,26 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
         </div>
 
         <div className="p-6 bg-slate-50 space-y-8">
-          <PageBlock>
-            <ProjectSummarySection />
-          </PageBlock>
-          <PageBlock>
-            <WidgetSection title="Loss Severity" className={`mx-auto w-full max-w-[22rem] ${hasAnyHighSeverityRows ? "" : "print-hide-no-high-severity"}`}>
+          <SdsPageBlock brand={BRAND}>
+            <SdsProjectSummarySection
+              orderName={orderName}
+              primaryCustomerName={primaryCustomerName}
+              address={address}
+              insuranceCompany={insuranceCompany}
+              insuranceAdjuster={insuranceAdjuster}
+              formattedDateOfLoss={formattedDateOfLoss}
+              claimNumber={claimNumber}
+              serviceOfferings={noeServiceOfferings}
+              orderTypes={orderTypes}
+              lossDetails={lossDetails}
+              scopeBridge={scopeBridge}
+            />
+          </SdsPageBlock>
+          <SdsPageBlock brand={BRAND}>
+            <SdsWidgetSection title="Loss Severity" className={`mx-auto w-full max-w-[22rem] ${hasAnyHighSeverityRows ? "" : "print-hide-no-high-severity"}`}>
               <div className="mb-2 pt-1 pb-2 border-b border-slate-200/60">
-                <div className="flex justify-between items-center px-1 mb-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Severity Scale</span>
-                  <span className="text-[10px] font-bold text-sky-600 uppercase tracking-widest bg-sky-50 px-1.5 py-0.5 rounded-full">0 — 3</span>
-                </div>
-                <div className="flex justify-between items-center px-1">
-                  <div className="flex items-center text-[10px] font-bold text-slate-600">
-                    <div className="w-2.5 h-2.5 rounded-full bg-slate-300 mr-1.5 border border-white shadow-sm"></div>
-                    <span>0: None</span>
-                  </div>
-                  <div className="flex-1 mx-2 h-1 bg-gradient-to-r from-slate-300 via-slate-400 to-slate-600 rounded-full opacity-30"></div>
-                  <div className="flex items-center text-[10px] font-bold text-slate-600 text-right">
-                    <span>3: Extreme</span>
-                    <div className="w-2.5 h-2.5 rounded-full bg-slate-700 ml-1.5 border border-white shadow-sm"></div>
-                  </div>
+                <div className="px-1 text-center text-[11px] font-bold text-slate-600">
+                  None 0 - 3 Extreme
                 </div>
               </div>
 
@@ -1120,54 +1513,35 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                   </div>
                 )}
               </div>
-            </WidgetSection>
-          </PageBlock>
+            </SdsWidgetSection>
+          </SdsPageBlock>
 
           {getPerils().length > 0 && (
             <div className="space-y-6">
               {getPerils().map((peril) => {
                 const perilLabel = peril === "fire" ? "Fire" : "Water";
-                const subtitle = claimNumber
+                  const subtitle = claimNumber
                   ? `Loss Type: ${perilLabel} · Claim #: ${claimNumber}`
                   : `Loss Type: ${perilLabel}`;
                 return (
-                  <PageBlock key={peril}>
-                    <WidgetSection title="Home Loss Visualization" subtitle={subtitle}>
-                      <LossOverviewWidget peril={peril} />
-                    </WidgetSection>
-                  </PageBlock>
+                  <SdsPageBlock key={peril} brand={BRAND}>
+                    <SdsWidgetSection title="Home Loss Visualization" subtitle={subtitle}>
+                      {LossOverviewWidget({ peril })}
+                    </SdsWidgetSection>
+                  </SdsPageBlock>
                 );
               })}
             </div>
           )}
-          {(hasLossIcons || hasSpecialConsiderations || hasSdsIconSelections) && (
-            <PageBlock>
-              {hasLossIcons && (
-                <WidgetSection title="Loss Type">
-                  <LossTypeIconsWidget />
-                </WidgetSection>
-              )}
-              {hasSdsIconSelections && (
-                <WidgetSection title="SDS Icons">
-                  <SdsIconSelectionsWidget />
-                </WidgetSection>
-              )}
-              {hasSpecialConsiderations && (
-                <WidgetSection title="Special Considerations">
-                  <SpecialConsiderationsWidget />
-                </WidgetSection>
-              )}
-            </PageBlock>
+          {hasSdsIconSelections && (
+            <SdsPageBlock brand={BRAND}>
+              <SdsWidgetSection title="SDS Icons">
+                {SdsIconSelectionsWidget()}
+              </SdsWidgetSection>
+            </SdsPageBlock>
           )}
-          {showDustWidget && (
-            <PageBlock>
-              <WidgetSection title="Service Requests">
-                <ServiceRequestsWidget />
-              </WidgetSection>
-            </PageBlock>
-          )}
-          <RestoreStoryPage />
-          <BrochurePage />
+          <SdsRestoreStoryPage brand={BRAND} media={BRAND_CARES_MEDIA} serviceHighlights={SERVICE_HIGHLIGHTS} />
+          <SdsBrochurePage brand={BRAND} media={BRAND_CARES_MEDIA} />
         </div>
       </div>
     </div>
