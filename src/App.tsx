@@ -2,11 +2,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import SameDayScope from './SameDayScope';
 import SdsDocument from './SdsDocument';
+import { CreditCard, FileText, Globe, Lock, LockOpen, Shield, SquarePen, Tag, UserRound } from 'lucide-react';
 import {
   buildScopeBridgeSnippet,
   createScopeBridgeState,
   normalizeScopeBridgeState,
-  statusBadgeLabel,
   withScopeBridgeSnippet,
 } from './scopeBridgeUtils';
 
@@ -218,6 +218,16 @@ const normalizePlaceholderKeyPart = (value = "") =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || "item";
+const sameNormalizedCompany = (left = "", right = "") => {
+  const a = normalizeCompany(left || "");
+  const b = normalizeCompany(right || "");
+  return !!a && !!b && a === b;
+};
+const sameNormalizedContact = (left = "", right = "") => {
+  const a = normalizeContact(left || "");
+  const b = normalizeContact(right || "");
+  return !!a && !!b && a === b;
+};
 
 const getInitials = (name = "") => {
   const parts = name.replace(/[^a-zA-Z\s]/g, "").trim().split(/\s+/).filter(Boolean);
@@ -374,6 +384,17 @@ const getBestMatch = (options = [], query) => {
 
 const normalizeContact = (value) => value.trim().toLowerCase();
 const normalizeCompany = (value) => value.trim().toLowerCase();
+const normalizeStringList = (value) => {
+  const raw = Array.isArray(value) ? value : value ? [value] : [];
+  return Array.from(
+    new Set(
+      raw
+        .map((item) => (item || "").toString().trim())
+        .filter(Boolean)
+    )
+  );
+};
+const mergeUniqueStrings = (...lists) => normalizeStringList(lists.flat());
 
 // --- CONSTANTS ---
 const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -405,8 +426,8 @@ const CUSTOMER_TYPES=[
 ];
 const ORDER_STATUSES=["New","Intake Complete","Pickup Complete","Tagging Complete","Ready to Bill"];
 const MEETING_TYPES = ["Scope", "Pickup", "In-Home", "Meeting"];
-const DEFAULT_COMPANIES=["Allstate", "State Farm", "Chubb", "Servpro of Anytown", "Metro Claims", "Pure Insurance", "DKI FastDry", "United Claims", "Croziers Moving", "Company 1", "Company 2"];
-const DEFAULT_CONTACTS=["Alex Morgan", "Jamie Lee", "Pat Adjuster", "Ronzel Simmons", "Zack Barsack", "Sim Fern", "Steven Earthman", "Contact 1", "Contact 2"];
+const DEFAULT_COMPANIES=["Allstate", "Allstate Insurance Co.", "State Farm", "Chubb", "Servpro of Anytown", "Metro Claims", "Pure Insurance", "DKI FastDry", "United Claims", "Croziers Moving", "Contractor Connection", "Not Yet Known", "Not Provided", "Company 1", "Company 2"];
+const DEFAULT_CONTACTS=["Alex Morgan", "Jamie Lee", "Pat Adjuster", "Ronzel Simmons", "Zack Barsack", "Sim Fern", "Steven Earthman", "Casey Assignment", "Contact 1", "Contact 2"];
 const WELCOME_CAMPAIGNS=["Brochure", "Rush Guide", "Vcard"];
 const VENDOR_TYPES=["Art","Contents","Moving","Mitigation","Contractor","Consultant","Agent","Broker","Decorator","Building Management","Superintendent","Other"];
 const SALES_REPS=["Dave Fenyo, Sales Rep","Jim Fenyo","Josh Cintron, Sales Rep"];
@@ -434,6 +455,8 @@ const BRIDGE_CUSTOMER_BLOCKERS = [
   "Wants a cash-out",
   "May clean themselves",
 ];
+const SPECIAL_PAPERWORK_BLOCKER = "Special paperwork required";
+const UNKNOWN_INSURANCE_BLOCKER = "Insurance Company Not Yet Known";
 const BRIDGE_INSURANCE_BLOCKERS = [
   "Limit Issue",
   "Hasn't approved scope",
@@ -441,6 +464,8 @@ const BRIDGE_INSURANCE_BLOCKERS = [
   "Hasn't determined coverage",
   "Pushing another vendor",
   "Waiting on Hygienist Results",
+  SPECIAL_PAPERWORK_BLOCKER,
+  UNKNOWN_INSURANCE_BLOCKER,
 ];
 const BRIDGE_BLOCKER_GROUPS = [
   { id: "customer", label: "Customer", issues: BRIDGE_CUSTOMER_BLOCKERS },
@@ -471,19 +496,36 @@ const BRIDGE_AUTO_MANAGED_BLOCKERS = [
   "Won't Sign Authorization",
   "Customer Wants Estimate",
   "Adjuster Wants Estimate",
+  SPECIAL_PAPERWORK_BLOCKER,
+  UNKNOWN_INSURANCE_BLOCKER,
 ];
-const BRIDGE_NEXT_STEP_OPTIONS = [
-  { id: "pickup_hold", label: "Pickup on hold" },
-  { id: "processing_hold", label: "Tag and Hold" },
-  { id: "emergency_groups_only", label: "Emergency Groups Only" },
-  { id: "cod", label: "COD" },
+const BRIDGE_PICKUP_STEP_OPTIONS = [
+  { id: "schedule", label: "Schedule", tone: "green" },
+  { id: "priority", label: "Priority Groups Only", tone: "yellow" },
+  { id: "hold", label: "Hold", tone: "red" },
+];
+const BRIDGE_PROCESS_STEP_OPTIONS = [
+  { id: "yes", label: "Yes", tone: "green" },
+  { id: "priority", label: "Priority Only", tone: "yellow" },
+  { id: "hold", label: "Hold (Tag and Hold)", tone: "red" },
+];
+const BRIDGE_DELIVERY_STEP_OPTIONS = [
+  { id: "ok", label: "OK to deliver", tone: "green" },
+  { id: "priority", label: "Priority Groups Only", tone: "yellow" },
+  { id: "hold_cod", label: "Hold (COD)", tone: "red" },
 ];
 const BRIDGE_MILESTONE_FIELDS = [
-  { id: "authorizationOnFile", atId: "authorizationOnFileAt", byId: "authorizationOnFileBy", label: "Authorization form on file" },
-  { id: "scopeApproved", atId: "scopeApprovedAt", byId: "scopeApprovedBy", label: "Scope approved" },
-  { id: "estimateApproved", atId: "estimateApprovedAt", byId: "estimateApprovedBy", label: "Estimate approved" },
+  { id: "authorizationOnFile", atId: "authorizationOnFileAt", byId: "authorizationOnFileBy", label: "Authorization Signed" },
+  { id: "scopeApproved", atId: "scopeApprovedAt", byId: "scopeApprovedBy", label: "Scope Pre-Approved" },
+  { id: "estimateApproved", atId: "estimateApprovedAt", byId: "estimateApprovedBy", label: "Adjuster Approval" },
 ];
 const canonicalBridgeIssue = (issue = "") => BRIDGE_BLOCKER_ALIASES[issue] || issue;
+const bridgeStageToneClass = (tone, active) => {
+  if (tone === "green") return active ? "border-emerald-300 bg-emerald-100 text-emerald-800" : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300";
+  if (tone === "yellow") return active ? "border-amber-300 bg-amber-100 text-amber-800" : "border-slate-200 bg-white text-slate-700 hover:border-amber-300";
+  if (tone === "red") return active ? "border-rose-300 bg-rose-100 text-rose-800" : "border-slate-200 bg-white text-slate-700 hover:border-rose-300";
+  return active ? "border-sky-300 bg-sky-100 text-sky-800" : "border-slate-200 bg-white text-slate-600 hover:border-sky-300";
+};
 const SERVICE_OFFERING_HELP = {
   Appliance: "Large items requiring specialized handling (refrigerators, ranges, etc.).",
   Art: "Items valued for artistic/aesthetic merit.",
@@ -497,10 +539,512 @@ const SERVICE_OFFERING_HELP = {
   TLI: "Total Loss Inventory - listing/valuing non-restorable items.",
   "Expert Stain Removal": "Specialized stain removal services."
 };
+const INSURANCE_COMPANY_SHORTCUTS = [
+  {
+    company: "Not Yet Known",
+    helpText: "You will enter the company info later.",
+    createsBlocker: true,
+  },
+  {
+    company: "Not Provided",
+    helpText: "You will not be able to find out.",
+    createsBlocker: false,
+  },
+];
+const INSURANCE_COMPANY_SHORTCUT_SET = new Set(
+  INSURANCE_COMPANY_SHORTCUTS.map((item) => normalizeCompany(item.company))
+);
+const NATIONAL_CARRIER_LINKS = {
+  [normalizeCompany("Allstate")]: "Allstate",
+  [normalizeCompany("Allstate Insurance Co.")]: "Allstate",
+  [normalizeCompany("State Farm")]: "State Farm",
+  [normalizeCompany("Nationwide")]: "Nationwide",
+  [normalizeCompany("Farmers")]: "Farmers",
+  [normalizeCompany("USAA")]: "USAA",
+  [normalizeCompany("Liberty Mutual")]: "Liberty Mutual",
+  [normalizeCompany("Progressive")]: "Progressive",
+  [normalizeCompany("Travelers")]: "Travelers",
+  [normalizeCompany("Chubb")]: "Chubb",
+  [normalizeCompany("American Family")]: "American Family",
+  [normalizeCompany("Pure Insurance")]: "Pure Insurance",
+};
+const INSTRUCTION_TYPES = [
+  "Tagging",
+  "Cleaning",
+  "Packing",
+  "Delivery",
+  "Communication",
+  "Scheduling",
+  "Pickup",
+  "Billing",
+  "Collections",
+];
+const ORDER_INSTRUCTION_PRESETS = {
+  Tagging: [
+    "A) TAG: Room By Room",
+  ],
+  Cleaning: [
+    "Allergies",
+  ],
+  Packing: [
+    "Bag Individually",
+  ],
+  Delivery: [
+    "COD you MUST PICK UP A CHECK",
+  ],
+  Communication: [
+    "Prefers Text",
+  ],
+  Scheduling: [
+    "Send Customer Inventory",
+  ],
+  Pickup: [
+    "Cost-conscious: VERY",
+  ],
+  Billing: [
+    "Must Run Thru TPA",
+  ],
+  Collections: [
+    "Pays Us Electronically",
+  ],
+};
+const ACTUAL_COMPANY_INSTRUCTION_LIBRARY = [
+  { type: "Pickup", text: "Cost-conscious: VERY" },
+  { type: "Scheduling", text: "Send Customer Inventory" },
+  { type: "Scheduling", text: "Send Customer Photos" },
+  { type: "Delivery", text: "COD you MUST PICK UP A CHECK" },
+  { type: "Communication", text: "Wants Constant Updates" },
+  { type: "Billing", text: "Use Xactimate" },
+  { type: "Billing", text: "Must Run Thru TPA" },
+  { type: "Billing", text: "Send Photos Separate from Invoice" },
+  { type: "Billing", text: "Tell Adjuster When to Run thru TPA" },
+  { type: "Collections", text: "Pays Us Electronically" },
+];
+const ACTUAL_CONTACT_INSTRUCTION_LIBRARY = [
+  { type: "Tagging", text: "A) TAG: Room By Room" },
+  { type: "Cleaning", text: "Allergies" },
+  { type: "Packing", text: "Bag Individually" },
+  { type: "Communication", text: "Do Not Call" },
+  { type: "Communication", text: "Prefers Email" },
+  { type: "Communication", text: "Prefers Phone" },
+  { type: "Communication", text: "Prefers Text" },
+  { type: "Pickup", text: "Call from Pickup with Scope/Estimate" },
+  { type: "Pickup", text: "Photo Inventory Required" },
+  { type: "Pickup", text: "Reject Anything Questionable" },
+  { type: "Delivery", text: "Must sign COS for Nationwide" },
+  { type: "Collections", text: "Confirm direct payment" },
+];
+const INSTRUCTION_TYPE_SET = new Set(INSTRUCTION_TYPES.map((type) => type.toLowerCase()));
+const getInstructionTypeTextKey = (type = "", text = "") =>
+  `${(type || "").toString().trim().toLowerCase()}|${(text || "").toString().trim().toLowerCase()}`;
+const inferInstructionType = (text = "", fallbackType = "Communication") => {
+  const normalized = (text || "").toString().trim().toLowerCase();
+  if (!normalized) return fallbackType;
+  if (/\b(tag|hanger|bins?)\b/.test(normalized)) return "Tagging";
+  if (/\b(clean|press|starch|dc\b|machine clean|free & clear|allerg|pets?|reject)\b/.test(normalized)) return "Cleaning";
+  if (/\b(box|bag|poly|pack|hanger)\b/.test(normalized)) return "Packing";
+  if (/\b(deliver|delivery|cos\b|check\b)\b/.test(normalized)) return "Delivery";
+  if (/\b(call|email|text|contact|update|spanish|english|hearing|elderly|primary contact|prefers)\b/.test(normalized)) return "Communication";
+  if (/\b(schedule|appointment|send customer|photos?)\b/.test(normalized)) return "Scheduling";
+  if (/\b(pickup|pick up|room by room|cost-conscious|rush|ballpark|inventory|required|appliance|electronics|take)\b/.test(normalized)) return "Pickup";
+  if (/\b(invoice|bill|estimate|fpp|simbility|xactimate|esx|mika|m i c a|portal|vendor)\b/.test(normalized)) return "Billing";
+  if (/\b(payment|pay us|pays us|pay customer|deductible|electronically|direct payment|2-party|1-party|collections?)\b/.test(normalized)) return "Collections";
+  return fallbackType;
+};
+const normalizeInstructionEntry = (entry, fallbackType = "Communication") => {
+  if (!entry) return null;
+  if (typeof entry === "string") {
+    const text = entry.trim();
+    if (!text) return null;
+    return {
+      id: "",
+      type: inferInstructionType(text, fallbackType),
+      text,
+    };
+  }
+  const text = (entry.text || entry.label || entry.value || "").toString().trim();
+  if (!text) return null;
+  const rawType = (entry.type || "").toString().trim();
+  const normalizedType = rawType && INSTRUCTION_TYPE_SET.has(rawType.toLowerCase())
+    ? INSTRUCTION_TYPES.find((type) => type.toLowerCase() === rawType.toLowerCase()) || rawType
+    : inferInstructionType(text, fallbackType);
+  return {
+    id: (entry.id || "").toString(),
+    type: normalizedType,
+    text,
+  };
+};
+const normalizeInstructionEntries = (entries = [], fallbackType = "Communication") =>
+  (Array.isArray(entries) ? entries : [entries])
+    .map((entry) => normalizeInstructionEntry(entry, fallbackType))
+    .filter(Boolean);
+const hashInstructionSeed = (value = "") =>
+  Array.from((value || "").toString()).reduce(
+    (acc, char, index) => (acc + (char.charCodeAt(0) * (index + 1))) % 1000003,
+    0
+  );
+const pickSeededInstructionEntries = (seedKey = "", pool = [], count = 1) => {
+  const normalizedPool = normalizeInstructionEntries(pool);
+  if (!normalizedPool.length || count <= 0) return [];
+  const targetCount = Math.min(count, normalizedPool.length);
+  const seed = hashInstructionSeed(seedKey);
+  const start = seed % normalizedPool.length;
+  const step = normalizedPool.length > 1 ? ((seed % (normalizedPool.length - 1)) + 1) : 1;
+  const picks = [];
+  const seen = new Set();
+  let cursor = start;
+  let attempts = 0;
+  while (picks.length < targetCount && attempts < normalizedPool.length * 2) {
+    const candidate = normalizedPool[cursor % normalizedPool.length];
+    const key = getInstructionTypeTextKey(candidate.type, candidate.text);
+    if (!seen.has(key)) {
+      seen.add(key);
+      picks.push({ ...candidate, id: "" });
+    }
+    cursor += step;
+    attempts += 1;
+  }
+  return picks;
+};
+const dedupeInstructionEntries = (entries = []) => {
+  const seen = new Set();
+  return (entries || []).filter((entry) => {
+    const key = [
+      (entry.type || "").toLowerCase(),
+      (entry.text || "").toLowerCase(),
+      (entry.sourceKind || "").toLowerCase(),
+      (entry.sourceName || "").toLowerCase(),
+    ].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+const mergeInstructionEntries = (...groups) =>
+  dedupeInstructionEntries(
+    groups.flatMap((group) => normalizeInstructionEntries(group || []))
+  );
+const getInstructionIdentity = (entry = {}) =>
+  (entry.id || `${(entry.type || "").toString().trim().toLowerCase()}|${(entry.text || "").toString().trim().toLowerCase()}`).toString();
+const DEFAULT_COMPANY_PROFILES = {
+  [normalizeCompany("Allstate Insurance Co.")]: {
+    nationalCarrier: "Allstate",
+  },
+  [normalizeCompany("Contractor Connection")]: {
+    companyType: "TPA",
+    companyInstructions: [
+      { type: "Billing", text: "Tell Adjuster When to Run thru TPA" },
+      { type: "Billing", text: "Must Run Thru TPA" },
+      { type: "Billing", text: "Send Photos Separate from Invoice" },
+    ],
+    specialDocuments: ["Contractor Connection specialty form"],
+    customerTextForms: ["Contractor Connection specialty form"],
+  },
+  [normalizeCompany("Not Yet Known")]: {
+    companyInstructions: [{ type: "Communication", text: "Insurance carrier details will be added later." }],
+    reportingPlaceholder: true,
+  },
+  [normalizeCompany("Not Provided")]: {
+    companyInstructions: [{ type: "Communication", text: "Insurance carrier details are unavailable for this order." }],
+    reportingPlaceholder: true,
+  },
+};
+const DEFAULT_CONTACT_PROFILES = {};
+const isInsuranceShortcutCompany = (companyName = "") =>
+  INSURANCE_COMPANY_SHORTCUT_SET.has(normalizeCompany(companyName || ""));
+const inferCompanyTypeFromName = (company = "") => {
+  if (!company) return "Other";
+  const c = company.toLowerCase();
+  const isCarrier = NATIONAL_CARRIERS.some(n => normalizeCompany(n) === normalizeCompany(company));
+  if (isCarrier) return "Insurance";
+  if (c.includes("contractor connection") || c.includes("tpa")) return "TPA";
+  if (c.includes("insurance")) return "Insurance";
+  if (c.includes("adjusting") || c.includes("claims")) return "Public Adjusting";
+  if (c.includes("moving")) return "Moving";
+  if (c.includes("restoration") || c.includes("dki") || c.includes("servpro")) return "Restoration Company";
+  return "Other";
+};
+const resolveLinkedNationalCarrierName = (companyName = "", sampleContacts = []) => {
+  const normalized = normalizeCompany(companyName || "");
+  if (!normalized || isInsuranceShortcutCompany(companyName)) return "";
+  if (NATIONAL_CARRIER_LINKS[normalized]) return NATIONAL_CARRIER_LINKS[normalized];
+  const directCarrier = NATIONAL_CARRIERS.find((carrier) => normalizeCompany(carrier) === normalized);
+  if (directCarrier) return directCarrier;
+  const profileCarrier = DEFAULT_COMPANY_PROFILES[normalized]?.nationalCarrier;
+  if (profileCarrier) return profileCarrier;
+  const sampleCarrier = sampleContacts.find((row) => normalizeCompany(row.company || "") === normalized)?.nationalCarrier;
+  return sampleCarrier || "";
+};
+const resolveCompanyProfile = (companyName = "", sampleContacts = []) => {
+  const normalized = normalizeCompany(companyName || "");
+  if (!normalized) {
+    return {
+      companyName: "",
+      companyType: "",
+      nationalCarrier: "",
+      companyInstructions: [],
+      companyPreferences: [],
+      specialDocuments: [],
+      customerTextForms: [],
+      reportingPlaceholder: false,
+    };
+  }
+  const defaults = DEFAULT_COMPANY_PROFILES[normalized] || {};
+  const matchingRows = (sampleContacts || []).filter(
+    (row) => normalizeCompany(row.company || "") === normalized
+  );
+  const companyInstructions = mergeInstructionEntries(
+    defaults.companyInstructions || defaults.companyPreferences || [],
+    matchingRows.flatMap((row) => row.companyInstructions || row.companyPreferences || [])
+  );
+  return {
+    companyName,
+    companyType:
+      defaults.companyType ||
+      matchingRows.find((row) => row.companyType)?.companyType ||
+      inferCompanyTypeFromName(companyName),
+    nationalCarrier: resolveLinkedNationalCarrierName(companyName, sampleContacts),
+    companyInstructions,
+    companyPreferences: companyInstructions.map((entry) => entry.text),
+    specialDocuments: mergeUniqueStrings(
+      defaults.specialDocuments || [],
+      matchingRows.flatMap((row) => row.specialDocuments || [])
+    ),
+    customerTextForms: mergeUniqueStrings(
+      defaults.customerTextForms || [],
+      matchingRows.flatMap((row) => row.customerTextForms || [])
+    ),
+    reportingPlaceholder: !!defaults.reportingPlaceholder,
+  };
+};
+const resolveContactProfile = (contactName = "", sampleContacts = []) => {
+  const normalized = normalizeContact(contactName || "");
+  if (!normalized) {
+    return {
+      contactName: "",
+      contactInstructions: [],
+      contactPreferences: [],
+      specialDocuments: [],
+      customerTextForms: [],
+    };
+  }
+  const defaults = DEFAULT_CONTACT_PROFILES[normalized] || {};
+  const row = (sampleContacts || []).find(
+    (item) => normalizeContact(item.name || "") === normalized
+  );
+  const contactInstructions = mergeInstructionEntries(
+    defaults.contactInstructions || defaults.contactPreferences || [],
+    row?.contactInstructions || row?.contactPreferences || []
+  );
+  return {
+    contactName,
+    contactInstructions,
+    contactPreferences: contactInstructions.map((entry) => entry.text),
+    specialDocuments: mergeUniqueStrings(
+      defaults.specialDocuments || [],
+      row?.specialDocuments || []
+    ),
+    customerTextForms: mergeUniqueStrings(
+      defaults.customerTextForms || [],
+      row?.customerTextForms || []
+    ),
+  };
+};
+const isInsuranceCarrierCompany = (companyName = "", sampleContacts = []) => {
+  const normalized = normalizeCompany(companyName || "");
+  if (!normalized) return false;
+  if (isInsuranceShortcutCompany(companyName)) return true;
+  if (resolveLinkedNationalCarrierName(companyName, sampleContacts)) return true;
+  const profile = resolveCompanyProfile(companyName, sampleContacts);
+  const type = normalizeCompany(profile.companyType || "");
+  return type === "insurance" || type.includes("insurance");
+};
+const EntityPreferencePanel = ({
+  company = "",
+  contact = "",
+  getCompanyProfile,
+  getContactProfile,
+  onOpenCustomerText,
+  sessionInstructionKeys,
+  onMarkInstructionKeysSeen,
+  className = "",
+}) => {
+  const companyProfile = company ? getCompanyProfile?.(company) : null;
+  const contactProfile = contact ? getContactProfile?.(contact) : null;
+  const companyInstructions = companyProfile?.companyInstructions || [];
+  const contactInstructions = contactProfile?.contactInstructions || [];
+  const companySpecialDocuments = companyProfile?.specialDocuments || [];
+  const contactSpecialDocuments = contactProfile?.specialDocuments || [];
+  const specialDocuments = mergeUniqueStrings(
+    companySpecialDocuments,
+    contactSpecialDocuments
+  );
+  const customerTextForms = mergeUniqueStrings(
+    companyProfile?.customerTextForms || [],
+    contactProfile?.customerTextForms || [],
+    specialDocuments
+  );
+  const companyLabel = (companyProfile?.companyName || company || "").trim();
+  const contactLabel = (contactProfile?.contactName || contact || "").trim();
+  const companyKey =
+    (companyInstructions.length || companyProfile?.specialDocuments?.length) && companyLabel
+      ? `company:${normalizeCompany(companyLabel)}`
+      : "";
+  const contactKey =
+    (contactInstructions.length || contactProfile?.specialDocuments?.length) && contactLabel
+      ? `contact:${normalizeContact(contactLabel)}`
+      : "";
+  const relevantKeys = [companyKey, contactKey].filter(Boolean);
+  const panelIdentity = relevantKeys.join("|") || `${normalizeCompany(companyLabel)}|${normalizeContact(contactLabel)}`;
+  const companyCollapsedByDefault = !!companyKey && sessionInstructionKeys?.has?.(companyKey);
+  const contactCollapsedByDefault = !!contactKey && sessionInstructionKeys?.has?.(contactKey);
+  const [collapsedState, setCollapsedState] = useState({
+    company: companyCollapsedByDefault,
+    contact: contactCollapsedByDefault,
+  });
+
+  useEffect(() => {
+    setCollapsedState({
+      company: companyCollapsedByDefault,
+      contact: contactCollapsedByDefault,
+    });
+  }, [panelIdentity]);
+
+  if (!companyInstructions.length && !contactInstructions.length && !specialDocuments.length) return null;
+
+  const companyEntries = [
+    ...companyInstructions,
+    ...specialDocuments.map((item) => ({ type: "Paperwork", text: item, isPaperwork: true })),
+  ];
+  const contactEntries = [...contactInstructions];
+
+  const toggleGroup = (group, keys = []) => {
+    setCollapsedState((prev) => {
+      const nextCollapsed = !prev[group];
+      if (prev[group] && !nextCollapsed && keys.length) {
+        onMarkInstructionKeysSeen?.(keys);
+      }
+      return { ...prev, [group]: nextCollapsed };
+    });
+  };
+
+  const renderInstructionGroup = ({ groupKey, title, entries, seenKey }) => {
+    if (!entries.length) return null;
+    const collapsed = collapsedState[groupKey];
+    return (
+      <div key={`instruction-group-${groupKey}`} className="rounded-lg border border-slate-200 bg-white">
+        <button
+          type="button"
+          onClick={() => toggleGroup(groupKey, seenKey ? [seenKey] : [])}
+          className="flex w-full items-center justify-between gap-3 rounded-t-lg border-b border-amber-100 bg-amber-50/60 px-3 py-2 text-left"
+        >
+          <span className="text-[13px] font-medium text-slate-700">{title}</span>
+          <span className="text-base font-semibold leading-none text-amber-700">{collapsed ? "+" : "-"}</span>
+        </button>
+        {!collapsed ? (
+          <div className="px-3 py-2">
+            <div className="space-y-1.5">
+              {entries.map((item) => (
+                item.isPaperwork ? (
+                  <div
+                    key={`${groupKey}-${item.type}-${item.text}`}
+                    className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-[13px] leading-6 text-amber-900"
+                  >
+                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+                    <div>
+                      <span className="font-semibold text-amber-900">Special paperwork required:</span>
+                      <span>{` ${item.text}`}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={`${groupKey}-${item.type}-${item.text}`} className="text-[13px] leading-6 text-slate-700">
+                    <span className="font-semibold text-slate-900">{`${item.type}:`}</span>
+                    <span>{` ${item.text}`}</span>
+                  </div>
+                )
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <div className={`space-y-2 ${className || ""}`}>
+      {renderInstructionGroup({
+        groupKey: "company",
+        title: companyLabel ? `${companyLabel} Instructions` : "Company Instructions",
+        entries: companyEntries,
+        seenKey: companyKey,
+      })}
+      {renderInstructionGroup({
+        groupKey: "contact",
+        title: contactLabel ? `${contactLabel} Instructions` : "Contact Instructions",
+        entries: contactEntries,
+        seenKey: contactKey,
+      })}
+      {customerTextForms.length > 0 && onOpenCustomerText ? (
+        <div className="flex justify-start">
+          <button
+            type="button"
+            onClick={() => onOpenCustomerText(customerTextForms)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600 hover:border-slate-300 hover:text-slate-800"
+          >
+            Text customer with form
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 // --- CONSTANTS FOR SELECTIONS ---
 const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil"];
-const NON_RESTORATION_TYPES = ["Commercial Cleaning", "Residential Cleaning", "Other"];
+const NON_RESTORATION_PRIMARY = "Non-Restoration";
+const NON_RESTORATION_SUBTYPES = ["Commercial Cleaning", "Residential Cleaning", "Other"];
+const getNonRestorationSubtype = (orderTypes = []) =>
+  NON_RESTORATION_SUBTYPES.find((type) => (orderTypes || []).includes(type)) || "";
+const isNonRestorationSelected = (orderTypes = []) =>
+  (orderTypes || []).includes(NON_RESTORATION_PRIMARY) || !!getNonRestorationSubtype(orderTypes);
+const hasRestorationOrderType = (orderTypes = []) =>
+  (orderTypes || []).some((type) => LOSS_TYPES.includes(type));
+const projectTypeFromOrderTypes = (orderTypes = []) => {
+  if (isNonRestorationSelected(orderTypes)) return "Non-Restoration Project";
+  if (hasRestorationOrderType(orderTypes)) return "Restoration Project";
+  return "";
+};
+const hasPrimaryOrderTypeDecision = (orderTypes = []) =>
+  isNonRestorationSelected(orderTypes) || hasRestorationOrderType(orderTypes);
+const hasRequiredNonRestorationSubtype = (orderTypes = []) =>
+  !isNonRestorationSelected(orderTypes) || !!getNonRestorationSubtype(orderTypes);
+const normalizeOrderTypes = (orderTypes = []) => {
+  const unique = Array.from(new Set((orderTypes || []).filter(Boolean)));
+  const subtype = getNonRestorationSubtype(unique);
+  const nonRestoration = unique.includes(NON_RESTORATION_PRIMARY) || !!subtype;
+  const restoration = unique.filter((type) => LOSS_TYPES.includes(type));
+  if (nonRestoration) return [NON_RESTORATION_PRIMARY, ...(subtype ? [subtype] : [])];
+  if (restoration.length) return restoration;
+  return unique;
+};
+const toggleNonRestorationPrimarySelection = (orderTypes = []) => {
+  const normalized = normalizeOrderTypes(orderTypes);
+  if (isNonRestorationSelected(normalized)) return [];
+  return [NON_RESTORATION_PRIMARY];
+};
+const toggleRestorationTypeSelection = (orderTypes = [], type = "") => {
+  if (!LOSS_TYPES.includes(type)) return normalizeOrderTypes(orderTypes);
+  const normalized = normalizeOrderTypes(orderTypes);
+  const activeRestoration = normalized.filter((item) => LOSS_TYPES.includes(item));
+  if (activeRestoration.includes(type)) {
+    return activeRestoration.filter((item) => item !== type);
+  }
+  return [...activeRestoration, type];
+};
+const selectNonRestorationSubtypeSelection = (orderTypes = [], subtype = "") => {
+  if (!NON_RESTORATION_SUBTYPES.includes(subtype)) return normalizeOrderTypes(orderTypes);
+  return [NON_RESTORATION_PRIMARY, subtype];
+};
 
 const CAUSES = {
   "Fire": ["Battery", "Candle", "Cooking", "Electrical", "Explosion", "Fireplace", "Flammables", "Heating", "Neighbor", "Protein", "Smoking", "Wildfire"],
@@ -545,13 +1089,111 @@ const inferRoleCapabilities = (companyType = "", companyName = "") => {
 };
 
 const SAMPLE_CONTACTS = [
-  { name: "Alex Morgan", company: "Allstate", companyType: "Insurance", salesRep: "Josh Cintron, Sales Rep", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
-  { name: "Jamie Lee", company: "State Farm", companyType: "Insurance", salesRep: "Josh Cintron, Sales Rep", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
-  { name: "Pat Adjuster", company: "Metro Claims", companyType: "Public Adjusting", salesRep: "Dave Fenyo, Sales Rep", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
-  { name: "Ronzel Simmons", company: "Pure Insurance", companyType: "Insurance", salesRep: "Dave Fenyo, Sales Rep", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
-  { name: "Zack Barsack", company: "DKI DryFast", companyType: "Restoration Company", salesRep: "", title: "Owner", isAdjuster: false, canRefer: true, canBill: false, canInsure: false },
-  { name: "Sim Fern", company: "United Claims", companyType: "Public Adjusting", salesRep: "", title: "Adjuster", isAdjuster: true, canRefer: true, canBill: true, canInsure: true },
-  { name: "Steven Earthman", company: "Croziers Moving", companyType: "Moving", salesRep: "", title: "Project Manager", isAdjuster: false, canRefer: true, canBill: false, canInsure: false }
+  {
+    name: "Alex Morgan",
+    company: "Allstate",
+    companyType: "Insurance",
+    salesRep: "Josh Cintron, Sales Rep",
+    title: "Adjuster",
+    isAdjuster: true,
+    canRefer: true,
+    canBill: true,
+    canInsure: true,
+    companyInstructions: pickSeededInstructionEntries("company:Allstate", ACTUAL_COMPANY_INSTRUCTION_LIBRARY, 1),
+    contactInstructions: pickSeededInstructionEntries("contact:Alex Morgan", ACTUAL_CONTACT_INSTRUCTION_LIBRARY, 1),
+  },
+  {
+    name: "Jamie Lee",
+    company: "State Farm",
+    companyType: "Insurance",
+    salesRep: "Josh Cintron, Sales Rep",
+    title: "Adjuster",
+    isAdjuster: true,
+    canRefer: true,
+    canBill: true,
+    canInsure: true,
+    companyInstructions: pickSeededInstructionEntries("company:State Farm", ACTUAL_COMPANY_INSTRUCTION_LIBRARY, 1),
+    contactInstructions: pickSeededInstructionEntries("contact:Jamie Lee", ACTUAL_CONTACT_INSTRUCTION_LIBRARY, 1),
+  },
+  {
+    name: "Pat Adjuster",
+    company: "Metro Claims",
+    companyType: "Public Adjusting",
+    salesRep: "Dave Fenyo, Sales Rep",
+    title: "Adjuster",
+    isAdjuster: true,
+    canRefer: true,
+    canBill: true,
+    canInsure: true,
+    companyInstructions: pickSeededInstructionEntries("company:Metro Claims", ACTUAL_COMPANY_INSTRUCTION_LIBRARY, 1),
+    contactInstructions: pickSeededInstructionEntries("contact:Pat Adjuster", ACTUAL_CONTACT_INSTRUCTION_LIBRARY, 1),
+  },
+  {
+    name: "Ronzel Simmons",
+    company: "Pure Insurance",
+    companyType: "Insurance",
+    salesRep: "Dave Fenyo, Sales Rep",
+    title: "Adjuster",
+    isAdjuster: true,
+    canRefer: true,
+    canBill: true,
+    canInsure: true,
+    companyInstructions: pickSeededInstructionEntries("company:Pure Insurance", ACTUAL_COMPANY_INSTRUCTION_LIBRARY, 1),
+    contactInstructions: pickSeededInstructionEntries("contact:Ronzel Simmons", ACTUAL_CONTACT_INSTRUCTION_LIBRARY, 1),
+  },
+  {
+    name: "Zack Barsack",
+    company: "DKI DryFast",
+    companyType: "Restoration Company",
+    salesRep: "",
+    title: "Owner",
+    isAdjuster: false,
+    canRefer: true,
+    canBill: false,
+    canInsure: false,
+    companyInstructions: pickSeededInstructionEntries("company:DKI DryFast", ACTUAL_COMPANY_INSTRUCTION_LIBRARY, 1),
+    contactInstructions: pickSeededInstructionEntries("contact:Zack Barsack", ACTUAL_CONTACT_INSTRUCTION_LIBRARY, 1),
+  },
+  {
+    name: "Sim Fern",
+    company: "United Claims",
+    companyType: "Public Adjusting",
+    salesRep: "",
+    title: "Adjuster",
+    isAdjuster: true,
+    canRefer: true,
+    canBill: true,
+    canInsure: true,
+    companyInstructions: pickSeededInstructionEntries("company:United Claims", ACTUAL_COMPANY_INSTRUCTION_LIBRARY, 1),
+    contactInstructions: pickSeededInstructionEntries("contact:Sim Fern", ACTUAL_CONTACT_INSTRUCTION_LIBRARY, 1),
+  },
+  {
+    name: "Steven Earthman",
+    company: "Croziers Moving",
+    companyType: "Moving",
+    salesRep: "",
+    title: "Project Manager",
+    isAdjuster: false,
+    canRefer: true,
+    canBill: false,
+    canInsure: false,
+    companyInstructions: pickSeededInstructionEntries("company:Croziers Moving", ACTUAL_COMPANY_INSTRUCTION_LIBRARY, 1),
+    contactInstructions: pickSeededInstructionEntries("contact:Steven Earthman", ACTUAL_CONTACT_INSTRUCTION_LIBRARY, 1),
+  },
+  {
+    name: "Casey Assignment",
+    company: "Contractor Connection",
+    companyType: "TPA",
+    salesRep: "",
+    title: "Assignment Coordinator",
+    isAdjuster: false,
+    canRefer: true,
+    canBill: true,
+    canInsure: true,
+    contactInstructions: pickSeededInstructionEntries("contact:Casey Assignment", ACTUAL_CONTACT_INSTRUCTION_LIBRARY, 1),
+    specialDocuments: ["Contractor Connection specialty form"],
+    customerTextForms: ["Contractor Connection specialty form"],
+  }
 ];
 
 const SAMPLE_PRESET_DATA = () => ({
@@ -567,6 +1209,9 @@ const SAMPLE_PRESET_DATA = () => ({
   insuranceClaim: "Yes",
   insuranceCompany: "Pure Insurance",
   insuranceAdjuster: "Ronzel Simmons",
+  orderInstructions: [
+    { id: "sample-order-instruction", type: "Communication", text: "Customer asked for evening updates when possible." }
+  ],
   claimNumber: "CLM-1001",
   dateOfLoss: "2026-02-14",
   serviceOfferings: ["Textiles", "Art"],
@@ -659,27 +1304,36 @@ const SDS_ICON_MAP = {
   "Skin Sensitivity": "/Gemini_Skin_Sensitivity.png",
   "Pets": "/Gemini_Pets.png",
   "Fireplace": "/Gemini_Fireplace.png",
-  "Insects": "/Gemini_Generated_Image_b58khsb58khsb58k.png",
+  "Insects": "/Insects_Clean.png",
   "Moth Damage": "/Gemini_Moth_Holes.png",
   "Sun Damage": "/Gemini_Generated_Image_7b5s067b5s067b5s.png",
   "Smoking": "/Gemini_Smoking.png",
   "Clutter": "/Clutter.png",
   "Fold as Much as Possible": "/Gemini_Fold_AMAP.png",
-  "Re-Hanging": "/Gemini_Generated_Image_jv26rcjv26rcjv26.png",
-  "Photo Inventory": "/Gemini_Photo_Inventory.png",
+  "Re-Hanging": "/Re_Hanging_Clean.png",
+  "Photo Inventory": "/Photo_Inventory.png",
   "Unpacking": "/Gemini_Unpacking.png",
   "Anti-Microbial": "/Gemini_Anti_Microbial.png",
   "Drying Needed": "/Drying.jpg",
   "Drying": "/Drying.jpg",
   "Disposal": "/Gemini_Generated_Image_tydpketydpketydp.png",
   "Fiber Protection": "/Gemini_Fiber_Protection.png",
-  "Moving": "/icon-moving.svg",
-  "Rolling Racks": "/icon-rolling-racks.svg",
-  "Total Loss Inventory": "/Total_Loss_Inventory.jpg",
+  "Moving": "/Moving.png",
+  "Rolling Racks": "/Rolling_Racks.png",
+  "Total Loss Inventory": "/Total_Loss_Inventory.png",
   "Content Manipulation": "/Content_Manipulation.jpg",
   "High Density": "/High_Density_Parking.png",
-  "Expert Stain Removal": "/Expert_Stain_Removal.jpg",
+  "Expert Stain Removal": "/Expert_Stain_Removal.png",
 };
+const SDS_ICON_CLASS_OVERRIDES = {
+  "Clutter": "h-full w-full object-contain object-center scale-[0.82]",
+  "Insects": "h-full w-full object-contain object-center scale-[0.9]",
+  "Re-Hanging": "h-full w-full object-contain object-center scale-[0.95]",
+  "Moving": "h-full w-full object-contain object-center scale-[0.9]",
+  "Rolling Racks": "h-full w-full object-contain object-center scale-[0.9]",
+  "Expert Stain Removal": "h-full w-full object-contain object-center scale-[0.88]",
+};
+const getSdsIconImageClass = (item) => SDS_ICON_CLASS_OVERRIDES[item] || "h-full w-full object-contain object-center";
 
 const QUICK_INSTRUCTION_NOTES = [
   "Gate code needed",
@@ -753,10 +1407,42 @@ const COMPANY_ROLE_DEFS = [
 ];
 
 const CONTACT_ROLE_BADGES = [
-  { id: "referrer", icon: "🏷️", title: "Referrer" },
-  { id: "insurance", icon: "🛡️", title: "Insurance" },
-  { id: "billto", icon: "💳", title: "Bill To" },
+  { id: "referrer", title: "Referrer" },
+  { id: "insurance", title: "Insurance" },
+  { id: "billto", title: "Bill To" },
 ];
+const ROLE_ICON_COMPONENTS = {
+  referrer: Tag,
+  insurance: Shield,
+  billto: CreditCard,
+  billing: CreditCard,
+  adjuster: UserRound,
+  national: Globe,
+};
+const resolveRoleIconKey = (role = {}) => {
+  if (role.iconKey && ROLE_ICON_COMPONENTS[role.iconKey]) return role.iconKey;
+  const id = (role.id || "").toLowerCase();
+  if (ROLE_ICON_COMPONENTS[id]) return id;
+  const icon = (role.icon || "").trim();
+  if (icon === "🏷️") return "referrer";
+  if (icon === "🛡️") return "insurance";
+  if (icon === "💳") return "billto";
+  if (icon === "🧑‍💼") return "adjuster";
+  if (icon === "🌐") return "national";
+  const title = (role.title || role.label || "").toLowerCase();
+  if (title.includes("referrer")) return "referrer";
+  if (title.includes("insurance")) return "insurance";
+  if (title.includes("bill")) return "billto";
+  if (title.includes("adjuster")) return "adjuster";
+  if (title.includes("national")) return "national";
+  return "";
+};
+const RoleIcon = ({ role, className = "h-3.5 w-3.5", strokeWidth = 2.1 }) => {
+  const iconKey = resolveRoleIconKey(role);
+  const Icon = ROLE_ICON_COMPONENTS[iconKey];
+  if (!Icon) return null;
+  return <Icon className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
+};
 
 const INSURANCE_ELIGIBLE_COMPANY_TYPES = new Set([
   "insurance",
@@ -810,6 +1496,9 @@ const isContactPlaceholder = (entry = {}) => {
   if (!contacts.length) return true;
   return contacts.some(c => isPlaceholderFlagActive(c?.placeholder) || !hasMeaningfulValue(c?.name));
 };
+const CONTACT_OPTIONAL_COMPANY_TYPES = new Set(["tpa"]);
+const companyTypeRequiresContact = (type = "") =>
+  !CONTACT_OPTIONAL_COMPANY_TYPES.has(normalizePlaceholderKeyPart(type));
 
 const syncCompanyEntryPlaceholders = (entry = {}) => {
   const normalized = { ...(entry || {}) };
@@ -941,7 +1630,8 @@ const DEFAULT_FORM={
   estimateNeeded:"", estimateRecipients:[], estimateType:"",
   estimateRequestedBy: "",
   pickupBeforeApproval:"", pickupBeforeApprovalNote:"", scopeApproved:"", estimateAmount:"", estimateApprovedAt:"",
-  insuranceClaim:"", insuranceCompany:"", insuranceAdjuster:"", adjusterCompany:"", nationalCarrier:"", claimNumber:"", dateOfLoss:"", workOrderNumber:"", policyNumber:"", insuranceOrderEmail:"", rentOrOwn:"",
+  orderInstructions: [],
+  insuranceClaim:"", insuranceCompany:"", insuranceAdjuster:"", adjusterCompany:"", nationalCarrier:"", nationalCarrierRequested:false, claimNumber:"", dateOfLoss:"", workOrderNumber:"", policyNumber:"", insuranceOrderEmail:"", rentOrOwn:"",
   contentsCoverageLimit:"", moldLimit:"", rentCoverageLimit:"", publicAdjustingCompany:"", publicAdjuster:"", independentAdjustingCo:"",
   independentAdjuster:"", tpaCompany:"", tpaContact:"", 
   salesRep: "",
@@ -1500,12 +2190,94 @@ const ToggleGroup = ({ options, value, onChange }) => (
   </div>
 );
 
-const RoleBadge = ({ icon, title }) => (
-  <span title={title} className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
-    <span className="text-[11px]">{icon}</span>
-    {title}
+const RoleBadge = ({ role }) => (
+  <span title={role.title} className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
+    <RoleIcon role={role} className="h-3 w-3" />
+    {role.title}
   </span>
 );
+const EditAffordance = ({ title = "Edit" }) => (
+  <span
+    title={title}
+    className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm"
+  >
+    <SquarePen className="h-3.5 w-3.5" aria-hidden="true" />
+  </span>
+);
+const AssignmentCueStrip = ({ items = [] }) => {
+  if (!items.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => (
+        <span
+          key={`assignment-cue-${item}`}
+          className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500"
+        >
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+};
+const LinkedAssignmentPanel = ({
+  title = "Linked Assignment",
+  helperText = "",
+  values = [],
+  cues = [],
+  headerBadge = "",
+  locked = true,
+  onToggleLock,
+}) => {
+  const Icon = locked ? Lock : LockOpen;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            {locked ? title : `${title} Unlocked`}
+          </div>
+          {locked && headerBadge ? (
+            <div className="mt-2">
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                {headerBadge}
+              </span>
+            </div>
+          ) : null}
+          <div className="mt-1 text-[11px] text-slate-500">
+            {locked
+              ? helperText
+              : "Unlocked for this order. Change these fields only if this section should be different."}
+          </div>
+        </div>
+        {onToggleLock ? (
+          <button
+            type="button"
+            onClick={onToggleLock}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600 hover:border-slate-300 hover:text-slate-800"
+          >
+            {locked ? "Unlock" : "Lock"}
+          </button>
+        ) : null}
+      </div>
+      {cues.length ? (
+        <div className="mt-3">
+          <AssignmentCueStrip items={cues} />
+        </div>
+      ) : null}
+      {values.length ? (
+        <div className={`mt-3 grid gap-3 ${values.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+          {values.map((item) => (
+            <div key={`linked-assignment-${title}-${item.label}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{item.label}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{item.value || "Not assigned"}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 const CompanyRecord = ({ company, contact, contacts, roles = [], className, editable, onChangeContact, onChangeCompany, onChangeContacts, roleOptions, onToggleRole, onFindCompany, rep, inactive, getRolesForContact, getRoleOptionsForContact, onToggleRoleForContact, contactOptions, onAddContact, getSalesRepForContact, getTitleForContact }) => {
   if (!editable && !company && !contact) return null;
@@ -1591,7 +2363,7 @@ const CompanyRecord = ({ company, contact, contacts, roles = [], className, edit
                           onClick={() => onToggleRoleForContact(company, c.name, r.id)}
                           className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${r.active ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700'}`}
                         >
-                          <span className="mr-1">{r.icon}</span>{r.label}
+                          <span className="mr-1 inline-flex"><RoleIcon role={r} className="h-3 w-3" /></span>{r.label}
                         </button>
                       ))}
                     </div>
@@ -1654,10 +2426,10 @@ const CompanyRecord = ({ company, contact, contacts, roles = [], className, edit
                             className="rounded-full"
                             title="Click to toggle role"
                           >
-                            <RoleBadge icon={r.icon} title={r.title} />
+                            <RoleBadge role={r} />
                           </button>
                         ) : (
-                          <RoleBadge key={`${r.title}-${idx}`} icon={r.icon} title={r.title} />
+                          <RoleBadge key={`${r.title}-${idx}`} role={r} />
                         )
                       ))}
                     </div>
@@ -1724,7 +2496,7 @@ const CompanyRecord = ({ company, contact, contacts, roles = [], className, edit
       </div>
       {!editable && roles.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
-          {roles.map(r => <RoleBadge key={r.title} icon={r.icon} title={r.title} />)}
+          {roles.map(r => <RoleBadge key={r.title} role={r} />)}
         </div>
       )}
       {roleOptions && roleOptions.length > 0 && (
@@ -1735,7 +2507,7 @@ const CompanyRecord = ({ company, contact, contacts, roles = [], className, edit
               onClick={() => onToggleRole?.(r.id)}
               className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${r.active ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700'}`}
             >
-              <span className="mr-1">{r.icon}</span>{r.label}
+              <span className="mr-1 inline-flex"><RoleIcon role={r} className="h-3 w-3" /></span>{r.label}
             </button>
           ))}
         </div>
@@ -1784,7 +2556,10 @@ const SubSection = ({ id, title, open, onToggle, children, compact, className, a
 // --- SHARED FIELD COMPONENTS ---
 
 const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, toggleMulti, showInlineHelp, auditOn, salesRep, setSalesRep, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, setToast, getSalesRepForContact, onOpenCrmLog, onPromptRoleAssignment }) => {
-  const [referrerQuery, setReferrerQuery] = useState(data.referrer || "");
+  const referrerDisplayValue = data.referrer && data.referringCompany
+    ? `${data.referrer} — ${data.referringCompany}`
+    : (data.referrer || data.referringCompany || "");
+  const [referrerQuery, setReferrerQuery] = useState(referrerDisplayValue);
   const [repMenuOpen, setRepMenuOpen] = useState(false);
   const [showSuggestedRoles, setShowSuggestedRoles] = useState(false);
   const [suggestedSelection, setSuggestedSelection] = useState(suggestedReferrerRoles || []);
@@ -1792,7 +2567,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
   const referrerFieldAnchorRef = useRef(null);
   const suggestedRolesCardRef = useRef(null);
   const referrerRep = getSalesRepForContact && data.referrer ? getSalesRepForContact(data.referrer) : "";
-  useEffect(() => setReferrerQuery(data.referrer || ""), [data.referrer]);
+  useEffect(() => setReferrerQuery(referrerDisplayValue), [referrerDisplayValue]);
   useEffect(() => setSuggestedSelection(suggestedReferrerRoles || []), [suggestedReferrerRoles]);
   const referrerBestMatch = getBestMatch(combinedContactOptions || [], referrerQuery);
   const roleActive = {
@@ -1802,30 +2577,48 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
     adjuster: !!data.referrer && data.insuranceAdjuster === data.referrer
   };
   const referrerRoles = [];
-  if (roleActive.insurance) referrerRoles.push({ icon: "🛡️", title: "Insurance" });
-  if (roleActive.adjuster) referrerRoles.push({ icon: "🧑‍💼", title: "Adjuster" });
-  if (roleActive.billing) referrerRoles.push({ icon: "💳", title: "Billing" });
-  if (roleActive.national) referrerRoles.push({ icon: "🌐", title: "National" });
+  if (roleActive.insurance) referrerRoles.push({ id: "insurance", title: "Insurance" });
+  if (roleActive.adjuster) referrerRoles.push({ id: "adjuster", title: "Adjuster" });
+  if (roleActive.billing) referrerRoles.push({ id: "billing", title: "Billing" });
+  if (roleActive.national) referrerRoles.push({ id: "national", title: "National Carrier" });
   const applyReferrerValue = (value) => {
-    const parsed = parseCombinedContact?.(value) || { contact: value, company: "" };
+    const raw = (value || "").trim();
+    const parsed = raw ? (parseCombinedContact?.(raw) || { contact: raw, company: "" }) : { contact: "", company: "" };
     if (parsed.contact && !parsed.company) {
       setToast("Contact must include a company.");
       return;
     }
+    const currentContact = data.referrer || "";
+    const currentCompany = data.referringCompany || "";
+    const nextContact = parsed.contact || "";
+    const nextCompany = parsed.company || "";
+    const sameBillingContact = !!currentContact && normalizeContact(data.billingContact || "") === normalizeContact(currentContact);
+    const sameBillingCompany = !!currentCompany && normalizeCompany(data.billingCompany || "") === normalizeCompany(currentCompany);
+    const sameInsuranceAdjuster = !!currentContact && normalizeContact(data.insuranceAdjuster || "") === normalizeContact(currentContact);
+    const sameInsuranceCompany = !!currentCompany && normalizeCompany(data.insuranceCompany || "") === normalizeCompany(currentCompany);
+    const sameNationalCarrier = !!currentCompany && normalizeCompany(data.nationalCarrier || "") === normalizeCompany(currentCompany);
     const patch = {
-      referrer: parsed.contact,
-      referringCompany: parsed.company || data.referringCompany
+      referrer: nextContact,
+      referringCompany: nextCompany,
     };
-    if (getSalesRepForContact && parsed.contact && !data.salesRep) {
-      const rep = getSalesRepForContact(parsed.contact);
-      if (rep) patch.salesRep = rep;
+    if (sameBillingContact) patch.billingContact = nextContact;
+    if (sameBillingCompany) patch.billingCompany = nextCompany;
+    if (sameInsuranceAdjuster) patch.insuranceAdjuster = nextContact;
+    if (sameInsuranceCompany) patch.insuranceCompany = nextCompany;
+    if (sameNationalCarrier) patch.nationalCarrier = nextCompany;
+    if (!nextCompany && data.billingPayer === "Referrer" && (sameBillingContact || sameBillingCompany)) {
+      patch.billingPayer = "";
+    }
+    if (getSalesRepForContact && nextContact && (!data.salesRep || data.salesRep === referrerRep)) {
+      const rep = getSalesRepForContact(nextContact);
+      patch.salesRep = rep || "";
     }
     updateMany(patch);
-    if (parsed.company) triggerAutoFlash?.("referringCompany");
-    if (parsed.contact) triggerAutoFlash?.("referrer");
+    if (nextCompany) triggerAutoFlash?.("referringCompany");
+    if (nextContact) triggerAutoFlash?.("referrer");
     onPromptRoleAssignment?.({
-      company: parsed.company || "",
-      contact: parsed.contact || "",
+      company: nextCompany,
+      contact: nextContact,
       source: "referrer",
       preferredRoles: ["referrer"],
       forceRoles: ["referrer"]
@@ -1868,7 +2661,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
   };
   const ensureReferrerFromQuery = () => {
     if (!referrerQuery) return;
-    if (data.referrer && data.referrer.toLowerCase() === referrerQuery.toLowerCase()) return;
+    if (referrerDisplayValue && referrerDisplayValue.toLowerCase() === referrerQuery.toLowerCase()) return;
     const best = getBestMatch(combinedContactOptions || [], referrerQuery);
     if (best) applyReferrerValue(best);
   };
@@ -1956,7 +2749,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                      <SearchSelect
                        data-audit-key="referrer"
                        className={auditOn && data.highlightMissing?.referrer ? "audit-missing" : ""}
-                       value={data.referrer}
+                       value={referrerDisplayValue}
                        onChange={(v)=>applyReferrerValue(v)}
                        onQueryChange={(v)=>setReferrerQuery(v)}
                      options={combinedContactOptions}
@@ -1964,7 +2757,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                      onBlur={() => ensureReferrerFromQuery()}
                    />
                  </div>
-                 {referrerBestMatch && referrerBestMatch !== data.referrer && (
+                 {referrerBestMatch && referrerBestMatch !== referrerDisplayValue && (
                    <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-2">
                      <span>Top match:</span>
                        <button
@@ -2229,8 +3022,8 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec1', sub: 'order', label: 'Order Name', keywords: 'order name autoname lastname townst' },
     { id: 'sec1', sub: 'order', label: 'Record Type', keywords: 'record type lead order' },
     { id: 'sec1', sub: 'order', label: 'Order Status', keywords: 'order status new in progress pickup complete' },
-    { id: 'sec1', sub: 'order', label: 'Project Type', keywords: 'project type restoration non-restoration' },
-    { id: 'sec1', sub: 'order', label: 'Order Type', keywords: 'order type loss types fire water mold dust debris puffback oil non-restoration cleaning commercial residential' },
+    { id: 'sec1', sub: 'order', label: 'Order Type', keywords: 'order type project type restoration non-restoration fire water mold dust debris puffback oil' },
+    { id: 'sec1', sub: 'order', label: 'Non-Restoration Type', keywords: 'non-restoration commercial cleaning residential cleaning other' },
     { id: 'sec1', sub: 'order', label: 'Service Offerings', keywords: 'service offerings rugs furniture packout consulting storage tli appliance art textiles' },
     { id: 'sec1', sub: 'order', label: 'Loss Type: Fire', keywords: 'fire smoke soot battery candle cooking electrical explosion fireplace flammables heating neighbor protein smoking wildfire', action: () => onSearchHit('Fire') },
     { id: 'sec1', sub: 'order', label: 'Loss Type: Water', keywords: 'water leak roof window frozen pipe burst overflow storm', action: () => onSearchHit('Water') },
@@ -2240,6 +3033,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec1', sub: 'order', label: 'Severity', keywords: 'severity rejects' },
     { id: 'sec1', sub: 'interview', label: 'Interview', keywords: 'interview living staying temp moving repairs packout conditions' },
     { id: 'sec1', sub: 'codes', label: 'Order Codes', keywords: 'handling severity quality box damp' },
+    { id: 'sec1', sub: 'codes', label: 'Order Instructions', keywords: 'instructions tagging cleaning packing delivery communication scheduling pickup billing collections' },
     { id: 'sec1', sub: 'source', label: 'Source', keywords: 'source referral marketing internal method sales rep' },
     { id: 'sec1', sub: 'source', label: 'Referrer (Contact or Company)', keywords: 'referrer referring company contact' },
     { id: 'sec1', sub: 'source', label: 'Method', keywords: 'method call email form meeting text tpa' },
@@ -2288,6 +3082,8 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec4', sub: 'finance', label: 'Price Multiplier', keywords: 'price multiplier' },
     { id: 'sec4', sub: 'finance', label: 'Estimate Requested', keywords: 'estimate requested' },
     { id: 'sec4', sub: 'companies', label: 'Companies & Contacts', keywords: 'companies contacts add company contact vendor' },
+    { id: 'sec1', sub: 'codes', label: 'Order Instructions', keywords: 'order instructions company instructions contact instructions preferences paperwork' },
+    { id: 'sec1', sub: 'codes', label: 'Add Order Instruction', keywords: 'add order instruction custom instruction' },
 
     { id: 'sec5', label: 'Schedule Section', keywords: 'schedule section' },
     { id: 'sec5', label: 'Schedule Type', keywords: 'scope pickup in-home' },
@@ -3168,7 +3964,7 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
 });
 
 // --- QUICK ENTRY COMPONENT ---
-const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, updateSmart, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment }) => {
+const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment, toggleNonRestorationPrimary, toggleRestorationType, selectNonRestorationSubtype }) => {
     const [eventNoteDraft, setEventNoteDraft] = useState("");
     const [showQuickInstructions, setShowQuickInstructions] = useState(false);
     const [showLoadListPanel, setShowLoadListPanel] = useState(false);
@@ -3189,6 +3985,10 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
     const quickNotes = QUICK_INSTRUCTION_NOTES;
     const eventSystemLines = buildEventSystemLines(data, conditionSummary);
     const eventSystemEntries = buildEventSystemEntries(data, conditionSummary);
+    const nonRestorationSelected = isNonRestorationSelected(data.orderTypes || []);
+    const nonRestorationSubtype = getNonRestorationSubtype(data.orderTypes || []);
+    const derivedProjectType = projectTypeFromOrderTypes(data.orderTypes || []);
+    const isRestorationProject = derivedProjectType === "Restoration Project";
     const hasEventInstructions = !!(
       stripEventSystemLines(data.eventInstructions || "").trim() ||
       (eventSystemLines || "").trim() ||
@@ -3221,7 +4021,8 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
               {quickQuestionsCollapsed ? (
                 <div className="mt-3 text-xs text-slate-600 flex flex-wrap gap-2">
                   <span className={`rounded-full px-2 py-0.5 font-semibold ${recordTypeLabel === "Select Type" ? "bg-amber-50 text-amber-700" : "bg-sky-50 text-sky-700"}`}>{recordTypeLabel}</span>
-                  {data.restorationType && <span className="rounded-full bg-slate-100 px-2 py-0.5">{data.restorationType}</span>}
+                  {derivedProjectType && <span className="rounded-full bg-slate-100 px-2 py-0.5">{derivedProjectType}</span>}
+                  {nonRestorationSelected && nonRestorationSubtype && <span className="rounded-full bg-slate-100 px-2 py-0.5">{nonRestorationSubtype}</span>}
                   {data.involvesInsurance && <span className="rounded-full bg-slate-100 px-2 py-0.5">Insurance: {data.involvesInsurance}</span>}
                   {data.payorQuick && <span className="rounded-full bg-slate-100 px-2 py-0.5">Payor: {data.payorQuick}</span>}
                 </div>
@@ -3233,13 +4034,41 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       { label: "Lead", title: "Potential project; incomplete information or no billing yet." }
                     ]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
                   </Field>
-                  <Field label="Is this a restoration project or non-restoration project?">
-                    <ToggleGroup options={[
-                      { label: "Restoration Project", title: "Project involving a loss event (fire, water, pests, etc.)." },
-                      { label: "Non-Restoration Project", title: "Service without a loss event (cleaning, storage, etc.)." }
-                    ]} value={data.restorationType} onChange={v => update("restorationType", v)} />
+                  <Field label="Order Type">
+                    <div className="flex flex-wrap gap-2">
+                      {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map((ot) => (
+                        <ToggleMulti
+                          key={ot}
+                          label={ot}
+                          title="Type of peril/damage involved."
+                          checked={(data.orderTypes || []).includes(ot)}
+                          onChange={() => {
+                            if (ot === NON_RESTORATION_PRIMARY) {
+                              toggleNonRestorationPrimary();
+                              return;
+                            }
+                            toggleRestorationType(ot);
+                          }}
+                        />
+                      ))}
+                    </div>
                   </Field>
-                  {data.restorationType === "Restoration Project" && (
+                  {nonRestorationSelected && (
+                    <Field label="Non-Restoration Type" missing={data.highlightMissing?.nonRestorationSubtype}>
+                      <div className="flex flex-wrap gap-2">
+                        {NON_RESTORATION_SUBTYPES.map((subtype) => (
+                          <ToggleMulti
+                            key={subtype}
+                            label={subtype}
+                            title="Required for non-restoration orders."
+                            checked={nonRestorationSubtype === subtype}
+                            onChange={() => selectNonRestorationSubtype(subtype)}
+                          />
+                        ))}
+                      </div>
+                    </Field>
+                  )}
+                  {isRestorationProject && (
                     <Field label="Does it involve insurance?">
                       <ToggleGroup options={[
                         { label: "Yes", title: "Whether customer is filing an insurance claim." },
@@ -3267,8 +4096,10 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Quick Flags</h3>
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Restoration Project?">
-                        <ToggleGroup options={["Y", "N"]} value={data.isRestorationProject} onChange={v => update("isRestorationProject", v)} />
+                    <Field label="Project Type">
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                          {derivedProjectType || "Select an Order Type above"}
+                        </div>
                     </Field>
                     <Field label="Going Through Insurance?">
                         <ToggleGroup options={["Yes", "No", "TBD"]} value={data.insuranceStatus} onChange={v => update("insuranceStatus", v)} />
@@ -3543,8 +4374,24 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
 // --- MAIN APP ---
 
+const createOrderInstructionDraft = (overrides = {}) => ({
+  id: "",
+  type: "Communication",
+  text: "",
+  ...overrides,
+});
+
 export default function App(){
   const SECTION_ORDER = ["sec1","sec2","sec3","sec4","sec5"];
+  const createAlertModalState = () => ({
+    isOpen: false,
+    title: "",
+    message: "",
+    details: [],
+    confirmLabel: "Confirm",
+    dismissLabel: "Close",
+    onConfirm: null,
+  });
   const createSmartConfirmState = () => ({
     isOpen: false,
     title: "",
@@ -3555,9 +4402,31 @@ export default function App(){
     onConfirm: null,
     onCancel: null,
   });
-  const normalizeSampleContacts = (rows = []) => (
-    rows.map(r => {
+  const normalizeSampleContacts = (rows = []) => {
+    const mergedRows = [...(rows || [])];
+    SAMPLE_CONTACTS.forEach((required) => {
+      const exists = mergedRows.some(
+        (row) =>
+          normalizeContact(row.name || "") === normalizeContact(required.name || "") &&
+          normalizeCompany(row.company || "") === normalizeCompany(required.company || "")
+      );
+      if (!exists) mergedRows.push(required);
+    });
+    return mergedRows.map(r => {
       const defaults = inferRoleCapabilities(r.companyType || "", r.company || "");
+      const seededRow = SAMPLE_CONTACTS.find(
+        (required) =>
+          normalizeContact(required.name || "") === normalizeContact(r.name || "") &&
+          normalizeCompany(required.company || "") === normalizeCompany(r.company || "")
+      );
+      const companyInstructions = mergeInstructionEntries(
+        seededRow?.companyInstructions || seededRow?.companyPreferences || [],
+        r.companyInstructions || r.companyPreferences || []
+      );
+      const contactInstructions = mergeInstructionEntries(
+        seededRow?.contactInstructions || seededRow?.contactPreferences || [],
+        r.contactInstructions || r.contactPreferences || []
+      );
       return {
         id: r.id || safeUid(),
         name: r.name || "",
@@ -3568,10 +4437,17 @@ export default function App(){
         isAdjuster: !!r.isAdjuster,
         canRefer: typeof r.canRefer === "boolean" ? r.canRefer : defaults.canRefer,
         canBill: typeof r.canBill === "boolean" ? r.canBill : defaults.canBill,
-        canInsure: typeof r.canInsure === "boolean" ? r.canInsure : defaults.canInsure
+        canInsure: typeof r.canInsure === "boolean" ? r.canInsure : defaults.canInsure,
+        companyInstructions,
+        contactInstructions,
+        companyPreferences: companyInstructions.map((entry) => entry.text),
+        contactPreferences: contactInstructions.map((entry) => entry.text),
+        specialDocuments: mergeUniqueStrings(seededRow?.specialDocuments || [], r.specialDocuments || []),
+        customerTextForms: mergeUniqueStrings(seededRow?.customerTextForms || [], r.customerTextForms || []),
+        nationalCarrier: (r.nationalCarrier || seededRow?.nationalCarrier || "").toString(),
       };
-    })
-  );
+    });
+  };
   const [entryMode, setEntryMode] = useState("start"); 
   const [showInlineHelp, setShowInlineHelp] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
@@ -3589,6 +4465,7 @@ export default function App(){
         ...parsed, 
         addresses: parsed.addresses?.length ? parsed.addresses : DEFAULT_FORM.addresses, 
         customers: parsed.customers?.length ? parsed.customers : DEFAULT_FORM.customers,
+        orderInstructions: normalizeInstructionEntries(parsed.orderInstructions || []),
         sdsServices: normalizedSdsServices,
         suggestedGroups: mergedSelectedGroups,
         scopeBridge: withScopeBridgeSnippet({
@@ -3653,9 +4530,14 @@ export default function App(){
   
   const [visitedSections, setVisitedSections] = useState(new Set(['sec1']));
 
-  const [alertModal, setAlertModal] = useState({ isOpen: false, message: "", onConfirm: null });
+  const [alertModal, setAlertModal] = useState(createAlertModalState);
   const [smartNotification, setSmartNotification] = useState(null);
   const [smartConfirm, setSmartConfirm] = useState(createSmartConfirmState);
+  const [orderInstructionModal, setOrderInstructionModal] = useState({
+    isOpen: false,
+    mode: "add",
+    draft: createOrderInstructionDraft(),
+  });
   const [roleAssignModal, setRoleAssignModal] = useState({
     isOpen: false,
     source: "",
@@ -3672,7 +4554,7 @@ export default function App(){
   const [reminderDraft, setReminderDraft] = useState({ date: "", time: "" });
   const [dateCloseTick, setDateCloseTick] = useState(0);
   const [timeCloseTick, setTimeCloseTick] = useState(0);
-  const [welcomeModal, setWelcomeModal] = useState({ isOpen: false, customerId: null, note: "" });
+  const [welcomeModal, setWelcomeModal] = useState({ isOpen: false, customerId: null, note: "", selectedSpecialDocs: [] });
   const [showWelcomeQuickNotes, setShowWelcomeQuickNotes] = useState(false);
   const [crmModal, setCrmModal] = useState({
     isOpen: false,
@@ -3718,8 +4600,16 @@ export default function App(){
   });
   const [showSampleDataModal, setShowSampleDataModal] = useState(false);
   const [livingAddressPrompt, setLivingAddressPrompt] = useState({ open: false, type: "" });
+  const [billingAssignmentUnlocked, setBillingAssignmentUnlocked] = useState(false);
+  const [insuranceAssignmentUnlocked, setInsuranceAssignmentUnlocked] = useState(false);
   const addCompanyInputRef = useRef(null);
   const [autoFlash, setAutoFlash] = useState({ key: "", ts: 0 });
+  const [sessionInstructionKeys, setSessionInstructionKeys] = useState(() => new Set());
+  const seenAttentionAlertKeysRef = useRef(new Set());
+  const lastNonRestorationToastRef = useRef("");
+  const lastCarrierAlertKeyRef = useRef("");
+  const tpaAssignmentPromptedRef = useRef(false);
+  const previousInsuranceCompanyRef = useRef(data.insuranceCompany || "");
 
   useEffect(() => {
     if (entryMode === "quick") {
@@ -3986,6 +4876,10 @@ export default function App(){
           specific: "Specific Groups Only",
         };
         patch.processType = processMap[incoming.processingOption] || prev.processType;
+      }
+
+      if (incoming.deliveryOption === "hold_cod") {
+        patch.processType = "COD";
       }
 
       return { ...prev, ...patch };
@@ -4408,21 +5302,33 @@ export default function App(){
     return () => document.removeEventListener("keydown", handleKeyboardNavigation, true);
   }, [entryMode, goToNextSection, goToPreviousSection]);
 
+  const toggleNonRestorationPrimary = () => {
+    setData((prev) => ({
+      ...prev,
+      orderTypes: toggleNonRestorationPrimarySelection(prev.orderTypes || []),
+    }));
+  };
+
+  const toggleRestorationType = (type) => {
+    setData((prev) => ({
+      ...prev,
+      orderTypes: toggleRestorationTypeSelection(prev.orderTypes || [], type),
+    }));
+    if (!data.orderTypes.includes(type)) {
+      setMinimizedLossTypes((p) => ({ ...p, [type]: false }));
+    }
+  };
+
+  const selectNonRestorationSubtype = (subtype) => {
+    setData((prev) => ({
+      ...prev,
+      orderTypes: selectNonRestorationSubtypeSelection(prev.orderTypes || [], subtype),
+    }));
+  };
+
   const toggleLossType = (type) => {
-     setData(prev => {
-         const current = prev.orderTypes || [];
-         const isActive = current.includes(type);
-         let newTypes;
-         if (isActive) {
-             newTypes = current.filter(t => t !== type);
-         } else {
-             newTypes = [...current, type];
-         }
-         return { ...prev, orderTypes: newTypes };
-     });
-     if(!data.orderTypes.includes(type)) {
-         setMinimizedLossTypes(p => ({...p, [type]: false}));
-     }
+    if (!LOSS_TYPES.includes(type)) return;
+    toggleRestorationType(type);
   };
   
   const toggleSeverity = (code) => {
@@ -5128,8 +6034,9 @@ export default function App(){
     setTimeCloseTick(t => t + 1);
   }, [update]);
 
-  const handleSendWelcome = (customerId) => {
-    setWelcomeModal({ isOpen: true, customerId, note: "" });
+  const handleSendWelcome = (customerId, options = {}) => {
+    const selectedSpecialDocs = normalizeStringList(options.selectedSpecialDocs || []);
+    setWelcomeModal({ isOpen: true, customerId, note: "", selectedSpecialDocs });
     setShowWelcomeQuickNotes(false);
   };
 
@@ -5195,7 +6102,7 @@ export default function App(){
   }, []);
 
   useEffect(() => {
-    const insuranceRelated = data.involvesInsurance === "Yes" && data.restorationType === "Restoration Project";
+    const insuranceRelated = data.involvesInsurance === "Yes" && hasRestorationOrderType(data.orderTypes || []);
     if (!insuranceRelated) {
       setData(prev => ({
         ...prev,
@@ -5211,7 +6118,7 @@ export default function App(){
       const updated = customers.map((c, idx) => idx === 0 ? { ...c, policyHolder: true, type: "Policyholder" } : c);
       return { ...prev, customers: updated };
     });
-  }, [data.involvesInsurance, data.restorationType]);
+  }, [data.involvesInsurance, data.orderTypes]);
 
   useEffect(() => {
     const lossSeverity = data.lossSeverity || initLossSeverity();
@@ -5319,6 +6226,11 @@ export default function App(){
     setInsuranceSubOpen(false);
     setFinanceSubOpen(false);
     setScheduleBridgeOpen(false);
+    setOrderInstructionModal({
+      isOpen: false,
+      mode: "add",
+      draft: createOrderInstructionDraft(),
+    });
     setToast("Reset complete");
   }, [entryMode]);
 
@@ -5348,7 +6260,7 @@ export default function App(){
     };
     push("Record Type", data.isLead === true ? "Lead" : data.isLead === false ? "Order" : "");
     push("Order Status", data.orderStatus);
-    push("Project Type", data.restorationType);
+    push("Project Type", projectTypeFromOrderTypes(data.orderTypes || []));
     push("Order Name", data.orderName);
     push("Order Type", data.orderTypes);
     push("Service Offerings", data.serviceOfferings);
@@ -5375,6 +6287,7 @@ export default function App(){
     push("Bill To", data.billingPayer);
     push("Billing Company", data.billingCompany);
     push("Billing Contact", data.billingContact);
+    push("Order Instructions", normalizeInstructionEntries(data.orderInstructions || []).map((entry) => `${entry.type}: ${entry.text}`).join(" | "));
     push("Insurance Claim", data.insuranceClaim);
     push("Insurance Company", data.insuranceCompany);
     push("National Carrier", data.nationalCarrier);
@@ -5459,7 +6372,8 @@ export default function App(){
 
   const validateGenerateScope = () => {
     const missing = {};
-    if(!(data.orderTypes||[]).length) missing.orderTypes=true;
+    if(!hasPrimaryOrderTypeDecision(data.orderTypes || [])) missing.orderTypes=true;
+    if(!hasRequiredNonRestorationSubtype(data.orderTypes || [])) missing.nonRestorationSubtype=true;
     setData(p=>({...p,highlightMissing:missing}));
     if(Object.keys(missing).length){
       setOpenSections(p => ({...p, sec1:true}));
@@ -5484,7 +6398,8 @@ export default function App(){
     const primaryAddress = (data.addresses || [])[0] || {};
 
     if(!data.orderName) missing.push({ id: "sec1", label: "Order Name", section: "sec1", key: "orderName" });
-    if(!(data.orderTypes||[]).length) missing.push({ id: "sec1", label: "Order Type", section: "sec1", key: "orderTypes" });
+    if(!hasPrimaryOrderTypeDecision(data.orderTypes || [])) missing.push({ id: "sec1", label: "Order Type", section: "sec1", key: "orderTypes" });
+    if(!hasRequiredNonRestorationSubtype(data.orderTypes || [])) missing.push({ id: "sec1", label: "Non-Restoration Type", section: "sec1", key: "nonRestorationSubtype" });
     if(!data.leadSourceCategory) missing.push({ id: "sec1", label: "Lead Source", section: "sec1", key: "leadSourceCategory" });
     if(data.leadSourceCategory === "Referral") {
       if(!data.referringCompany) missing.push({ id: "sec1", label: "Referring Company", section: "sec1", key: "referringCompany" });
@@ -5569,7 +6484,7 @@ export default function App(){
           category: "placeholders"
         });
       }
-      if (!companyPending && isContactPlaceholder(entry)) {
+      if (!companyPending && companyTypeRequiresContact(type) && isContactPlaceholder(entry)) {
         missing.push({
           id: "sec4",
           label: `Resolve Placeholder: ${type} contact`,
@@ -5589,6 +6504,7 @@ export default function App(){
     const primaryAddress = (data.addresses || [])[0] || {};
     total += 1; // orderName
     total += 1; // orderTypes
+    if (isNonRestorationSelected(data.orderTypes || [])) total += 1; // nonRestorationSubtype
     total += 1; // lead source category
     if (data.leadSourceCategory === "Referral") total += 2;
     if (data.leadSourceCategory === "Marketing" || data.leadSourceCategory === "Internal") total += 1;
@@ -5613,16 +6529,437 @@ export default function App(){
     }
     total += (data.addresses || []).filter(addr => isAddressPlaceholder(addr)).length;
     total += (data.customers || []).filter((customer) => isPlaceholderFlagActive(customer?.placeholder)).length;
-    total += Object.values(data.additionalCompanies || {}).reduce((acc, rawEntry) => {
+    total += Object.entries(data.additionalCompanies || {}).reduce((acc, [type, rawEntry]) => {
       const entry = syncCompanyEntryPlaceholders(rawEntry || {});
       let count = acc;
       const companyPending = isCompanyPlaceholder(entry);
       if (companyPending) count += 1;
-      if (!companyPending && isContactPlaceholder(entry)) count += 1;
+      if (!companyPending && companyTypeRequiresContact(type) && isContactPlaceholder(entry)) count += 1;
       return count;
     }, 0);
     return total;
   };
+
+  const getCompanyProfile = useCallback(
+    (companyName = "") => resolveCompanyProfile(companyName, sampleContacts),
+    [sampleContacts]
+  );
+  const getContactProfile = useCallback(
+    (contactName = "") => resolveContactProfile(contactName, sampleContacts),
+    [sampleContacts]
+  );
+
+  const orderCompanyNames = useMemo(() => {
+    const names = new Map();
+    const add = (value) => {
+      const trimmed = (value || "").toString().trim();
+      if (!trimmed) return;
+      const key = normalizeCompany(trimmed);
+      if (!names.has(key)) names.set(key, trimmed);
+    };
+    add(data.referringCompany);
+    add(data.billingCompany);
+    add(data.insuranceCompany);
+    add(data.publicAdjustingCompany);
+    add(data.independentAdjustingCo);
+    add(data.tpaCompany);
+    Object.values(data.additionalCompanies || {}).forEach((entry) => add(entry?.company));
+    return Array.from(names.values());
+  }, [
+    data.referringCompany,
+    data.billingCompany,
+    data.insuranceCompany,
+    data.publicAdjustingCompany,
+    data.independentAdjustingCo,
+    data.tpaCompany,
+    data.additionalCompanies,
+  ]);
+
+  const orderContactNames = useMemo(() => {
+    const names = new Map();
+    const add = (value) => {
+      const trimmed = (value || "").toString().trim();
+      if (!trimmed) return;
+      const key = normalizeContact(trimmed);
+      if (!names.has(key)) names.set(key, trimmed);
+    };
+    add(data.referrer);
+    add(data.billingContact);
+    add(data.insuranceAdjuster);
+    add(data.publicAdjuster);
+    add(data.independentAdjuster);
+    add(data.tpaContact);
+    Object.values(data.additionalCompanies || {}).forEach((entry) => {
+      entryContactList(entry || {}).forEach((contact) => add(contact?.name));
+    });
+    return Array.from(names.values());
+  }, [
+    data.referrer,
+    data.billingContact,
+    data.insuranceAdjuster,
+    data.publicAdjuster,
+    data.independentAdjuster,
+    data.tpaContact,
+    data.additionalCompanies,
+  ]);
+
+  const currentOrderSpecialDocs = useMemo(() => {
+    return mergeUniqueStrings(
+      orderCompanyNames.flatMap((companyName) => getCompanyProfile(companyName).specialDocuments || []),
+      orderContactNames.flatMap((contactName) => getContactProfile(contactName).specialDocuments || [])
+    );
+  }, [orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile]);
+
+  const currentOrderCustomerForms = useMemo(() => {
+    return mergeUniqueStrings(
+      orderCompanyNames.flatMap((companyName) => {
+        const profile = getCompanyProfile(companyName);
+        return profile.customerTextForms?.length ? profile.customerTextForms : profile.specialDocuments;
+      }),
+      orderContactNames.flatMap((contactName) => {
+        const profile = getContactProfile(contactName);
+        return profile.customerTextForms?.length ? profile.customerTextForms : profile.specialDocuments;
+      })
+    );
+  }, [orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile]);
+  const orderLevelInstructions = useMemo(
+    () => normalizeInstructionEntries(data.orderInstructions || []),
+    [data.orderInstructions]
+  );
+  const orderInstructionSelectionSet = useMemo(
+    () => new Set(orderLevelInstructions.map((entry) => getInstructionTypeTextKey(entry.type, entry.text))),
+    [orderLevelInstructions]
+  );
+  const markInstructionKeysSeen = useCallback((keys = []) => {
+    if (!keys.length) return;
+    setSessionInstructionKeys((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      keys.forEach((key) => {
+        if (!key || next.has(key)) return;
+        next.add(key);
+        changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+  const buildAssignmentCueItems = useCallback((groups = []) => {
+    return groups.flatMap((group) => {
+      const matches = [];
+      if (group.companyMatch) matches.push("company");
+      if (group.contactMatch) matches.push("contact");
+      if (!matches.length) return [];
+      if (matches.length === 2) return [`${group.label} linked`];
+      return [`${group.label} ${matches[0]} linked`];
+    });
+  }, []);
+
+  const linkedInsuranceCarrier = useMemo(
+    () => resolveLinkedNationalCarrierName(data.insuranceCompany || "", sampleContacts),
+    [data.insuranceCompany, sampleContacts]
+  );
+  const billingAssignmentCues = useMemo(
+    () => buildAssignmentCueItems([
+      {
+        label: "Referrer",
+        companyMatch: sameNormalizedCompany(data.billingCompany, data.referringCompany),
+        contactMatch: sameNormalizedContact(data.billingContact, data.referrer),
+      },
+      {
+        label: "Insurance",
+        companyMatch: sameNormalizedCompany(data.billingCompany, data.insuranceCompany),
+        contactMatch: sameNormalizedContact(data.billingContact, data.insuranceAdjuster),
+      },
+    ]),
+    [
+      data.billingCompany,
+      data.referringCompany,
+      data.billingContact,
+      data.referrer,
+      data.insuranceCompany,
+      data.insuranceAdjuster,
+      buildAssignmentCueItems,
+    ]
+  );
+  const billingAssignmentLinked =
+    billingAssignmentCues.length > 0 && !!(data.billingCompany || data.billingContact);
+  const insuranceAssignmentCues = useMemo(
+    () => buildAssignmentCueItems([
+      {
+        label: "Referrer",
+        companyMatch: sameNormalizedCompany(data.insuranceCompany, data.referringCompany),
+        contactMatch: sameNormalizedContact(data.insuranceAdjuster, data.referrer),
+      },
+      {
+        label: "Bill To",
+        companyMatch: sameNormalizedCompany(data.insuranceCompany, data.billingCompany),
+        contactMatch: sameNormalizedContact(data.insuranceAdjuster, data.billingContact),
+      },
+    ]),
+    [
+      data.insuranceCompany,
+      data.referringCompany,
+      data.insuranceAdjuster,
+      data.referrer,
+      data.billingCompany,
+      data.billingContact,
+      buildAssignmentCueItems,
+    ]
+  );
+  const insuranceAssignmentLinked =
+    insuranceAssignmentCues.length > 0 &&
+    !!(data.insuranceCompany || data.insuranceAdjuster || data.nationalCarrier);
+  useEffect(() => {
+    if (!billingAssignmentLinked) setBillingAssignmentUnlocked(false);
+  }, [billingAssignmentLinked]);
+  useEffect(() => {
+    if (!insuranceAssignmentLinked) setInsuranceAssignmentUnlocked(false);
+  }, [insuranceAssignmentLinked]);
+  const showInsuranceShortcutOptions =
+    !(
+      !!(data.insuranceCompany || "").trim() &&
+      !!linkedInsuranceCarrier &&
+      !isInsuranceShortcutCompany(data.insuranceCompany)
+    );
+  const insuranceCarrierLinkMissing =
+    data.insuranceClaim === "Yes" &&
+    !!(data.insuranceCompany || "").trim() &&
+    !linkedInsuranceCarrier &&
+    !isInsuranceShortcutCompany(data.insuranceCompany) &&
+    !isNonRestorationSelected(data.orderTypes || []);
+
+  const openPrimaryCustomerText = useCallback((selectedSpecialDocs = []) => {
+    const primaryCustomer =
+      (data.customers || []).find((customer) => customer.isPrimary) ||
+      (data.customers || [])[0];
+    if (!primaryCustomer?.id) {
+      setOpenSections((prev) => ({ ...prev, sec2: true }));
+      setToast("Add a customer before sending a text.");
+      return;
+    }
+    setOpenSections((prev) => ({ ...prev, sec2: true }));
+    handleSendWelcome(primaryCustomer.id, {
+      selectedSpecialDocs: selectedSpecialDocs.length ? selectedSpecialDocs : currentOrderCustomerForms,
+    });
+  }, [data.customers, currentOrderCustomerForms, handleSendWelcome]);
+  const openAddOrderInstructionModal = useCallback(() => {
+    setOrderInstructionModal({
+      isOpen: true,
+      mode: "add",
+      draft: createOrderInstructionDraft(),
+    });
+  }, []);
+  const openEditOrderInstructionModal = useCallback((entry = {}) => {
+    setOrderInstructionModal({
+      isOpen: true,
+      mode: "edit",
+      draft: createOrderInstructionDraft({
+        id: getInstructionIdentity(entry),
+        type: entry.type || "Communication",
+        text: entry.text || "",
+      }),
+    });
+  }, []);
+  const closeOrderInstructionModal = useCallback(() => {
+    setOrderInstructionModal({
+      isOpen: false,
+      mode: "add",
+      draft: createOrderInstructionDraft(),
+    });
+  }, []);
+  const saveOrderInstruction = useCallback(() => {
+    const normalized = normalizeInstructionEntry(orderInstructionModal.draft, "Communication");
+    if (!normalized?.text) {
+      setToast("Add instruction text before saving.");
+      return;
+    }
+    const draftIdentity = getInstructionIdentity(orderInstructionModal.draft);
+    setData((prev) => {
+      const existing = normalizeInstructionEntries(prev.orderInstructions || []);
+      const nextEntry = {
+        ...normalized,
+        id: normalized.id || safeUid(),
+      };
+      const hasMatch = existing.some((entry) => getInstructionIdentity(entry) === draftIdentity);
+      const nextInstructions = hasMatch
+        ? existing.map((entry) => (
+            getInstructionIdentity(entry) === draftIdentity
+              ? nextEntry
+              : entry
+          ))
+        : [...existing, nextEntry];
+      return {
+        ...prev,
+        orderInstructions: dedupeInstructionEntries(nextInstructions),
+      };
+    });
+    closeOrderInstructionModal();
+    setToast(orderInstructionModal.mode === "edit" ? "Order instruction updated." : "Order instruction added.");
+  }, [orderInstructionModal, closeOrderInstructionModal]);
+  const renderAlertMessageContent = useCallback((message = "", title = "") => {
+    const marker = " has saved guidance for this order.";
+    if (
+      message &&
+      marker &&
+      message.endsWith(marker) &&
+      /instructions found|requirements found/i.test(title || "")
+    ) {
+      const entity = message.slice(0, -marker.length).trim();
+      return (
+        <>
+          <span className="font-semibold text-slate-900">{entity}</span>
+          <span>{marker}</span>
+        </>
+      );
+    }
+    return message;
+  }, []);
+  const renderAlertDetailContent = useCallback((detail = "") => {
+    const separatorIndex = (detail || "").indexOf(":");
+    if (separatorIndex === -1) return detail;
+    const label = detail.slice(0, separatorIndex).trim();
+    const text = detail.slice(separatorIndex + 1).trim();
+    return (
+      <>
+        <span className="font-semibold text-slate-900">{label}:</span>
+        {text ? <span>{` ${text}`}</span> : null}
+      </>
+    );
+  }, []);
+  const toggleOrderInstructionPreset = useCallback((type, text) => {
+    const preset = normalizeInstructionEntry({ type, text }, type);
+    if (!preset) return;
+    const presetKey = getInstructionTypeTextKey(preset.type, preset.text);
+    setData((prev) => {
+      const existing = normalizeInstructionEntries(prev.orderInstructions || []);
+      const hasPreset = existing.some((entry) => getInstructionTypeTextKey(entry.type, entry.text) === presetKey);
+      return {
+        ...prev,
+        orderInstructions: hasPreset
+          ? existing.filter((entry) => getInstructionTypeTextKey(entry.type, entry.text) !== presetKey)
+          : dedupeInstructionEntries([
+              ...existing,
+              { ...preset, id: safeUid() },
+            ]),
+      };
+    });
+  }, []);
+  const removeOrderInstruction = useCallback((entry = {}) => {
+    setAlertModal({
+      isOpen: true,
+      title: "Remove order instruction?",
+      message: entry.text || "Remove this order instruction?",
+      details: entry.type ? [`Type: ${entry.type}`] : [],
+      confirmLabel: "Remove",
+      dismissLabel: "Cancel",
+      onConfirm: () => {
+        setData((prev) => ({
+          ...prev,
+          orderInstructions: normalizeInstructionEntries(prev.orderInstructions || []).filter(
+            (item) => getInstructionIdentity(item) !== getInstructionIdentity(entry)
+          ),
+        }));
+        setToast("Order instruction removed.");
+      },
+    });
+  }, []);
+
+  const orderAttentionAlerts = useMemo(() => {
+    const items = [];
+    orderCompanyNames.forEach((companyName) => {
+      const profile = getCompanyProfile(companyName);
+      const details = [
+        ...profile.companyInstructions.map((item) => `${item.type}: ${item.text}`),
+        ...profile.specialDocuments.map((item) => `Paperwork: ${item}`),
+      ];
+      if (!details.length) return;
+      items.push({
+        key: `company:${normalizeCompany(companyName)}:${details.join("|")}`,
+        entityKey: `company:${normalizeCompany(companyName)}`,
+        title: profile.specialDocuments.length ? "Special requirements found" : "Company instructions found",
+        message: `${companyName} has saved guidance for this order.`,
+        details,
+      });
+    });
+    orderContactNames.forEach((contactName) => {
+      const profile = getContactProfile(contactName);
+      const details = [
+        ...profile.contactInstructions.map((item) => `${item.type}: ${item.text}`),
+        ...profile.specialDocuments.map((item) => `Paperwork: ${item}`),
+      ];
+      if (!details.length) return;
+      items.push({
+        key: `contact:${normalizeContact(contactName)}:${details.join("|")}`,
+        entityKey: `contact:${normalizeContact(contactName)}`,
+        title: profile.specialDocuments.length ? "Special requirements found" : "Contact instructions found",
+        message: `${contactName} has saved guidance for this order.`,
+        details,
+      });
+    });
+    return items;
+  }, [orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile]);
+
+  useEffect(() => {
+    const unseen = orderAttentionAlerts.find(
+      (item) => !seenAttentionAlertKeysRef.current.has(item.key)
+    );
+    if (!unseen) return;
+    seenAttentionAlertKeysRef.current.add(unseen.key);
+    markInstructionKeysSeen(unseen.entityKey ? [unseen.entityKey] : []);
+    setAlertModal({
+      isOpen: true,
+      title: unseen.title,
+      message: unseen.message,
+      details: unseen.details,
+      confirmLabel: "OK",
+      dismissLabel: "Close",
+      onConfirm: null,
+    });
+  }, [orderAttentionAlerts, markInstructionKeysSeen]);
+
+  useEffect(() => {
+    const key = insuranceCarrierLinkMissing ? normalizeCompany(data.insuranceCompany || "") : "";
+    if (!key) {
+      lastCarrierAlertKeyRef.current = "";
+      return;
+    }
+    if (lastCarrierAlertKeyRef.current === key) return;
+    lastCarrierAlertKeyRef.current = key;
+    setToast(`No national carrier link found for ${data.insuranceCompany}.`);
+  }, [insuranceCarrierLinkMissing, data.insuranceCompany]);
+
+  const estimateRequesterQuickOptions = useMemo(() => {
+    const options = [];
+    const seen = new Set();
+    const add = (name, roleLabel = "") => {
+      const trimmed = (name || "").toString().trim();
+      if (!trimmed) return;
+      const value = roleLabel ? `${trimmed} (${roleLabel})` : trimmed;
+      const key = value.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push(value);
+    };
+    (data.customers || []).forEach((customer) => {
+      const fullName = [customer.first, customer.last].filter(Boolean).join(" ").trim();
+      add(fullName, "Customer");
+    });
+    add(data.insuranceAdjuster, "Adjuster");
+    add(data.publicAdjuster, "Public Adjuster");
+    add(data.independentAdjuster, "Independent Adjuster");
+    add(data.tpaContact, "TPA");
+    add(data.billingContact, "Bill To");
+    add(data.referrer, "Referrer");
+    return options;
+  }, [
+    data.customers,
+    data.insuranceAdjuster,
+    data.publicAdjuster,
+    data.independentAdjuster,
+    data.tpaContact,
+    data.billingContact,
+    data.referrer,
+  ]);
 
   const sectionAuditStatus = useMemo(() => {
     const missing = computeAuditMissing();
@@ -5636,6 +6973,7 @@ export default function App(){
     const requiredBySection = { sec1: 0, sec2: 0, sec3: 0, sec4: 0, sec5: 0 };
 
     requiredBySection.sec1 += 3; // orderName, orderTypes, leadSourceCategory
+    if (isNonRestorationSelected(data.orderTypes || [])) requiredBySection.sec1 += 1;
     if (data.leadSourceCategory === "Referral") requiredBySection.sec1 += 2;
     if (data.leadSourceCategory === "Marketing" || data.leadSourceCategory === "Internal") requiredBySection.sec1 += 1;
     if ((data.orderTypes || []).includes("Mold")) requiredBySection.sec1 += 1;
@@ -5699,9 +7037,9 @@ export default function App(){
     missing.forEach(m => {
       if (["leadSourceCategory","referringCompany","referrer","leadSourceDetail"].includes(m.key)) subsections.add("source");
     if (["billingPayer"].includes(m.key)) subsections.add("billing");
-    if (["orderName","orderTypes","moldCoverageConfirm"].includes(m.key)) subsections.add("order");
+    if (["orderName","orderTypes","nonRestorationSubtype","moldCoverageConfirm"].includes(m.key)) subsections.add("order");
       if (["insuranceClaim","insuranceCompany","insuranceAdjuster","claimNumber","dateOfLoss","nationalCarrier","directionOfPayment","contentsCoverageLimit","moldLimit"].includes(m.key)) subsections.add("insurance");
-      if (["moldCoverageConfirm","orderTypes"].includes(m.key)) subsections.add("order");
+      if (["moldCoverageConfirm","orderTypes","nonRestorationSubtype"].includes(m.key)) subsections.add("order");
       if (["rentCoverageLimit"].includes(m.key)) subsections.add("address");
       if (["pricePlatform","priceList","multiplier","estimateRequested"].includes(m.key)) subsections.add("finance");
       if ((m.key || "").startsWith("placeholder-customer-")) subsections.add("customer");
@@ -5775,10 +7113,26 @@ export default function App(){
   const deriveScopeBridgeStatus = useCallback((bridge) => {
     if ((bridge?.projectStatus || "") === "red") return "red";
     const hasPending = (bridge?.pendingIssues || []).length > 0;
+    const processingOption = (bridge?.processingOption || "").toString();
+    const deliveryOption = (bridge?.deliveryOption || "").toString();
+    const nextStep = (bridge?.nextStep || "").toString();
+    const legacyOperationalStep = [
+      "pickup_hold",
+      "processing_hold",
+      "emergency_groups_only",
+      "cod",
+      "delivery_hold",
+      "wait_approval",
+      "wait_test",
+      "delivery_priority",
+      "delivery_hold_cod",
+    ].includes(nextStep);
     const hasOperationalHold =
       (bridge?.pickupOption || "") === "wait" ||
-      ["tag_hold", "urgent", "cod"].includes((bridge?.processingOption || "").toString()) ||
-      !!(bridge?.nextStep || "");
+      (bridge?.pickupOption || "") === "urgent" ||
+      ["tag_hold", "urgent", "cod", "specific"].includes(processingOption) ||
+      ["priority", "hold_cod"].includes(deliveryOption) ||
+      legacyOperationalStep;
     return hasPending || hasOperationalHold ? "yellow" : "green";
   }, []);
 
@@ -5803,8 +7157,6 @@ export default function App(){
   const toggleScopeBridgeIssue = useCallback((issue) => {
     patchScopeBridge((prev) => {
       const normalizedIssue = canonicalBridgeIssue(issue);
-      const isAutoManaged = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(normalizedIssue);
-      if (isAutoManaged) return prev;
       const currentPending = Array.from(new Set((prev.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean)));
       const nextPending = toggleMulti(currentPending, normalizedIssue);
       return {
@@ -5817,14 +7169,51 @@ export default function App(){
   const toggleScopeBridgeMilestone = useCallback((milestoneId, atId) => {
     patchScopeBridge((prev) => {
       const currentMilestones = prev.milestones || {};
+      const currentPending = Array.from(new Set((prev.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean)));
       const nextEnabled = !currentMilestones[milestoneId];
+      const isEstimateApproval = milestoneId === "estimateApproved";
+      const isAuthorizationSigned = milestoneId === "authorizationOnFile";
+      const clearOverridePatch = isEstimateApproval && nextEnabled
+        ? {
+            proceedWithoutApproval: false,
+            proceedWithoutApprovalAt: "",
+            proceedWithoutApprovalBy: "",
+          }
+        : {};
+      let nextPending = [...currentPending];
+      if (nextEnabled && isAuthorizationSigned) {
+        nextPending = nextPending.filter((issue) => issue !== "Won't Sign Authorization");
+      }
+      if (nextEnabled && isEstimateApproval) {
+        nextPending = nextPending.filter((issue) => issue !== "Customer Wants Estimate" && issue !== "Adjuster Wants Estimate");
+      }
+      return {
+        ...prev,
+        pendingIssues: nextPending,
+        milestones: {
+          ...currentMilestones,
+          ...clearOverridePatch,
+          [milestoneId]: nextEnabled,
+          [atId]: nextEnabled ? new Date().toISOString() : "",
+        }
+      };
+    });
+  }, [patchScopeBridge]);
+
+  const toggleProceedWithoutApproval = useCallback(() => {
+    patchScopeBridge((prev) => {
+      const currentMilestones = prev.milestones || {};
+      const nextEnabled = !currentMilestones.proceedWithoutApproval;
       return {
         ...prev,
         milestones: {
           ...currentMilestones,
-          [milestoneId]: nextEnabled,
-          [atId]: nextEnabled ? new Date().toISOString() : "",
-        }
+          proceedWithoutApproval: nextEnabled,
+          proceedWithoutApprovalAt: nextEnabled ? new Date().toISOString() : "",
+          estimateApproved: nextEnabled ? false : currentMilestones.estimateApproved,
+          estimateApprovedAt: nextEnabled ? "" : currentMilestones.estimateApprovedAt,
+          estimateApprovedBy: nextEnabled ? "" : currentMilestones.estimateApprovedBy,
+        },
       };
     });
   }, [patchScopeBridge]);
@@ -5842,13 +7231,20 @@ export default function App(){
     const auto = [];
     const milestones = scopeBridgeState.milestones || {};
     const authorizationOnFile = !!milestones.authorizationOnFile;
-    const estimateApproved = !!milestones.estimateApproved || hasMeaningfulValue(data.estimateApprovedAt);
+    const proceedWithoutApproval = !!milestones.proceedWithoutApproval;
+    const estimateApproved = proceedWithoutApproval || !!milestones.estimateApproved || hasMeaningfulValue(data.estimateApprovedAt);
     const estimateRequestedBy = (data.estimateRequestedBy || "").toString().trim().toLowerCase();
     const estimateRequestedByInsurance = /\b(adjuster|insurance|carrier|public adjuster|pa|tpa)\b/.test(estimateRequestedBy);
 
     if (!authorizationOnFile) auto.push("Won't Sign Authorization");
     if (!!data.estimateRequested && !estimateApproved) {
       auto.push(estimateRequestedByInsurance ? "Adjuster Wants Estimate" : "Customer Wants Estimate");
+    }
+    if (currentOrderSpecialDocs.length > 0) {
+      auto.push(SPECIAL_PAPERWORK_BLOCKER);
+    }
+    if (normalizeCompany(data.insuranceCompany || "") === normalizeCompany("Not Yet Known")) {
+      auto.push(UNKNOWN_INSURANCE_BLOCKER);
     }
 
     return Array.from(new Set(auto));
@@ -5857,12 +7253,23 @@ export default function App(){
     data.estimateRequested,
     data.estimateRequestedBy,
     data.estimateApprovedAt,
+    data.insuranceCompany,
+    currentOrderSpecialDocs,
   ]);
   const autoManagedBridgeBlockerSet = useMemo(
     () => new Set(BRIDGE_AUTO_MANAGED_BLOCKERS),
     []
   );
+  const prevAutoBridgeIssuesRef = useRef(null);
   useEffect(() => {
+    const prevAuto = prevAutoBridgeIssuesRef.current;
+    if (!prevAuto) {
+      prevAutoBridgeIssuesRef.current = autoBridgeIssues;
+      return;
+    }
+    if (stringListMatches(prevAuto, autoBridgeIssues)) return;
+    prevAutoBridgeIssuesRef.current = autoBridgeIssues;
+
     const currentPendingRaw = scopeBridgeState.pendingIssues || [];
     const currentPending = Array.from(new Set(currentPendingRaw.map(canonicalBridgeIssue).filter(Boolean)));
     const autoSet = new Set(autoBridgeIssues);
@@ -5907,47 +7314,51 @@ export default function App(){
     return parts.join(" · ");
   }, [data.estimateType, data.estimateRequestedBy]);
   const authorizationOnFile = !!(scopeBridgeState.milestones || {}).authorizationOnFile;
-  const selectedBridgeNextStep = useMemo(() => {
-    const known = (scopeBridgeState.nextStep || "").toString();
-    if (BRIDGE_NEXT_STEP_OPTIONS.some((option) => option.id === known)) return known;
-    if ((scopeBridgeState.processingOption || "") === "cod") return "cod";
-    if ((scopeBridgeState.processingOption || "") === "tag_hold") return "processing_hold";
-    if ((scopeBridgeState.processingOption || "") === "urgent" || (scopeBridgeState.pickupOption || "") === "urgent") return "emergency_groups_only";
-    if ((scopeBridgeState.pickupOption || "") === "wait") return "pickup_hold";
-    return "";
-  }, [scopeBridgeState.nextStep, scopeBridgeState.pickupOption, scopeBridgeState.processingOption]);
-  const toggleBridgeNextStep = useCallback((optionId) => {
+  const selectedBridgePickupStep = useMemo(() => {
+    const pickup = (scopeBridgeState.pickupOption || "").toString();
+    if (pickup === "wait") return "hold";
+    if (pickup === "urgent") return "priority";
+    return "schedule";
+  }, [scopeBridgeState.pickupOption]);
+  const selectedBridgeProcessStep = useMemo(() => {
+    const process = (scopeBridgeState.processingOption || "").toString();
+    if (process === "tag_hold") return "hold";
+    if (process === "urgent" || process === "specific") return "priority";
+    return "yes";
+  }, [scopeBridgeState.processingOption]);
+  const selectedBridgeDeliveryStep = useMemo(() => {
+    const delivery = (scopeBridgeState.deliveryOption || "").toString();
+    if (delivery === "hold_cod") return "hold_cod";
+    if (delivery === "priority") return "priority";
+    if (delivery === "ok") return "ok";
+
+    const nextStep = (scopeBridgeState.nextStep || "").toString();
+    if (nextStep === "delivery_hold_cod" || nextStep === "cod" || nextStep === "delivery_hold") return "hold_cod";
+    if (nextStep === "delivery_priority" || nextStep === "emergency_groups_only") return "priority";
+    if ((scopeBridgeState.processingOption || "").toString() === "cod") return "hold_cod";
+    return "ok";
+  }, [scopeBridgeState.deliveryOption, scopeBridgeState.nextStep, scopeBridgeState.processingOption]);
+  const setBridgePickupStep = useCallback((optionId) => {
     patchScopeBridge((prev) => {
-      const currentStep = (() => {
-        const known = (prev.nextStep || "").toString();
-        if (BRIDGE_NEXT_STEP_OPTIONS.some((option) => option.id === known)) return known;
-        if ((prev.processingOption || "") === "cod") return "cod";
-        if ((prev.processingOption || "") === "tag_hold") return "processing_hold";
-        if ((prev.processingOption || "") === "urgent" || (prev.pickupOption || "") === "urgent") return "emergency_groups_only";
-        if ((prev.pickupOption || "") === "wait") return "pickup_hold";
-        return "";
-      })();
-      const isTurningOff = currentStep === optionId;
-      if (isTurningOff) {
-        const clearPatch = { nextStep: "" };
-        if (optionId === "pickup_hold" && prev.pickupOption === "wait") clearPatch.pickupOption = "";
-        if (optionId === "processing_hold" && prev.processingOption === "tag_hold") clearPatch.processingOption = "";
-        if (optionId === "emergency_groups_only") {
-          if (prev.pickupOption === "urgent") clearPatch.pickupOption = "";
-          if (prev.processingOption === "urgent") clearPatch.processingOption = "";
-        }
-        if (optionId === "cod" && prev.processingOption === "cod") clearPatch.processingOption = "";
-        return { ...prev, ...clearPatch };
-      }
-      const nextPatch = { nextStep: optionId };
-      if (optionId === "pickup_hold") nextPatch.pickupOption = "wait";
-      if (optionId === "processing_hold") nextPatch.processingOption = "tag_hold";
-      if (optionId === "emergency_groups_only") {
-        nextPatch.pickupOption = "urgent";
-        nextPatch.processingOption = "urgent";
-      }
-      if (optionId === "cod") nextPatch.processingOption = "cod";
-      return { ...prev, ...nextPatch };
+      const pickupOption = optionId === "hold" ? "wait" : optionId === "priority" ? "urgent" : "";
+      return { ...prev, pickupOption };
+    });
+  }, [patchScopeBridge]);
+  const setBridgeProcessStep = useCallback((optionId) => {
+    patchScopeBridge((prev) => {
+      const processingOption = optionId === "hold" ? "tag_hold" : optionId === "priority" ? "urgent" : "all";
+      return { ...prev, processingOption };
+    });
+  }, [patchScopeBridge]);
+  const setBridgeDeliveryStep = useCallback((optionId) => {
+    patchScopeBridge((prev) => {
+      const deliveryOption = optionId === "hold_cod" ? "hold_cod" : optionId === "priority" ? "priority" : "ok";
+      const nextStep = optionId === "hold_cod"
+        ? "delivery_hold_cod"
+        : optionId === "priority"
+          ? "delivery_priority"
+          : "delivery_ok";
+      return { ...prev, deliveryOption, nextStep };
     });
   }, [patchScopeBridge]);
   const attentionWater = data.damageWasWet === "Y" || data.damageWasWet === true;
@@ -6037,8 +7448,16 @@ export default function App(){
         placeholder: entry?.placeholder || null,
         contactPlaceholder: entry?.contactPlaceholder || null
       });
+      if (!companyTypeRequiresContact(role.type)) {
+        normalizedEntry.contactPlaceholder = null;
+      }
       const companyPlaceholder = !!entry && !sourceCompany && isCompanyPlaceholder(normalizedEntry);
-      const contactPlaceholder = !!entry && !sourceContact && !companyPlaceholder && isContactPlaceholder(normalizedEntry);
+      const contactPlaceholder =
+        !!entry &&
+        !sourceContact &&
+        !companyPlaceholder &&
+        companyTypeRequiresContact(role.type) &&
+        isContactPlaceholder(normalizedEntry);
       const pending = companyPlaceholder || contactPlaceholder;
       const filled = !!companyName;
       return {
@@ -6684,7 +8103,9 @@ export default function App(){
               contact: "",
               company: "",
               placeholder: createPlaceholderFlag("company", `${type} pending`),
-              contactPlaceholder: createPlaceholderFlag("contact", `${type} contact pending`)
+              contactPlaceholder: companyTypeRequiresContact(type)
+                ? createPlaceholderFlag("contact", `${type} contact pending`)
+                : null
             }
           )
         }
@@ -6797,15 +8218,7 @@ export default function App(){
   }, [data.additionalCompanies]);
 
   const autoTypeForCompany = (company) => {
-    if (!company) return "Other";
-    const c = company.toLowerCase();
-    const isCarrier = NATIONAL_CARRIERS.some(n => normalizeCompany(n) === normalizeCompany(company));
-    if (isCarrier) return "Insurance";
-    if (c.includes("insurance")) return "Insurance";
-    if (c.includes("adjusting") || c.includes("claims")) return "Public Adjusting";
-    if (c.includes("moving")) return "Moving";
-    if (c.includes("restoration") || c.includes("dki") || c.includes("servpro")) return "Restoration Company";
-    return "Other";
+    return inferCompanyTypeFromName(company);
   };
 
   const upsertAdditionalCompany = (type, entry) => {
@@ -6849,7 +8262,11 @@ export default function App(){
         placeholder: hasMeaningfulValue(incomingEntry.company) ? null : (incomingEntry.placeholder || existingEntry.placeholder || null),
         contactPlaceholder: mergedContacts.some(c => hasMeaningfulValue(c?.name))
           ? null
-          : (incomingEntry.contactPlaceholder || existingEntry.contactPlaceholder || createPlaceholderFlag("contact", `${targetType} contact pending`))
+          : (
+              companyTypeRequiresContact(targetType)
+                ? (incomingEntry.contactPlaceholder || existingEntry.contactPlaceholder || createPlaceholderFlag("contact", `${targetType} contact pending`))
+                : null
+            )
       });
       setCompanyEdit(prev => ({ ...prev, [targetType]: false }));
       return { ...prev, additionalCompanyTypes: Array.from(types), additionalCompanies: entries };
@@ -6892,7 +8309,13 @@ export default function App(){
           ...(prev.additionalCompanies?.[type] || { contact: "", company: "" }),
           contact,
           company: (prev.additionalCompanies?.[type]?.company || suggested || ""),
-          contactPlaceholder: hasMeaningfulValue(contact) ? null : (prev.additionalCompanies?.[type]?.contactPlaceholder || createPlaceholderFlag("contact", `${type} contact pending`))
+          contactPlaceholder: hasMeaningfulValue(contact)
+            ? null
+            : (
+                companyTypeRequiresContact(type)
+                  ? (prev.additionalCompanies?.[type]?.contactPlaceholder || createPlaceholderFlag("contact", `${type} contact pending`))
+                  : null
+              )
         })
       }
     }));
@@ -6930,6 +8353,31 @@ export default function App(){
     }
   };
 
+  const handleInsuranceCompanyChange = (value) => {
+    const company = (value || "").toString().trim();
+    const linkedCarrier = resolveLinkedNationalCarrierName(company, sampleContacts);
+    if (company) {
+      setCompanies((prev) => Array.from(new Set([...prev, company])));
+    }
+    setData((prev) => {
+      const companyChanged = normalizeCompany(prev.insuranceCompany || "") !== normalizeCompany(company);
+      return {
+        ...prev,
+        insuranceCompany: company,
+        insuranceClaim: company ? "Yes" : prev.insuranceClaim,
+        involvesInsurance: company && !isNonRestorationProject ? "Yes" : prev.involvesInsurance,
+        nationalCarrier: linkedCarrier ? linkedCarrier : (companyChanged ? "" : prev.nationalCarrier || ""),
+        nationalCarrierRequested: linkedCarrier ? false : (companyChanged ? false : !!prev.nationalCarrierRequested),
+      };
+    });
+  };
+
+  const requestNationalCarrierLink = () => {
+    if (!data.insuranceCompany) return;
+    update("nationalCarrierRequested", true);
+    setToast(`Request noted: add ${data.insuranceCompany} to the national carrier list.`);
+  };
+
   const handleAdjusterContactChange = (value) => {
     const raw = (value || "").trim();
     const parsed = parseCombinedContact(raw);
@@ -6962,6 +8410,12 @@ export default function App(){
       });
     }
   };
+  const resolveInsuranceCarrierFromContact = useCallback((contactName = "") => {
+    const normalized = normalizeContact(contactName || "");
+    if (!normalized) return "";
+    const mappedCompany = contactCompanyMap.get(normalized) || "";
+    return isInsuranceCarrierCompany(mappedCompany, sampleContacts) ? mappedCompany : "";
+  }, [contactCompanyMap, sampleContacts]);
 
   useEffect(() => {
     let didCollapse = false;
@@ -6985,31 +8439,161 @@ export default function App(){
     }
   }, [data.lossDetails, data.orderTypes, minimizedLossTypes, autoScrollDone, lastLossDetailTouched, manualEditLossTypes]);
 
+  const projectType = useMemo(
+    () => projectTypeFromOrderTypes(data.orderTypes || []),
+    [data.orderTypes]
+  );
+  const isNonRestorationProject = projectType === "Non-Restoration Project";
+  const isRestorationProject = projectType === "Restoration Project";
+
   useEffect(() => {
-    if (data.restorationType === "Non-Restoration Project") {
-      setData(prev => {
-        const nextTypes = (prev.orderTypes || []).filter(t => !LOSS_TYPES.includes(t));
-        return {
-          ...prev,
-          orderTypes: nextTypes,
-          involvesInsurance: "No",
-          payorQuick: prev.payorQuick === "Insurance" ? "" : prev.payorQuick,
-          insuranceClaim: "No",
-          insuranceCompany: "",
-          insuranceAdjuster: "",
-          claimNumber: "",
-          dateOfLoss: "",
-        };
-      });
+    setData((prev) => {
+      const currentTypes = prev.orderTypes || [];
+      const nextTypes = normalizeOrderTypes(currentTypes);
+      const nextProjectType = projectTypeFromOrderTypes(nextTypes);
+      const patch = {};
+
+      if (!stringListMatches(nextTypes, currentTypes)) patch.orderTypes = nextTypes;
+      if ((prev.restorationType || "") !== nextProjectType) patch.restorationType = nextProjectType;
+
+      if (nextProjectType === "Non-Restoration Project") {
+        patch.involvesInsurance = "No";
+        patch.payorQuick = prev.payorQuick === "Insurance" ? "" : prev.payorQuick;
+        patch.insuranceClaim = "No";
+        patch.insuranceCompany = "";
+        patch.insuranceAdjuster = "";
+        patch.claimNumber = "";
+        patch.dateOfLoss = "";
+      }
+
+      if (!Object.keys(patch).length) return prev;
+      return { ...prev, ...patch };
+    });
+  }, [data.orderTypes]);
+
+  useEffect(() => {
+    if (!isNonRestorationProject) {
+      lastNonRestorationToastRef.current = "";
       return;
     }
-    if (data.restorationType === "Restoration Project") {
-      setData(prev => ({
+    if (lastNonRestorationToastRef.current === projectType) return;
+    lastNonRestorationToastRef.current = projectType;
+    setToast("Insurance Company and National Carrier not Required");
+  }, [isNonRestorationProject, projectType]);
+
+  useEffect(() => {
+    if (isNonRestorationProject) return;
+    const inferredBillingCarrier =
+      isInsuranceCarrierCompany(data.billingCompany || "", sampleContacts)
+        ? data.billingCompany || ""
+        : resolveInsuranceCarrierFromContact(data.billingContact || "");
+    const inferredInsuranceCarrier =
+      isInsuranceCarrierCompany(data.insuranceCompany || "", sampleContacts)
+        ? data.insuranceCompany || ""
+        : resolveInsuranceCarrierFromContact(data.insuranceAdjuster || "");
+    const primaryCarrier = inferredInsuranceCarrier || inferredBillingCarrier;
+    if (!primaryCarrier) return;
+    const linkedCarrier = resolveLinkedNationalCarrierName(primaryCarrier, sampleContacts);
+    setData((prev) => {
+      const patch = {};
+      if (!prev.billingCompany && inferredBillingCarrier) patch.billingCompany = inferredBillingCarrier;
+      if (!prev.insuranceCompany && primaryCarrier) patch.insuranceCompany = primaryCarrier;
+      if (!prev.adjusterCompany && inferredInsuranceCarrier && prev.insuranceAdjuster) {
+        patch.adjusterCompany = inferredInsuranceCarrier;
+      }
+      if (prev.insuranceClaim !== "Yes") patch.insuranceClaim = "Yes";
+      if (prev.involvesInsurance !== "Yes") patch.involvesInsurance = "Yes";
+      if (!prev.billingPayer && inferredBillingCarrier) patch.billingPayer = "Insurance";
+      if (linkedCarrier && prev.nationalCarrier !== linkedCarrier) {
+        patch.nationalCarrier = linkedCarrier;
+        patch.nationalCarrierRequested = false;
+      }
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
+    });
+  }, [
+    data.billingCompany,
+    data.billingContact,
+    data.insuranceCompany,
+    data.insuranceAdjuster,
+    isNonRestorationProject,
+    sampleContacts,
+    resolveInsuranceCarrierFromContact,
+  ]);
+
+  useEffect(() => {
+    if (isNonRestorationProject) return;
+    const linkedCarrier = resolveLinkedNationalCarrierName(data.insuranceCompany || "", sampleContacts);
+    if (!linkedCarrier) return;
+    setData((prev) => {
+      if (prev.nationalCarrier === linkedCarrier && !prev.nationalCarrierRequested) return prev;
+      return {
         ...prev,
-        orderTypes: (prev.orderTypes || []).filter(t => !NON_RESTORATION_TYPES.includes(t))
-      }));
+        nationalCarrier: linkedCarrier,
+        nationalCarrierRequested: false,
+      };
+    });
+  }, [data.insuranceCompany, isNonRestorationProject, sampleContacts]);
+
+  useEffect(() => {
+    const previousCompany = previousInsuranceCompanyRef.current || "";
+    const currentCompany = data.insuranceCompany || "";
+    const companyChanged =
+      normalizeCompany(previousCompany) !== normalizeCompany(currentCompany);
+    previousInsuranceCompanyRef.current = currentCompany;
+    if (!companyChanged || isNonRestorationProject) return;
+    const linkedCarrier = resolveLinkedNationalCarrierName(currentCompany, sampleContacts);
+    if (linkedCarrier) return;
+    setData((prev) => {
+      if (!prev.nationalCarrier && !prev.nationalCarrierRequested) return prev;
+      return {
+        ...prev,
+        nationalCarrier: "",
+        nationalCarrierRequested: false,
+      };
+    });
+  }, [data.insuranceCompany, isNonRestorationProject, sampleContacts]);
+
+  useEffect(() => {
+    if (data.contactMethod !== "TPA Assignment") {
+      tpaAssignmentPromptedRef.current = false;
+      return;
     }
-  }, [data.restorationType]);
+    setData((prev) => {
+      const types = new Set(prev.additionalCompanyTypes || []);
+      const existing = syncCompanyEntryPlaceholders(
+        prev.additionalCompanies?.["TPA"] || {
+          contact: prev.tpaContact || "",
+          company: prev.tpaCompany || "",
+          placeholder: createPlaceholderFlag("company", "TPA company expected"),
+          contactPlaceholder: null,
+        }
+      );
+      const nextEntry = syncCompanyEntryPlaceholders({
+        ...existing,
+        company: prev.tpaCompany || existing.company || "",
+        contact: prev.tpaContact || existing.contact || "",
+      });
+      nextEntry.contactPlaceholder = null;
+      const changed =
+        !types.has("TPA") ||
+        JSON.stringify(existing) !== JSON.stringify(nextEntry);
+      if (!changed) return prev;
+      types.add("TPA");
+      return {
+        ...prev,
+        additionalCompanyTypes: Array.from(types),
+        additionalCompanies: {
+          ...(prev.additionalCompanies || {}),
+          TPA: nextEntry,
+        },
+      };
+    });
+    if (!tpaAssignmentPromptedRef.current) {
+      tpaAssignmentPromptedRef.current = true;
+      setCompaniesSubOpen(true);
+      setToast("TPA Assignment selected. Add the TPA company.");
+    }
+  }, [data.contactMethod, data.tpaCompany, data.tpaContact]);
 
   useEffect(() => {
     const hasMold = (data.orderTypes || []).includes("Mold");
@@ -7039,8 +8623,9 @@ export default function App(){
   }, [data.rentCoverageLimit, data.contentsCoverageLimit]);
 
   const quickQuestionsComplete =
-    !!data.restorationType &&
-    (data.restorationType !== "Restoration Project" || !!data.involvesInsurance) &&
+    hasPrimaryOrderTypeDecision(data.orderTypes || []) &&
+    hasRequiredNonRestorationSubtype(data.orderTypes || []) &&
+    (!isRestorationProject || !!data.involvesInsurance) &&
     (data.involvesInsurance !== "Yes" || !!data.payorQuick);
 
   useEffect(() => {
@@ -7054,8 +8639,8 @@ export default function App(){
 
   const companyRolesFor = (entry) => {
     const roles = [];
-    const addRole = (id, icon, title) => {
-      if (!roles.find(r => r.id === id)) roles.push({ id, icon, title });
+    const addRole = (id, title) => {
+      if (!roles.find(r => r.id === id)) roles.push({ id, title });
     };
     const company = entry?.company || "";
     const contacts = entry?.contacts && entry.contacts.length
@@ -7068,12 +8653,20 @@ export default function App(){
     const isReferrerCompany = !data.referrer && !!data.referringCompany && data.referringCompany === company;
     const isBillToCompany = !data.billingContact && !!data.billingCompany && data.billingCompany === company;
     const isInsuranceCompany = !data.insuranceAdjuster && !!data.insuranceCompany && data.insuranceCompany === company;
-    if (isReferrerContact) addRole("referrer", "🏷️", "Referrer");
-    if (isInsuranceContact) addRole("insurance", "🛡️", "Insurance");
-    if (isBillToContact) addRole("billto", "💳", "Bill To");
-    if (isReferrerCompany) addRole("referrer", "🏷️", "Referrer");
-    if (isInsuranceCompany) addRole("insurance", "🛡️", "Insurance");
-    if (isBillToCompany) addRole("billto", "💳", "Bill To");
+    const isLinkedNationalCarrierCompany =
+      !!data.nationalCarrier &&
+      !!company &&
+      (
+        normalizeCompany(data.insuranceCompany || "") === normalizeCompany(company) ||
+        (!data.insuranceCompany && normalizeCompany(data.billingCompany || "") === normalizeCompany(company))
+      );
+    if (isReferrerContact) addRole("referrer", "Referrer");
+    if (isInsuranceContact) addRole("insurance", "Insurance");
+    if (isBillToContact) addRole("billto", "Bill To");
+    if (isReferrerCompany) addRole("referrer", "Referrer");
+    if (isInsuranceCompany) addRole("insurance", "Insurance");
+    if (isBillToCompany) addRole("billto", "Bill To");
+    if (isLinkedNationalCarrierCompany) addRole("national", "National Carrier");
     return roles;
   };
 
@@ -7082,9 +8675,9 @@ export default function App(){
     const isReferrer = !!data.referrer && contact && data.referrer === contact;
     const isBillTo = !!data.billingContact && contact && data.billingContact === contact;
     const isInsurance = !!data.insuranceAdjuster && contact && data.insuranceAdjuster === contact;
-    if (isReferrer) roles.push({ id: "referrer", icon: "🏷️", title: "Referrer" });
-    if (isInsurance) roles.push({ id: "insurance", icon: "🛡️", title: "Insurance" });
-    if (isBillTo) roles.push({ id: "billto", icon: "💳", title: "Bill To" });
+    if (isReferrer) roles.push({ id: "referrer", title: "Referrer" });
+    if (isInsurance) roles.push({ id: "insurance", title: "Insurance" });
+    if (isBillTo) roles.push({ id: "billto", title: "Bill To" });
     return roles;
   };
 
@@ -7097,9 +8690,9 @@ export default function App(){
     const billAssigned = !!data.billingCompany || !!data.billingContact;
     const insuranceEligible = isRoleEligibleForCompany("insurance", company);
     const options = [];
-    if (!refAssigned || isReferrer) options.push({ id: "referrer", label: "Referrer", icon: "🏷️", active: isReferrer });
-    if (isInsurance || (!insuranceAssigned && insuranceEligible)) options.push({ id: "insurance", label: "Insurance", icon: "🛡️", active: isInsurance });
-    if (!billAssigned || isBillTo) options.push({ id: "billto", label: "Bill To", icon: "💳", active: isBillTo });
+    if (!refAssigned || isReferrer) options.push({ id: "referrer", label: "Referrer", active: isReferrer });
+    if (isInsurance || (!insuranceAssigned && insuranceEligible)) options.push({ id: "insurance", label: "Insurance", active: isInsurance });
+    if (!billAssigned || isBillTo) options.push({ id: "billto", label: "Bill To", active: isBillTo });
     return options;
   };
 
@@ -7294,28 +8887,43 @@ export default function App(){
                                   <Field label="Order Status">
                                     <ToggleGroup options={ORDER_STATUSES} value={data.orderStatus} onChange={v => update("orderStatus", v)} />
                                   </Field>
-                                  <Field label="Project Type">
-                                    <ToggleGroup options={[
-                                      { label: "Restoration Project", title: "Project involving a loss event (fire, water, pests, etc.)." },
-                                      { label: "Non-Restoration Project", title: "Service without a loss event (cleaning, storage, etc.)." }
-                                    ]} value={data.restorationType} onChange={v => update("restorationType", v)} />
-                                  </Field>
                                 </div>
                                 {showInlineHelp && <div className="text-[11px] text-slate-400">Auto-generated by using the LastName-TownST.</div>}
                                 <Field label="Order Type" missing={data.highlightMissing.orderTypes} smart>
                                   <div className="flex flex-wrap gap-2" data-audit-key="orderTypes">
-                                      {(data.restorationType === "Non-Restoration Project" ? NON_RESTORATION_TYPES : LOSS_TYPES).map(ot=> (
+                                      {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map(ot=> (
                                           <ToggleMulti
                                             key={ot}
                                             label={ot}
                                             title="Type of peril/damage involved."
                                             checked={(data.orderTypes||[]).includes(ot)}
-                                            onChange={()=>toggleLossType(ot)}
+                                            onChange={() => {
+                                              if (ot === NON_RESTORATION_PRIMARY) {
+                                                toggleNonRestorationPrimary();
+                                                return;
+                                              }
+                                              toggleRestorationType(ot);
+                                            }}
                                             className={ot === "Water" && attentionWater ? "attention-fill" : ot === "Mold" && attentionMold ? "attention-fill" : ""}
                                           />
                                       ))}
                                   </div>
                                 </Field>
+                                {isNonRestorationProject && (
+                                  <Field label="Non-Restoration Type" missing={data.highlightMissing.nonRestorationSubtype}>
+                                    <div className="flex flex-wrap gap-2" data-audit-key="nonRestorationSubtype">
+                                      {NON_RESTORATION_SUBTYPES.map((subtype) => (
+                                        <ToggleMulti
+                                          key={subtype}
+                                          label={subtype}
+                                          title="Required for non-restoration orders."
+                                          checked={getNonRestorationSubtype(data.orderTypes || []) === subtype}
+                                          onChange={() => selectNonRestorationSubtype(subtype)}
+                                        />
+                                      ))}
+                                    </div>
+                                  </Field>
+                                )}
                                 {(attentionWater || attentionMold) && (
                                   <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
                                     {attentionWater && <div>Still Wet selected → review Water loss type and severity.</div>}
@@ -7333,7 +8941,7 @@ export default function App(){
                                     const severityLetterMap = { Fire: "F", Water: "W", Mold: "M", Dust: "D", Protein: "P", Oil: "O" };
                                     const severityCode = (data.severityCodes || []).find(c => c.startsWith(severityGroup + "-"));
                                     const severityShort = severityCode ? `${severityLetterMap[severityGroup] || ""}${severityCode.split("-")[1]}` : "";
-                                    const needsSeverityCode = hasSeverity && data.restorationType !== "Non-Restoration Project" && expectedSeverityGroups.has(severityGroup) && !severityCode;
+                                    const needsSeverityCode = hasSeverity && !isNonRestorationProject && expectedSeverityGroups.has(severityGroup) && !severityCode;
                                     const attentionForSeverity = (severityGroup === "Water" && attentionWater) || (severityGroup === "Mold" && attentionMold) || needsSeverityCode;
                                     return (
                                         <div key={type} className="animate-purple-section-fade rounded-xl border border-sky-100 bg-sky-50/30 overflow-hidden transition-all shadow-sm">
@@ -7351,7 +8959,7 @@ export default function App(){
                                             </button>
                                             {!isMinimized && (
                                                 <div className="p-4 grid gap-4 border-t border-sky-100 bg-white">
-                                                    {hasSeverity && data.restorationType !== "Non-Restoration Project" && (
+                                                    {hasSeverity && !isNonRestorationProject && (
                                                         <Field label="Severity" subtle>
                                                             <div className={`rounded-lg ${needsSeverityCode ? "border border-orange-200 bg-orange-50/60 p-2" : ""}`}>
                                                               <div className="flex gap-2" data-audit-key={`severity-${severityGroup.toLowerCase()}`}>{SEVERITY_LEVELS.map(level => { const code = `${severityGroup}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`h-9 w-9 rounded-lg text-sm font-bold transition-all border ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : needsSeverityCode ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100' : 'bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-200'} ${attentionForSeverity && !needsSeverityCode ? 'attention-outline' : ''}`}>{level}</button>); })}</div>
@@ -7614,7 +9222,7 @@ export default function App(){
                                       </button>
                                       {openCodes && (
                                           <div className="p-4 grid gap-6 bg-white border-t border-slate-100 fade-in">
-                                            {data.restorationType !== "Non-Restoration Project" && (
+                                            {!isNonRestorationProject && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">SEVERITY</div>
                                                 <div className="text-xs text-slate-500 mb-3">1 = No Rejects, 5 = Many Rejects (higher means more rejects).</div>
@@ -7646,6 +9254,90 @@ export default function App(){
                                             </div>
                                             <div className="border-t border-slate-100 my-1"></div>
                                           <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div><div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className="!px-3 !py-2 !text-sm" checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
+                                            <div className="border-t border-slate-100 my-1"></div>
+                                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                <div>
+                                                  <div className="mb-1 text-xs font-bold text-slate-400">ORDER INSTRUCTIONS</div>
+                                                  <div className="text-xs text-slate-500">
+                                                    Add order-only instructions here. Company and contact instructions still flow in automatically from section 4.
+                                                  </div>
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={openAddOrderInstructionModal}
+                                                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:border-slate-300 hover:text-slate-800"
+                                                >
+                                                  + Custom
+                                                </button>
+                                              </div>
+                                              {orderLevelInstructions.length ? (
+                                                <div className="mt-4 space-y-2">
+                                                  {orderLevelInstructions.map((entry) => (
+                                                    <div
+                                                      key={`codes-order-instruction-${getInstructionIdentity(entry)}`}
+                                                      className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-start sm:justify-between"
+                                                    >
+                                                      <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                                          {entry.type}
+                                                        </span>
+                                                        <span className="text-sm font-medium text-slate-700">{entry.text}</span>
+                                                      </div>
+                                                      <div className="flex items-center gap-2">
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => openEditOrderInstructionModal(entry)}
+                                                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600 hover:border-slate-300 hover:text-slate-800"
+                                                        >
+                                                          Edit
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => removeOrderInstruction(entry)}
+                                                          className="rounded-full border border-rose-200 bg-white px-3 py-1 text-[11px] font-bold text-rose-700 hover:border-rose-300"
+                                                        >
+                                                          Remove
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              ) : (
+                                                <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-sm text-slate-500">
+                                                  No order-level instructions selected yet.
+                                                </div>
+                                              )}
+                                              <div className="mt-4 border-t border-slate-200 pt-4">
+                                                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Quick Add Examples</div>
+                                                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                                                  {Object.entries(ORDER_INSTRUCTION_PRESETS).map(([type, items]) => (
+                                                    <div key={`order-instruction-preset-${type}`} className="rounded-lg border border-slate-200 bg-white p-3">
+                                                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{type}</div>
+                                                      <div className="mt-2 flex flex-wrap gap-2">
+                                                        {items.map((item) => {
+                                                          const selected = orderInstructionSelectionSet.has(getInstructionTypeTextKey(type, item));
+                                                          return (
+                                                            <button
+                                                              key={`order-instruction-preset-${type}-${item}`}
+                                                              type="button"
+                                                              onClick={() => toggleOrderInstructionPreset(type, item)}
+                                                              className={`rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+                                                                selected
+                                                                  ? "border-slate-400 bg-slate-100 text-slate-800"
+                                                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800"
+                                                              }`}
+                                                            >
+                                                              {item}
+                                                            </button>
+                                                          );
+                                                        })}
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            </div>
                                           </div>
                                       )}
                                   </div>
@@ -7698,9 +9390,9 @@ export default function App(){
                             </button>
                           }
                         >
-                          <div className="rounded-xl border border-slate-200 bg-white p-4 mb-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-sm font-bold text-slate-700">Roles</div>
+                          <div className="mb-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="pt-1 text-[11px] text-slate-500">Click a company type to add this company type.</div>
                               <div className="flex items-center gap-2">
                                 {pendingCompanyRoleCount > 0 && (
                                   <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">
@@ -7715,7 +9407,6 @@ export default function App(){
                                 </button>
                               </div>
                             </div>
-                            <div className="mt-1 text-[11px] text-slate-500">Click a company type to add this company type.</div>
                             <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
                               <div className="hidden md:grid grid-cols-12 bg-slate-50 px-4 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 <div className="col-span-3">Company Type</div>
@@ -7744,98 +9435,125 @@ export default function App(){
                                             ? `placeholder-contact-${normalizePlaceholderKeyPart(role.type || role.id)}`
                                             : undefined)
                                       }
-                                      className={`grid grid-cols-1 md:grid-cols-12 gap-2 px-4 py-2 ${(role.pending || isPlaceholderFlagActive(c?.placeholder)) ? 'placeholder-shell rounded-lg' : ''}`}
+                                      className={`px-4 py-2 ${(role.pending || isPlaceholderFlagActive(c?.placeholder)) ? 'placeholder-shell rounded-lg my-1.5' : ''}`}
                                     >
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleCompanyRoleNeeded(role)}
-                                        className="md:col-span-3 text-left rounded-lg py-1 focus-visible:ring-2 focus-visible:ring-sky-200"
-                                        title="Toggle needed"
-                                      >
-                                        {idx === 0 && (
-                                          <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-2">
-                                              <span className="text-sm font-semibold text-sky-700">{role.label}</span>
-                                              {role.pending && (
-                                                <span className="text-[10px] font-bold uppercase tracking-wider placeholder-text">Placeholder</span>
+                                      <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleCompanyRoleNeeded(role)}
+                                          className="md:col-span-3 text-left rounded-lg py-1 focus-visible:ring-2 focus-visible:ring-sky-200"
+                                          title="Mark this company type as needed"
+                                        >
+                                          {idx === 0 && (
+                                            <div className="flex flex-col gap-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-sm font-semibold text-sky-700">{role.label}</span>
+                                                {role.pending && (
+                                                  <span className="text-[10px] font-bold uppercase tracking-wider placeholder-text">Placeholder</span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => openCompanyRolePicker(role)}
+                                          className={`md:col-span-5 w-full text-left rounded-lg px-2 py-1 text-sm transition hover:bg-slate-50`}
+                                          title="Edit company"
+                                        >
+                                          {idx === 0 && (
+                                            <div className="flex flex-col gap-1">
+                                              <div className="flex items-center justify-between gap-3">
+                                                <span className={`font-medium ${role.companyName ? 'text-slate-700' : 'placeholder-text'}`}>
+                                                  {role.companyName || "Add company"}
+                                                </span>
+                                                <EditAffordance title="Edit company" />
+                                              </div>
+                                              {(() => {
+                                                const contactRoles = c?.name && getRolesForContact ? getRolesForContact(role.companyName, c.name) : [];
+                                                const companyBadges = companyRolesFor(entryForBadges);
+                                                const roleBadges = anyContactRoles
+                                                  ? companyBadges.filter((badge) => badge.id === "national")
+                                                  : companyBadges;
+                                                return roleBadges.length > 0 ? (
+                                                  <div className="flex flex-wrap gap-1">
+                                                  {roleBadges.map(r => (
+                                                    toggleRoleForContact ? (
+                                                      <button
+                                                        key={`${role.id}-${r.title}`}
+                                                        type="button"
+                                                        onClick={() => toggleRoleForContact(role.companyName, "", r.id || r.title?.toLowerCase())}
+                                                        className="rounded-full"
+                                                        title="Click to toggle role"
+                                                      >
+                                                        <RoleBadge role={r} />
+                                                      </button>
+                                                    ) : (
+                                                      <RoleBadge key={`${role.id}-${r.title}`} role={r} />
+                                                    )
+                                                  ))}
+                                                </div>
+                                              ) : null;
+                                              })()}
+                                            </div>
+                                          )}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => openCompanyRolePicker(role)}
+                                          className={`md:col-span-4 w-full text-left rounded-lg px-2 py-1 text-sm transition hover:bg-slate-50`}
+                                          title="Edit contact"
+                                        >
+                                          {c?.name ? (
+                                            <div className="flex flex-col">
+                                              <div className="flex items-center justify-between gap-3">
+                                                <span className={`font-medium ${isPlaceholderFlagActive(c?.placeholder) ? "placeholder-text" : "text-slate-700"}`}>{c.name}</span>
+                                                <EditAffordance title="Edit contact" />
+                                              </div>
+                                              <span className="text-[11px] text-slate-500">{getTitleForContact(c.name) || "Contact"}</span>
+                                              {getRolesForContact && (
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                  {getRolesForContact(role.companyName, c.name).map(r => (
+                                                    toggleRoleForContact ? (
+                                                      <button
+                                                        key={`${role.id}-${c.name}-${r.title}`}
+                                                        type="button"
+                                                        onClick={() => toggleRoleForContact(role.companyName, c.name, r.id || r.title?.toLowerCase())}
+                                                        className="rounded-full"
+                                                        title="Click to toggle role"
+                                                      >
+                                                        <RoleBadge role={r} />
+                                                      </button>
+                                                    ) : (
+                                                      <RoleBadge key={`${role.id}-${c.name}-${r.title}`} role={r} />
+                                                    )
+                                                  ))}
+                                                </div>
                                               )}
                                             </div>
-                                          </div>
-                                        )}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => openCompanyRolePicker(role)}
-                                        className={`md:col-span-5 w-full text-left rounded-lg px-2 py-1 text-sm transition hover:bg-slate-50`}
-                                        title="Choose company"
-                                      >
-                                        {idx === 0 && (
-                                          <div className="flex flex-col gap-1">
-                                            <span className={`font-medium ${role.companyName ? 'text-slate-700' : 'placeholder-text'}`}>
-                                              {role.companyName || "Add company"}
-                                            </span>
-                                            {(() => {
-                                              const contactRoles = c?.name && getRolesForContact ? getRolesForContact(role.companyName, c.name) : [];
-                                              const roleBadges = anyContactRoles ? [] : companyRolesFor(entryForBadges);
-                                              return roleBadges.length > 0 ? (
-                                                <div className="flex flex-wrap gap-1">
-                                                {roleBadges.map(r => (
-                                                  toggleRoleForContact ? (
-                                                    <button
-                                                      key={`${role.id}-${r.title}`}
-                                                      type="button"
-                                                      onClick={() => toggleRoleForContact(role.companyName, "", r.id || r.title?.toLowerCase())}
-                                                      className="rounded-full"
-                                                      title="Click to toggle role"
-                                                    >
-                                                      <RoleBadge icon={r.icon} title={r.title} />
-                                                    </button>
-                                                  ) : (
-                                                    <RoleBadge key={`${role.id}-${r.title}`} icon={r.icon} title={r.title} />
-                                                  )
-                                                ))}
-                                              </div>
-                                            ) : null;
-                                            })()}
-                                          </div>
-                                        )}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => openCompanyRolePicker(role)}
-                                        className={`md:col-span-4 w-full text-left rounded-lg px-2 py-1 text-sm transition hover:bg-slate-50`}
-                                        title="Choose contact"
-                                      >
-                                        {c?.name ? (
-                                          <div className="flex flex-col">
-                                            <span className={`font-medium ${isPlaceholderFlagActive(c?.placeholder) ? "placeholder-text" : "text-slate-700"}`}>{c.name}</span>
-                                            <span className="text-[11px] text-slate-500">{getTitleForContact(c.name) || "Contact"}</span>
-                                            {getRolesForContact && (
-                                              <div className="mt-1 flex flex-wrap gap-1">
-                                                {getRolesForContact(role.companyName, c.name).map(r => (
-                                                  toggleRoleForContact ? (
-                                                    <button
-                                                      key={`${role.id}-${c.name}-${r.title}`}
-                                                      type="button"
-                                                      onClick={() => toggleRoleForContact(role.companyName, c.name, r.id || r.title?.toLowerCase())}
-                                                      className="rounded-full"
-                                                      title="Click to toggle role"
-                                                    >
-                                                      <RoleBadge icon={r.icon} title={r.title} />
-                                                    </button>
-                                                  ) : (
-                                                    <RoleBadge key={`${role.id}-${c.name}-${r.title}`} icon={r.icon} title={r.title} />
-                                                  )
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          <span className="placeholder-text">
-                                            Add contact
-                                          </span>
-                                        )}
-                                      </button>
+                                          ) : (
+                                            <div className="flex items-center justify-between gap-3">
+                                              <span className="placeholder-text">
+                                                Add contact
+                                              </span>
+                                              <EditAffordance title="Add contact" />
+                                            </div>
+                                          )}
+                                        </button>
+                                      </div>
+                                      <div className="mt-2 md:grid md:grid-cols-12 md:gap-2">
+                                        <div className="hidden md:block md:col-span-3" />
+                                        <EntityPreferencePanel
+                                          company={role.companyName}
+                                          contact={c?.name || ""}
+                                          getCompanyProfile={getCompanyProfile}
+                                          getContactProfile={getContactProfile}
+                                          onOpenCustomerText={openPrimaryCustomerText}
+                                          sessionInstructionKeys={sessionInstructionKeys}
+                                          onMarkInstructionKeysSeen={markInstructionKeysSeen}
+                                          className="md:col-span-9"
+                                        />
+                                      </div>
                                     </div>
                                   ));
                                 })}
@@ -7846,18 +9564,44 @@ export default function App(){
                         <SubSection id="sec4-billing" title="Billing" open={billingSubOpen} onToggle={(nextOpen) => setBillingSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("billing") ? "audit-outline" : ""}>
                           <Field label="Bill To"><div data-audit-key="billingPayer" className={auditOn && data.highlightMissing?.billingPayer ? "audit-missing rounded-lg p-1" : ""}><ToggleGroup options={["Insurance","Customer","Referrer","Public Adjuster","Building","Contractor","Other"]} value={data.billingPayer} onChange={v=>update("billingPayer",v)} /></div></Field>
                           {!(data.billingPayer === "Customer" || data.payorQuick === "Self-pay") && (
-                            <div className="grid sm:grid-cols-2 gap-4">
-                              <Field label={
-                                <span className="inline-flex items-center gap-2">
-                                  Billing Company
-                                  <span className="inline-flex items-center gap-1">
-                                    {companyRolesFor({ company: data.billingCompany, contact: data.billingContact }).map(r => <RoleBadge key={`billing-${r.title}`} icon={r.icon} title={r.title} />)}
-                                  </span>
-                                </span>
-                              }><Input className={getFlashClass("billingCompany")} value={data.billingCompany} onChange={e=>update("billingCompany", e.target.value)} placeholder="Billing company" /></Field>
-                              <Field label="Billing Contact" subtle action={<span className="text-[10px] text-slate-400">Auto-fill company</span>}>
-                                <SearchSelect data-audit-key="billingContact" value={data.billingContact} onChange={(v)=>handleBillingContactChange(v)} options={combinedContactOptions} listId="billing-contact-list" />
-                              </Field>
+                            <div className="space-y-3">
+                              {billingAssignmentLinked ? (
+                                <LinkedAssignmentPanel
+                                  title="Billing linked from assigned roles"
+                                  helperText="Using company/contact already assigned on this order."
+                                  values={[
+                                    { label: "Billing Company", value: data.billingCompany },
+                                    { label: "Billing Contact", value: data.billingContact },
+                                  ]}
+                                  cues={billingAssignmentCues}
+                                  locked={!billingAssignmentUnlocked}
+                                  onToggleLock={() => setBillingAssignmentUnlocked((prev) => !prev)}
+                                />
+                              ) : null}
+                              {(!billingAssignmentLinked || billingAssignmentUnlocked) ? (
+                                <div className="grid sm:grid-cols-2 gap-4">
+                                  <Field label={
+                                    <span className="inline-flex items-center gap-2">
+                                      Billing Company
+                                      <span className="inline-flex items-center gap-1">
+                                        {companyRolesFor({ company: data.billingCompany, contact: data.billingContact }).map(r => <RoleBadge key={`billing-${r.title}`} role={r} />)}
+                                      </span>
+                                    </span>
+                                  }><Input className={getFlashClass("billingCompany")} value={data.billingCompany} onChange={e=>update("billingCompany", e.target.value)} placeholder="Billing company" /></Field>
+                                  <Field label="Billing Contact" subtle action={<span className="text-[10px] text-slate-400">Auto-fill company</span>}>
+                                    <SearchSelect data-audit-key="billingContact" value={data.billingContact} onChange={(v)=>handleBillingContactChange(v)} options={combinedContactOptions} listId="billing-contact-list" />
+                                  </Field>
+                                </div>
+                              ) : null}
+                              <EntityPreferencePanel
+                                company={data.billingCompany}
+                                contact={data.billingContact}
+                                getCompanyProfile={getCompanyProfile}
+                                getContactProfile={getContactProfile}
+                                onOpenCustomerText={openPrimaryCustomerText}
+                                sessionInstructionKeys={sessionInstructionKeys}
+                                onMarkInstructionKeysSeen={markInstructionKeysSeen}
+                              />
                             </div>
                           )}
                           <Field label="Billing Note"><Textarea value={data.billingNote} onChange={e=>update("billingNote",e.target.value)} /></Field>
@@ -7891,39 +9635,155 @@ export default function App(){
                                   ))}
                                 </div>
                                 <Input value={data.estimateRequestedBy} onChange={e=>update("estimateRequestedBy", e.target.value)} placeholder="Who is requesting?" />
+                                {estimateRequesterQuickOptions.length > 0 && (
+                                  <div className="flex flex-wrap gap-2">
+                                    {estimateRequesterQuickOptions.map((option) => (
+                                      <button
+                                        key={`estimate-requester-${option}`}
+                                        type="button"
+                                        onClick={() => update("estimateRequestedBy", option)}
+                                        className={`rounded-full border px-3 py-1 text-xs font-bold ${
+                                          data.estimateRequestedBy === option
+                                            ? "border-sky-400 bg-sky-50 text-sky-700"
+                                            : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                                        }`}
+                                      >
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
+                          {currentOrderCustomerForms.length > 0 && (
+                            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                              <div className="font-bold uppercase tracking-wider text-[10px] text-amber-700">Special Customer Forms</div>
+                              <div className="mt-1">Available to text: {currentOrderCustomerForms.join(", ")}</div>
+                              <button
+                                type="button"
+                                onClick={() => openPrimaryCustomerText(currentOrderCustomerForms)}
+                                className="mt-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-[11px] font-bold text-amber-800 hover:border-amber-400"
+                              >
+                                Open customer text
+                              </button>
+                            </div>
+                          )}
                         </SubSection>
                         <SubSection id="sec4-insurance" title="Insurance" open={insuranceSubOpen} onToggle={(nextOpen) => setInsuranceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
                           <Field label="Insurance Claim?" smart action={<ToggleGroup options={["Yes","No"]} value={data.insuranceClaim} onChange={v=>update("insuranceClaim",v)} />} />
                           <Field label="Direction of Payment"><ToggleGroup options={["Direct from Insurance","Check","Credit Card","Other"]} value={data.directionOfPayment} onChange={v=>update("directionOfPayment",v)} /></Field>
                           {data.insuranceClaim==="Yes" && (
                             <div className="animate-purple-section-fade slide-up rounded-xl bg-white p-4 grid gap-4 shadow-sm">
-                              <div className="grid sm:grid-cols-[1fr_220px] gap-4 items-start">
-                                <Field label={
-                                  <span className="inline-flex items-center gap-2">
-                                    Insurance Company
-                                    <span className="inline-flex items-center gap-1">
-                                      {companyRolesFor({ company: data.insuranceCompany, contact: data.insuranceAdjuster }).map(r => <RoleBadge key={`ins-${r.title}`} icon={r.icon} title={r.title} />)}
-                                    </span>
-                                  </span>
-                                }>
-                                  <div className={`flex gap-2 ${getFlashClass("insuranceCompany")}`}>
-                                    <SearchSelect value={data.insuranceCompany} onChange={(v)=>update("insuranceCompany",v)} options={companies} listId="insurance-company-list" />
-                                    <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"company",value:"",onSave:(name)=>update("insuranceCompany",name)})}>+</button>
+                              {insuranceAssignmentLinked ? (
+                                <LinkedAssignmentPanel
+                                  title="Insurance linked from assigned roles"
+                                  helperText="Using insurance information already assigned on this order."
+                                  headerBadge={
+                                    data.nationalCarrier || linkedInsuranceCarrier
+                                      ? `National Carrier: ${data.nationalCarrier || linkedInsuranceCarrier}`
+                                      : ""
+                                  }
+                                  values={[
+                                    { label: "Insurance Company", value: data.insuranceCompany },
+                                    { label: "Adjuster", value: data.insuranceAdjuster },
+                                  ]}
+                                  cues={insuranceAssignmentCues}
+                                  locked={!insuranceAssignmentUnlocked}
+                                  onToggleLock={() => setInsuranceAssignmentUnlocked((prev) => !prev)}
+                                />
+                              ) : null}
+                              {(!insuranceAssignmentLinked || insuranceAssignmentUnlocked) ? (
+                                <>
+                                  {showInsuranceShortcutOptions ? (
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Insurance Shortcuts</div>
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        {INSURANCE_COMPANY_SHORTCUTS.map((option) => (
+                                          <button
+                                            key={option.company}
+                                            type="button"
+                                            onClick={() => handleInsuranceCompanyChange(option.company)}
+                                            className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                                              data.insuranceCompany === option.company
+                                                ? "border-sky-400 bg-sky-50 text-sky-700"
+                                                : "border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:text-sky-700"
+                                            }`}
+                                            title={option.helpText}
+                                          >
+                                            {option.company}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <div className="mt-2 grid gap-1 text-[11px] text-slate-500">
+                                        {INSURANCE_COMPANY_SHORTCUTS.map((option) => (
+                                          <div key={`insurance-shortcut-help-${option.company}`}>
+                                            <span className="font-semibold text-slate-700">{option.company}:</span> {option.helpText}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                  <div className="grid sm:grid-cols-[1fr_220px] gap-4 items-start">
+                                    <Field label={
+                                      <span className="inline-flex items-center gap-2">
+                                        Insurance Company
+                                        <span className="inline-flex items-center gap-1">
+                                          {companyRolesFor({ company: data.insuranceCompany, contact: data.insuranceAdjuster }).map(r => <RoleBadge key={`ins-${r.title}`} role={r} />)}
+                                        </span>
+                                      </span>
+                                    }>
+                                      <div className={`flex gap-2 ${getFlashClass("insuranceCompany")}`}>
+                                        <SearchSelect value={data.insuranceCompany} onChange={(v)=>handleInsuranceCompanyChange(v)} options={companies} listId="insurance-company-list" />
+                                        <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"company",value:"",onSave:(name)=>handleInsuranceCompanyChange(name)})}>+</button>
+                                      </div>
+                                    </Field>
+                                    <Field label="National Carrier">
+                                      <SearchSelect value={data.nationalCarrier} onChange={(v)=>update("nationalCarrier",v)} options={NATIONAL_CARRIERS} listId="national-carrier-list" placeholder="Auto-linked when available" className={getFlashClass("nationalCarrier")} />
+                                    </Field>
                                   </div>
-                                </Field>
-                                <Field label="National Carrier">
-                                  <SearchSelect value={data.nationalCarrier} onChange={(v)=>update("nationalCarrier",v)} options={NATIONAL_CARRIERS} listId="national-carrier-list" placeholder="Linked" className={getFlashClass("nationalCarrier")} />
-                                </Field>
-                              </div>
-                              <Field label="Adjuster">
-                                <div className={`flex gap-2 ${getFlashClass("insuranceAdjuster")}`}>
-                                  <SearchSelect data-audit-key="insuranceAdjuster" value={data.insuranceAdjuster} onChange={(v)=>handleAdjusterContactChange(v)} options={combinedContactOptions} listId="insurance-adjuster-list" />
-                                  <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"contact",value:"",onSave:(name)=>update("insuranceAdjuster",name)})}>+</button>
+                                  <Field label="Adjuster">
+                                    <div className={`flex gap-2 ${getFlashClass("insuranceAdjuster")}`}>
+                                      <SearchSelect data-audit-key="insuranceAdjuster" value={data.insuranceAdjuster} onChange={(v)=>handleAdjusterContactChange(v)} options={combinedContactOptions} listId="insurance-adjuster-list" />
+                                      <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"contact",value:"",onSave:(name)=>update("insuranceAdjuster",name)})}>+</button>
+                                    </div>
+                                  </Field>
+                                </>
+                              ) : null}
+                              {insuranceCarrierLinkMissing && (
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-900">
+                                  <div className="font-bold uppercase tracking-wider text-[10px] text-amber-700">National Carrier Link Needed</div>
+                                  <div className="mt-1">
+                                    {data.insuranceCompany} is not linked to a national carrier yet.
+                                  </div>
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={requestNationalCarrierLink}
+                                      className="rounded-full border border-amber-300 bg-white px-3 py-1 text-[11px] font-bold text-amber-800 hover:border-amber-400"
+                                    >
+                                      {data.nationalCarrierRequested ? "Request submitted" : "Request carrier link"}
+                                    </button>
+                                    <span className="text-[11px] text-amber-700">
+                                      Non-restoration orders do not require a national carrier.
+                                    </span>
+                                  </div>
                                 </div>
-                              </Field>
+                              )}
+                              {isInsuranceShortcutCompany(data.insuranceCompany) && (
+                                <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                                  {data.insuranceCompany} satisfies the reporting placeholder requirement for this prototype.
+                                </div>
+                              )}
+                              <EntityPreferencePanel
+                                company={data.insuranceCompany}
+                                contact={data.insuranceAdjuster}
+                                getCompanyProfile={getCompanyProfile}
+                                getContactProfile={getContactProfile}
+                                onOpenCustomerText={openPrimaryCustomerText}
+                                sessionInstructionKeys={sessionInstructionKeys}
+                                onMarkInstructionKeysSeen={markInstructionKeysSeen}
+                              />
                               <div className="grid grid-cols-2 gap-4">
                                 <Field label="Claim #"><Input value={data.claimNumber} onChange={e=>update("claimNumber",e.target.value)} /></Field>
                                 <Field label="Date of Loss"><DatePicker value={data.dateOfLoss} onChange={(v)=>update("dateOfLoss", v)} /></Field>
@@ -7947,7 +9807,6 @@ export default function App(){
                             </div>
                           )}
                         </SubSection>
-
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec4')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
                           <button onClick={() => goToNextSection('sec4')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec4')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
@@ -8166,10 +10025,7 @@ export default function App(){
                         </SubSection>
                         <SubSection id="sec5-bridge" title="Scope Update and Blockers" open={scheduleBridgeOpen} onToggle={(nextOpen) => setScheduleBridgeOpen(!!nextOpen)} compact={compactMode} className={bridgeSectionClass}>
                           <div className="space-y-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="text-xs text-slate-500">
-                                Shared NOE/Scope/SDS status center for approvals, blockers, and next-step decisions.
-                              </div>
+                            <div className="flex justify-end">
                               <button
                                 type="button"
                                 onClick={() => setEntryMode("same-day-scope")}
@@ -8180,130 +10036,188 @@ export default function App(){
                               </button>
                             </div>
 
-                            <div className={`rounded-lg border p-3 space-y-3 ${bridgeStatusClass}`}>
+                            <div className={`rounded-lg border p-3 space-y-4 ${bridgeStatusClass}`}>
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-bold tracking-wide text-slate-700">
-                                  {statusBadgeLabel(scopeBridgeState.projectStatus)}
-                                </span>
                                 <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
                                   {activeBridgeIssues.length} blocker(s)
                                 </span>
-                                {selectedBridgeNextStep ? (
-                                  <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                                    {BRIDGE_NEXT_STEP_OPTIONS.find((option) => option.id === selectedBridgeNextStep)?.label || selectedBridgeNextStep}
-                                  </span>
-                                ) : null}
+                                <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  Pickup: {BRIDGE_PICKUP_STEP_OPTIONS.find((option) => option.id === selectedBridgePickupStep)?.label || "Schedule"}
+                                </span>
+                                <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  Process: {BRIDGE_PROCESS_STEP_OPTIONS.find((option) => option.id === selectedBridgeProcessStep)?.label || "Yes"}
+                                </span>
+                                <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  Delivery: {BRIDGE_DELIVERY_STEP_OPTIONS.find((option) => option.id === selectedBridgeDeliveryStep)?.label || "OK to deliver"}
+                                </span>
                               </div>
 
-                              <div className="grid gap-3 lg:grid-cols-2">
-                                {groupedBridgeIssues.map((group) => (
-                                  <div key={group.id} className="rounded-lg border border-slate-200 bg-white p-2">
-                                    <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-slate-500">{group.label}</div>
-                                    <div className="space-y-1.5">
-                                      {group.rows.map(({ issue, active }) => {
-                                        const isAuto = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
-                                        const isEstimateIssue = issue === "Customer Wants Estimate" || issue === "Adjuster Wants Estimate";
-                                        const showEstimateDetails = active && isEstimateIssue && !!data.estimateRequested;
-                                        const showAuthDetails = active && issue === "Won't Sign Authorization";
-                                        return (
-                                          <button
-                                            key={issue}
-                                            type="button"
-                                            onClick={() => {
-                                              if (!isAuto) toggleScopeBridgeIssue(issue);
-                                            }}
-                                            disabled={isAuto}
-                                            className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-                                              active
-                                                ? "border-sky-300 bg-sky-50"
-                                                : isAuto
-                                                  ? "border-slate-200 bg-slate-50"
-                                                  : "border-slate-200 bg-white hover:border-sky-200"
-                                            }`}
-                                          >
-                                            <div className="flex items-center justify-between gap-2">
-                                              <span className="text-xs font-semibold text-slate-700">--- {issue.replace("Customer Wants Estimate", "Wants Estimate").replace("Adjuster Wants Estimate", "Wants estimate")}</span>
-                                              <span className={`text-[10px] font-bold ${active ? "text-sky-700" : "text-slate-400"}`}>{active ? "ON" : "OFF"}</span>
-                                            </div>
-                                            {isAuto ? (
-                                              <div className="mt-1 text-[10px] font-semibold text-slate-500">Auto-linked</div>
-                                            ) : null}
-                                            {showAuthDetails ? (
-                                              <div className="mt-1 text-[10px] text-slate-500">
-                                                {authorizationOnFile ? "Authorization marked as blocker." : "Auto-on until authorization is on file."}
-                                              </div>
-                                            ) : null}
-                                            {showEstimateDetails ? (
-                                              <div className="mt-1 text-[10px] text-slate-500">
-                                                {bridgeEstimateDetails || "Estimate required."}
-                                              </div>
-                                            ) : null}
-                                          </button>
-                                        );
-                                      })}
+                              <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-2">
+                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Status Updates</div>
+                                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                  <div className="rounded-lg border border-slate-200/80 bg-white p-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="text-xs font-semibold text-slate-700">Customer Contacted</div>
+                                      <Switch
+                                        checked={!!data.eventCustomerContacted}
+                                        onChange={() => update("eventCustomerContacted", !data.eventCustomerContacted)}
+                                      />
                                     </div>
                                   </div>
-                                ))}
-                              </div>
-
-                              <div className="rounded-lg border border-slate-200 bg-white p-2">
-                                <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Next Steps</div>
-                                <div className="space-y-1.5">
-                                  {BRIDGE_NEXT_STEP_OPTIONS.map((option) => {
-                                    const active = selectedBridgeNextStep === option.id;
+                                  {BRIDGE_MILESTONE_FIELDS.map((field) => {
+                                    const milestone = scopeBridgeState.milestones || {};
+                                    const active = !!milestone[field.id];
+                                    const isAdjusterApproval = field.id === "estimateApproved";
+                                    const proceedWithoutApproval = !!milestone.proceedWithoutApproval;
                                     return (
-                                      <button
-                                        key={option.id}
-                                        type="button"
-                                        onClick={() => toggleBridgeNextStep(option.id)}
-                                        className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-                                          active
-                                            ? "border-sky-300 bg-sky-50"
-                                            : "border-slate-200 bg-white hover:border-sky-200"
-                                        }`}
-                                      >
+                                      <div key={field.id} className="rounded-lg border border-slate-200/80 bg-white p-2">
                                         <div className="flex items-center justify-between gap-2">
-                                          <span className="text-xs font-semibold text-slate-700">--- {option.label}</span>
-                                          <span className={`text-[10px] font-bold ${active ? "text-sky-700" : "text-slate-400"}`}>{active ? "ON" : "OFF"}</span>
+                                          <div className="text-xs font-semibold text-slate-700">{field.label}</div>
+                                          <Switch
+                                            checked={active}
+                                            onChange={() => toggleScopeBridgeMilestone(field.id, field.atId)}
+                                          />
                                         </div>
-                                      </button>
+                                        {isAdjusterApproval ? (
+                                          <button
+                                            type="button"
+                                            onClick={toggleProceedWithoutApproval}
+                                            className={`mt-2 w-full rounded-lg border px-2 py-1.5 text-left text-[11px] font-semibold transition ${
+                                              proceedWithoutApproval
+                                                ? "border-amber-300 bg-amber-100 text-amber-800"
+                                                : "border-slate-200 bg-white text-slate-600 hover:border-amber-300"
+                                            }`}
+                                          >
+                                            Proceed without approval
+                                          </button>
+                                        ) : null}
+                                        {active ? (
+                                          <div className="mt-2 space-y-1.5">
+                                            <Input
+                                              value={milestone[field.byId] || ""}
+                                              onChange={(e) => updateScopeBridgeMilestone(field.byId, e.target.value)}
+                                              placeholder="Completed by"
+                                              className="!py-1.5 !text-xs"
+                                            />
+                                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600">
+                                              {milestone[field.atId] ? `Completed ${formatShortTimestamp(new Date(milestone[field.atId]))}` : "Completed now"}
+                                            </div>
+                                          </div>
+                                        ) : null}
+                                        {isAdjusterApproval && proceedWithoutApproval ? (
+                                          <div className="mt-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600">
+                                            {milestone.proceedWithoutApprovalAt ? `Override ${formatShortTimestamp(new Date(milestone.proceedWithoutApprovalAt))}` : "Override enabled"}
+                                          </div>
+                                        ) : null}
+                                      </div>
                                     );
                                   })}
                                 </div>
                               </div>
-                            </div>
 
-                            <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
-                              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Completion Flags (timestamped)</div>
-                              <div className="grid gap-2">
-                                {BRIDGE_MILESTONE_FIELDS.map((field) => {
-                                  const milestone = scopeBridgeState.milestones || {};
-                                  const active = !!milestone[field.id];
-                                  return (
-                                    <div key={field.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="text-sm font-semibold text-slate-700">{field.label}</div>
-                                        <Switch
-                                          checked={active}
-                                          onChange={() => toggleScopeBridgeMilestone(field.id, field.atId)}
-                                        />
+                              <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-3">
+                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Blockers</div>
+                                <div className="grid gap-3 lg:grid-cols-2">
+                                  {groupedBridgeIssues.map((group) => (
+                                    <div key={group.id} className="rounded-lg border border-slate-200/80 bg-white p-2">
+                                      <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-slate-500">{group.label}</div>
+                                      <div className="space-y-1.5">
+                                        {group.rows.map(({ issue, active }) => {
+                                          const isAuto = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
+                                          const isEstimateIssue = issue === "Customer Wants Estimate" || issue === "Adjuster Wants Estimate";
+                                          const showEstimateDetails = active && isEstimateIssue && !!data.estimateRequested;
+                                          const showAuthDetails = active && issue === "Won't Sign Authorization";
+                                          return (
+                                            <button
+                                              key={issue}
+                                              type="button"
+                                              onClick={() => toggleScopeBridgeIssue(issue)}
+                                              className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                                                active
+                                                  ? "border-sky-300 bg-sky-50"
+                                                  : "border-slate-200 bg-white hover:border-sky-200"
+                                              }`}
+                                            >
+                                              <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs font-semibold text-slate-700">{issue.replace("Customer Wants Estimate", "Wants Estimate").replace("Adjuster Wants Estimate", "Wants estimate")}</span>
+                                                <span className={`text-[10px] font-bold ${active ? "text-sky-700" : "text-slate-400"}`}>{active ? "ON" : "OFF"}</span>
+                                              </div>
+                                              {isAuto ? (
+                                                <div className="mt-1 text-[10px] font-semibold text-slate-500">Auto-linked</div>
+                                              ) : null}
+                                              {showAuthDetails ? (
+                                                <div className="mt-1 text-[10px] text-slate-500">
+                                                  {authorizationOnFile ? "Authorization marked as blocker." : "Auto-on until authorization is on file."}
+                                                </div>
+                                              ) : null}
+                                              {showEstimateDetails ? (
+                                                <div className="mt-1 text-[10px] text-slate-500">
+                                                  {bridgeEstimateDetails || "Estimate required."}
+                                                </div>
+                                              ) : null}
+                                            </button>
+                                          );
+                                        })}
                                       </div>
-                                      {active ? (
-                                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                          <Input
-                                            value={milestone[field.byId] || ""}
-                                            onChange={(e) => updateScopeBridgeMilestone(field.byId, e.target.value)}
-                                            placeholder="Completed by"
-                                            className="!py-1.5 !text-xs"
-                                          />
-                                          <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600">
-                                            {milestone[field.atId] ? `Completed ${formatShortTimestamp(new Date(milestone[field.atId]))}` : "Completed now"}
-                                          </div>
-                                        </div>
-                                      ) : null}
                                     </div>
-                                  );
-                                })}
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-3">
+                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Next Steps</div>
+                                <div className="grid gap-3 lg:grid-cols-3">
+                                  {[
+                                    {
+                                      id: "pickup",
+                                      label: "Pickup",
+                                      selected: selectedBridgePickupStep,
+                                      options: BRIDGE_PICKUP_STEP_OPTIONS,
+                                      onSelect: setBridgePickupStep,
+                                    },
+                                    {
+                                      id: "process",
+                                      label: "Process",
+                                      selected: selectedBridgeProcessStep,
+                                      options: BRIDGE_PROCESS_STEP_OPTIONS,
+                                      onSelect: setBridgeProcessStep,
+                                    },
+                                    {
+                                      id: "delivery",
+                                      label: "Delivery",
+                                      selected: selectedBridgeDeliveryStep,
+                                      options: BRIDGE_DELIVERY_STEP_OPTIONS,
+                                      onSelect: setBridgeDeliveryStep,
+                                    },
+                                  ].map((group) => {
+                                    const selectedOption = group.options.find((option) => option.id === group.selected) || group.options[0];
+                                    return (
+                                      <div key={group.id} className="rounded-lg border border-slate-200/80 bg-white p-2 space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="text-xs font-bold uppercase tracking-wider text-slate-500">{group.label}</div>
+                                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${bridgeStageToneClass(selectedOption.tone, true)}`}>
+                                            {selectedOption.label}
+                                          </span>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                          {group.options.map((option) => {
+                                            const active = group.selected === option.id;
+                                            return (
+                                              <button
+                                                key={option.id}
+                                                type="button"
+                                                onClick={() => group.onSelect(option.id)}
+                                                className={`w-full rounded-lg border px-3 py-2 text-left text-xs font-semibold transition ${bridgeStageToneClass(option.tone, active)}`}
+                                              >
+                                                {option.label}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             </div>
 
@@ -8324,7 +10238,7 @@ export default function App(){
                                         className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
                                         <div className="h-[4.9rem] w-full flex items-center justify-center">
-                                          <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                          <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
                                         <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
                                           {item}
@@ -8349,7 +10263,7 @@ export default function App(){
                                         className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
                                         <div className="h-[4.9rem] w-full flex items-center justify-center">
-                                          <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                          <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
                                         <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
                                           {item}
@@ -8374,7 +10288,7 @@ export default function App(){
                                         className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
                                         <div className="h-[4.9rem] w-full flex items-center justify-center">
-                                          <img src={iconSrc} alt={item} className="h-full w-full object-contain" />
+                                          <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
                                         <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
                                           {item}
@@ -8413,7 +10327,6 @@ export default function App(){
                     companies={companies} 
                     setModal={setModal} 
                     toggleMulti={toggleMulti} 
-                    updateSmart={updateSmart}
                     handleConfirmClick={handleConfirmClick}
                     setToast={setToast}
                     showInlineHelp={showInlineHelp}
@@ -8437,6 +10350,9 @@ export default function App(){
                     dateCloseSignal={dateCloseTick}
                     timeCloseSignal={timeCloseTick}
                     onPromptRoleAssignment={openRoleAssignmentPrompt}
+                    toggleNonRestorationPrimary={toggleNonRestorationPrimary}
+                    toggleRestorationType={toggleRestorationType}
+                    selectNonRestorationSubtype={selectNonRestorationSubtype}
                 />
               )}
 
@@ -8506,6 +10422,102 @@ export default function App(){
           </div>
         )}
       
+      {orderInstructionModal.isOpen && (
+        <div className="fixed inset-0 z-[128] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+            <div className="border-b border-slate-200 bg-white px-6 py-4">
+              <h3 className="text-xl font-bold text-slate-900">
+                {orderInstructionModal.mode === "edit" ? "Edit Order Instruction" : "Add Order Instruction"}
+              </h3>
+            </div>
+            <div className="space-y-4 p-6">
+              <Field label="Instruction Type">
+                <Select
+                  value={orderInstructionModal.draft.type}
+                  onChange={(e) => setOrderInstructionModal((prev) => ({
+                    ...prev,
+                    draft: { ...prev.draft, type: e.target.value },
+                  }))}
+                >
+                  {INSTRUCTION_TYPES.map((type) => (
+                    <option key={`order-instruction-type-${type}`} value={type}>{type}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Instruction">
+                <Textarea
+                  value={orderInstructionModal.draft.text}
+                  onChange={(e) => setOrderInstructionModal((prev) => ({
+                    ...prev,
+                    draft: { ...prev.draft, text: e.target.value },
+                  }))}
+                  placeholder="Enter an order-only instruction..."
+                />
+              </Field>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                Order-level instructions apply only to this order. Company and contact instructions remain inherited from their saved profiles.
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                onClick={closeOrderInstructionModal}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
+                onClick={saveOrderInstruction}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {alertModal.isOpen && (
+        <div className="fixed inset-0 z-[129] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+            <div className="border-b border-slate-200 bg-white px-6 py-4">
+              <h3 className="text-xl font-bold text-slate-900">{alertModal.title || "Alert"}</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              {alertModal.message ? (
+                <p className="text-sm text-slate-700">{renderAlertMessageContent(alertModal.message, alertModal.title)}</p>
+              ) : null}
+              {alertModal.details?.length ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                  <ul className="space-y-1 text-sm text-slate-700">
+                    {alertModal.details.map((detail, index) => (
+                      <li key={`alert-detail-${index}`}>• {renderAlertDetailContent(detail)}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                onClick={() => setAlertModal(createAlertModalState())}
+              >
+                {alertModal.onConfirm ? (alertModal.dismissLabel || "Cancel") : (alertModal.dismissLabel || "Close")}
+              </button>
+              {alertModal.onConfirm ? (
+                <button
+                  className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
+                  onClick={() => {
+                    const action = alertModal.onConfirm;
+                    setAlertModal(createAlertModalState());
+                    action?.();
+                  }}
+                >
+                  {alertModal.confirmLabel || "Confirm"}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
       {toast && <Toast message={toast} onClose={()=>setToast("")} />}
       {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} />}
       {smartConfirm.isOpen && (
@@ -8587,7 +10599,7 @@ export default function App(){
                         onClick={() => toggleRoleAssignmentSelection(role.id)}
                         className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${active ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"}`}
                       >
-                        <span className="mr-1">{role.icon}</span>
+                        <span className="mr-1 inline-flex"><RoleIcon role={role} className="h-4 w-4" /></span>
                         {role.title}
                       </button>
                     );
@@ -8896,7 +10908,7 @@ export default function App(){
             onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); setAddCompanyPanel(""); }}
           >
           <div
-            className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden fade-in"
+            className="w-full max-w-5xl min-h-[34rem] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-visible fade-in sm:min-h-[40rem]"
             onClick={(e)=>e.stopPropagation()}
             tabIndex={0}
             onKeyDown={(e) => {
@@ -8924,7 +10936,7 @@ export default function App(){
                 Close
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-8 pb-10 space-y-5">
               <Field label="" subtle>
                 <SearchSelect
                   value=""
@@ -8951,8 +10963,8 @@ export default function App(){
                   clearOnCommit
                   inputRef={addCompanyInputRef}
                   options={combinedContactOptions}
-                  maxResults={16}
-                  menuClassName="max-h-[28rem]"
+                  maxResults={24}
+                  menuClassName="max-h-[60vh] sm:max-h-[34rem]"
                   placeholder="Start typing a contact or company..."
                 />
               </Field>
@@ -9402,12 +11414,14 @@ export default function App(){
                   <div className="p-6 space-y-4">
                       {(() => {
                         const customer = (data.customers || []).find(c => c.id === welcomeModal.customerId) || {};
+                        const selectedSpecialDocs = normalizeStringList(welcomeModal.selectedSpecialDocs || []);
                         const attachments = [
                           customer.sendBrochure && "Brochure",
                           customer.sendRushGuide && "Rush Guide",
                           customer.sendAuthLink && "Authorization Form",
                           customer.sendCosLink && "COS Link",
                           customer.sendGoogleReviewLink && "Google Review Link",
+                          ...selectedSpecialDocs,
                         ].filter(Boolean);
                         const hasMobile = (customer.phone || "").replace(/[^\d]/g, "").length >= 10;
                         return (
@@ -9420,7 +11434,35 @@ export default function App(){
                             ) : (
                               <div className="text-xs text-slate-500">No attachments selected.</div>
                             )}
-                            <div className="text-xs text-red-500 mt-2">company specific docs available here</div>
+                            {currentOrderCustomerForms.length > 0 && (
+                              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Special Customer Forms</div>
+                                <div className="mt-2 grid gap-2 text-xs font-semibold text-amber-900">
+                                  {currentOrderCustomerForms.map((form) => {
+                                    const checked = selectedSpecialDocs.includes(form);
+                                    return (
+                                      <label key={`welcome-special-doc-${form}`} className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          className="h-4 w-4 rounded border-amber-300"
+                                          checked={checked}
+                                          onChange={(e) => {
+                                            setWelcomeModal((modalState) => {
+                                              const current = normalizeStringList(modalState.selectedSpecialDocs || []);
+                                              const next = e.target.checked
+                                                ? mergeUniqueStrings(current, [form])
+                                                : current.filter((item) => item !== form);
+                                              return { ...modalState, selectedSpecialDocs: next };
+                                            });
+                                          }}
+                                        />
+                                        {form}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                             {!hasMobile && (
                               <div className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                                 Add a mobile phone number to send texts.
@@ -9462,7 +11504,7 @@ export default function App(){
                       </div>
                   </div>
                   <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
-                      <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setWelcomeModal({ isOpen:false, customerId:null, note:"" })}>Cancel</button>
+                      <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setWelcomeModal({ isOpen:false, customerId:null, note:"", selectedSpecialDocs: [] })}>Cancel</button>
                       {(() => {
                         const customer = (data.customers || []).find(c => c.id === welcomeModal.customerId) || {};
                         const hasMobile = (customer.phone || "").replace(/[^\d]/g, "").length >= 10;
@@ -9470,7 +11512,7 @@ export default function App(){
                           <button
                             disabled={!hasMobile}
                             className={`rounded-lg px-6 py-2 text-sm font-bold text-white shadow ${hasMobile ? "bg-emerald-600 hover:bg-emerald-700" : "bg-slate-300 cursor-not-allowed"}`}
-                            onClick={() => { if (!hasMobile) return; setToast("Welcome message sent!"); setWelcomeModal({ isOpen:false, customerId:null, note:"" }); }}
+                            onClick={() => { if (!hasMobile) return; setToast("Welcome message sent!"); setWelcomeModal({ isOpen:false, customerId:null, note:"", selectedSpecialDocs: [] }); }}
                           >
                             Send
                           </button>

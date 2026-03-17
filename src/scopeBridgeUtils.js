@@ -26,6 +26,8 @@ export const SCOPE_BRIDGE_PENDING_ISSUES = [
   'Awaiting Hygienist Results',
   'Awaiting Coverage Determination',
   'Awaiting Test Group Results',
+  'Special paperwork required',
+  'Insurance Company Not Yet Known',
   'Limit Issues',
   'Deciding Who Will Pay',
   'Customer is not open to cleaning',
@@ -79,7 +81,10 @@ export const SCOPE_BRIDGE_NEXT_STEP_OPTIONS = [
   { id: 'delivery_hold', label: 'Delivery on hold' },
   { id: 'schedule', label: 'Ready to schedule final retrieval' },
   { id: 'wait_approval', label: 'Awaiting adjuster approval' },
-  { id: 'wait_test', label: 'Awaiting test results' }
+  { id: 'wait_test', label: 'Awaiting test results' },
+  { id: 'delivery_ok', label: 'OK to deliver' },
+  { id: 'delivery_priority', label: 'Priority groups only' },
+  { id: 'delivery_hold_cod', label: 'Hold (COD)' }
 ];
 
 const normalizeStatus = (value) => {
@@ -114,6 +119,9 @@ const normalizeMilestones = (value) => {
     estimateApproved: !!raw.estimateApproved,
     estimateApprovedAt: (raw.estimateApprovedAt || '').toString(),
     estimateApprovedBy: (raw.estimateApprovedBy || '').toString(),
+    proceedWithoutApproval: !!raw.proceedWithoutApproval,
+    proceedWithoutApprovalAt: (raw.proceedWithoutApprovalAt || '').toString(),
+    proceedWithoutApprovalBy: (raw.proceedWithoutApprovalBy || '').toString(),
   };
 };
 
@@ -133,6 +141,7 @@ export const createScopeBridgeState = (overrides = {}) => {
     milestones: normalizeMilestones(source.milestones),
     pickupOption: (source.pickupOption || '').toString(),
     processingOption: (source.processingOption || '').toString(),
+    deliveryOption: (source.deliveryOption || '').toString(),
     selectedGroups: normalizeList(source.selectedGroups),
     nextStep: (source.nextStep || '').toString(),
     snippet: (source.snippet || '').toString(),
@@ -150,6 +159,12 @@ export const statusBadgeLabel = (status) => {
 };
 
 export const nextStepLabel = (nextStep) => {
+  const aliases = {
+    delivery_ok: 'OK to deliver',
+    delivery_priority: 'Priority groups only',
+    delivery_hold_cod: 'Hold (COD)',
+  };
+  if (aliases[nextStep]) return aliases[nextStep];
   const match = SCOPE_BRIDGE_NEXT_STEP_OPTIONS.find((option) => option.id === nextStep);
   return match ? match.label : '';
 };
@@ -235,8 +250,28 @@ export const buildScopeBridgeSnippet = (rawFormData = {}) => {
   if (milestones.authorizationOnFile) parts.push('AUTHORIZATION: ON FILE.');
   if (milestones.scopeApproved) parts.push('SCOPE: APPROVED.');
   if (milestones.estimateApproved) parts.push('ESTIMATE: APPROVED.');
+  if (!milestones.estimateApproved && milestones.proceedWithoutApproval) {
+    parts.push('ADJUSTER APPROVAL: PROCEED WITHOUT APPROVAL.');
+  }
 
-  if (formData.nextStep) {
+  const deliveryOption = (() => {
+    const direct = (formData.deliveryOption || '').toString();
+    if (direct === 'ok' || direct === 'priority' || direct === 'hold_cod') return direct;
+    if (formData.nextStep === 'delivery_ok') return 'ok';
+    if (formData.nextStep === 'delivery_priority' || formData.nextStep === 'emergency_groups_only') return 'priority';
+    if (formData.nextStep === 'delivery_hold_cod' || formData.nextStep === 'cod' || formData.nextStep === 'delivery_hold') return 'hold_cod';
+    if (formData.processingOption === 'cod') return 'hold_cod';
+    return '';
+  })();
+
+  if (deliveryOption) {
+    const deliveryText = {
+      ok: 'DELIVERY: OK TO DELIVER.',
+      priority: 'DELIVERY: PRIORITY GROUPS ONLY.',
+      hold_cod: 'DELIVERY: HOLD (COD).',
+    };
+    parts.push(deliveryText[deliveryOption] || `DELIVERY: ${deliveryOption}.`);
+  } else if (formData.nextStep) {
     const logiMap = {
       pickup_hold: 'Pickup on hold.',
       processing_hold: 'Tag and Hold.',
@@ -246,6 +281,9 @@ export const buildScopeBridgeSnippet = (rawFormData = {}) => {
       schedule: 'Ready for final retrieval.',
       wait_approval: 'Awaiting Adjuster Approval.',
       wait_test: 'Awaiting test results.',
+      delivery_ok: 'OK to deliver.',
+      delivery_priority: 'Priority groups only.',
+      delivery_hold_cod: 'Hold (COD).',
     };
     parts.push(`LOGISTICS: ${logiMap[formData.nextStep] || formData.nextStep}`);
   }
