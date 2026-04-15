@@ -2037,7 +2037,7 @@ const normalizeOption = (opt) => {
   return { label, value, type: opt?.type || "generic" };
 };
 
-const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, className, onKeyDown, onBlur, clearOnCommit, inputRef, onEmptyEnter, maxResults = 8, uppercase = false, menuClassName = "", ...props }) => {
+const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, className, onKeyDown, onBlur, clearOnCommit, inputRef, onEmptyEnter, onAddNew, maxResults = 8, uppercase = false, menuClassName = "", ...props }) => {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [query, setQuery] = useState(value || "");
@@ -2130,7 +2130,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
         {...props}
       />
       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-300">▾</span>
-      {open && filtered.length > 0 && (
+      {open && (filtered.length > 0 || (query.trim() && onAddNew)) && (
         <div ref={listRef} className={`absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg overflow-auto ${menuClassName || "max-h-60"}`}>
           {filtered.map((opt, idx) => (
             <button
@@ -2155,6 +2155,17 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
               )}
             </button>
           ))}
+          {query.trim() && onAddNew && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onAddNew(query.trim()); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-50 border-t border-slate-100 flex items-center gap-2"
+            >
+              <span className="text-base">+</span>
+              <span>{filtered.length === 0 ? `Add "${query.trim()}" as new` : `Add "${query.trim()}" as new`}</span>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -2581,6 +2592,8 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
     ? `${data.referrer} — ${data.referringCompany}`
     : (data.referrer || data.referringCompany || "");
   const [referrerQuery, setReferrerQuery] = useState(referrerDisplayValue);
+  const [addNewContact, setAddNewContact] = useState(null);
+  useEffect(() => { if (!data.referrer && !data.referringCompany) setAddNewContact(null); }, [data.referrer, data.referringCompany]);
   const [repMenuOpen, setRepMenuOpen] = useState(false);
   const [showSuggestedRoles, setShowSuggestedRoles] = useState(false);
   const [suggestedSelection, setSuggestedSelection] = useState(suggestedReferrerRoles || []);
@@ -2776,9 +2789,75 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                      options={combinedContactOptions}
                      placeholder="Type contact or company..."
                      onBlur={() => ensureReferrerFromQuery()}
+                     onAddNew={(name) => {
+                       const dashParts = name.split(/\s*[-—]\s*/);
+                       const namePart = dashParts[0] || name;
+                       const companyPart = dashParts[1] || "";
+                       const namePieces = namePart.trim().split(/\s+/);
+                       setAddNewContact({
+                         firstName: namePieces[0] || "",
+                         lastName: namePieces.slice(1).join(" ") || "",
+                         companyName: companyPart,
+                         phone: "",
+                         email: "",
+                       });
+                     }}
                    />
                  </div>
-                 {referrerBestMatch && referrerBestMatch !== referrerDisplayValue && (
+                 {addNewContact && (() => {
+                   const companyExists = addNewContact.companyName && companies.some(c => normalizeCompany(c) === normalizeCompany(addNewContact.companyName));
+                   const fullName = [addNewContact.firstName, addNewContact.lastName].filter(Boolean).join(" ");
+                   return (
+                   <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50/50 p-3 space-y-3">
+                     <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Add New Contact</div>
+                     <div className="grid gap-2 sm:grid-cols-2">
+                       <Input value={addNewContact.firstName || ""} onChange={e => setAddNewContact(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" />
+                       <Input value={addNewContact.lastName || ""} onChange={e => setAddNewContact(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" />
+                     </div>
+                     <div>
+                       <div className="text-[10px] font-semibold text-slate-500 mb-1">Company</div>
+                       <SearchSelect
+                         value={addNewContact.companyName || ""}
+                         onChange={v => setAddNewContact(p => ({ ...p, companyName: v }))}
+                         onQueryChange={v => setAddNewContact(p => ({ ...p, companyName: v }))}
+                         options={companies.map(c => ({ label: c, value: c, type: "company" }))}
+                         placeholder="Search existing or type new company..."
+                         onAddNew={v => setAddNewContact(p => ({ ...p, companyName: v }))}
+                       />
+                       {addNewContact.companyName && (
+                         <div className={`mt-1 text-[10px] font-semibold ${companyExists ? 'text-emerald-600' : 'text-amber-600'}`}>
+                           {companyExists
+                             ? `"${addNewContact.companyName}" exists — ${fullName || "contact"} will be added to this company.`
+                             : `"${addNewContact.companyName}" is new — a new company will be created.`}
+                         </div>
+                       )}
+                     </div>
+                     <div className="grid gap-2 sm:grid-cols-2">
+                       <Input value={addNewContact.phone || ""} onChange={e => setAddNewContact(p => ({ ...p, phone: formatPhoneNumber(e.target.value) }))} placeholder="Phone (optional)" />
+                       <Input value={addNewContact.email || ""} onChange={e => setAddNewContact(p => ({ ...p, email: e.target.value }))} placeholder="Email (optional)" />
+                     </div>
+                     <div className="flex gap-2">
+                       <button
+                         type="button"
+                         onClick={() => {
+                           if (!fullName && !addNewContact.companyName) return;
+                           const display = fullName && addNewContact.companyName
+                             ? `${fullName} — ${addNewContact.companyName}`
+                             : fullName || addNewContact.companyName;
+                           applyReferrerValue(display);
+                           setAddNewContact(null);
+                           setToast?.(`Added ${display}`);
+                         }}
+                         className="rounded-lg bg-sky-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
+                       >
+                         Save & Select as Referrer
+                       </button>
+                       <button type="button" onClick={() => setAddNewContact(null)} className="rounded-lg border border-slate-200 px-4 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">Cancel</button>
+                     </div>
+                   </div>
+                   );
+                 })()}
+                 {referrerBestMatch && referrerBestMatch !== referrerDisplayValue && !addNewContact && (
                    <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-2">
                      <span>Top match:</span>
                        <button
@@ -2792,7 +2871,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                    )}
                  </Field>
                </div>
-               {(data.referrer || data.referringCompany) && (
+               {(data.referrer || data.referringCompany) && !addNewContact && (
                  <div>
                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Assign roles for this contact</div>
                    <div className="flex flex-wrap gap-2">
@@ -2847,9 +2926,13 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
            <div className="animate-indigo-fade p-4 rounded-lg bg-sky-50/30 border border-sky-100"><Field label="Type"><div className="flex flex-wrap gap-2" data-audit-key="leadSourceDetail">{INTERNAL_TYPES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} />)}</div></Field></div>
        )}
 
-      {data.leadSourceCategory && (
+      {data.leadSourceCategory && salesRep && (
+        <div className="text-[11px] text-slate-400">Sales Rep: <span className="font-semibold text-slate-600">{salesRep.split(",")[0]}</span> (auto-assigned from referrer)</div>
+      )}
+
+      {data.leadSourceCategory && !salesRep && (
       <React.Fragment>
-      <Field label="Sales Rep" className="max-w-[90px]">
+      <Field label="Sales Rep" className="max-w-[200px]">
         <div className="relative inline-flex items-center gap-2">
           <button
             type="button"
@@ -2857,8 +2940,9 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
             className="h-10 w-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-bold border border-sky-200 hover:bg-sky-50"
             title={salesRep || "Select sales rep"}
           >
-            {getRepInitials(salesRep || "Rep")}
+            {getRepInitials(salesRep || "?")}
           </button>
+          {!salesRep && <span className="text-xs text-slate-400">Select rep</span>}
           {repMenuOpen && (
             <div className="absolute top-12 left-0 z-50 w-48 rounded-lg border border-slate-200 bg-white shadow-lg">
               {SALES_REPS.map(r => (
@@ -2886,7 +2970,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       </React.Fragment>
       )}
       {showSuggestedRoles && (
-        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[120] flex items-start justify-center bg-slate-900/35 p-4">
+        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[120] flex items-start justify-center bg-slate-900/35 p-4" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); ensureReferrerFromQuery(); onApplyReferrerRoles?.(suggestedSelection); setShowSuggestedRoles(false); } if (e.key === "Escape") setShowSuggestedRoles(false); }}>
           <div ref={suggestedRolesCardRef} className="w-full max-w-2xl max-h-[calc(100vh-2rem)] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-auto fade-in" style={{ marginTop: `${suggestedRolesOffsetTop}px` }}>
             <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
               <div>
@@ -4044,14 +4128,19 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
     const [quickCompanyDraftCompany, setQuickCompanyDraftCompany] = useState("");
     const [quickCompanyDraftContact, setQuickCompanyDraftContact] = useState("");
 
-    const quickCompanyRoles = [
-      { id: "insurance", label: "Insurance", companyField: "insuranceCompany", contactField: "insuranceAdjuster", extraPatch: { insuranceClaim: "Yes", involvesInsurance: "Yes" } },
-      { id: "tpa", label: "TPA", companyField: "tpaCompany", contactField: "tpaContact" },
-      { id: "billing", label: "Bill To", companyField: "billingCompany", contactField: "billingContact" },
-      { id: "publicAdjuster", label: "Public Adjuster", companyField: "publicAdjustingCompany", contactField: "publicAdjuster" },
-    ];
+    // Reset add-company state when data is cleared
+    const vendorCount = (data.vendors || []).length;
+    useEffect(() => {
+      if (vendorCount === 0) {
+        setQuickCompanySelectedRole("");
+        setQuickCompanyDraftCompany("");
+        setQuickCompanyDraftContact("");
+      }
+    }, [vendorCount]);
 
-    const activeQuickCompanies = quickCompanyRoles.filter(r => data[r.companyField]);
+    const QUICK_COMPANY_TYPES = ["Insurance", "TPA", "Restoration Company", "Moving", "Public Adjusting", "Independent Adjusting", "Contractor", "Hygienist", "Art", "Other"];
+
+    const quickAddedCompanies = data.vendors || [];
     const dateRef = useRef(null);
     const timeRef = useRef(null);
     const noteInputRef = useRef(null);
@@ -4176,108 +4265,128 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   )}
                   </div>
 
-                  <div className="border-t border-slate-100 pt-4">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Other Companies on this Order</div>
-                    {activeQuickCompanies.length > 0 && (
-                      <div className="space-y-2 mb-3">
-                        {activeQuickCompanies.map(role => (
-                          <div key={role.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                            <span className="rounded-full bg-sky-100 border border-sky-200 px-2 py-0.5 text-[9px] font-bold text-sky-700">{role.label}</span>
-                            <span className="text-sm font-semibold text-slate-700">{data[role.companyField]}</span>
-                            {data[role.contactField] && <span className="text-sm text-slate-500">— {data[role.contactField]}</span>}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const patch = { [role.companyField]: "", [role.contactField]: "" };
-                                if (role.id === "insurance") { patch.insuranceClaim = ""; patch.involvesInsurance = ""; }
-                                updateMany(patch);
-                              }}
-                              className="ml-auto text-[10px] font-bold text-slate-400 hover:text-rose-500"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
+                  <div className="border-t border-slate-100 pt-4 space-y-3">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Companies & Contacts on this Order</div>
+                    {quickAddedCompanies.length > 0 && (
+                      <div className="space-y-2">
+                        {quickAddedCompanies.map((v, idx) => {
+                          const isReferrer = data.referringCompany && normalizeCompany(v.company || "") === normalizeCompany(data.referringCompany);
+                          const isInsurance = data.insuranceCompany && normalizeCompany(v.company || "") === normalizeCompany(data.insuranceCompany);
+                          const isBillTo = data.billingCompany && normalizeCompany(v.company || "") === normalizeCompany(data.billingCompany);
+                          return (
+                            <div key={v.id || `qc-${idx}`} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 flex-wrap">
+                              <span className="rounded-full bg-sky-100 border border-sky-200 px-2.5 py-1 text-[10px] font-bold text-sky-700">{v.type || "Company"}</span>
+                              <span className="text-base font-bold text-slate-800">{v.company || v.name}</span>
+                              {v.contact && <span className="text-base text-slate-600">— {v.contact}</span>}
+                              {isReferrer && <span className="rounded-full bg-sky-100 border border-sky-200 px-1.5 py-0.5 text-[8px] font-bold text-sky-700">Referrer</span>}
+                              {isInsurance && <span className="rounded-full bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700">Insurance</span>}
+                              {isBillTo && <span className="rounded-full bg-amber-100 border border-amber-200 px-1.5 py-0.5 text-[8px] font-bold text-amber-700">Bill To</span>}
+                              <button
+                                type="button"
+                                onClick={() => update("vendors", quickAddedCompanies.filter((_, i) => i !== idx))}
+                                className="ml-auto text-[10px] font-bold text-slate-400 hover:text-rose-500"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
-                    {!quickCompanyOpen ? (
-                      <button
-                        type="button"
-                        onClick={() => setQuickCompanyOpen(true)}
-                        className="rounded-full border border-dashed border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                      >
-                        + Add a company or contact
-                      </button>
-                    ) : (
-                      <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">What is their role on this order?</div>
-                        <div className="flex flex-wrap gap-2">
-                          {quickCompanyRoles.filter(r => !data[r.companyField]).map(role => (
-                            <button
-                              key={role.id}
-                              type="button"
-                              onClick={() => setQuickCompanySelectedRole(role.id)}
-                              className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-all ${quickCompanySelectedRole === role.id ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-600 hover:border-sky-300'}`}
-                            >
-                              {role.label}
-                            </button>
-                          ))}
-                        </div>
-                        {quickCompanySelectedRole && (
-                          <div className="space-y-2">
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <div>
-                                <div className="text-[10px] font-semibold text-slate-500 mb-1">Company</div>
-                                <SearchSelect
-                                  value={quickCompanyDraftCompany}
-                                  onChange={v => setQuickCompanyDraftCompany(v)}
-                                  onQueryChange={v => setQuickCompanyDraftCompany(v)}
-                                  options={companies}
-                                  placeholder="Search or type new company..."
-                                />
-                              </div>
-                              <div>
-                                <div className="text-[10px] font-semibold text-slate-500 mb-1">Contact (optional)</div>
-                                <SearchSelect
-                                  value={quickCompanyDraftContact}
-                                  onChange={v => setQuickCompanyDraftContact(v)}
-                                  onQueryChange={v => setQuickCompanyDraftContact(v)}
-                                  options={combinedContactOptions}
-                                  placeholder="Search or type new contact..."
-                                />
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                      {quickCompanySelectedRole !== "adding-new" ? (
+                        <>
+                          <SearchSelect
+                            value=""
+                            onChange={v => {
+                              const parsed = parseCombinedContact?.(v) || { contact: "", company: "" };
+                              const companyName = parsed.company || v;
+                              const contactName = parsed.contact || "";
+                              const inferredType = inferCompanyTypeFromName(companyName);
+                              const entry = { company: companyName, contact: contactName, type: inferredType !== "Other" ? inferredType : "", id: safeUid() };
+                              update("vendors", [...(data.vendors || []), entry]);
+                              setToast?.(`Added ${contactName ? contactName + " at " : ""}${companyName}`);
+                            }}
+                            onQueryChange={() => {}}
+                            options={combinedContactOptions}
+                            placeholder="Search existing contacts and companies to add..."
+                            clearOnCommit
+                            onAddNew={v => {
+                              setQuickCompanySelectedRole("adding-new");
+                              setQuickCompanyDraftContact(v);
+                              setQuickCompanyDraftCompany("");
+                            }}
+                          />
+                          <div className="text-[10px] text-slate-400">Select from the list to add. Not found? Click "+ Add" to create new.</div>
+                        </>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Add New to System</div>
+                            <button type="button" onClick={() => { setQuickCompanySelectedRole(""); setQuickCompanyDraftCompany(""); setQuickCompanyDraftContact(""); }} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">Cancel</button>
+                          </div>
+                          {/* Step 1: Find the company first */}
+                          <div>
+                            <div className="text-[10px] font-semibold text-slate-500 mb-1">Company</div>
+                            <SearchSelect
+                              value={quickCompanyDraftCompany}
+                              onChange={v => setQuickCompanyDraftCompany(v)}
+                              onQueryChange={v => setQuickCompanyDraftCompany(v)}
+                              options={companies.map(c => ({ label: c, value: c, type: "company" }))}
+                              placeholder="Find or type new company name..."
+                              onAddNew={v => setQuickCompanyDraftCompany(v)}
+                            />
+                            {quickCompanyDraftCompany && (() => {
+                              const exists = companies.some(c => normalizeCompany(c) === normalizeCompany(quickCompanyDraftCompany));
+                              return (
+                                <div className={`mt-1 text-[10px] font-semibold ${exists ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                  {exists ? `"${quickCompanyDraftCompany}" found` : `"${quickCompanyDraftCompany}" is new`}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          {/* Company type — only for NEW companies */}
+                          {quickCompanyDraftCompany && !companies.some(c => normalizeCompany(c) === normalizeCompany(quickCompanyDraftCompany)) && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-slate-500 mb-2">Company type:</div>
+                              <div className="flex flex-wrap gap-2">
+                                {QUICK_COMPANY_TYPES.map(type => (
+                                  <button key={type} type="button" onClick={() => setQuickCompanySelectedRole(`type:${type}`)}
+                                    className={`rounded-full border px-3 py-1 text-[10px] font-bold transition-all ${quickCompanySelectedRole === `type:${type}` ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-600 hover:border-sky-300'}`}
+                                  >{type}</button>
+                                ))}
                               </div>
                             </div>
-                            <div className="text-[10px] text-slate-400">Not in the list? Just type the name — it will be added as a new company or contact.</div>
-                          </div>
-                        )}
-                        <div className="flex gap-2">
-                          {quickCompanySelectedRole && quickCompanyDraftCompany && (
+                          )}
+                          {/* Contact — after company is set */}
+                          {quickCompanyDraftCompany && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-slate-500 mb-1">Contact at {quickCompanyDraftCompany}</div>
+                              <Input value={quickCompanyDraftContact} onChange={e => setQuickCompanyDraftContact(e.target.value)} placeholder="First and last name" />
+                            </div>
+                          )}
+                          {/* Save button */}
+                          {quickCompanyDraftCompany && (
                             <button
                               type="button"
                               onClick={() => {
-                                const role = quickCompanyRoles.find(r => r.id === quickCompanySelectedRole);
-                                if (!role) return;
-                                updateMany({ [role.companyField]: quickCompanyDraftCompany, [role.contactField]: quickCompanyDraftContact || "", ...(role.extraPatch || {}) });
+                                const exists = companies.some(c => normalizeCompany(c) === normalizeCompany(quickCompanyDraftCompany));
+                                const type = exists ? inferCompanyTypeFromName(quickCompanyDraftCompany) : (quickCompanySelectedRole?.startsWith("type:") ? quickCompanySelectedRole.replace("type:", "") : "Other");
+                                const entry = { company: quickCompanyDraftCompany, contact: quickCompanyDraftContact || "", type, id: safeUid() };
+                                update("vendors", [...(data.vendors || []), entry]);
+                                setToast?.(`Added ${quickCompanyDraftContact ? quickCompanyDraftContact + " at " : ""}${quickCompanyDraftCompany}`);
                                 setQuickCompanyDraftCompany("");
                                 setQuickCompanyDraftContact("");
                                 setQuickCompanySelectedRole("");
-                                setQuickCompanyOpen(false);
                               }}
-                              className="rounded-lg bg-sky-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
+                              className="w-full rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white hover:bg-sky-600"
                             >
-                              Add
+                              Add to Order
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => { setQuickCompanyOpen(false); setQuickCompanySelectedRole(""); setQuickCompanyDraftCompany(""); setQuickCompanyDraftContact(""); }}
-                            className="rounded-lg border border-slate-200 px-4 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50"
-                          >
-                            Cancel
-                          </button>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
               </div>
             </div>
@@ -4331,12 +4440,11 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
             <div id="quick-scheduling" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="scheduling">
                 <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Scheduling</h3>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                      <button onClick={() => update('scheduleType', 'Scope')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Scope' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">📋</span><span className="font-bold text-xs">Scope</span></button>
                      <button onClick={() => update('scheduleType', 'Pickup')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Pickup' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🚚</span><span className="font-bold text-xs">Pickup</span></button>
                      <button onClick={() => update('scheduleType', 'In-Home')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'In-Home' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🏡</span><span className="font-bold text-xs">In-Home</span></button>
                      <button onClick={() => update('scheduleType', 'Meeting')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Meeting' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🗓️</span><span className="font-bold text-xs">Meeting</span></button>
-                     <button onClick={() => updateMany({ scheduleType: 'TBD', pickupTime: '12:00 AM', eventFirm: false, pickupTimeTentative: true })} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'TBD' ? 'border-amber-400 bg-amber-50 text-amber-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">⏳</span><span className="font-bold text-xs">TBD</span></button>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 mb-4">
                     <Field
@@ -4354,7 +4462,16 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     >
                       <DatePicker value={data.pickupDate} onChange={(v)=>update("pickupDate", v)} closeSignal={dateCloseSignal} />
                     </Field>
-                    <Field label="Time">
+                    <Field label="Time" action={
+                      <button
+                        type="button"
+                        onClick={() => updateMany({ pickupTime: '12:00 AM', pickupTimeTentative: true, eventFirm: false })}
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-colors ${data.pickupTime === '12:00 AM' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'border border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-700'}`}
+                        title="Set time to TBD (12:00 AM placeholder)"
+                      >
+                        TBD
+                      </button>
+                    }>
                       <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseSignal} />
                     </Field>
                 </div>
@@ -4372,77 +4489,14 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     )}
                   </div>
                 </Field>
-                {data.scheduleType === 'TBD' && (
+                {data.pickupTime === '12:00 AM' && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 font-semibold">
-                    TBD — on the calendar but time not yet confirmed. 12:00 AM = unscheduled.
+                    Time is TBD — on the calendar for this date but time not yet confirmed.
                   </div>
                 )}
-                {!scheduleMoreOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setScheduleMoreOpen(true)}
-                    className="mt-3 text-xs font-bold text-sky-600 hover:text-sky-700"
-                  >
-                    + More scheduling options
-                  </button>
-                )}
-                {scheduleMoreOpen && (
-                  <div className="mt-4 space-y-4 rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Additional Options</div>
-                      <button type="button" onClick={() => setScheduleMoreOpen(false)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">Collapse</button>
-                    </div>
-                    <Field label="Vehicle">
-                      <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle" />
-                    </Field>
-                    <Field label="Firm / Tentative">
-                      <div className="flex flex-wrap gap-2">
-                        <ToggleMulti
-                          label="Firm"
-                          checked={!!data.eventFirm}
-                          onChange={() => updateMany({ eventFirm: !data.eventFirm, pickupTimeTentative: false, scheduleStatus: !data.eventFirm ? "" : data.scheduleStatus })}
-                        />
-                        <ToggleMulti
-                          label="Tentative"
-                          checked={!!data.pickupTimeTentative}
-                          onChange={() => updateMany({ pickupTimeTentative: !data.pickupTimeTentative, eventFirm: false })}
-                          colorClass="!bg-orange-50 !border-orange-400 !text-orange-700"
-                        />
-                      </div>
-                    </Field>
-                    <Field label="Scheduling Status">
-                      <div className="space-y-2">
-                        <div className={data.eventFirm ? "opacity-50 pointer-events-none" : ""}>
-                          <ToggleGroup
-                            options={["Schedule ASAP","Rep will Schedule"]}
-                            value={data.scheduleStatus}
-                            onChange={(v)=>updateMany({ scheduleStatus: v, eventFirm: false, pickupTimeTentative: false })}
-                          />
-                        </div>
-                        <div className="text-[11px] text-slate-400">What needs to happen next to confirm this appointment.</div>
-                      </div>
-                    </Field>
-                    <Field label="Who are we meeting?">
-                      <div className="flex flex-wrap gap-2">
-                        {(knownPeople && knownPeople.length > 0) ? knownPeople.map(p => (
-                          <ToggleMulti key={p} label={p} checked={(data.meetingWith || []).includes(p)} onChange={() => update("meetingWith", toggleMulti(data.meetingWith || [], p))}/>
-                        )) : <span className="text-sm text-slate-400 italic">Add customers or contacts first</span>}
-                      </div>
-                    </Field>
-                    <div className="grid sm:grid-cols-2 gap-4">
-                        <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">Send Confirmation</button>
-                        <button onClick={onOpenReminder} className={`rounded-lg border px-4 py-3 text-sm font-semibold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600"}`}>{data.reminderEnabled ? "Edit Reminder" : "Schedule Reminder"}</button>
-                    </div>
-                    <div className="flex items-center justify-start border-t border-slate-100 pt-3">
-                      <button
-                        onClick={() => { update("addCRMlog", true); onOpenCrmLog?.(); }}
-                        className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                      >
-                        + Add CRM Log
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <Field label="Vehicle">
+                  <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle (optional)" />
+                </Field>
             </div>
 
             <div id="quick-instructions" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="event-instructions">
@@ -6427,7 +6481,8 @@ export default function App(){
   const handleReset = useCallback(() => {
     localStorage.removeItem("same-day-scope-v52");
     localStorage.removeItem("noe-scope-photos");
-    setData({ ...DEFAULT_FORM, isLead: null, currentUser: data.currentUser || "" });
+    const user = data.currentUser || "";
+    setData({ ...DEFAULT_FORM, isLead: null, currentUser: user, eventAssignee: user, vendors: [], referrer: "", referringCompany: "", salesRep: "", leadSourceCategory: "", leadSourceDetail: "", contactMethod: "", insuranceCompany: "", insuranceAdjuster: "", billingCompany: "", billingContact: "" });
     setPhotoScopeData(null);
     setOpenSections({sec1:true, sec2:false, sec3:false, sec4:false, sec5:false});
     setVisitedSections(new Set(['sec1']));
@@ -11022,8 +11077,13 @@ export default function App(){
         </div>
       )}
       {roleAssignModal.isOpen && (
-        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[131] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-12 sm:pt-20">
-          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[131] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-12 sm:pt-20"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); applyRoleAssignment(); }
+            if (e.key === "Escape") { e.preventDefault(); setRoleAssignModal(prev => ({ ...prev, isOpen: false })); }
+          }}
+        >
+          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden" tabIndex={-1} ref={el => el?.focus()}>
             <div className="bg-sky-500 px-6 py-4">
               <h3 className="text-xl font-bold text-white">Assign Company/Contact Roles</h3>
               <div className="mt-1 text-base text-sky-100">Apply badges for this company/contact now.</div>
