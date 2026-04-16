@@ -1668,7 +1668,7 @@ const DEFAULT_FORM={
   eventFirm: false,
   eventUrgent: false,
   eventHandledBySalesRep: false,
-  eventCustomerContacted: false,
+  eventCustomerContacted: "office",
   eventBillToContacted: false,
   scheduleStatus: "",
   reminderEnabled: false,
@@ -2142,11 +2142,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
               className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between ${
                 idx === highlight
                   ? "bg-sky-50 text-sky-700"
-                  : opt.type === "company"
-                    ? "text-emerald-700 hover:bg-slate-50"
-                    : opt.type === "contact"
-                      ? "text-sky-700 hover:bg-slate-50"
-                      : "text-slate-700 hover:bg-slate-50"
+                  : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               <span>{opt.label}</span>
@@ -2155,7 +2151,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
               )}
             </button>
           ))}
-          {query.trim() && onAddNew && (
+          {query.trim() && onAddNew && filtered.length === 0 && (
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
@@ -2163,7 +2159,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
               className="w-full text-left px-3 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-50 border-t border-slate-100 flex items-center gap-2"
             >
               <span className="text-base">+</span>
-              <span>{filtered.length === 0 ? `Add "${query.trim()}" as new` : `Add "${query.trim()}" as new`}</span>
+              <span>Add "{query.trim()}" as new</span>
             </button>
           )}
         </div>
@@ -2587,7 +2583,7 @@ const SubSection = ({ id, title, open, onToggle, children, compact, className, a
 
 // --- SHARED FIELD COMPONENTS ---
 
-const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, toggleMulti, showInlineHelp, auditOn, salesRep, setSalesRep, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, setToast, getSalesRepForContact, onOpenCrmLog, onPromptRoleAssignment }) => {
+const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, toggleMulti, showInlineHelp, auditOn, salesRep, setSalesRep, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, setToast, getSalesRepForContact, onOpenCrmLog, onPromptRoleAssignment, onAddNewToSystem }) => {
   const referrerDisplayValue = data.referrer && data.referringCompany
     ? `${data.referrer} — ${data.referringCompany}`
     : (data.referrer || data.referringCompany || "");
@@ -2770,94 +2766,48 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                <div ref={referrerFieldAnchorRef}>
                  <Field
                    label="Referrer (Contact or Company)"
-                   action={
-                     referrerRep ? (
-                       <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-bold text-sky-700">
-                         <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold">{getRepInitials(referrerRep)}</span>
-                         <span>Rep</span>
-                       </div>
-                     ) : null
-                   }
+                   action={referrerDisplayValue ? (
+                     <button
+                       type="button"
+                       onClick={() => {
+                         if (window.confirm(`Remove ${referrerDisplayValue} as referrer? This will also clear any linked roles (Bill To, Insurance, Sales Rep).`)) {
+                           updateMany({ referrer: "", referringCompany: "", salesRep: "" });
+                           setToast?.("Referrer removed");
+                         }
+                       }}
+                       className="text-[10px] font-bold text-slate-400 hover:text-rose-500"
+                     >
+                       Remove
+                     </button>
+                   ) : null}
                  >
+                 {referrerDisplayValue ? (
+                   <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                     <span className="text-sm font-semibold text-slate-700">{referrerDisplayValue}</span>
+                   </div>
+                 ) : (
                  <div className="max-w-sm">
                      <SearchSelect
                        data-audit-key="referrer"
                        className={auditOn && data.highlightMissing?.referrer ? "audit-missing" : ""}
-                       value={referrerDisplayValue}
+                       value=""
                        onChange={(v)=>applyReferrerValue(v)}
                        onQueryChange={(v)=>setReferrerQuery(v)}
                      options={combinedContactOptions}
                      placeholder="Type contact or company..."
                      onBlur={() => ensureReferrerFromQuery()}
                      onAddNew={(name) => {
-                       const dashParts = name.split(/\s*[-—]\s*/);
-                       const namePart = dashParts[0] || name;
-                       const companyPart = dashParts[1] || "";
-                       const namePieces = namePart.trim().split(/\s+/);
-                       setAddNewContact({
-                         firstName: namePieces[0] || "",
-                         lastName: namePieces.slice(1).join(" ") || "",
-                         companyName: companyPart,
-                         phone: "",
-                         email: "",
-                       });
+                       if (onAddNewToSystem) {
+                         const nameParts = (name || "").trim().split(/\s+/);
+                         onAddNewToSystem({
+                           firstName: nameParts[0] || "",
+                           lastName: nameParts.slice(1).join(" ") || "",
+                           source: "referrer",
+                         });
+                       }
                      }}
                    />
-                 </div>
-                 {addNewContact && (() => {
-                   const companyExists = addNewContact.companyName && companies.some(c => normalizeCompany(c) === normalizeCompany(addNewContact.companyName));
-                   const fullName = [addNewContact.firstName, addNewContact.lastName].filter(Boolean).join(" ");
-                   return (
-                   <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50/50 p-3 space-y-3">
-                     <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Add New Contact</div>
-                     <div className="grid gap-2 sm:grid-cols-2">
-                       <Input value={addNewContact.firstName || ""} onChange={e => setAddNewContact(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" />
-                       <Input value={addNewContact.lastName || ""} onChange={e => setAddNewContact(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" />
-                     </div>
-                     <div>
-                       <div className="text-[10px] font-semibold text-slate-500 mb-1">Company</div>
-                       <SearchSelect
-                         value={addNewContact.companyName || ""}
-                         onChange={v => setAddNewContact(p => ({ ...p, companyName: v }))}
-                         onQueryChange={v => setAddNewContact(p => ({ ...p, companyName: v }))}
-                         options={companies.map(c => ({ label: c, value: c, type: "company" }))}
-                         placeholder="Search existing or type new company..."
-                         onAddNew={v => setAddNewContact(p => ({ ...p, companyName: v }))}
-                       />
-                       {addNewContact.companyName && (
-                         <div className={`mt-1 text-[10px] font-semibold ${companyExists ? 'text-emerald-600' : 'text-amber-600'}`}>
-                           {companyExists
-                             ? `"${addNewContact.companyName}" exists — ${fullName || "contact"} will be added to this company.`
-                             : `"${addNewContact.companyName}" is new — a new company will be created.`}
-                         </div>
-                       )}
-                     </div>
-                     <div className="grid gap-2 sm:grid-cols-2">
-                       <Input value={addNewContact.phone || ""} onChange={e => setAddNewContact(p => ({ ...p, phone: formatPhoneNumber(e.target.value) }))} placeholder="Phone (optional)" />
-                       <Input value={addNewContact.email || ""} onChange={e => setAddNewContact(p => ({ ...p, email: e.target.value }))} placeholder="Email (optional)" />
-                     </div>
-                     <div className="flex gap-2">
-                       <button
-                         type="button"
-                         onClick={() => {
-                           if (!fullName && !addNewContact.companyName) return;
-                           const display = fullName && addNewContact.companyName
-                             ? `${fullName} — ${addNewContact.companyName}`
-                             : fullName || addNewContact.companyName;
-                           applyReferrerValue(display);
-                           setAddNewContact(null);
-                           setToast?.(`Added ${display}`);
-                         }}
-                         className="rounded-lg bg-sky-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
-                       >
-                         Save & Select as Referrer
-                       </button>
-                       <button type="button" onClick={() => setAddNewContact(null)} className="rounded-lg border border-slate-200 px-4 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">Cancel</button>
-                     </div>
-                   </div>
-                   );
-                 })()}
-                 {referrerBestMatch && referrerBestMatch !== referrerDisplayValue && !addNewContact && (
+                 {referrerBestMatch && referrerBestMatch !== referrerDisplayValue && (
                    <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-2">
                      <span>Top match:</span>
                        <button
@@ -2869,6 +2819,8 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                        <span>(press Enter or Tab)</span>
                      </div>
                    )}
+                 </div>
+                 )}
                  </Field>
                </div>
                {(data.referrer || data.referringCompany) && !addNewContact && (
@@ -2908,15 +2860,12 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                    </div>
                  </div>
                )}
-               <div className="flex items-center justify-between text-xs text-slate-500">
-                 <span>CRM Log</span>
-                 <button
-                   onClick={onOpenCrmLog}
-                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                 >
-                   + Add CRM Log
-                 </button>
-               </div>
+               <button
+                 onClick={onOpenCrmLog}
+                 className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 hover:text-sky-700"
+               >
+                 + Add CRM Log{data.referrer ? ` for ${data.referrer}` : ""}
+               </button>
            </div>
        )}
       {data.leadSourceCategory === "Marketing" && (
@@ -2927,7 +2876,13 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
        )}
 
       {data.leadSourceCategory && salesRep && (
-        <div className="text-[11px] text-slate-400">Sales Rep: <span className="font-semibold text-slate-600">{salesRep.split(",")[0]}</span> (auto-assigned from referrer)</div>
+        <Field label="Sales Rep">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold shadow-sm">{getRepInitials(salesRep)}</span>
+            <span className="text-sm font-semibold text-slate-700">{salesRep.split(",")[0]}</span>
+          </div>
+          {showInlineHelp && <div className="text-[10px] text-slate-400 mt-1">Auto-assigned from referrer.</div>}
+        </Field>
       )}
 
       {data.leadSourceCategory && !salesRep && (
@@ -3194,6 +3149,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec1', sub: 'source', label: 'Method', keywords: 'method call email form meeting text tpa' },
     { id: 'sec1', sub: 'source', label: 'Sales Rep', keywords: 'sales rep representative rep' },
 
+    { id: 'sec1', label: 'Notes & Instructions', keywords: 'notes instructions event notes' },
     { id: 'sec2', label: 'Customer Section', keywords: 'customer section' },
     { id: 'sec2', label: 'Customer Type', keywords: 'customer type relationship' },
     { id: 'sec2', label: 'First Name', keywords: 'first name' },
@@ -4127,6 +4083,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
     const [quickCompanySelectedRole, setQuickCompanySelectedRole] = useState("");
     const [quickCompanyDraftCompany, setQuickCompanyDraftCompany] = useState("");
     const [quickCompanyDraftContact, setQuickCompanyDraftContact] = useState("");
+    const [addNewModal, setAddNewModal] = useState(null);
 
     // Reset add-company state when data is cleared
     const vendorCount = (data.vendors || []).length;
@@ -4210,7 +4167,22 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     )}
                   </Field>
                   <div className="border-t border-slate-100 pt-4">
-                    <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={onApplyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={onOpenCrmLog} onPromptRoleAssignment={onPromptRoleAssignment} />
+                    <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={onApplyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={onOpenCrmLog} onPromptRoleAssignment={onPromptRoleAssignment} onAddNewToSystem={(info) => {
+                      setAddNewModal({
+                        firstName: info.firstName || "",
+                        lastName: info.lastName || "",
+                        title: "",
+                        phone: "",
+                        email: "",
+                        companyName: "",
+                        companyType: "",
+                        companyPhone: "",
+                        companyWebsite: "",
+                        companyAddress: "",
+                        isNewCompany: false,
+                        source: info.source || "referrer",
+                      });
+                    }} />
                   </div>
                   <div className="border-t border-slate-100 pt-4 space-y-4">
                   <Field label="Order Type">
@@ -4219,7 +4191,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         <ToggleMulti
                           key={ot}
                           label={ot}
-                          title="Type of peril/damage involved."
+                          title={ot === "Fire" ? "Includes smoke, soot, puffback, and protein fires." : ot === "Water" ? "Includes leaks, floods, burst pipes, and storm damage." : ot === "Mold" ? "Includes visible mold, mildew, and musty odor." : "Type of peril/damage involved."}
                           checked={(data.orderTypes || []).includes(ot)}
                           onChange={() => {
                             if (ot === NON_RESTORATION_PRIMARY) {
@@ -4263,6 +4235,16 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       }} />
                     </Field>
                   )}
+                  {data.payorQuick === "Insurance" && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="Claim #" noeField="claimNumber">
+                        <Input value={data.claimNumber || ""} onChange={e => update("claimNumber", e.target.value)} placeholder="e.g. 70100933341" />
+                      </Field>
+                      <Field label="Policy #" noeField="policyNumber">
+                        <Input value={data.policyNumber || ""} onChange={e => update("policyNumber", e.target.value)} placeholder="e.g. 2361416060" />
+                      </Field>
+                    </div>
+                  )}
                   </div>
 
                   <div className="border-t border-slate-100 pt-4 space-y-3">
@@ -4274,13 +4256,77 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                           const isInsurance = data.insuranceCompany && normalizeCompany(v.company || "") === normalizeCompany(data.insuranceCompany);
                           const isBillTo = data.billingCompany && normalizeCompany(v.company || "") === normalizeCompany(data.billingCompany);
                           return (
-                            <div key={v.id || `qc-${idx}`} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 flex-wrap">
-                              <span className="rounded-full bg-sky-100 border border-sky-200 px-2.5 py-1 text-[10px] font-bold text-sky-700">{v.type || "Company"}</span>
-                              <span className="text-base font-bold text-slate-800">{v.company || v.name}</span>
-                              {v.contact && <span className="text-base text-slate-600">— {v.contact}</span>}
-                              {isReferrer && <span className="rounded-full bg-sky-100 border border-sky-200 px-1.5 py-0.5 text-[8px] font-bold text-sky-700">Referrer</span>}
-                              {isInsurance && <span className="rounded-full bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700">Insurance</span>}
-                              {isBillTo && <span className="rounded-full bg-amber-100 border border-amber-200 px-1.5 py-0.5 text-[8px] font-bold text-amber-700">Bill To</span>}
+                            <div key={v.id || `qc-${idx}`} className={`flex items-center gap-3 rounded-lg border px-4 py-3 flex-wrap ${v.incomplete ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 bg-white'}`}>
+                              {v.incomplete ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nameParts = (v.contact || "").trim().split(/\s+/);
+                                    setAddNewModal({
+                                      firstName: nameParts[0] || "",
+                                      lastName: nameParts.slice(1).join(" ") || "",
+                                      title: "",
+                                      phone: "",
+                                      email: "",
+                                      companyName: v.company || "",
+                                      companyType: v.type || "",
+                                      companyPhone: "",
+                                      companyWebsite: "",
+                                      companyAddress: "",
+                                      isNewCompany: !v.company,
+                                      source: "vendors",
+                                      replaceIdx: idx,
+                                    });
+                                  }}
+                                  className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-200 cursor-pointer"
+                                >
+                                  Needs Attention
+                                </button>
+                              ) : (
+                                <span className="rounded-full bg-sky-100 border border-sky-200 px-2.5 py-1 text-[10px] font-bold text-sky-700">{v.type || "Company"}</span>
+                              )}
+                              <span className="text-base font-bold text-slate-800">{v.company || v.contact || v.name}</span>
+                              {v.contact && v.company && <span className="text-base text-slate-600">— {v.contact}</span>}
+                              {[
+                                { active: isInsurance, label: "Insurance", toggle: () => {
+                                  if (isInsurance) updateMany({ insuranceCompany: "", insuranceAdjuster: "" });
+                                  else updateMany({ insuranceCompany: v.company, insuranceAdjuster: v.contact || "", insuranceClaim: "Yes", involvesInsurance: "Yes" });
+                                }},
+                                { active: isBillTo, label: "Bill To", toggle: () => {
+                                  if (isBillTo) updateMany({ billingCompany: "", billingContact: "" });
+                                  else updateMany({ billingCompany: v.company, billingContact: v.contact || "" });
+                                }},
+                              ].map(role => (
+                                <button key={role.label} type="button" onClick={role.toggle}
+                                  className={`rounded-full px-2 py-0.5 text-[9px] font-bold border transition-all ${role.active ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-sky-200 hover:text-sky-600'}`}
+                                >{role.label}</button>
+                              ))}
+                              {v.incomplete && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nameParts = (v.contact || "").trim().split(/\s+/);
+                                    setAddNewModal({
+                                      firstName: nameParts[0] || "",
+                                      lastName: nameParts.slice(1).join(" ") || "",
+                                      title: "",
+                                      phone: "",
+                                      email: "",
+                                      companyName: v.company || "",
+                                      companyType: v.type || "",
+                                      companyPhone: "",
+                                      companyWebsite: "",
+                                      companyAddress: "",
+                                      isNewCompany: !v.company,
+                                      source: "vendors",
+                                      replaceIdx: idx,
+                                    });
+                                  }}
+                                  className="text-[10px] font-bold text-amber-700 hover:text-amber-800"
+                                >
+                                  Complete
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => update("vendors", quickAddedCompanies.filter((_, i) => i !== idx))}
@@ -4294,98 +4340,47 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       </div>
                     )}
                     <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
-                      {quickCompanySelectedRole !== "adding-new" ? (
-                        <>
-                          <SearchSelect
-                            value=""
-                            onChange={v => {
-                              const parsed = parseCombinedContact?.(v) || { contact: "", company: "" };
-                              const companyName = parsed.company || v;
-                              const contactName = parsed.contact || "";
-                              const inferredType = inferCompanyTypeFromName(companyName);
-                              const entry = { company: companyName, contact: contactName, type: inferredType !== "Other" ? inferredType : "", id: safeUid() };
-                              update("vendors", [...(data.vendors || []), entry]);
-                              setToast?.(`Added ${contactName ? contactName + " at " : ""}${companyName}`);
-                            }}
-                            onQueryChange={() => {}}
-                            options={combinedContactOptions}
-                            placeholder="Search existing contacts and companies to add..."
-                            clearOnCommit
-                            onAddNew={v => {
-                              setQuickCompanySelectedRole("adding-new");
-                              setQuickCompanyDraftContact(v);
-                              setQuickCompanyDraftCompany("");
-                            }}
-                          />
-                          <div className="text-[10px] text-slate-400">Select from the list to add. Not found? Click "+ Add" to create new.</div>
-                        </>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Add New to System</div>
-                            <button type="button" onClick={() => { setQuickCompanySelectedRole(""); setQuickCompanyDraftCompany(""); setQuickCompanyDraftContact(""); }} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">Cancel</button>
-                          </div>
-                          {/* Step 1: Find the company first */}
-                          <div>
-                            <div className="text-[10px] font-semibold text-slate-500 mb-1">Company</div>
-                            <SearchSelect
-                              value={quickCompanyDraftCompany}
-                              onChange={v => setQuickCompanyDraftCompany(v)}
-                              onQueryChange={v => setQuickCompanyDraftCompany(v)}
-                              options={companies.map(c => ({ label: c, value: c, type: "company" }))}
-                              placeholder="Find or type new company name..."
-                              onAddNew={v => setQuickCompanyDraftCompany(v)}
-                            />
-                            {quickCompanyDraftCompany && (() => {
-                              const exists = companies.some(c => normalizeCompany(c) === normalizeCompany(quickCompanyDraftCompany));
-                              return (
-                                <div className={`mt-1 text-[10px] font-semibold ${exists ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                  {exists ? `"${quickCompanyDraftCompany}" found` : `"${quickCompanyDraftCompany}" is new`}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                          {/* Company type — only for NEW companies */}
-                          {quickCompanyDraftCompany && !companies.some(c => normalizeCompany(c) === normalizeCompany(quickCompanyDraftCompany)) && (
-                            <div>
-                              <div className="text-[10px] font-semibold text-slate-500 mb-2">Company type:</div>
-                              <div className="flex flex-wrap gap-2">
-                                {QUICK_COMPANY_TYPES.map(type => (
-                                  <button key={type} type="button" onClick={() => setQuickCompanySelectedRole(`type:${type}`)}
-                                    className={`rounded-full border px-3 py-1 text-[10px] font-bold transition-all ${quickCompanySelectedRole === `type:${type}` ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-600 hover:border-sky-300'}`}
-                                  >{type}</button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {/* Contact — after company is set */}
-                          {quickCompanyDraftCompany && (
-                            <div>
-                              <div className="text-[10px] font-semibold text-slate-500 mb-1">Contact at {quickCompanyDraftCompany}</div>
-                              <Input value={quickCompanyDraftContact} onChange={e => setQuickCompanyDraftContact(e.target.value)} placeholder="First and last name" />
-                            </div>
-                          )}
-                          {/* Save button */}
-                          {quickCompanyDraftCompany && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const exists = companies.some(c => normalizeCompany(c) === normalizeCompany(quickCompanyDraftCompany));
-                                const type = exists ? inferCompanyTypeFromName(quickCompanyDraftCompany) : (quickCompanySelectedRole?.startsWith("type:") ? quickCompanySelectedRole.replace("type:", "") : "Other");
-                                const entry = { company: quickCompanyDraftCompany, contact: quickCompanyDraftContact || "", type, id: safeUid() };
-                                update("vendors", [...(data.vendors || []), entry]);
-                                setToast?.(`Added ${quickCompanyDraftContact ? quickCompanyDraftContact + " at " : ""}${quickCompanyDraftCompany}`);
-                                setQuickCompanyDraftCompany("");
-                                setQuickCompanyDraftContact("");
-                                setQuickCompanySelectedRole("");
-                              }}
-                              className="w-full rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white hover:bg-sky-600"
-                            >
-                              Add to Order
-                            </button>
-                          )}
-                        </div>
-                      )}
+                      <SearchSelect
+                        value=""
+                        onChange={v => {
+                          const parsed = parseCombinedContact?.(v) || { contact: "", company: "" };
+                          const companyName = parsed.company || v;
+                          const contactName = parsed.contact || "";
+                          const existing = (data.vendors || []).some(x =>
+                            normalizeCompany(x.company || "") === normalizeCompany(companyName) &&
+                            normalizeContact(x.contact || "") === normalizeContact(contactName)
+                          );
+                          if (existing) { setToast?.(`${contactName ? contactName + " at " : ""}${companyName} is already on this order`); return; }
+                          // Check if this is a known contact/company or a free-typed unknown
+                          const isKnown = combinedContactOptions.some(opt =>
+                            normalizeCompany(opt.value || "") === normalizeCompany(v) ||
+                            normalizeContact(opt.value || "") === normalizeContact(v)
+                          );
+                          const inferredType = inferCompanyTypeFromName(companyName);
+                          const entry = {
+                            company: companyName,
+                            contact: contactName,
+                            type: isKnown && inferredType !== "Other" ? inferredType : "",
+                            id: safeUid(),
+                            incomplete: !isKnown,
+                          };
+                          update("vendors", [...(data.vendors || []), entry]);
+                          setToast?.(isKnown
+                            ? `Added ${contactName ? contactName + " at " : ""}${companyName}`
+                            : `Added "${v}" as placeholder — tap Complete to add full details`
+                          );
+                        }}
+                        onQueryChange={() => {}}
+                        options={combinedContactOptions}
+                        placeholder="Search existing contacts and companies to add..."
+                        clearOnCommit
+                        onAddNew={v => {
+                          const entry = { company: "", contact: v, type: "", id: safeUid(), incomplete: true };
+                          update("vendors", [...(data.vendors || []), entry]);
+                          setToast?.(`Added "${v}" as placeholder — tap to complete details`);
+                        }}
+                      />
+                      <div className="text-[10px] text-slate-400">Select to add. Not found? Click "+ Add" to save as placeholder.</div>
                     </div>
                   </div>
               </div>
@@ -4475,28 +4470,19 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseSignal} />
                     </Field>
                 </div>
-                <Field label="Assignee">
-                  <div className="flex items-center gap-2">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Assignee">
                     <Input value={data.eventAssignee} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" />
-                    {!data.eventAssignee && data.currentUser && (
-                      <button
-                        type="button"
-                        onClick={() => update("eventAssignee", data.currentUser)}
-                        className="shrink-0 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-bold text-sky-700 hover:bg-sky-100"
-                      >
-                        Assign me
-                      </button>
-                    )}
-                  </div>
-                </Field>
+                  </Field>
+                  <Field label="Vehicle">
+                    <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle (optional)" />
+                  </Field>
+                </div>
                 {data.pickupTime === '12:00 AM' && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 font-semibold">
-                    Time is TBD — on the calendar for this date but time not yet confirmed.
+                    TBD — on the calendar but time not yet confirmed.
                   </div>
                 )}
-                <Field label="Vehicle">
-                  <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle (optional)" />
-                </Field>
             </div>
 
             <div id="quick-instructions" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="event-instructions">
@@ -4512,8 +4498,9 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Customer Contact</div>
                   <div className="flex flex-wrap gap-2">
                     <ToggleMulti label="Already contacted" checked={data.eventCustomerContacted === "done"} onChange={() => updateMany({ eventCustomerContacted: data.eventCustomerContacted === "done" ? "" : "done", scheduleStatus: "" })} className="!text-[10px] !px-2.5 !py-1" />
-                    <ToggleMulti label="I will contact" checked={data.eventCustomerContacted === "rep"} onChange={() => updateMany({ eventCustomerContacted: data.eventCustomerContacted === "rep" ? "" : "rep", scheduleStatus: "" })} className="!text-[10px] !px-2.5 !py-1" />
+                    <ToggleMulti label="Rep will contact" checked={data.eventCustomerContacted === "rep"} onChange={() => updateMany({ eventCustomerContacted: data.eventCustomerContacted === "rep" ? "" : "rep", scheduleStatus: "" })} className="!text-[10px] !px-2.5 !py-1" />
                     <ToggleMulti label="Office please contact" checked={data.eventCustomerContacted === "office"} onChange={() => updateMany({ eventCustomerContacted: data.eventCustomerContacted === "office" ? "" : "office", scheduleStatus: "Office will contact" })} className="!text-[10px] !px-2.5 !py-1" />
+                    <ToggleMulti label="Enter only — do not contact" checked={data.eventCustomerContacted === "enter-only"} onChange={() => updateMany({ eventCustomerContacted: data.eventCustomerContacted === "enter-only" ? "" : "enter-only", scheduleStatus: "" })} className="!text-[10px] !px-2.5 !py-1" />
                   </div>
                 </div>
             </div>
@@ -4537,6 +4524,109 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 )}
               </div>
             </div>
+
+            {addNewModal && (
+              <div className="fixed inset-0 z-[140] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-8 sm:pt-16 overflow-auto"
+                onKeyDown={e => { if (e.key === "Escape") setAddNewModal(null); }}
+              >
+                <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden" tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
+                  <div className="bg-sky-500 px-6 py-4">
+                    <h3 className="text-lg font-bold text-white">Add New Contact / Company</h3>
+                    <p className="text-sm text-sky-100">This will add them to the system for future orders.</p>
+                  </div>
+                  <div className="p-6 space-y-5">
+                    {/* Company section */}
+                    <div className="space-y-3">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Company</div>
+                      <SearchSelect
+                        value={addNewModal.companyName}
+                        onChange={v => setAddNewModal(p => ({ ...p, companyName: v, isNewCompany: !companies.some(c => normalizeCompany(c) === normalizeCompany(v)) }))}
+                        onQueryChange={() => {}}
+                        options={companies.map(c => ({ label: c, value: c, type: "company" }))}
+                        placeholder="Search existing or type new company..."
+                        onAddNew={v => setAddNewModal(p => ({ ...p, companyName: v, isNewCompany: true }))}
+                      />
+                      {addNewModal.companyName && (
+                        <div className={`text-[11px] font-semibold ${addNewModal.isNewCompany ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          {addNewModal.isNewCompany
+                            ? `"${addNewModal.companyName}" is new — will be created`
+                            : `"${addNewModal.companyName}" found`}
+                        </div>
+                      )}
+                      {addNewModal.isNewCompany && addNewModal.companyName && (
+                        <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">New Company Details</div>
+                            <button
+                              type="button"
+                              onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(addNewModal.companyName)}`, '_blank')}
+                              className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100"
+                            >
+                              Search Google
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {QUICK_COMPANY_TYPES.map(type => (
+                              <button key={type} type="button" onClick={() => setAddNewModal(p => ({ ...p, companyType: type }))}
+                                className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition-all ${addNewModal.companyType === type ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
+                              >{type}</button>
+                            ))}
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <Input value={addNewModal.companyPhone || ""} onChange={e => setAddNewModal(p => ({ ...p, companyPhone: formatPhoneNumber(e.target.value) }))} placeholder="Company phone" />
+                            <Input value={addNewModal.companyWebsite || ""} onChange={e => setAddNewModal(p => ({ ...p, companyWebsite: e.target.value }))} placeholder="Website" />
+                          </div>
+                          <Input value={addNewModal.companyAddress || ""} onChange={e => setAddNewModal(p => ({ ...p, companyAddress: e.target.value }))} placeholder="Company address" />
+                        </div>
+                      )}
+                    </div>
+                    {/* Contact section */}
+                    <div className="space-y-3">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact{addNewModal.companyName ? ` at ${addNewModal.companyName}` : ""}</div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input value={addNewModal.firstName || ""} onChange={e => setAddNewModal(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" />
+                        <Input value={addNewModal.lastName || ""} onChange={e => setAddNewModal(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" />
+                      </div>
+                      <Input value={addNewModal.title || ""} onChange={e => setAddNewModal(p => ({ ...p, title: e.target.value }))} placeholder="Title (e.g. Adjuster, Project Manager, Owner)" />
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input value={addNewModal.phone || ""} onChange={e => setAddNewModal(p => ({ ...p, phone: formatPhoneNumber(e.target.value) }))} placeholder="Phone" />
+                        <Input value={addNewModal.email || ""} onChange={e => setAddNewModal(p => ({ ...p, email: e.target.value }))} placeholder="Email" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 px-6 py-4 flex justify-between border-t border-slate-200">
+                    <button onClick={() => setAddNewModal(null)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700">Cancel</button>
+                    <button
+                      onClick={() => {
+                        const fullName = [addNewModal.firstName, addNewModal.lastName].filter(Boolean).join(" ");
+                        const companyName = addNewModal.companyName || "";
+                        if (!fullName && !companyName) return;
+                        const inferredType = addNewModal.isNewCompany ? (addNewModal.companyType || "Other") : inferCompanyTypeFromName(companyName);
+                        const entry = { company: companyName, contact: fullName, type: inferredType, title: addNewModal.title || "", id: safeUid(), incomplete: false };
+                        if (addNewModal.replaceIdx !== undefined && addNewModal.replaceIdx !== null) {
+                          const next = [...(data.vendors || [])];
+                          next[addNewModal.replaceIdx] = entry;
+                          update("vendors", next);
+                        } else {
+                          update("vendors", [...(data.vendors || []), entry]);
+                        }
+                        if (addNewModal.source === "referrer") {
+                          const display = fullName && companyName ? `${fullName} — ${companyName}` : fullName || companyName;
+                          update("referrer", fullName);
+                          update("referringCompany", companyName);
+                        }
+                        setToast?.(`Added ${fullName ? fullName + (companyName ? " at " + companyName : "") : companyName} to the system`);
+                        setAddNewModal(null);
+                      }}
+                      disabled={!addNewModal.firstName && !addNewModal.companyName}
+                      className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white hover:bg-sky-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Add to System & Order
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
         </div>
     );
@@ -6257,6 +6347,38 @@ export default function App(){
 
   const handleSearchNavigate = (item) => {
     if (!item) return;
+    // In Quick Entry, scroll to the matching quick section
+    if (entryMode === "quick") {
+      const quickMap = {
+        sec1: "quick-questions",
+        sec2: "quick-customer",
+        sec3: "quick-address",
+        sec5: "quick-scheduling",
+      };
+      // Also check if the search label matches Quick Entry sections
+      const labelLower = (item.label || "").toLowerCase();
+      if (labelLower.includes("note") || labelLower.includes("instruction") || labelLower.includes("event")) {
+        document.getElementById("quick-instructions")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      const quickId = quickMap[item.id];
+      if (quickId) {
+        document.getElementById(quickId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        // Field not in Quick Entry — offer to switch
+        setEntryMode("detailed");
+        setTimeout(() => {
+          if (item.id) jumpToSection(item.id, { scroll: !item.sub });
+          setTimeout(() => {
+            if (item.sub) {
+              openSearchSubsection(item.sub, item.id);
+              requestAnimationFrame(() => scrollToSubsection(item.sub, item.id));
+            }
+          }, 80);
+        }, 100);
+      }
+      return;
+    }
     if (item.id) jumpToSection(item.id, { scroll: !item.sub });
     setTimeout(() => {
       if (item.sub) {
@@ -11079,7 +11201,7 @@ export default function App(){
       {roleAssignModal.isOpen && (
         <div data-suggested-roles-modal="true" className="fixed inset-0 z-[131] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-12 sm:pt-20"
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); applyRoleAssignment(); }
+            if (e.key === "Enter") { e.preventDefault(); applySelectedRoleAssignments(); }
             if (e.key === "Escape") { e.preventDefault(); setRoleAssignModal(prev => ({ ...prev, isOpen: false })); }
           }}
         >

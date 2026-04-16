@@ -1,5 +1,21 @@
 # React + TypeScript + Vite
 
+## Automation workflow prototype
+
+Run the app with `npm run dev`, then open `/automation-workflow/index.html` to use the standalone warehouse automation workflow prototype.
+
+Local dev URL:
+
+- `http://localhost:5173/automation-workflow/index.html`
+
+## Warehouse operations prototype
+
+This newer prototype is separate from the NOE app flow and mirrors the real operating boards more closely.
+
+Local dev URL:
+
+- `http://localhost:5173/warehouse-ops-prototype/index.html`
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
