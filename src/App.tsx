@@ -9400,7 +9400,7 @@ export default function App(){
                                               }
                                               toggleRestorationType(ot);
                                             }}
-                                            className={ot === "Water" && attentionWater ? "attention-fill" : ot === "Mold" && attentionMold ? "attention-fill" : ""}
+                                            className={ot === "Water" && attentionWater && !(data.orderTypes||[]).includes("Water") ? "attention-fill" : ot === "Mold" && attentionMold && !(data.orderTypes||[]).includes("Mold") ? "attention-fill" : ""}
                                           />
                                       ))}
                                   </div>
@@ -9423,8 +9423,10 @@ export default function App(){
                                 )}
                                 {(attentionWater || attentionMold) && (
                                   <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
-                                    {attentionWater && <div>Still Wet selected → review Water loss type and severity.</div>}
-                                    {attentionMold && <div>Visible Mold selected → review Mold loss type, severity, and Mold coverage.</div>}
+                                    {attentionWater && !(data.orderTypes||[]).includes("Water") && <div>Still Wet selected → consider adding Water as an order type.</div>}
+                                    {attentionWater && (data.orderTypes||[]).includes("Water") && <div>Water confirmed — review severity in Codes section below.</div>}
+                                    {attentionMold && !(data.orderTypes||[]).includes("Mold") && <div>Visible Mold selected → consider adding Mold as an order type.</div>}
+                                    {attentionMold && (data.orderTypes||[]).includes("Mold") && <div>Mold confirmed — review severity and Mold coverage limit in Insurance.</div>}
                                   </div>
                                 )}
                                 {(data.orderTypes || []).filter(t => LOSS_TYPES.includes(t)).map(type => {
@@ -9737,7 +9739,7 @@ export default function App(){
                                             {!isNonRestorationProject && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">SEVERITY</div>
-                                                {showInlineHelp && <div className="text-xs text-slate-500 mb-3">How much damage/soiling is expected? 1 = Minimal, 5 = Extensive (more items may not be salvageable).</div>}
+                                                {showInlineHelp && <div className="text-xs text-slate-500 mb-1">Severity reject scale: 1 = None, 2 = Possible, 3 = Many expected, 5 = Extreme.</div>}
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">{SEVERITY_GROUPS.map(type => {
                                                   const hasGroupCode = (data.severityCodes || []).some(c => c.startsWith(`${type}-`));
                                                   const expectsGroupCode = expectedSeverityGroups.has(type);
@@ -9747,7 +9749,7 @@ export default function App(){
                                                     <div key={type} data-audit-key={`severity-${type.toLowerCase()}`} className={`rounded-lg border p-2 ${needsExpectedCode ? "border-orange-300 bg-orange-50/60" : "border-slate-200"} ${needsAttention && !needsExpectedCode ? "attention-outline" : ""}`}>
                                                       <div className="mb-1.5 flex items-center justify-between">
                                                         <div className="text-xs font-bold text-slate-600">{type}</div>
-                                                        {needsExpectedCode ? <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">Expected</span> : null}
+                                                        {needsExpectedCode ? <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">Suggested — {type} selected as order type</span> : null}
                                                       </div>
                                                       <div className="flex gap-1">
                                                         {SEVERITY_LEVELS.map(level => { const code = `${type}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`flex-1 rounded py-1 text-xs font-bold transition-all ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : needsExpectedCode ? 'bg-orange-50 border border-orange-300 text-orange-700 hover:bg-orange-100' : 'bg-slate-100 border border-slate-300 text-slate-600 hover:bg-slate-200'} ${needsAttention && !needsExpectedCode ? "attention-outline" : ""}`}>{level}</button>); })}
@@ -9760,8 +9762,8 @@ export default function App(){
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className={suggestQ1 ? "suggested-field rounded-lg p-2" : ""}>
                                               <div className="mb-2 text-xs font-bold text-slate-400">QUALITY</div>
-                                              {showInlineHelp && <div className="text-xs text-slate-500 mb-3">Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).</div>}
-                                              {suggestQ1 && <div className="mb-2 text-[10px] font-bold suggested-pill inline-flex rounded-full px-2 py-0.5">Suggested: Q1</div>}
+                                              {showInlineHelp && <div className="text-xs text-slate-500 mb-1">Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).</div>}
+                                              {suggestQ1 && <div className="mb-2 text-[10px] font-bold suggested-pill inline-flex rounded-full px-2 py-0.5">Suggested: Q1 — based on insurance carrier or premium service</div>}
                                               <div className="flex flex-wrap gap-2">{QUALITY_CODES.map(q => (<ToggleMulti key={q} label={q} checked={data.qualityCode === q} onChange={() => update("qualityCode", q)} />))}</div>
                                             </div>
                                             <div className="border-t border-slate-100 my-1"></div>
@@ -9886,6 +9888,27 @@ export default function App(){
 
                     <Section id="sec4" noeSection="billing" title="4. Billing & Companies" helpText="Who pays + who is involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onHeaderClick={()=>handleToggleSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
                       <div className="grid gap-6">
+                        {data.insuranceClaim === "Yes" && (
+                          <div className="rounded-lg border border-sky-100 bg-sky-50/40 p-4">
+                            <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider mb-3">Insurance Quick Reference</div>
+                            <div className="grid gap-3 sm:grid-cols-4">
+                              <Field label="Claim #" noeField="claimNumber">
+                                <Input value={data.claimNumber || ""} onChange={e => update("claimNumber", e.target.value)} placeholder="Claim number" />
+                              </Field>
+                              <Field label="Policy #" noeField="policyNumber">
+                                <Input value={data.policyNumber || ""} onChange={e => update("policyNumber", e.target.value)} placeholder="Policy number" />
+                              </Field>
+                              <Field label="Date of Loss" noeField="dateOfLoss">
+                                <DatePicker value={data.dateOfLoss || ""} onChange={v => update("dateOfLoss", v)} />
+                              </Field>
+                              <Field label="Insurance Company" noeField="insuranceCompany">
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                                  {data.insuranceCompany || "Not yet assigned"}
+                                </div>
+                              </Field>
+                            </div>
+                          </div>
+                        )}
                         <SubSection
                           id="sec4-companies"
                           title="Companies & Contacts"
