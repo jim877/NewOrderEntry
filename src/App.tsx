@@ -1003,7 +1003,7 @@ const EntityPreferencePanel = ({
 // --- CONSTANTS FOR SELECTIONS ---
 const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil", "Other"];
 const LOSS_TYPE_COACHING = {
-  "Fire": "The primary peril — the damage that happened first. A kitchen fire extinguished with water = Fire loss with Water as secondary contamination.",
+  "Fire": "Includes smoke, soot, and protein fires. If extinguished with water, add Water as a secondary contaminant below.",
   "Water": "Includes leaks, burst pipes, storm, sprinkler, firefighting. Some water losses are excluded or capped. Always verify coverage for groundwater, flood, and sump pump failure.",
   "Mold": "If primary, there are usually mold limits — insurance caps the amount they will pay for mold cleanup. Mold that is a result of covered water damage is typically covered in full under the water coverage.",
   "Dust/Debris": "Some insurance claims result from construction projects contaminating the living space. Also a common secondary contaminant from remediation — flood cuts or removal of charred/water-logged building material.",
@@ -2783,7 +2783,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       </Field>
       {showCoaching && data.leadSourceCategory === "Referral" && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-          <span className="font-bold">Coaching:</span> The referrer is the first person who called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead — we may not yet be able to contact the customer.
+          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> The referrer is the first person who called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead — we may not yet be able to contact the customer.
         </div>
       )}
 
@@ -2907,7 +2907,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold shadow-sm">{getRepInitials(salesRep)}</span>
             <span className="text-sm font-semibold text-slate-700">{salesRep.split(",")[0]}</span>
           </div>
-          {showInlineHelp && <div className="text-[10px] text-slate-400 mt-1">Auto-assigned from referrer.</div>}
+          {showCoaching && <div className="text-[10px] text-slate-400 mt-1">Auto-assigned from referrer.</div>}
         </Field>
       )}
 
@@ -2947,7 +2947,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
           )}
         </div>
       </Field>
-      {showInlineHelp && <div className="text-[11px] text-slate-400">Employee managing customer relationships/accounts.</div>}
+      {showCoaching && <div className="text-[11px] text-slate-400">Employee managing customer relationships/accounts.</div>}
       </React.Fragment>
       )}
       {showSuggestedRoles && (
@@ -3544,12 +3544,12 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                     </button>
                     {showSettings && (
                         <div className="absolute right-0 top-10 w-56 rounded-xl border border-slate-200 bg-white shadow-xl p-2">
-                            <button 
-                                onClick={() => setShowInlineHelp(!showInlineHelp)} 
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all ${showInlineHelp ? 'bg-sky-50 text-sky-600' : 'hover:bg-slate-50 text-slate-600'}`}
+                            <button
+                                onClick={() => setShowCoaching(!showCoaching)}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all ${showCoaching ? 'bg-violet-50 text-violet-600' : 'hover:bg-slate-50 text-slate-600'}`}
                             >
-                                <span>Inline Help</span>
-                                <span>{showInlineHelp ? 'On' : 'Off'}</span>
+                                <span>🎓 Coaching</span>
+                                <span>{showCoaching ? 'On' : 'Off'}</span>
                             </button>
                             <button
                                 onClick={() => setCompactMode(!compactMode)}
@@ -4184,7 +4184,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       { label: "Order", title: "Active project with confirmed billing." },
                       { label: "Lead", title: "Potential project; incomplete information or no billing yet." }
                     ]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
-                    {showInlineHelp && (
+                    {showCoaching && (
                     <div className="text-[11px] text-slate-400 mt-1">
                       {data.isLead === true
                         ? "A Lead requires selling the customer and getting approvals from the adjuster before we proceed. No billable charges yet — just an opportunity we will pursue."
@@ -4234,10 +4234,15 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         />
                       ))}
                     </div>
-                    {showInlineHelp && <div className="text-[11px] text-slate-400 mt-1">Select the primary peril — the damage that happened first. Hover each type for details.</div>}
+                    {showCoaching && (
+                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
+                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button>
+                        <span className="font-bold">Coaching:</span> This is the primary peril — the damage that happened first. For example, a kitchen fire extinguished with water is a Fire loss with Water as a secondary contaminant.
+                      </div>
+                    )}
                     {showCoaching && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
-                        <span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
                       </div>
                     )}
                   </Field>
@@ -4273,7 +4278,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                           />
                         ))}
                       </div>
-                      {showInlineHelp && <div className="text-[11px] text-slate-400 mt-1">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
+                      {showCoaching && <div className="text-[11px] text-slate-400 mt-1">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
                     </Field>
                   )}
                   {isRestorationProject && (
@@ -4549,7 +4554,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
             <div id="quick-instructions" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="event-instructions">
                 <h3 className="mb-1 text-sm font-bold uppercase text-sky-600">Notes & Instructions</h3>
-                {showInlineHelp && <p className="text-xs text-slate-400 mb-3">Add anything the field team or office needs to know — conditions, special requests, access info, customer preferences, what to bring.</p>}
+                {showCoaching && <p className="text-xs text-slate-400 mb-3">Add anything the field team or office needs to know — conditions, special requests, access info, customer preferences, what to bring.</p>}
                 <AutoGrowTextarea
                   value={stripEventSystemLines(data.eventInstructions || "")}
                   onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
@@ -9454,7 +9459,7 @@ export default function App(){
                                       <button className={`rounded-lg border px-3 text-xs font-bold transition-all ${data.orderNameLocked?"bg-slate-800 text-white":"bg-white hover:bg-slate-50"}`} onClick={()=>updateMany({ orderNameLocked: !data.orderNameLocked, orderNameAuto: data.orderNameLocked ? data.orderNameAuto : false })}>{data.orderNameLocked?"LOCKED":"LOCK"}</button>
                                   </div>
                                 </Field>
-                                {showInlineHelp && <div className="text-[11px] text-slate-400">Auto-generated from LastName-TownST. Lock to prevent changes.</div>}
+                                {showCoaching && <div className="text-[11px] text-slate-400">Auto-generated from LastName-TownST. Lock to prevent changes.</div>}
                                 <div className="grid gap-4 sm:grid-cols-2">
                                   <Field label="Record Type">
                                     <ToggleGroup options={[
@@ -9467,6 +9472,12 @@ export default function App(){
                                   </Field>
                                 </div>
                                 <Field label="What caused the loss?" missing={data.highlightMissing.orderTypes} smart>
+                                  {showCoaching && !data.primaryLossType && (
+                                    <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-2">
+                                      <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button>
+                                      <span className="font-bold">Coaching:</span> Select the primary peril — the damage that happened first. For example, a kitchen fire extinguished with water is a Fire loss with Water as a secondary contaminant.
+                                    </div>
+                                  )}
                                   <div className="flex flex-wrap gap-2" data-audit-key="orderTypes">
                                       {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map(ot=> (
                                           <ToggleMulti
@@ -9489,12 +9500,12 @@ export default function App(){
                                       ))}
                                   </div>
                                 </Field>
-                                {showInlineHelp && data.primaryLossType && !isNonRestorationProject && (
+                                {showCoaching && data.primaryLossType && !isNonRestorationProject && (
                                   <>
                                     <div className="text-[11px] text-slate-400">Primary: <span className="font-semibold text-slate-600">{data.primaryLossType}</span>. Select additional contaminants below if applicable.</div>
                                     {LOSS_TYPE_COACHING[data.primaryLossType] && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
                                       </div>
                                     )}
                                   </>
@@ -9532,7 +9543,7 @@ export default function App(){
                                         />
                                       ))}
                                     </div>
-                                    {showInlineHelp && <div className="text-[11px] text-slate-400">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
+                                    {showCoaching && <div className="text-[11px] text-slate-400">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
                                   </Field>
                                 )}
                                 {(attentionWater || attentionMold) && (
@@ -9634,14 +9645,14 @@ export default function App(){
 
                             <SubSection id="sec1-interview-panel" title="Interview" open={interviewSubOpen} onToggle={(nextOpen) => setInterviewSubOpen(!!nextOpen)} compact={compactMode}>
                                 <div id="sec1-interview" className="space-y-4">
-                                  {showInlineHelp && <div className="text-xs text-slate-400 mb-2">Ask the customer these questions before going out to the home.</div>}
+                                  {showCoaching && <div className="text-xs text-slate-400 mb-2">Ask the customer these questions before going out to the home.</div>}
 
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">Is anything still wet or damaged?</div>
-                                    {showInlineHelp && <div className="text-[10px] text-slate-400">Ask the customer about current conditions at the home. These affect what we bring and how we prioritize.</div>}
+                                    {showCoaching && <div className="text-[10px] text-slate-400">Ask the customer about current conditions at the home. These affect what we bring and how we prioritize.</div>}
                                     <div className="flex flex-wrap gap-2">
                                       {[
-                                        { id: "wet", stateKey: "damageWasWet", label: "Still Wet", active: !!data.damageWasWet, onToggle: () => updateSmart("damageWasWet", data.damageWasWet ? "N" : "Y"), suggested: suggestWet },
+                                        { id: "wet", stateKey: "damageWasWet", label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true, onToggle: () => updateSmart("damageWasWet", (data.damageWasWet === "Y" || data.damageWasWet === true) ? "N" : "Y"), suggested: suggestWet },
                                         { id: "mold", stateKey: "damageMoldMildew", label: "Visible Mold", active: !!data.damageMoldMildew, onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew) },
                                         { id: "structural", stateKey: "structuralElectricDamage", label: "Structural Damage", active: data.structuralElectricDamage === "Y", onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y") },
                                         { id: "lights", stateKey: "noLights", label: "No Electricity", active: !!data.noLights, onToggle: () => updateSmart("noLights", !data.noLights) },
@@ -9659,37 +9670,37 @@ export default function App(){
                                     </div>
                                     {showCoaching && (data.damageWasWet === "Y" || data.damageWasWet === true) && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> Tell the customer we need to get out there ASAP. Wet items left untreated can develop mold, which may not be covered by insurance. Ask them to keep colors separated and avoid mixing wet items together.
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Tell the customer we need to get out there ASAP. Wet items left untreated can develop mold, which may not be covered by insurance. Ask them to keep colors separated and avoid mixing wet items together.
                                       </div>
                                     )}
                                     {showCoaching && !!data.damageMoldMildew && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> Visible mold requires immediate attention. Ask if anyone in the household has respiratory concerns. PPE will be required for our team. Mold coverage should be confirmed with the adjuster.
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Visible mold requires immediate attention. Ask if anyone in the household has respiratory concerns. PPE will be required for our team. Mold coverage should be confirmed with the adjuster.
                                       </div>
                                     )}
                                     {showCoaching && !!data.noLights && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> No electricity means we need to bring portable lighting. Ask if there's a generator on site.
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> No electricity means we need to bring portable lighting. Ask if there's a generator on site.
                                       </div>
                                     )}
                                     {showCoaching && !!data.boardedUp && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> Boarded up home — confirm access arrangements. Ask who has the key or access code. Will fire department or restoration company need to provide access?
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Boarded up home — confirm access arrangements. Ask who has the key or access code. Will fire department or restoration company need to provide access?
                                       </div>
                                     )}
                                   </div>
 
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">What repairs are being done to the home?</div>
-                                    {showInlineHelp && <div className="text-[10px] text-slate-400">Select all that apply. This helps estimate timeline and storage needs.</div>}
+                                    {showCoaching && <div className="text-[10px] text-slate-400">Select all that apply. This helps estimate timeline and storage needs.</div>}
                                     {showCoaching && (data.repairsSummary || "").includes("Complete Rebuild") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> Complete rebuild means the customer will be displaced for an extended period. Confirm long-term storage needs and set expectations on timeline. Ask if they have a temporary living arrangement.
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Complete rebuild means the customer will be displaced for an extended period. Confirm long-term storage needs and set expectations on timeline. Ask if they have a temporary living arrangement.
                                       </div>
                                     )}
                                     {showCoaching && (data.repairsSummary || "").includes("Major Structural") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> Major structural damage may mean limited access to parts of the home. Ask which areas are affected and if a contractor has assessed the structure. We may need to coordinate access with the contractor.
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Major structural damage may mean limited access to parts of the home. Ask which areas are affected and if a contractor has assessed the structure. We may need to coordinate access with the contractor.
                                       </div>
                                     )}
                                     <div className="flex flex-wrap gap-2">
@@ -9715,19 +9726,19 @@ export default function App(){
                                           <ToggleMulti key={s.label} label={s.label} title={s.title} checked={data.livingStatus === s.label} onChange={() => updateLivingStatus(data.livingStatus === s.label ? "" : s.label)} className="!px-3 !py-2 !text-sm" />
                                         ))}
                                       </div>
-                                      {data.livingStatus === "Temp Housing" && showInlineHelp && (
+                                      {data.livingStatus === "Temp Housing" && showCoaching && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <span className="font-bold">Coaching:</span> Ask: "Where are you staying — hotel, rental, trailer, or with family?" Get the temp address and add it in the Address section. Ask how long they expect to be displaced — this determines storage timeline.
+                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Ask: "Where are you staying — hotel, rental, trailer, or with family?" Get the temp address and add it in the Address section. Ask how long they expect to be displaced — this determines storage timeline.
                                         </div>
                                       )}
-                                      {data.livingStatus === "Moving" && showInlineHelp && (
+                                      {data.livingStatus === "Moving" && showCoaching && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <span className="font-bold">Coaching:</span> Customer is permanently relocating. Get the new address for final delivery. Ask: "When do you expect to be in the new home?" This determines our delivery timeline. All items will be delivered to the new address, not the loss site.
+                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer is permanently relocating. Get the new address for final delivery. Ask: "When do you expect to be in the new home?" This determines our delivery timeline. All items will be delivered to the new address, not the loss site.
                                         </div>
                                       )}
-                                      {data.livingStatus === "Staying in home" && showInlineHelp && (
+                                      {data.livingStatus === "Staying in home" && showCoaching && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <span className="font-bold">Coaching:</span> Customer is living in the home during work. Be mindful of scheduling around their routine. Ask about work hours and best times for pickup/delivery. We may need to work room-by-room.
+                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer is living in the home during work. Be mindful of scheduling around their routine. Ask about work hours and best times for pickup/delivery. We may need to work room-by-room.
                                         </div>
                                       )}
                                     </div>
@@ -9735,12 +9746,12 @@ export default function App(){
                                       <div className="text-sm font-bold text-sky-600">When do they need their final delivery returned?</div>
                                       {showCoaching && data.processType === "Long-Term Storage" && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <span className="font-bold">Coaching:</span> Long-term storage — confirm with the customer they understand monthly storage fees. Ask for an estimated return date so we can plan ahead. Set a reminder to follow up.
+                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Long-term storage — confirm with the customer they understand monthly storage fees. Ask for an estimated return date so we can plan ahead. Set a reminder to follow up.
                                         </div>
                                       )}
                                       {showCoaching && data.processType === "Deliver ASAP" && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <span className="font-bold">Coaching:</span> Customer wants items back quickly. Prioritize processing. Confirm the delivery address is ready to receive items.
+                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer wants items back quickly. Prioritize processing. Confirm the delivery address is ready to receive items.
                                         </div>
                                       )}
                                       <div className="flex flex-wrap gap-2">
@@ -9758,7 +9769,7 @@ export default function App(){
 
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">What are we picking up?</div>
-                                    {showInlineHelp && <div className="text-[10px] text-slate-400">Select all items we'll be removing from the home.</div>}
+                                    {showCoaching && <div className="text-[10px] text-slate-400">Select all items we'll be removing from the home.</div>}
                                     <div className="flex flex-wrap gap-2">
                                       {["Rugs", "Draperies", "Draperies w/ Rods", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
                                         <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={()=>update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} className="!px-4 !py-2.5 !text-sm" />
@@ -9768,20 +9779,20 @@ export default function App(){
 
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">Special considerations</div>
-                                    {showInlineHelp && <div className="text-[10px] text-slate-400">Note anything about the customer or household that affects how we handle the project.</div>}
+                                    {showCoaching && <div className="text-[10px] text-slate-400">Note anything about the customer or household that affects how we handle the project.</div>}
                                     {showCoaching && (data.sdsConsiderations || []).includes("Elderly") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> Elderly customer — be patient and speak clearly. They may need extra time and assistance. Consider labeling boxes clearly for easy identification. Offer to help with packing/unpacking.
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Elderly customer — be patient and speak clearly. They may need extra time and assistance. Consider labeling boxes clearly for easy identification. Offer to help with packing/unpacking.
                                       </div>
                                     )}
                                     {showCoaching && (data.sdsConsiderations || []).includes("Pregnancy") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> Customer is pregnant — avoid strong chemicals and fumes. Schedule work to minimize disruption. Use fragrance-free products.
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer is pregnant — avoid strong chemicals and fumes. Schedule work to minimize disruption. Use fragrance-free products.
                                       </div>
                                     )}
                                     {showCoaching && (data.sdsConsiderations || []).includes("Respiratory Concerns") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> Respiratory concerns — use hypoallergenic products. Notify the processing team. Ask about specific triggers.
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Respiratory concerns — use hypoallergenic products. Notify the processing team. Ask about specific triggers.
                                       </div>
                                     )}
                                     <div className="flex flex-wrap gap-2">
@@ -9795,7 +9806,7 @@ export default function App(){
                                   </div>
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
                                       <div className="text-sm font-semibold text-sky-600 mb-1">Suggested Groups</div>
-                                      {showInlineHelp && <div className="text-[11px] text-slate-400 mb-3">Processing groups define how items are batched (e.g., rush vs. long-term). Link a group to a specific pickup address if needed.</div>}
+                                      {showCoaching && <div className="text-[11px] text-slate-400 mb-3">Processing groups define how items are batched (e.g., rush vs. long-term). Link a group to a specific pickup address if needed.</div>}
                                       <div className="flex flex-wrap gap-2">
                                         {SUGGESTED_GROUPS.map(g => {
                                           const selected = (data.suggestedGroups || []).includes(g);
@@ -9892,7 +9903,7 @@ export default function App(){
                                     )}
                                     {showCoaching && data.howDryLaundry === "Air-Dry" && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <span className="font-bold">Coaching:</span> Customer air-dries clothing — we must not machine dry any items. All items will be tagged for air-dry. This is important to avoid shrinkage and damage claims.
+                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer air-dries clothing — we must not machine dry any items. All items will be tagged for air-dry. This is important to avoid shrinkage and damage claims.
                                       </div>
                                     )}
 
@@ -9929,7 +9940,7 @@ export default function App(){
                                             {!isNonRestorationProject && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">SEVERITY</div>
-                                                {showInlineHelp && <div className="text-xs text-slate-500 mb-1">Severity reject scale: 1 = None, 2 = Possible, 3 = Many expected, 5 = Extreme.</div>}
+                                                {showCoaching && <div className="text-xs text-slate-500 mb-1">Severity reject scale: 1 = None, 2 = Possible, 3 = Many expected, 5 = Extreme.</div>}
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">{SEVERITY_GROUPS.map(type => {
                                                   const hasGroupCode = (data.severityCodes || []).some(c => c.startsWith(`${type}-`));
                                                   const expectsGroupCode = expectedSeverityGroups.has(type);
@@ -9953,7 +9964,7 @@ export default function App(){
                                             {(data.primaryLossType || (data.orderTypes||[]).some(t => ["Fire","Water","Puffback"].includes(t))) && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">DETAILED SEVERITY</div>
-                                                {showInlineHelp && <div className="text-xs text-slate-500 mb-3">Rate specific contaminant levels. 0 = None, 3 = Severe. Used in the SDS document.</div>}
+                                                {showCoaching && <div className="text-xs text-slate-500 mb-3">Rate specific contaminant levels. 0 = None, 3 = Severe. Used in the SDS document.</div>}
                                                 <div className="grid gap-4 sm:grid-cols-2">
                                                   {[
                                                     { key: "fire", label: "Fire", fields: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"], colorStart: "#fef3c7", colorEnd: "#f97316" },
@@ -10001,12 +10012,12 @@ export default function App(){
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className={suggestQ1 ? "suggested-field rounded-lg p-2" : ""}>
                                               <div className="mb-2 text-xs font-bold text-slate-400">QUALITY</div>
-                                              {showInlineHelp && <div className="text-xs text-slate-500 mb-1">Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).</div>}
+                                              {showCoaching && <div className="text-xs text-slate-500 mb-1">Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).</div>}
                                               {suggestQ1 && <div className="mb-2 text-[10px] font-bold suggested-pill inline-flex rounded-full px-2 py-0.5">Suggested: Q1 — based on insurance carrier or premium service</div>}
                                               <div className="flex flex-wrap gap-2">{QUALITY_CODES.map(q => (<ToggleMulti key={q} label={q} checked={data.qualityCode === q} onChange={() => update("qualityCode", q)} />))}</div>
                                             </div>
                                             <div className="border-t border-slate-100 my-1"></div>
-                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div>{showInlineHelp && <div className="text-xs text-slate-500 mb-3">Special processing instructions. Hover each code for its meaning.</div>}<div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className="!px-3 !py-2 !text-sm" checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
+                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div>{showCoaching && <div className="text-xs text-slate-500 mb-3">Special processing instructions. Hover each code for its meaning.</div>}<div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className="!px-3 !py-2 !text-sm" checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -10175,7 +10186,7 @@ export default function App(){
                                   <button type="button" onClick={() => setPendingAddress(null)} className="text-xs font-bold text-slate-400 hover:text-slate-600">Cancel</button>
                                 </div>
                               )}
-                              {!pendingAddress && showInlineHelp && <div className="text-[10px] text-slate-400">Search for an address, then select the type to add it.</div>}
+                              {!pendingAddress && showCoaching && <div className="text-[10px] text-slate-400">Search for an address, then select the type to add it.</div>}
                             </div>
                           );
                         })()}
