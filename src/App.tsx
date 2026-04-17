@@ -1003,14 +1003,21 @@ const EntityPreferencePanel = ({
 // --- CONSTANTS FOR SELECTIONS ---
 const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil", "Other"];
 const LOSS_TYPE_COACHING = {
-  "Fire": "The primary peril. Includes smoke, soot, and protein fires. A kitchen fire extinguished with water = Fire loss with Water as secondary.",
-  "Water": "Includes leaks, burst pipes, storm, sprinkler, firefighting. Always verify coverage for groundwater, flood, and sump pump failure.",
-  "Mold": "If primary, there are usually mold limits — insurance caps the amount they will pay. Mold from covered water damage is typically covered in full under water coverage.",
-  "Dust/Debris": "Construction contamination or secondary from remediation (flood cuts, removal of charred/water-logged material).",
-  "Puffback": "Gas or oil furnace/fireplace malfunction pushes soot or oily smell into the home. No actual flames involved.",
-  "Oil": "Home heating oil spilled, sprayed or misted. Requires almost exclusively dry cleaning — washing is often not an option. May require replacing items that cannot be dry cleaned.",
-  "Other": "Trees falling on houses, windstorms, etc. that do not fit into other peril types.",
-  "Non-Restoration": "Orders unrelated to an accident or insurance claim — regular residential or commercial cleaning, not a catastrophe or insurable event.",
+  "Fire": "The primary peril — the damage that happened first. A kitchen fire extinguished with water = Fire loss with Water as secondary contamination.",
+  "Water": "Includes leaks, burst pipes, storm, sprinkler, firefighting. Some water losses are excluded or capped. Always verify coverage for groundwater, flood, and sump pump failure.",
+  "Mold": "If primary, there are usually mold limits — insurance caps the amount they will pay for mold cleanup. Mold that is a result of covered water damage is typically covered in full under the water coverage.",
+  "Dust/Debris": "Some insurance claims result from construction projects contaminating the living space. Also a common secondary contaminant from remediation — flood cuts or removal of charred/water-logged building material.",
+  "Puffback": "When a gas or (more typically) oil furnace or fireplace malfunctions and pushes soot or an oily smell back into the home. No actual flames involved.",
+  "Oil": "Home heating oil spilled, sprayed or misted into the home from equipment malfunction or human error. Requires almost exclusively dry cleaning — washing is often not an option. May require replacing items that cannot be dry cleaned.",
+  "Other": "Trees falling on houses, windstorms, etc. that do not fit nicely into the other peril types.",
+  "Non-Restoration": "Orders that have nothing to do with an accident or insurance claim — regular residential or commercial cleaning projects not related to a catastrophe or insurable event.",
+};
+const ROLE_COACHING = {
+  "Policyholder": "The person(s) named on the policy who is required to sign our authorization paperwork.",
+  "Primary": "The primary contact handling our portion of the project. May or may not be the policyholder or owner — can be a PA, employee, or family member.",
+  "Referral": "The first person that called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead.",
+  "Expert Stain Removal": "A per-hour charge for removing complicated loss-related stains from items worth saving. Example: removing rust or dye stains from a rug or carpet.",
+  "Find Address": "Use Google to insert a valid, verified address.",
 };
 const NON_RESTORATION_PRIMARY = "Non-Restoration";
 const NON_RESTORATION_SUBTYPES = ["Commercial Cleaning", "Residential Cleaning", "Other"];
@@ -3348,7 +3355,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 };
 
 // --- UNIFIED FLOATING HEADER (PROGRESS HEADER) ---
-const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
+const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
     const steps = [
         { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }, { id: "interview", label: "Interview" }, { id: "codes", label: "Codes" }] },
         { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
@@ -3749,8 +3756,8 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
               )}
 	         </div>
 	         <div className="flex flex-wrap gap-2">
-	            <ToggleMulti className="!py-1 !px-3 sm:!px-3 !text-xs" label="Primary" checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
-            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Policy Holder" checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder })} />
+	            <ToggleMulti className="!py-1 !px-3 sm:!px-3 !text-xs" label="Primary" title={ROLE_COACHING["Primary"]} checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
+            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Policy Holder" title={ROLE_COACHING["Policyholder"]} checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder })} />
             <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay })} />
          </div>
       </div>
@@ -4340,7 +4347,12 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                               {[
                                 { active: isInsurance, label: "Insurance", toggle: () => {
                                   if (isInsurance) updateMany({ insuranceCompany: "", insuranceAdjuster: "" });
-                                  else updateMany({ insuranceCompany: v.company, insuranceAdjuster: v.contact || "", insuranceClaim: "Yes", involvesInsurance: "Yes" });
+                                  else {
+                                    if (data.insuranceCompany && normalizeCompany(data.insuranceCompany) !== normalizeCompany(v.company)) {
+                                      if (!window.confirm(`This order already has "${data.insuranceCompany}" as insurance. Change to "${v.company}"?`)) return;
+                                    }
+                                    updateMany({ insuranceCompany: v.company, insuranceAdjuster: v.contact || "", insuranceClaim: "Yes", involvesInsurance: "Yes" });
+                                  }
                                 }},
                                 { active: isBillTo, label: "Bill To", toggle: () => {
                                   if (isBillTo) updateMany({ billingCompany: "", billingContact: "" });
@@ -9216,6 +9228,11 @@ export default function App(){
         if (company && data.insuranceCompany === company) patch.insuranceCompany = "";
         if (contact && data.insuranceAdjuster === contact) patch.insuranceAdjuster = "";
       } else {
+        if (data.insuranceCompany && company && normalizeCompany(data.insuranceCompany) !== normalizeCompany(company)) {
+          if (!window.confirm(`This order already has "${data.insuranceCompany}" as the insurance company. Are you sure you want to change it to "${company}"? Multiple insurance companies on one order is rare but possible.`)) {
+            return;
+          }
+        }
         if (company) patch.insuranceCompany = company;
         if (contact) patch.insuranceAdjuster = contact;
         patch.insuranceClaim = "Yes";
@@ -9348,6 +9365,8 @@ export default function App(){
             setEntryMode={setEntryMode}
             showInlineHelp={showInlineHelp}
             setShowInlineHelp={setShowInlineHelp}
+            showCoaching={showCoaching}
+            setShowCoaching={setShowCoaching}
             compactMode={compactMode}
             setCompactMode={setCompactMode}
             onReset={handleReset}
