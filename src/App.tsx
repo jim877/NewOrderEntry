@@ -1002,6 +1002,16 @@ const EntityPreferencePanel = ({
 
 // --- CONSTANTS FOR SELECTIONS ---
 const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil", "Other"];
+const LOSS_TYPE_COACHING = {
+  "Fire": "The primary peril. Includes smoke, soot, and protein fires. A kitchen fire extinguished with water = Fire loss with Water as secondary.",
+  "Water": "Includes leaks, burst pipes, storm, sprinkler, firefighting. Always verify coverage for groundwater, flood, and sump pump failure.",
+  "Mold": "If primary, there are usually mold limits — insurance caps the amount they will pay. Mold from covered water damage is typically covered in full under water coverage.",
+  "Dust/Debris": "Construction contamination or secondary from remediation (flood cuts, removal of charred/water-logged material).",
+  "Puffback": "Gas or oil furnace/fireplace malfunction pushes soot or oily smell into the home. No actual flames involved.",
+  "Oil": "Home heating oil spilled, sprayed or misted. Requires almost exclusively dry cleaning — washing is often not an option. May require replacing items that cannot be dry cleaned.",
+  "Other": "Trees falling on houses, windstorms, etc. that do not fit into other peril types.",
+  "Non-Restoration": "Orders unrelated to an accident or insurance claim — regular residential or commercial cleaning, not a catastrophe or insurable event.",
+};
 const NON_RESTORATION_PRIMARY = "Non-Restoration";
 const NON_RESTORATION_SUBTYPES = ["Commercial Cleaning", "Residential Cleaning", "Other"];
 const getNonRestorationSubtype = (orderTypes = []) =>
@@ -1049,10 +1059,10 @@ const selectNonRestorationSubtypeSelection = (orderTypes = [], subtype = "") => 
 
 const CAUSES = {
   "Fire": ["Battery", "Candle", "Cooking", "Electrical", "Explosion", "Fireplace", "Flammables", "Heating", "Neighbor", "Protein", "Smoking", "Wildfire"],
-  "Water": ["Roof Leak", "Window/Door Leak", "Frozen Pipes", "Pipe Burst", "Overflow", "Storm", "Sprinkler", "Firefighting"],
+  "Water": ["Roof Leak", "Window/Door Leak", "Frozen Pipes", "Pipe Burst", "Overflow", "Storm", "Sprinkler", "Firefighting", "Groundwater⚠", "Flood⚠", "Sump Pump Failure⚠"],
   "Mold": ["Spores Only", "Visible Mold", "Moldy Odor"],
   "Dust/Debris": ["Mitigation", "Construction", "Fiberglass"],
-  "Puffback": ["Oily Odor"],
+  "Puffback": ["Oily Film", "Oily Odor", "Oily Soot"],
   "Non-Restoration Cleaning": ["Inhome Cleaning", "Pickup", "Stain Removal", "Furniture Cleaning", "Drapery Take-down"],
   "Oil": ["Spill", "Furnace"]
 };
@@ -1582,6 +1592,15 @@ function initLossSeverity(overrides = {}) {
         "Visible Mold": 0,
         "Sprinkler Chemical": 0,
         "Flood Cut Debris": 0
+      }
+    },
+    puffback: {
+      enabled: false,
+      values: {
+        "Oil": 0,
+        "Soot": 0,
+        "Odor": 0,
+        "Oily Film": 0
       }
     },
     ...overrides
@@ -2755,11 +2774,9 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                {LEAD_SOURCES.map(s => <ToggleMulti key={s} label={s} title={LEAD_SOURCE_HELP[s]} checked={data.leadSourceCategory === s} onChange={() => update("leadSourceCategory", s)} />)}
           </div>
       </Field>
-      {showInlineHelp && data.leadSourceCategory && (
-        <div className="text-[11px] text-slate-400">
-          {data.leadSourceCategory === "Referral" && "Opportunity came from a Company or Contact."}
-          {data.leadSourceCategory === "Marketing" && "Opportunity came from Marketing efforts."}
-          {data.leadSourceCategory === "Internal" && "Opportunity came from other internal sources."}
+      {showInlineHelp && data.leadSourceCategory === "Referral" && (
+        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+          <span className="font-bold">Coaching:</span> The referrer is the first person who called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead — we may not yet be able to contact the customer.
         </div>
       )}
 
@@ -3505,8 +3522,15 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                 {entryMode !== 'detailed' && <div className="flex-1"></div>}
 
                 <div className="min-w-[120px] flex justify-end gap-2 relative">
-                    <button 
-                        onClick={() => setShowSettings(v => !v)} 
+                    <button
+                        onClick={() => setShowInlineHelp(v => !v)}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${showInlineHelp ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-400 hover:border-violet-300'}`}
+                        title={showInlineHelp ? "Hide coaching prompts" : "Show coaching prompts"}
+                    >
+                        {showInlineHelp ? "🎓 Coaching" : "🎓"}
+                    </button>
+                    <button
+                        onClick={() => setShowSettings(v => !v)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border bg-white text-slate-400 border-slate-200 hover:border-slate-300"
                     >
                         <span>Settings ⚙︎</span>
@@ -3725,9 +3749,9 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
               )}
 	         </div>
 	         <div className="flex flex-wrap gap-2">
-	            <ToggleMulti className="!py-1 !px-3 sm:!px-3 !text-xs" label="Primary" checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: true })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
-            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Policy Holder" checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder, type: !c.policyHolder ? "Policyholder" : c.type })} />
-            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay, type: !c.selfPay ? "Owner" : c.type })} />
+	            <ToggleMulti className="!py-1 !px-3 sm:!px-3 !text-xs" label="Primary" checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
+            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Policy Holder" checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder })} />
+            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay })} />
          </div>
       </div>
 
@@ -3770,19 +3794,14 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
 
          <Field label="Preferred Contact Method">
              <div className="flex flex-wrap gap-2">
-                 {["Phone", "Email", "Text"].map(m => (
-                     <ToggleMulti key={m} label={m} checked={c.preferredMethod === m} onChange={() => updateCust(c.id, { preferredMethod: m })} colorClass="!bg-sky-500 !border-sky-500 !text-white" />
+                 {["Phone", "Email", "Text", "Do Not Contact"].map(m => (
+                     <ToggleMulti key={m} label={m} checked={m === "Do Not Contact" ? !!c.doNotContact : c.preferredContact === m} onChange={() => {
+                       if (m === "Do Not Contact") updateCust(c.id, { doNotContact: !c.doNotContact, preferredContact: !c.doNotContact ? "" : c.preferredContact });
+                       else updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false });
+                     }} colorClass={m === "Do Not Contact" ? "!bg-rose-50 !border-rose-300 !text-rose-700" : "!bg-sky-500 !border-sky-500 !text-white"} />
                  ))}
              </div>
          </Field>
-
-         <div className="flex items-center gap-3">
-           <span className="text-sm font-bold text-rose-700">Do Not Contact</span>
-           <Switch checked={!!c.doNotContact} onChange={(val)=>updateCust(c.id,{doNotContact: val})} />
-           {c.doNotContact && (
-             <span className="text-xs text-rose-700">Enabled</span>
-           )}
-         </div>
 
          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
              <button onClick={() => updateCust(c.id, { showWelcomePanel: !c.showWelcomePanel })} className="flex w-full items-center justify-between">
@@ -3816,22 +3835,12 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
          </div>
 
          <Field label="Notes">
-             <div className="mb-2">
-               <button
-                 onClick={() => updateCust(c.id, { showQuickNotes: !c.showQuickNotes })}
-                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${c.showQuickNotes ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
-               >
-                 📝 Add Quick Note
-               </button>
+             <div className="flex flex-wrap gap-1.5 mb-2">
+               {CUSTOMER_QUICK_NOTES.map(n => (
+                 <ToggleMulti key={n} label={n} checked={(c.quickNotes || []).includes(n)} onChange={() => toggleQuickNote(n)} className="!text-[10px] !px-2 !py-1" />
+               ))}
              </div>
-             {c.showQuickNotes && (
-                 <div className="mb-2 flex flex-wrap gap-2">
-                     {CUSTOMER_QUICK_NOTES.map(n => (
-                         <ToggleMulti key={n} label={n} checked={(c.quickNotes || []).includes(n)} onChange={() => toggleQuickNote(n)} />
-                     ))}
-                 </div>
-             )}
-             <Textarea value={c.note} onChange={e => updateCust(c.id, { note: e.target.value })} placeholder="Add notes about this customer..." />
+             <Input value={c.note} onChange={e => updateCust(c.id, { note: e.target.value })} placeholder="Additional notes..." />
          </Field>
 
          {c.isPrimary && (
@@ -4171,7 +4180,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     {showInlineHelp && (
                     <div className="text-[11px] text-slate-400 mt-1">
                       {data.isLead === true
-                        ? "A Lead is an opportunity that isn't ready to schedule yet. You can convert it to an Order anytime."
+                        ? "A Lead requires selling the customer and getting approvals from the adjuster before we proceed. No billable charges yet — just an opportunity we will pursue."
                         : data.isLead === false
                           ? "An Order is a confirmed project ready to be scheduled and worked."
                           : "Select one to continue."}
@@ -4203,7 +4212,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         <ToggleMulti
                           key={ot}
                           label={ot}
-                          title={ot === "Fire" ? "Includes smoke, soot, puffback, and protein fires." : ot === "Water" ? "Includes leaks, floods, burst pipes, and storm damage." : ot === "Mold" ? "Includes visible mold, mildew, and musty odor." : "Type of peril/damage involved."}
+                          title={LOSS_TYPE_COACHING[ot] || "Type of peril/damage involved."}
                           checked={data.primaryLossType === ot || (ot === NON_RESTORATION_PRIMARY && nonRestorationSelected)}
                           onChange={() => {
                             if (ot === NON_RESTORATION_PRIMARY) {
@@ -4218,7 +4227,12 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         />
                       ))}
                     </div>
-                    {showInlineHelp && <div className="text-[11px] text-slate-400 mt-1">Select the primary cause. Fire includes smoke, soot, puffback.</div>}
+                    {showInlineHelp && <div className="text-[11px] text-slate-400 mt-1">Select the primary peril — the damage that happened first. Hover each type for details.</div>}
+                    {showInlineHelp && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
+                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
+                        <span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                      </div>
+                    )}
                   </Field>
                   {nonRestorationSelected && (
                     <Field label="Non-Restoration Type" missing={data.highlightMissing?.nonRestorationSubtype}>
@@ -9438,7 +9452,7 @@ export default function App(){
                                           <ToggleMulti
                                             key={ot}
                                             label={ot}
-                                            title={ot === "Fire" ? "Includes smoke, soot, puffback, and protein fires." : ot === "Water" ? "Includes leaks, floods, burst pipes, and storm damage." : ot === "Mold" ? "Includes visible mold, mildew, and musty odor." : "Type of peril/damage involved."}
+                                            title={LOSS_TYPE_COACHING[ot] || "Type of peril/damage involved."}
                                             checked={data.primaryLossType === ot || (ot === NON_RESTORATION_PRIMARY && isNonRestorationProject)}
                                             onChange={() => {
                                               if (ot === NON_RESTORATION_PRIMARY) {
@@ -9455,7 +9469,16 @@ export default function App(){
                                       ))}
                                   </div>
                                 </Field>
-                                {showInlineHelp && data.primaryLossType && !isNonRestorationProject && <div className="text-[11px] text-slate-400">Primary: <span className="font-semibold text-slate-600">{data.primaryLossType}</span>. Select additional contaminants below if applicable.</div>}
+                                {showInlineHelp && data.primaryLossType && !isNonRestorationProject && (
+                                  <>
+                                    <div className="text-[11px] text-slate-400">Primary: <span className="font-semibold text-slate-600">{data.primaryLossType}</span>. Select additional contaminants below if applicable.</div>
+                                    {LOSS_TYPE_COACHING[data.primaryLossType] && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
                                 {isNonRestorationProject && (
                                   <Field label="Non-Restoration Type" missing={data.highlightMissing.nonRestorationSubtype}>
                                     <div className="flex flex-wrap gap-2" data-audit-key="nonRestorationSubtype">
@@ -9540,7 +9563,19 @@ export default function App(){
                                                             </div>
                                                         </Field>
                                                     )}
-                                                    {hasCauses && (<Field label={`${type} Cause`} subtle><div className="flex flex-wrap gap-2">{CAUSES[type].map(c => (<ToggleMulti key={c} label={c} checked={(details.causes || []).includes(c)} onChange={() => updateLossDetail(type, 'causes', c)} />))}</div></Field>)}
+                                                    {hasCauses && (<Field label={`${type} Cause`} subtle><div className="flex flex-wrap gap-2">{CAUSES[type].map(c => {
+                                                      const isWarning = c.endsWith("⚠");
+                                                      const label = isWarning ? c.replace("⚠", "") : c;
+                                                      const causeKey = c;
+                                                      const isSelected = (details.causes || []).includes(causeKey);
+                                                      return (<ToggleMulti key={c} label={label} checked={isSelected} onChange={() => updateLossDetail(type, 'causes', causeKey)} className={isWarning && isSelected ? "!border-rose-400 !bg-rose-50 !text-rose-700" : isWarning ? "!border-amber-300 !text-amber-700" : ""} title={isWarning ? "Coverage verification required — confirm with adjuster" : ""} />);
+                                                    })}</div>
+                                                    {(details.causes || []).some(c => c.endsWith("⚠")) && (
+                                                      <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] text-rose-700 font-semibold">
+                                                        ⚠ Coverage verification required — some water losses are excluded or capped with a low limit. Always verify coverage for groundwater, flood, and sump pump failure with the adjuster before proceeding.
+                                                      </div>
+                                                    )}
+                                                    </Field>)}
                                                     {hasOrigins && (<Field label="Origin" subtle><div className="flex flex-wrap gap-2">{ORIGINS.map(o => (<ToggleMulti key={o} label={o} checked={(details.origins || []).includes(o)} onChange={() => updateLossDetail(type, 'origins', o)} />))}</div></Field>)}
                                                     {type === "Mold" && (
                                                       <div className="rounded-lg border border-orange-300 bg-orange-50 p-3">
@@ -9583,6 +9618,7 @@ export default function App(){
 
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">Is anything still wet or damaged?</div>
+                                    {showInlineHelp && <div className="text-[10px] text-slate-400">Ask the customer about current conditions at the home. These affect what we bring and how we prioritize.</div>}
                                     <div className="flex flex-wrap gap-2">
                                       {[
                                         { id: "wet", stateKey: "damageWasWet", label: "Still Wet", active: !!data.damageWasWet, onToggle: () => updateSmart("damageWasWet", data.damageWasWet ? "N" : "Y"), suggested: suggestWet },
@@ -9601,13 +9637,48 @@ export default function App(){
                                         );
                                       })}
                                     </div>
+                                    {showInlineHelp && (data.damageWasWet === "Y" || data.damageWasWet === true) && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> Tell the customer we need to get out there ASAP. Wet items left untreated can develop mold, which may not be covered by insurance. Ask them to keep colors separated and avoid mixing wet items together.
+                                      </div>
+                                    )}
+                                    {showInlineHelp && !!data.damageMoldMildew && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> Visible mold requires immediate attention. Ask if anyone in the household has respiratory concerns. PPE will be required for our team. Mold coverage should be confirmed with the adjuster.
+                                      </div>
+                                    )}
+                                    {showInlineHelp && !!data.noLights && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> No electricity means we need to bring portable lighting. Ask if there's a generator on site.
+                                      </div>
+                                    )}
+                                    {showInlineHelp && !!data.boardedUp && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> Boarded up home — confirm access arrangements. Ask who has the key or access code. Will fire department or restoration company need to provide access?
+                                      </div>
+                                    )}
                                   </div>
 
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">What repairs are being done to the home?</div>
+                                    {showInlineHelp && <div className="text-[10px] text-slate-400">Select all that apply. This helps estimate timeline and storage needs.</div>}
+                                    {showInlineHelp && (data.repairsSummary || "").includes("Complete Rebuild") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> Complete rebuild means the customer will be displaced for an extended period. Confirm long-term storage needs and set expectations on timeline. Ask if they have a temporary living arrangement.
+                                      </div>
+                                    )}
+                                    {showInlineHelp && (data.repairsSummary || "").includes("Major Structural") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> Major structural damage may mean limited access to parts of the home. Ask which areas are affected and if a contractor has assessed the structure. We may need to coordinate access with the contractor.
+                                      </div>
+                                    )}
                                     <div className="flex flex-wrap gap-2">
-                                      {["Just Cleaning", "Clean and Paint", "Cosmetic Damage", "Major Structural Damage", "Refinish Floors", "Replace Floors", "Complete Rebuild"].map(s => (
-                                        <ToggleMulti key={s} label={s} checked={data.repairsSummary === s} onChange={()=>update("repairsSummary", data.repairsSummary === s ? "" : s)} className="!px-4 !py-2.5 !text-sm" />
+                                      {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
+                                        <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
+                                          const current = (data.repairsSummary || "").split(", ").filter(Boolean);
+                                          const next = current.includes(s) ? current.filter(x => x !== s) : [...current, s];
+                                          update("repairsSummary", next.join(", "));
+                                        }} className="!px-4 !py-2.5 !text-sm" />
                                       ))}
                                     </div>
                                   </div>
@@ -9616,16 +9687,50 @@ export default function App(){
                                     <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                       <div className="text-sm font-bold text-sky-600">Where is the customer living?</div>
                                       <div className="flex flex-wrap gap-2">
-                                        {["Staying in home", "Moving", "Hotel", "Neighbor", "Relative", "Rental", "Other Home"].map(s => (
-                                          <ToggleMulti key={s} label={s} checked={data.livingStatus === s} onChange={() => updateLivingStatus(data.livingStatus === s ? "" : s)} className="!px-3 !py-2 !text-sm" />
+                                        {[
+                                          { label: "Staying in home", title: "Customer remains in the home during the project." },
+                                          { label: "Temp Housing", title: "Displaced temporarily (hotel, rental, trailer, family) — will return to primary address." },
+                                          { label: "Moving", title: "Permanently relocating — will NOT return. Final delivery goes to a new address." },
+                                        ].map(s => (
+                                          <ToggleMulti key={s.label} label={s.label} title={s.title} checked={data.livingStatus === s.label} onChange={() => updateLivingStatus(data.livingStatus === s.label ? "" : s.label)} className="!px-3 !py-2 !text-sm" />
                                         ))}
                                       </div>
+                                      {data.livingStatus === "Temp Housing" && showInlineHelp && (
+                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                          <span className="font-bold">Coaching:</span> Ask: "Where are you staying — hotel, rental, trailer, or with family?" Get the temp address and add it in the Address section. Ask how long they expect to be displaced — this determines storage timeline.
+                                        </div>
+                                      )}
+                                      {data.livingStatus === "Moving" && showInlineHelp && (
+                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                          <span className="font-bold">Coaching:</span> Customer is permanently relocating. Get the new address for final delivery. Ask: "When do you expect to be in the new home?" This determines our delivery timeline. All items will be delivered to the new address, not the loss site.
+                                        </div>
+                                      )}
+                                      {data.livingStatus === "Staying in home" && showInlineHelp && (
+                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                          <span className="font-bold">Coaching:</span> Customer is living in the home during work. Be mindful of scheduling around their routine. Ask about work hours and best times for pickup/delivery. We may need to work room-by-room.
+                                        </div>
+                                      )}
                                     </div>
                                     <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                       <div className="text-sm font-bold text-sky-600">When do they need their final delivery returned?</div>
+                                      {showInlineHelp && data.processType === "Long-Term Storage" && (
+                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                          <span className="font-bold">Coaching:</span> Long-term storage — confirm with the customer they understand monthly storage fees. Ask for an estimated return date so we can plan ahead. Set a reminder to follow up.
+                                        </div>
+                                      )}
+                                      {showInlineHelp && data.processType === "Deliver ASAP" && (
+                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                          <span className="font-bold">Coaching:</span> Customer wants items back quickly. Prioritize processing. Confirm the delivery address is ready to receive items.
+                                        </div>
+                                      )}
                                       <div className="flex flex-wrap gap-2">
-                                        {["Deliver to Temp", "Deliver to Move", "Deliver to home ASAP", "Long-Term Storage"].map(s => (
-                                          <ToggleMulti key={s} label={s} checked={data.processType === s} onChange={()=>update("processType", data.processType === s ? "" : s)} className="!px-3 !py-2 !text-sm" />
+                                        {[
+                                          { label: "Deliver ASAP", title: "Return items as soon as possible." },
+                                          { label: "Deliver to Temp", title: "Deliver to temporary housing location." },
+                                          { label: "Deliver to New Home", title: "Customer is moving — deliver to the new address." },
+                                          { label: "Long-Term Storage", title: "Store until customer is ready (may be months)." },
+                                        ].map(s => (
+                                          <ToggleMulti key={s.label} label={s.label} title={s.title} checked={data.processType === s.label} onChange={()=>update("processType", data.processType === s.label ? "" : s.label)} className="!px-3 !py-2 !text-sm" />
                                         ))}
                                       </div>
                                     </div>
@@ -9633,11 +9738,40 @@ export default function App(){
 
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">What are we picking up?</div>
+                                    {showInlineHelp && <div className="text-[10px] text-slate-400">Select all items we'll be removing from the home.</div>}
                                     <div className="flex flex-wrap gap-2">
-                                      {["Rugs", "Window Treatments", "Hardware", "Furniture", "Electronics", "Clothing", "Bedding", "Draperies"].map(s => (
+                                      {["Rugs", "Draperies", "Draperies w/ Rods", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
                                         <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={()=>update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} className="!px-4 !py-2.5 !text-sm" />
                                       ))}
                                     </div>
+                                  </div>
+
+                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                                    <div className="text-sm font-bold text-sky-600">Special considerations</div>
+                                    {showInlineHelp && <div className="text-[10px] text-slate-400">Note anything about the customer or household that affects how we handle the project.</div>}
+                                    {showInlineHelp && (data.sdsConsiderations || []).includes("Elderly") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> Elderly customer — be patient and speak clearly. They may need extra time and assistance. Consider labeling boxes clearly for easy identification. Offer to help with packing/unpacking.
+                                      </div>
+                                    )}
+                                    {showInlineHelp && (data.sdsConsiderations || []).includes("Pregnancy") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> Customer is pregnant — avoid strong chemicals and fumes. Schedule work to minimize disruption. Use fragrance-free products.
+                                      </div>
+                                    )}
+                                    {showInlineHelp && (data.sdsConsiderations || []).includes("Respiratory Concerns") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> Respiratory concerns — use hypoallergenic products. Notify the processing team. Ask about specific triggers.
+                                      </div>
+                                    )}
+                                    <div className="flex flex-wrap gap-2">
+                                      {["Elderly", "Pregnancy", "Baby/Infant", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
+                                        <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s))} className="!px-4 !py-2.5 !text-sm" />
+                                      ))}
+                                    </div>
+                                    {(data.sdsConsiderations || []).includes("Pets") && (
+                                      <Input value={data.householdAnimals || ""} onChange={e => update("householdAnimals", e.target.value)} placeholder="What pets? (e.g. Dog named Spot, Shih Tzu)" />
+                                    )}
                                   </div>
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
                                       <div className="text-sm font-semibold text-sky-600 mb-1">Suggested Groups</div>
@@ -9736,6 +9870,11 @@ export default function App(){
                                     {data.howDryLaundry && data.howDryLaundry !== "Dryer" && (
                                       <div className="text-[10px] text-sky-600 font-semibold">Handling code auto-applied for {data.howDryLaundry.toLowerCase()} preference.</div>
                                     )}
+                                    {showInlineHelp && data.howDryLaundry === "Air-Dry" && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <span className="font-bold">Coaching:</span> Customer air-dries clothing — we must not machine dry any items. All items will be tagged for air-dry. This is important to avoid shrinkage and damage claims.
+                                      </div>
+                                    )}
 
                                     <div className="text-sm font-bold text-sky-600 pt-2">Storage</div>
                                     <div className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${suggestStorage ? 'border-amber-300 bg-amber-50' : highlightStorageFromProcess ? 'border-orange-300 bg-orange-50' : 'border-slate-100 bg-slate-50/50'}`}>
@@ -9791,7 +9930,7 @@ export default function App(){
                                               </div>
                                             )}
                                             {/* Drill-down severity sliders */}
-                                            {(data.primaryLossType || (data.orderTypes||[]).some(t => ["Fire","Water"].includes(t))) && (
+                                            {(data.primaryLossType || (data.orderTypes||[]).some(t => ["Fire","Water","Puffback"].includes(t))) && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">DETAILED SEVERITY</div>
                                                 {showInlineHelp && <div className="text-xs text-slate-500 mb-3">Rate specific contaminant levels. 0 = None, 3 = Severe. Used in the SDS document.</div>}
@@ -9799,10 +9938,12 @@ export default function App(){
                                                   {[
                                                     { key: "fire", label: "Fire", fields: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"], colorStart: "#fef3c7", colorEnd: "#f97316" },
                                                     { key: "water", label: "Water", fields: ["Water", "Humidity", "Musty Smell", "Visible Mildew", "Visible Mold", "Sprinkler Chemical", "Flood Cut Debris"], colorStart: "#dbeafe", colorEnd: "#3b82f6" },
+                                                    { key: "puffback", label: "Puffback", fields: ["Oil", "Soot", "Odor", "Oily Film"], colorStart: "#f3e8ff", colorEnd: "#7c3aed" },
                                                   ].filter(section => {
                                                     const types = data.orderTypes || [];
                                                     if (section.key === "fire") return types.includes("Fire") || data.primaryLossType === "Fire";
                                                     if (section.key === "water") return types.includes("Water") || data.primaryLossType === "Water" || (data.secondaryContaminants||[]).includes("Water");
+                                                    if (section.key === "puffback") return types.includes("Puffback") || data.primaryLossType === "Puffback" || (data.secondaryContaminants||[]).includes("Puffback");
                                                     return false;
                                                   }).map(section => {
                                                     const sectionData = (data.lossSeverity || {})[section.key] || { values: {} };
