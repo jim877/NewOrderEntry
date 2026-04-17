@@ -1611,6 +1611,8 @@ const DEFAULT_FORM={
   referringCompany:"", referrer:"",
   
   orderTypes: [],
+  primaryLossType: "",
+  secondaryContaminants: [],
   lossDetails: {}, 
   
   livingStatus: "", 
@@ -4185,24 +4187,28 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     }} />
                   </div>
                   <div className="border-t border-slate-100 pt-4 space-y-4">
-                  <Field label="Order Type">
+                  <Field label="What caused the loss?">
                     <div className="flex flex-wrap gap-2">
                       {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map((ot) => (
                         <ToggleMulti
                           key={ot}
                           label={ot}
                           title={ot === "Fire" ? "Includes smoke, soot, puffback, and protein fires." : ot === "Water" ? "Includes leaks, floods, burst pipes, and storm damage." : ot === "Mold" ? "Includes visible mold, mildew, and musty odor." : "Type of peril/damage involved."}
-                          checked={(data.orderTypes || []).includes(ot)}
+                          checked={data.primaryLossType === ot || (ot === NON_RESTORATION_PRIMARY && nonRestorationSelected)}
                           onChange={() => {
                             if (ot === NON_RESTORATION_PRIMARY) {
                               toggleNonRestorationPrimary();
+                              updateMany({ primaryLossType: NON_RESTORATION_PRIMARY });
                               return;
                             }
-                            toggleRestorationType(ot);
+                            const newPrimary = data.primaryLossType === ot ? "" : ot;
+                            const newOrderTypes = newPrimary ? [newPrimary, ...(data.secondaryContaminants || []).filter(s => s !== newPrimary)] : [...(data.secondaryContaminants || [])];
+                            updateMany({ primaryLossType: newPrimary, orderTypes: newOrderTypes });
                           }}
                         />
                       ))}
                     </div>
+                    {showInlineHelp && <div className="text-[11px] text-slate-400 mt-1">Select the primary cause. Fire includes smoke, soot, puffback.</div>}
                   </Field>
                   {nonRestorationSelected && (
                     <Field label="Non-Restoration Type" missing={data.highlightMissing?.nonRestorationSubtype}>
@@ -4217,6 +4223,26 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                           />
                         ))}
                       </div>
+                    </Field>
+                  )}
+                  {data.primaryLossType && !nonRestorationSelected && (
+                    <Field label="Additional contaminants?">
+                      <div className="flex flex-wrap gap-2">
+                        {LOSS_TYPES.filter(t => t !== data.primaryLossType && t !== "Other").map(t => (
+                          <ToggleMulti
+                            key={t}
+                            label={t}
+                            checked={(data.secondaryContaminants || []).includes(t)}
+                            onChange={() => {
+                              const next = (data.secondaryContaminants || []).includes(t)
+                                ? (data.secondaryContaminants || []).filter(s => s !== t)
+                                : [...(data.secondaryContaminants || []), t];
+                              updateMany({ secondaryContaminants: next, orderTypes: [data.primaryLossType, ...next] });
+                            }}
+                          />
+                        ))}
+                      </div>
+                      {showInlineHelp && <div className="text-[11px] text-slate-400 mt-1">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
                     </Field>
                   )}
                   {isRestorationProject && (
@@ -9385,27 +9411,30 @@ export default function App(){
                                     <ToggleGroup options={ORDER_STATUSES} value={data.orderStatus} onChange={v => update("orderStatus", v)} />
                                   </Field>
                                 </div>
-                                <Field label="Order Type" missing={data.highlightMissing.orderTypes} smart>
+                                <Field label="What caused the loss?" missing={data.highlightMissing.orderTypes} smart>
                                   <div className="flex flex-wrap gap-2" data-audit-key="orderTypes">
                                       {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map(ot=> (
                                           <ToggleMulti
                                             key={ot}
                                             label={ot}
-                                            title="Type of peril/damage involved."
-                                            checked={(data.orderTypes||[]).includes(ot)}
+                                            title={ot === "Fire" ? "Includes smoke, soot, puffback, and protein fires." : ot === "Water" ? "Includes leaks, floods, burst pipes, and storm damage." : ot === "Mold" ? "Includes visible mold, mildew, and musty odor." : "Type of peril/damage involved."}
+                                            checked={data.primaryLossType === ot || (ot === NON_RESTORATION_PRIMARY && isNonRestorationProject)}
                                             onChange={() => {
                                               if (ot === NON_RESTORATION_PRIMARY) {
                                                 toggleNonRestorationPrimary();
+                                                updateMany({ primaryLossType: NON_RESTORATION_PRIMARY });
                                                 return;
                                               }
-                                              toggleRestorationType(ot);
+                                              const newPrimary = data.primaryLossType === ot ? "" : ot;
+                                              const newOrderTypes = newPrimary ? [newPrimary, ...(data.secondaryContaminants || []).filter(s => s !== newPrimary)] : [...(data.secondaryContaminants || [])];
+                                              updateMany({ primaryLossType: newPrimary, orderTypes: newOrderTypes });
                                             }}
-                                            className={ot === "Water" && attentionWater && !(data.orderTypes||[]).includes("Water") ? "attention-fill" : ot === "Mold" && attentionMold && !(data.orderTypes||[]).includes("Mold") ? "attention-fill" : ""}
+                                            className={ot === "Water" && attentionWater && data.primaryLossType !== "Water" && !(data.secondaryContaminants||[]).includes("Water") ? "attention-fill" : ot === "Mold" && attentionMold && data.primaryLossType !== "Mold" && !(data.secondaryContaminants||[]).includes("Mold") ? "attention-fill" : ""}
                                           />
                                       ))}
                                   </div>
                                 </Field>
-                                {showInlineHelp && <div className="text-[11px] text-slate-400">Fire includes smoke, soot, puffback. Select multiple if applicable.</div>}
+                                {showInlineHelp && data.primaryLossType && !isNonRestorationProject && <div className="text-[11px] text-slate-400">Primary: <span className="font-semibold text-slate-600">{data.primaryLossType}</span>. Select additional contaminants below if applicable.</div>}
                                 {isNonRestorationProject && (
                                   <Field label="Non-Restoration Type" missing={data.highlightMissing.nonRestorationSubtype}>
                                     <div className="flex flex-wrap gap-2" data-audit-key="nonRestorationSubtype">
@@ -9421,11 +9450,32 @@ export default function App(){
                                     </div>
                                   </Field>
                                 )}
+                                {data.primaryLossType && !isNonRestorationProject && (
+                                  <Field label="Additional contaminants?">
+                                    <div className="flex flex-wrap gap-2">
+                                      {LOSS_TYPES.filter(t => t !== data.primaryLossType && t !== "Other").map(t => (
+                                        <ToggleMulti
+                                          key={t}
+                                          label={t}
+                                          checked={(data.secondaryContaminants || []).includes(t)}
+                                          onChange={() => {
+                                            const next = (data.secondaryContaminants || []).includes(t)
+                                              ? (data.secondaryContaminants || []).filter(s => s !== t)
+                                              : [...(data.secondaryContaminants || []), t];
+                                            updateMany({ secondaryContaminants: next, orderTypes: [data.primaryLossType, ...next] });
+                                          }}
+                                          className={t === "Water" && attentionWater && !(data.secondaryContaminants||[]).includes("Water") ? "attention-fill" : t === "Mold" && attentionMold && !(data.secondaryContaminants||[]).includes("Mold") ? "attention-fill" : ""}
+                                        />
+                                      ))}
+                                    </div>
+                                    {showInlineHelp && <div className="text-[11px] text-slate-400">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
+                                  </Field>
+                                )}
                                 {(attentionWater || attentionMold) && (
                                   <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
-                                    {attentionWater && !(data.orderTypes||[]).includes("Water") && <div>Still Wet selected → consider adding Water as an order type.</div>}
+                                    {attentionWater && !(data.orderTypes||[]).includes("Water") && <div>Still Wet selected → consider adding Water as a contaminant.</div>}
                                     {attentionWater && (data.orderTypes||[]).includes("Water") && <div>Water confirmed — review severity in Codes section below.</div>}
-                                    {attentionMold && !(data.orderTypes||[]).includes("Mold") && <div>Visible Mold selected → consider adding Mold as an order type.</div>}
+                                    {attentionMold && !(data.orderTypes||[]).includes("Mold") && <div>Visible Mold selected → consider adding Mold as a contaminant.</div>}
                                     {attentionMold && (data.orderTypes||[]).includes("Mold") && <div>Mold confirmed — review severity and Mold coverage limit in Insurance.</div>}
                                   </div>
                                 )}
@@ -9757,6 +9807,53 @@ export default function App(){
                                                     </div>
                                                   );
                                                 })}</div>
+                                              </div>
+                                            )}
+                                            {/* Drill-down severity sliders */}
+                                            {(data.primaryLossType || (data.orderTypes||[]).some(t => ["Fire","Water"].includes(t))) && (
+                                              <div>
+                                                <div className="mb-2 text-xs font-bold text-slate-400">DETAILED SEVERITY</div>
+                                                {showInlineHelp && <div className="text-xs text-slate-500 mb-3">Rate specific contaminant levels. 0 = None, 3 = Severe. Used in the SDS document.</div>}
+                                                <div className="grid gap-4 sm:grid-cols-2">
+                                                  {[
+                                                    { key: "fire", label: "Fire", fields: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"], colorStart: "#fef3c7", colorEnd: "#f97316" },
+                                                    { key: "water", label: "Water", fields: ["Water", "Humidity", "Musty Smell", "Visible Mildew", "Visible Mold", "Sprinkler Chemical", "Flood Cut Debris"], colorStart: "#dbeafe", colorEnd: "#3b82f6" },
+                                                  ].filter(section => {
+                                                    const types = data.orderTypes || [];
+                                                    if (section.key === "fire") return types.includes("Fire") || data.primaryLossType === "Fire";
+                                                    if (section.key === "water") return types.includes("Water") || data.primaryLossType === "Water" || (data.secondaryContaminants||[]).includes("Water");
+                                                    return false;
+                                                  }).map(section => {
+                                                    const sectionData = (data.lossSeverity || {})[section.key] || { values: {} };
+                                                    return (
+                                                      <div key={section.key} className="rounded-lg border border-slate-200 p-3">
+                                                        <div className="text-xs font-bold text-slate-600 mb-2">{section.label} Contaminants</div>
+                                                        <div className="space-y-2">
+                                                          {section.fields.map(field => {
+                                                            const val = (sectionData.values || {})[field] || 0;
+                                                            return (
+                                                              <div key={field} className="flex items-center gap-3">
+                                                                <span className="text-[11px] text-slate-600 w-28 shrink-0">{field}</span>
+                                                                <input
+                                                                  type="range" min="0" max="3" step="1" value={val}
+                                                                  onChange={e => {
+                                                                    const next = { ...(data.lossSeverity || initLossSeverity()) };
+                                                                    next[section.key] = { ...next[section.key], enabled: true, values: { ...(next[section.key]?.values || {}), [field]: Number(e.target.value) } };
+                                                                    next.touched = true;
+                                                                    update("lossSeverity", next);
+                                                                  }}
+                                                                  className="flex-1 h-1 rounded-full appearance-none outline-none"
+                                                                  style={{ background: `linear-gradient(to right, ${section.colorStart}, ${val > 0 ? section.colorEnd : '#e5e7eb'} ${(val/3)*100}%, #e5e7eb ${(val/3)*100}%)` }}
+                                                                />
+                                                                <span className="text-[10px] font-bold text-slate-500 w-4 text-right">{val}</span>
+                                                              </div>
+                                                            );
+                                                          })}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
                                               </div>
                                             )}
                                             <div className="border-t border-slate-100 my-1"></div>
