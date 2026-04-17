@@ -2804,7 +2804,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                {LEAD_SOURCES.map(s => <ToggleMulti key={s} label={s} title={LEAD_SOURCE_HELP[s]} checked={data.leadSourceCategory === s} onChange={() => update("leadSourceCategory", s)} />)}
           </div>
       </Field>
-      {showCoaching && data.leadSourceCategory === "Referral" && (
+      {showInlineHelp && data.leadSourceCategory === "Referral" && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
           <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> The referrer is the first person who called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead — we may not yet be able to contact the customer.
         </div>
@@ -2930,7 +2930,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold shadow-sm">{getRepInitials(salesRep)}</span>
             <span className="text-sm font-semibold text-slate-700">{salesRep.split(",")[0]}</span>
           </div>
-          {showCoaching && <div className="text-[10px] text-slate-400 mt-1">Auto-assigned from referrer.</div>}
+          {showInlineHelp && <div className="text-[10px] text-slate-400 mt-1">Auto-assigned from referrer.</div>}
         </Field>
       )}
 
@@ -2970,7 +2970,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
           )}
         </div>
       </Field>
-      {showCoaching && <div className="text-[11px] text-slate-400">Employee managing customer relationships/accounts.</div>}
+      {showInlineHelp && <div className="text-[11px] text-slate-400">Employee managing customer relationships/accounts.</div>}
       </React.Fragment>
       )}
       {showSuggestedRoles && (
@@ -4217,7 +4217,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       { label: "Order", title: "Active project with confirmed billing." },
                       { label: "Lead", title: "Potential project; incomplete information or no billing yet." }
                     ]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
-                    {showCoaching && (
+                    {showInlineHelp && (
                     <div className="text-[11px] text-slate-400 mt-1">
                       {data.isLead === true
                         ? "A Lead requires selling the customer and getting approvals from the adjuster before we proceed. No billable charges yet — just an opportunity we will pursue."
@@ -4267,13 +4267,13 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         />
                       ))}
                     </div>
-                    {showCoaching && (
+                    {showInlineHelp && (
                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
                         <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button>
                         <span className="font-bold">Coaching:</span> This is the primary peril — the damage that happened first. For example, a kitchen fire extinguished with water is a Fire loss with Water as a secondary contaminant.
                       </div>
                     )}
-                    {showCoaching && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
+                    {showInlineHelp && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
                         <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
                       </div>
@@ -4311,7 +4311,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                           />
                         ))}
                       </div>
-                      {showCoaching && <div className="text-[11px] text-slate-400 mt-1">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
+                      {showInlineHelp && <div className="text-[11px] text-slate-400 mt-1">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
                     </Field>
                   )}
                   {isRestorationProject && (
@@ -4587,7 +4587,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
             <div id="quick-instructions" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="event-instructions">
                 <h3 className="mb-1 text-sm font-bold uppercase text-sky-600">Notes & Instructions</h3>
-                {showCoaching && <p className="text-xs text-slate-400 mb-3">Add anything the field team or office needs to know — conditions, special requests, access info, customer preferences, what to bring.</p>}
+                {showInlineHelp && <p className="text-xs text-slate-400 mb-3">Add anything the field team or office needs to know — conditions, special requests, access info, customer preferences, what to bring.</p>}
                 <AutoGrowTextarea
                   value={stripEventSystemLines(data.eventInstructions || "")}
                   onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
@@ -9402,7 +9402,7 @@ export default function App(){
             version="v55"
             entryMode={entryMode}
             setEntryMode={setEntryMode}
-            showInlineHelp={showInlineHelp}
+            showInlineHelp={showCoaching}
             setShowInlineHelp={setShowInlineHelp}
             showCoaching={showCoaching}
             setShowCoaching={setShowCoaching}
@@ -9687,7 +9687,7 @@ export default function App(){
                             </SubSection>
 
                             <SubSection id="sec1-source" title="Source" open={sourceSubOpen} onToggle={(nextOpen) => setSourceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("source") ? "audit-outline" : ""}>
-                            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} onPromptRoleAssignment={openRoleAssignmentPrompt} />
+                            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showCoaching} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} onPromptRoleAssignment={openRoleAssignmentPrompt} />
                             </SubSection>
 
                             <SubSection id="sec1-interview-panel" title="Interview" open={interviewSubOpen} onToggle={(nextOpen) => setInterviewSubOpen(!!nextOpen)} compact={compactMode}>
@@ -9791,16 +9791,6 @@ export default function App(){
                                     </div>
                                     <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                       <div className="text-sm font-bold text-sky-600">When do they need their final delivery returned?</div>
-                                      {showCoaching && data.processType === "Long-Term Storage" && (
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Long-term storage — confirm with the customer they understand monthly storage fees. Ask for an estimated return date so we can plan ahead. Set a reminder to follow up.
-                                        </div>
-                                      )}
-                                      {showCoaching && data.processType === "Deliver ASAP" && (
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer wants items back quickly. Prioritize processing. Confirm the delivery address is ready to receive items.
-                                        </div>
-                                      )}
                                       <div className="flex flex-wrap gap-2">
                                         {[
                                           { label: "Deliver ASAP", title: "Return items as soon as possible." },
@@ -9811,6 +9801,16 @@ export default function App(){
                                           <ToggleMulti key={s.label} label={s.label} title={s.title} checked={data.processType === s.label} onChange={()=>update("processType", data.processType === s.label ? "" : s.label)} className="!px-3 !py-2 !text-sm" />
                                         ))}
                                       </div>
+                                      {showCoaching && data.processType === "Long-Term Storage" && (
+                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Long-term storage — confirm with the customer they understand monthly storage fees. Ask for an estimated return date so we can plan ahead. Set a reminder to follow up.
+                                        </div>
+                                      )}
+                                      {showCoaching && data.processType === "Deliver ASAP" && (
+                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer wants items back quickly. Prioritize processing. Confirm the delivery address is ready to receive items.
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
 
@@ -10742,7 +10742,7 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec5" noeSection="schedule" title="5. Schedule" helpText={!summaryMode ? "Set the next appointment. Put everything the field team needs in Event Instructions." : ""} isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}
+                    <Section id="sec5" noeSection="schedule" title="5. Schedule & Blockers" helpText={!summaryMode ? "Set the next appointment. Put everything the field team needs in Event Instructions." : ""} isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}
                       summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec5')} lines={[
                         { label: "Event", value: [data.scheduleType, data.pickupDate ? formatDateLabel(data.pickupDate) : "", data.pickupTime].filter(Boolean).join(" • ") || null },
                         { label: "Assignee", value: data.eventAssignee || null },
@@ -11342,7 +11342,7 @@ export default function App(){
                     toggleMulti={toggleMulti} 
                     handleConfirmClick={handleConfirmClick}
                     setToast={setToast}
-                    showInlineHelp={showInlineHelp}
+                    showInlineHelp={showCoaching}
                     auditOn={auditOn}
                     onApplyReferrerRoles={applyReferrerRoles}
                     suggestedReferrerRoles={suggestedReferrerRoles}
