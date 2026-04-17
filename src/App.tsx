@@ -2189,9 +2189,9 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
   );
 };
 
-const Toast = ({message,onClose})=>{ 
-  useEffect(()=>{ const id=setTimeout(onClose,2600); return ()=>clearTimeout(id);},[onClose]); 
-  return(<div className="fade-in fixed bottom-28 left-1/2 z-[90] -translate-x-1/2 rounded-full bg-slate-800/90 backdrop-blur px-6 py-2.5 text-sm font-medium text-white shadow-xl shadow-slate-500/20">{message}</div>) 
+const Toast = ({message,onClose})=>{
+  useEffect(()=>{ const id=setTimeout(onClose,3500); return ()=>clearTimeout(id);},[onClose]);
+  return(<div className="fade-in fixed bottom-28 left-1/2 z-[90] -translate-x-1/2 rounded-2xl bg-slate-800/95 backdrop-blur px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2"><span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>{message}</div>)
 };
 
 const Switch = ({ checked, onChange }) => (
@@ -2774,7 +2774,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                {LEAD_SOURCES.map(s => <ToggleMulti key={s} label={s} title={LEAD_SOURCE_HELP[s]} checked={data.leadSourceCategory === s} onChange={() => update("leadSourceCategory", s)} />)}
           </div>
       </Field>
-      {showInlineHelp && data.leadSourceCategory === "Referral" && (
+      {showCoaching && data.leadSourceCategory === "Referral" && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
           <span className="font-bold">Coaching:</span> The referrer is the first person who called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead — we may not yet be able to contact the customer.
         </div>
@@ -3523,11 +3523,11 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
 
                 <div className="min-w-[120px] flex justify-end gap-2 relative">
                     <button
-                        onClick={() => setShowInlineHelp(v => !v)}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${showInlineHelp ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-400 hover:border-violet-300'}`}
-                        title={showInlineHelp ? "Hide coaching prompts" : "Show coaching prompts"}
+                        onClick={() => setShowCoaching(v => !v)}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${showCoaching ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-400 hover:border-violet-300'}`}
+                        title={showCoaching ? "Hide coaching prompts" : "Show coaching prompts"}
                     >
-                        {showInlineHelp ? "🎓 Coaching" : "🎓"}
+                        {showCoaching ? "🎓 Coaching" : "🎓"}
                     </button>
                     <button
                         onClick={() => setShowSettings(v => !v)}
@@ -4228,7 +4228,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       ))}
                     </div>
                     {showInlineHelp && <div className="text-[11px] text-slate-400 mt-1">Select the primary peril — the damage that happened first. Hover each type for details.</div>}
-                    {showInlineHelp && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
+                    {showCoaching && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
                         <span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
                       </div>
@@ -4760,6 +4760,7 @@ export default function App(){
   };
   const [entryMode, setEntryMode] = useState("start"); 
   const [showInlineHelp, setShowInlineHelp] = useState(true);
+  const [showCoaching, setShowCoaching] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
   const [data, setData] = useState(() => {
     try {
@@ -9637,22 +9638,22 @@ export default function App(){
                                         );
                                       })}
                                     </div>
-                                    {showInlineHelp && (data.damageWasWet === "Y" || data.damageWasWet === true) && (
+                                    {showCoaching && (data.damageWasWet === "Y" || data.damageWasWet === true) && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> Tell the customer we need to get out there ASAP. Wet items left untreated can develop mold, which may not be covered by insurance. Ask them to keep colors separated and avoid mixing wet items together.
                                       </div>
                                     )}
-                                    {showInlineHelp && !!data.damageMoldMildew && (
+                                    {showCoaching && !!data.damageMoldMildew && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> Visible mold requires immediate attention. Ask if anyone in the household has respiratory concerns. PPE will be required for our team. Mold coverage should be confirmed with the adjuster.
                                       </div>
                                     )}
-                                    {showInlineHelp && !!data.noLights && (
+                                    {showCoaching && !!data.noLights && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> No electricity means we need to bring portable lighting. Ask if there's a generator on site.
                                       </div>
                                     )}
-                                    {showInlineHelp && !!data.boardedUp && (
+                                    {showCoaching && !!data.boardedUp && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> Boarded up home — confirm access arrangements. Ask who has the key or access code. Will fire department or restoration company need to provide access?
                                       </div>
@@ -9662,12 +9663,12 @@ export default function App(){
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">What repairs are being done to the home?</div>
                                     {showInlineHelp && <div className="text-[10px] text-slate-400">Select all that apply. This helps estimate timeline and storage needs.</div>}
-                                    {showInlineHelp && (data.repairsSummary || "").includes("Complete Rebuild") && (
+                                    {showCoaching && (data.repairsSummary || "").includes("Complete Rebuild") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> Complete rebuild means the customer will be displaced for an extended period. Confirm long-term storage needs and set expectations on timeline. Ask if they have a temporary living arrangement.
                                       </div>
                                     )}
-                                    {showInlineHelp && (data.repairsSummary || "").includes("Major Structural") && (
+                                    {showCoaching && (data.repairsSummary || "").includes("Major Structural") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> Major structural damage may mean limited access to parts of the home. Ask which areas are affected and if a contractor has assessed the structure. We may need to coordinate access with the contractor.
                                       </div>
@@ -9713,12 +9714,12 @@ export default function App(){
                                     </div>
                                     <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                       <div className="text-sm font-bold text-sky-600">When do they need their final delivery returned?</div>
-                                      {showInlineHelp && data.processType === "Long-Term Storage" && (
+                                      {showCoaching && data.processType === "Long-Term Storage" && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                           <span className="font-bold">Coaching:</span> Long-term storage — confirm with the customer they understand monthly storage fees. Ask for an estimated return date so we can plan ahead. Set a reminder to follow up.
                                         </div>
                                       )}
-                                      {showInlineHelp && data.processType === "Deliver ASAP" && (
+                                      {showCoaching && data.processType === "Deliver ASAP" && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                           <span className="font-bold">Coaching:</span> Customer wants items back quickly. Prioritize processing. Confirm the delivery address is ready to receive items.
                                         </div>
@@ -9749,17 +9750,17 @@ export default function App(){
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">Special considerations</div>
                                     {showInlineHelp && <div className="text-[10px] text-slate-400">Note anything about the customer or household that affects how we handle the project.</div>}
-                                    {showInlineHelp && (data.sdsConsiderations || []).includes("Elderly") && (
+                                    {showCoaching && (data.sdsConsiderations || []).includes("Elderly") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> Elderly customer — be patient and speak clearly. They may need extra time and assistance. Consider labeling boxes clearly for easy identification. Offer to help with packing/unpacking.
                                       </div>
                                     )}
-                                    {showInlineHelp && (data.sdsConsiderations || []).includes("Pregnancy") && (
+                                    {showCoaching && (data.sdsConsiderations || []).includes("Pregnancy") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> Customer is pregnant — avoid strong chemicals and fumes. Schedule work to minimize disruption. Use fragrance-free products.
                                       </div>
                                     )}
-                                    {showInlineHelp && (data.sdsConsiderations || []).includes("Respiratory Concerns") && (
+                                    {showCoaching && (data.sdsConsiderations || []).includes("Respiratory Concerns") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> Respiratory concerns — use hypoallergenic products. Notify the processing team. Ask about specific triggers.
                                       </div>
@@ -9870,7 +9871,7 @@ export default function App(){
                                     {data.howDryLaundry && data.howDryLaundry !== "Dryer" && (
                                       <div className="text-[10px] text-sky-600 font-semibold">Handling code auto-applied for {data.howDryLaundry.toLowerCase()} preference.</div>
                                     )}
-                                    {showInlineHelp && data.howDryLaundry === "Air-Dry" && (
+                                    {showCoaching && data.howDryLaundry === "Air-Dry" && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
                                         <span className="font-bold">Coaching:</span> Customer air-dries clothing — we must not machine dry any items. All items will be tagged for air-dry. This is important to avoid shrinkage and damage claims.
                                       </div>
