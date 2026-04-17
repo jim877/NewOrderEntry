@@ -3661,8 +3661,8 @@ const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaret
 const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts }) => {
   const toggleList = (list, value) => list.includes(value) ? list.filter(v=>v!==value) : [...list, value];
   const [householdName, setHouseholdName] = useState("");
-  const [open, setOpen] = useState(false);
   const customerDisplayName = [c.first, c.last].filter(hasMeaningfulValue).join(" ").trim();
+  const [open, setOpen] = useState(!customerDisplayName);
   const customerPlaceholder = isPlaceholderFlagActive(c.placeholder);
   const customerRoleLabel = hasMeaningfulValue(c.type) ? c.type : (c.isPrimary ? "Primary" : "Relationship");
   const hasMobile = (c.phone || "").replace(/[^\d]/g, "").length >= 10;
@@ -3682,7 +3682,22 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
       className={`group relative rounded-lg sm:rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-sky-300 hover:shadow-md ${customerPlaceholder ? "placeholder-shell" : (c.isPrimary ? "border-sky-400 ring-1 ring-sky-50" : "border-slate-200")}`}
     >
       {c.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
-      {total > 1 && ( <button onClick={() => onRemove(c.id, index)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
+      {total > 1 && !c._showMenu && ( <button onClick={() => updateCust(c.id, { _showMenu: true })} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
+      {c._showMenu && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => updateCust(c.id, { _showMenu: false })}>
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-slate-100">
+              <div className="text-sm font-bold text-slate-800">{customerDisplayName || "Customer"}</div>
+              <div className="text-xs text-slate-500">{c.type || "No type set"}</div>
+            </div>
+            <div className="p-3 space-y-1">
+              <button onClick={() => updateCust(c.id, { _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={() => updateCust(c.id, { inactive: true, _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50">Make Inactive</button>
+              <button onClick={() => { if (window.confirm(`Permanently delete ${customerDisplayName || "this customer"}?`)) onRemove(c.id, index); else updateCust(c.id, { _showMenu: false }); }} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div
         className="mb-4 flex cursor-pointer flex-col gap-3 pl-1 sm:pl-2 sm:flex-row sm:items-center sm:justify-between"
@@ -3923,12 +3938,40 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
     <div
       data-address-item-id={addr.id}
       data-audit-key={placeholder ? `placeholder-address-${addr.id}` : undefined}
-      className={`group relative overflow-hidden rounded-lg sm:rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all hover:shadow-md ${placeholder ? "placeholder-shell" : (addr.isPrimary ? "border-sky-400 ring-1 ring-sky-50" : "border-slate-200")}`}
+      className={`group relative overflow-hidden rounded-lg sm:rounded-xl border ${open ? 'p-3 sm:p-5' : 'p-2 sm:p-3'} shadow-sm transition-all hover:shadow-md ${addr.inactive ? "bg-slate-50 opacity-60 border-slate-200" : placeholder ? "placeholder-shell bg-white" : addr.isPrimary ? "bg-white border-sky-400 ring-1 ring-sky-50" : "bg-white border-slate-200"}`}
     >
       {addr.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
-      {total > 1 && ( <button onClick={()=>onRemove(addr.id)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
+      {total > 1 && !addr.inactive && (
+        <button
+          onClick={() => updateAddr(addr.id, { _showMenu: true })}
+          className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+          title="Remove or deactivate address"
+        >×</button>
+      )}
+      {addr._showMenu && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => updateAddr(addr.id, { _showMenu: false })}>
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-slate-100">
+              <div className="text-sm font-bold text-slate-800">{addr.type || "Address"}</div>
+              <div className="text-xs text-slate-500">{summarizeAddress(addr)}</div>
+            </div>
+            <div className="p-3 space-y-1">
+              <button onClick={() => updateAddr(addr.id, { _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={() => updateAddr(addr.id, { inactive: true, isPrimary: false, isLossSite: false, _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50">Make Inactive</button>
+              <button onClick={() => { if (window.confirm("Permanently delete this address?")) onRemove(addr.id); else updateAddr(addr.id, { _showMenu: false }); }} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {addr.inactive && (
+        <button
+          onClick={() => updateAddr(addr.id, { inactive: false })}
+          className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-sky-600 hover:bg-sky-50"
+          title="Reactivate this address"
+        >Reactivate</button>
+      )}
       <div
-        className="mb-4 pl-1 sm:pl-2 flex items-center gap-2 cursor-pointer"
+        className="pl-1 sm:pl-2 flex items-center gap-2 cursor-pointer"
         onClick={(e) => {
           if (isHeaderToggleIgnoredTarget(e.target)) return;
           setOpen(v => !v);
@@ -3945,118 +3988,85 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
          >
            <Chevron open={open} />
          </button>
-         <div className="flex flex-col">
-           <span className={`text-sm font-bold ${placeholder ? "placeholder-text" : "text-slate-800"}`}>{addr.type || "Address"}</span>
-           <span className="text-[10px] text-slate-500">{summarizeAddress(addr)}</span>
+         <div className="flex flex-col min-w-0">
+           <div className="flex items-center gap-2">
+             <span className={`text-base font-bold truncate ${placeholder ? "placeholder-text" : "text-slate-800"}`}>{addr.type || "Address"}</span>
+             {verified
+               ? <span title="This address was found and confirmed via Google Maps." className="rounded-full bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700 cursor-help shrink-0">✓</span>
+               : null
+             }
+           </div>
+           <span className="text-xs text-slate-500 truncate">{summarizeAddress(addr)}</span>
          </div>
-         {placeholder && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>}
-         {addr.isPrimary && <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-700">Primary</span>}
-         {addr.isLossSite && <span className="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Loss Site</span>}
+         <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+           {addr.inactive && <span className="rounded-full bg-slate-200 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-500">Inactive</span>}
+           {placeholder && !addr.inactive && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>}
+           <button type="button" onClick={() => updateAddr(addr.id, { isPrimary: !addr.isPrimary })} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${addr.isPrimary ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-sky-300'}`}>Primary</button>
+           <button type="button" onClick={() => updateAddr(addr.id, { isLossSite: !addr.isLossSite })} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${addr.isLossSite ? 'bg-rose-100 border-rose-300 text-rose-700' : 'bg-white border-slate-200 text-slate-400 hover:border-rose-300'}`}>Loss Site</button>
+         </div>
       </div>
       {open && (
-      <div className="grid gap-4 pl-1 sm:pl-2">
-        <div className="rounded-lg border border-sky-100 bg-sky-50/50 p-2">
-          <Field label="Find on Google (recommended)" subtle className="text-sky-700">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Start typing address..."
-                value={addr.googleQuery || ""}
-                onChange={e=>updateAddr(addr.id,{googleQuery:e.target.value})}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    updateAddr(addr.id,{street:"1 Main St",city:"Bloomingdale",state:"NJ",zip:"07403"});
-                  }
-                }}
-              />
-              <button className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600 transition-all" onClick={()=>updateAddr(addr.id,{street:"1 Main St",city:"Bloomingdale",state:"NJ",zip:"07403"})}>Search</button>
-            </div>
-          </Field>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[140px]">
-            <Field label="Type">
-              <Select
-                ref={typeSelectRef}
-                value={addr.type}
-                onChange={e=>updateAddr(addr.id,{type:e.target.value})}
-                className={placeholder && !addr.type ? "attention-fill" : ""}
-              >
-                <option value="" disabled>Select Type...</option>
+      <div className="space-y-4 pl-1 sm:pl-2">
+        {/* Core Address — always visible */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <div className="grid grid-cols-4 gap-3">
+            <div className="col-span-3"><Field label="Street"><Input data-audit-key="addrStreet" className={index===0 && auditOn && highlightMissing?.addrStreet ? "audit-missing" : ""} value={addr.street} onChange={e=>updateAddr(addr.id,{street:e.target.value})} /></Field></div>
+            <div className="col-span-1"><Field label="Apt / Unit"><Input value={addr.apt} onChange={e=>updateAddr(addr.id,{apt:e.target.value})} placeholder="Apt #" /></Field></div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="City"><Input data-audit-key="addrCity" className={index===0 && auditOn && highlightMissing?.addrCity ? "audit-missing" : ""} value={addr.city} onChange={e=>updateAddr(addr.id,{city:e.target.value})} /></Field>
+            <Field label="State">
+              <SearchSelect value={addr.state} onChange={(v)=>updateAddr(addr.id,{state:v})} options={STATES} placeholder="State" className={index===0 && auditOn && highlightMissing?.addrState ? "audit-missing" : ""} maxResults={STATES.length} uppercase />
+            </Field>
+            <Field label="Zip"><Input data-audit-key="addrZip" className={index===0 && auditOn && highlightMissing?.addrZip ? "audit-missing" : ""} value={addr.zip} onChange={e=>updateAddr(addr.id,{zip:e.target.value})} inputMode="numeric" /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Address Type">
+              <Select ref={typeSelectRef} value={addr.type || ""} onChange={e=>updateAddr(addr.id,{type:e.target.value})}>
+                <option value="">Select type...</option>
                 {["House","Apartment","Garden Apartment","Row House","Neighbor","Hotel","Moving","Relative","Rental","Other Home","Temp","Work","Other"].map(t=><option key={t} value={t}>{t}</option>)}
               </Select>
-              {placeholder && !addr.type && (
-                <div className="mt-1 text-[10px] font-semibold text-orange-700">
-                  Select address type now, or leave as placeholder for later.
+            </Field>
+            <Field label="Address Note">
+              <Input value={addr.note || ""} onChange={e=>updateAddr(addr.id,{note:e.target.value})} placeholder="e.g. Long driveway on left, gate code 1234" />
+            </Field>
+          </div>
+        </div>
+
+        {/* Property Details — collapsible */}
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <button type="button" onClick={() => setCoordsOpen(v => !v)} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 rounded-xl">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Property Details</span>
+            <span className={`text-slate-400 text-xs transition-transform ${coordsOpen ? "rotate-90" : ""}`}>›</span>
+          </button>
+          {coordsOpen && (
+            <div className="px-4 pb-4 space-y-4 border-t border-slate-100">
+              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block h-2 w-2 rounded-full ${verified ? "bg-emerald-500" : "bg-slate-300"}`} />
+                  <span className="text-sm text-slate-700">{verified ? "Address verified" : "Verify address"}</span>
+                </div>
+                <button onClick={() => onVerify?.(addr.id)} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Verify</button>
+              </div>
+              {index === 0 && (<><span data-audit-key="addrLat" className="block h-[1px] w-[1px] opacity-0" /><span data-audit-key="addrLng" className="block h-[1px] w-[1px] opacity-0" /></>)}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Latitude"><Input className={index===0 && auditOn && highlightMissing?.addrLat ? "audit-missing" : ""} value={addr.lat} onChange={e=>updateAddr(addr.id,{lat:e.target.value})} placeholder="e.g. 40.8874" /></Field>
+                <Field label="Longitude"><Input className={index===0 && auditOn && highlightMissing?.addrLng ? "audit-missing" : ""} value={addr.lng} onChange={e=>updateAddr(addr.id,{lng:e.target.value})} placeholder="e.g. -74.0291" /></Field>
+              </div>
+              {index === 0 && (
+                <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                  <span className="text-sm text-slate-700">Rent or own?</span>
+                  <ToggleGroup options={["Rent","Own"]} value={rentOrOwn} onChange={onRentOrOwnChange} />
                 </div>
               )}
-            </Field>
-          </div>
-          <div className="flex-1"><Field label="Location Status"><div className="flex gap-2"><ToggleMulti label="Primary" checked={!!addr.isPrimary} onChange={()=>updateAddr(addr.id,{isPrimary:!addr.isPrimary})} colorClass="!bg-sky-100 !border-sky-400 !text-sky-700" showDot={false} /><ToggleMulti label="Loss Site" checked={!!addr.isLossSite} onChange={()=>updateAddr(addr.id,{isLossSite:!addr.isLossSite})} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} /></div></Field></div>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><Field label="Street Address"><Input data-audit-key="addrStreet" className={index===0 && auditOn && highlightMissing?.addrStreet ? "audit-missing" : ""} value={addr.street} onChange={e=>updateAddr(addr.id,{street:e.target.value})} /></Field><Field label="Apt / Unit #"><Input value={addr.apt} onChange={e=>updateAddr(addr.id,{apt:e.target.value})} /></Field></div>
-        <div className="grid grid-cols-3 gap-4">
-           <div className="col-span-1"><Field label="City"><Input data-audit-key="addrCity" className={index===0 && auditOn && highlightMissing?.addrCity ? "audit-missing" : ""} value={addr.city} onChange={e=>updateAddr(addr.id,{city:e.target.value})} /></Field></div>
-           <div className="col-span-1">
-             <Field label="State">
-               <SearchSelect
-                 value={addr.state}
-                 onChange={(v)=>updateAddr(addr.id,{state:v})}
-                 options={STATES}
-                 placeholder="State"
-                 className={index===0 && auditOn && highlightMissing?.addrState ? "audit-missing" : ""}
-                 maxResults={STATES.length}
-                 uppercase
-               />
-               <div className="mt-1 text-[10px] text-slate-400">Press Tab to accept.</div>
-             </Field>
-           </div>
-           <div className="col-span-1"><Field label="Zip"><Input data-audit-key="addrZip" className={index===0 && auditOn && highlightMissing?.addrZip ? "audit-missing" : ""} value={addr.zip} onChange={e=>updateAddr(addr.id,{zip:e.target.value})} inputMode="numeric" pattern="\d{5}" /></Field></div>
-        </div>
-        <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${verified ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"} ${index===0 && auditOn && (!addr.lat || !addr.lng) ? "audit-missing" : ""}`}>
-          <div className="flex items-center gap-2 text-xs font-semibold">
-            <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${verified ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-              {verified ? "✓" : "!"}
-            </span>
-            <span className={verified ? "text-emerald-700" : "text-amber-700"}>
-              {verified ? "Verified by Google" : "Address not verified"}
-            </span>
-          </div>
-          <button
-            onClick={() => setCoordsOpen(v => !v)}
-            className="text-[10px] font-bold text-slate-500 hover:text-sky-700"
-          >
-            {coordsOpen ? "Hide coords" : "Edit coords"}
-          </button>
-          {index === 0 && (
-            <>
-              <span data-audit-key="addrLat" className="block h-[1px] w-[1px] opacity-0" />
-              <span data-audit-key="addrLng" className="block h-[1px] w-[1px] opacity-0" />
-            </>
+              {index === 0 && rentOrOwn === "Rent" && (
+                <div className="rounded-lg border border-orange-300 bg-orange-50 p-3">
+                  <div className="text-sm font-bold text-orange-800 mb-2">Confirm Coverage</div>
+                  <Input data-audit-key="rentCoverageLimit" className={auditOn && highlightMissing?.rentCoverageLimit ? "audit-missing" : ""} value={rentCoverageLimit || ""} onChange={e=>onRentCoverageChange(e.target.value)} placeholder="Coverage amount ($)" />
+                </div>
+              )}
+            </div>
           )}
-        </div>
-        {coordsOpen && (
-          <div className="grid grid-cols-2 gap-4">
-             <div className="col-span-1"><Field label="Latitude"><Input className={index===0 && auditOn && highlightMissing?.addrLat ? "audit-missing" : ""} value={addr.lat} onChange={e=>updateAddr(addr.id,{lat:e.target.value})} placeholder="e.g. 40.8874" /></Field></div>
-             <div className="col-span-1"><Field label="Longitude"><Input className={index===0 && auditOn && highlightMissing?.addrLng ? "audit-missing" : ""} value={addr.lng} onChange={e=>updateAddr(addr.id,{lng:e.target.value})} placeholder="e.g. -74.0291" /></Field></div>
-          </div>
-        )}
-        {index === 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <Field label="Rent or Own?">
-              <ToggleGroup options={["Rent","Own"]} value={rentOrOwn} onChange={onRentOrOwnChange} />
-            </Field>
-            {rentOrOwn === "Rent" && (
-              <div className="mt-3 rounded-lg border border-orange-300 bg-orange-50 p-3">
-                <div className="text-sm font-bold text-orange-800 mb-2">Confirm Coverage</div>
-                <Input data-audit-key="rentCoverageLimit" className={auditOn && highlightMissing?.rentCoverageLimit ? "audit-missing" : ""} value={rentCoverageLimit || ""} onChange={e=>onRentCoverageChange(e.target.value)} placeholder="Coverage amount ($)" />
-              </div>
-            )}
-          </div>
-        )}
-        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-           <div className="text-xs text-slate-500">Verify address and auto-fill lat/long (demo)</div>
-           <button onClick={() => onVerify?.(addr.id)} className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Verify</button>
         </div>
         <div className="flex justify-end">
           <button
@@ -5028,6 +5038,7 @@ export default function App(){
   const [autoScrollDone, setAutoScrollDone] = useState(false);
   const [lastLossDetailTouched, setLastLossDetailTouched] = useState(null);
   const [pendingAddressTypePromptId, setPendingAddressTypePromptId] = useState("");
+  const [pendingAddressFromGoogle, setPendingAddressFromGoogle] = useState(null);
   const [orderSubOpen, setOrderSubOpen] = useState(true);
   const [sourceSubOpen, setSourceSubOpen] = useState(false);
   const [interviewSubOpen, setInterviewSubOpen] = useState(false);
@@ -5276,7 +5287,11 @@ export default function App(){
   const updateAddr = useCallback((id, patch) => setData(p => ({
     ...p,
     addresses: p.addresses.map(a => {
-      if (a.id !== id) return a;
+      if (a.id !== id) {
+        // If setting another address as Primary, clear Primary from this one
+        if (patch.isPrimary === true) return { ...a, isPrimary: false };
+        return a;
+      }
       const next = { ...a, ...patch };
       const hasResolvedAddressData = [next.street, next.city, next.state, next.zip, next.googleQuery]
         .some(v => hasMeaningfulValue(v) && (v || "").toString().trim().toUpperCase() !== "TBD");
@@ -6480,11 +6495,13 @@ export default function App(){
   const addNewAddress = useCallback(() => {
     const addressId = safeUid();
     setData(p => {
-        const hasPrimary = p.addresses.some(a => a.isPrimary);
+        // Remove any existing empty addresses (except primary)
+        const cleaned = p.addresses.filter((a, i) => i === 0 || hasMeaningfulValue(a.street) || hasMeaningfulValue(a.city));
+        const hasPrimary = cleaned.some(a => a.isPrimary);
         return {
           ...p,
           addresses: [
-            ...p.addresses,
+            ...cleaned,
             initAddress({
               id: addressId,
               isPrimary: !hasPrimary,
@@ -6500,18 +6517,22 @@ export default function App(){
   }, [setToast]);
   
   const addNewCustomer = useCallback(() => {
-    setData(p => ({
-      ...p,
-      customers: [
-        ...p.customers,
-        initCustomer({
-          type: "",
-          policyHolder: false,
-          isPrimary: false,
-          placeholder: createPlaceholderFlag("customer", "Customer details needed")
-        })
-      ]
-    }));
+    // Remove any existing empty customers first
+    setData(p => {
+      const cleaned = p.customers.filter((c, i) => i === 0 || hasMeaningfulValue(c.first) || hasMeaningfulValue(c.last) || hasMeaningfulValue(c.phone) || hasMeaningfulValue(c.email));
+      return {
+        ...p,
+        customers: [
+          ...cleaned,
+          initCustomer({
+            type: "",
+            policyHolder: false,
+            isPrimary: false,
+            placeholder: createPlaceholderFlag("customer", "Customer details needed")
+          })
+        ]
+      };
+    });
   }, []);
 
   const handleAddressTypePromptFocused = useCallback((addressId) => {
@@ -6666,9 +6687,7 @@ export default function App(){
     else setAlertModal({ isOpen: true, message: "Remove this customer?", onConfirm: () => setData(p=>({...p,customers:p.customers.filter(x=>x.id!==id)})) });
   }, []);
   const removeAddr = useCallback((id) => {
-    if (window.confirm("Remove this address?")) {
-      setData(p=>({...p,addresses:p.addresses.filter(a=>a.id!==id)}));
-    }
+    setData(p=>({...p,addresses:p.addresses.filter(a=>a.id!==id)}));
   }, []);
 
   const buildSaveSummary = () => {
@@ -9376,8 +9395,9 @@ export default function App(){
                       onCaretClick={()=>handleToggleSection('sec1')}
                       badges={
                         <div className="flex items-center gap-2">
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${recordTypeLabel === "Select Type" ? "bg-amber-50 text-amber-700" : "bg-sky-50 text-sky-700"}`}>{recordTypeLabel}</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{codeSummary}</span>
+                          {recordTypeLabel !== "Select Type" && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">{recordTypeLabel}</span>}
+                          {data.primaryLossType && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{data.primaryLossType}</span>}
+                          {codeSummary && codeSummary !== "None" && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{codeSummary}</span>}
                         </div>
                       }
                       compact={compactMode}
@@ -9558,117 +9578,66 @@ export default function App(){
                             </SubSection>
 
                             <SubSection id="sec1-interview-panel" title="Interview" open={interviewSubOpen} onToggle={(nextOpen) => setInterviewSubOpen(!!nextOpen)} compact={compactMode}>
-                                <div id="sec1-interview">
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4 space-y-4">
-                                      <label className="text-xs font-bold text-sky-600 uppercase flex items-center gap-1">Conditions <span className="text-orange-500">⚡</span></label>
-                                      <div className="flex flex-wrap gap-3">
-                                          {[
-                                            {
-                                              id: "wet",
-                                              stateKey: "damageWasWet",
-                                              label: "Still Wet",
-                                              active: !!data.damageWasWet,
-                                              onToggle: () => updateSmart("damageWasWet", data.damageWasWet ? "N" : "Y"),
-                                              suggested: suggestWet
-                                            },
-                                            {
-                                              id: "mold",
-                                              stateKey: "damageMoldMildew",
-                                              label: "Visible Mold",
-                                              active: !!data.damageMoldMildew,
-                                              onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew)
-                                            },
-                                            {
-                                              id: "structural",
-                                              stateKey: "structuralElectricDamage",
-                                              label: "Structural Damage",
-                                              active: data.structuralElectricDamage === "Y",
-                                              onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y")
-                                            },
-                                            {
-                                              id: "lights",
-                                              stateKey: "noLights",
-                                              label: "No Electricity",
-                                              active: !!data.noLights,
-                                              onToggle: () => updateSmart("noLights", !data.noLights)
-                                            },
-                                            {
-                                              id: "heat",
-                                              stateKey: "noHeat",
-                                              label: "No Heat",
-                                              active: !!data.noHeat,
-                                              onToggle: () => updateSmart("noHeat", !data.noHeat)
-                                            },
-                                            {
-                                              id: "boarded",
-                                              stateKey: "boardedUp",
-                                              label: "Boarded Up",
-                                              active: !!data.boardedUp,
-                                              onToggle: () => updateSmart("boardedUp", !data.boardedUp)
-                                            }
-                                          ].map(item => {
-                                            const autoFillHint = conditionAutoFillHints[item.stateKey];
-                                            return (
-                                            <div key={item.id} className="flex flex-col items-start gap-1">
-                                            <button
-                                              type="button"
-                                              onClick={item.onToggle}
-                                              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
-                                                item.active
-                                                  ? "border-orange-300 bg-orange-50 text-slate-800"
-                                                  : "border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:text-sky-700"
-                                              } ${item.suggested ? "suggested-field" : ""}`}
-                                            >
-                                              <span className={`inline-block h-2 w-2 rounded-full ${item.active ? "bg-sky-500" : "bg-slate-300"}`} />
-                                              <span>{item.label}</span>
-                                              {item.suggested ? (
-                                                <span className="ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold suggested-pill">
-                                                  Suggested
-                                                </span>
-                                              ) : null}
-                                            </button>
-                                            {autoFillHint ? (
-                                              <span className="ml-2 text-[10px] font-semibold text-sky-600 fade-in">
-                                                + {autoFillHint} added to load
-                                              </span>
-                                            ) : null}
-                                            </div>
-                                            );
-                                          })}
-                                      </div>
-                                  </div>
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
-                                      <div className="text-sm font-semibold text-sky-600 mb-3">Repairs Summary</div>
-                                      <div className="flex flex-wrap gap-2">
-                                      {["Just Cleaning", "Clean and Paint", "Cosmetic Damage", "Major Structural Damage", "Refinish Floors", "Replace Floors", "Complete Rebuild"].map(s => (
-                                          <ToggleMulti key={s} label={s} checked={data.repairsSummary === s} onChange={()=>update("repairsSummary", data.repairsSummary === s ? "" : s)} />
-                                        ))}
-                                      </div>
-                                  </div>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                        <Field label={<span className="text-sky-600">Living Situation</span>}>
-                                          <div className="flex flex-wrap gap-2">
-                                            {["Staying in home", "Moving", "Hotel", "Neighbor", "Relative", "Rental", "Other Home"].map(s => (
-                                              <ToggleMulti
-                                                key={s}
-                                                label={s}
-                                                checked={data.livingStatus === s}
-                                                onChange={() => updateLivingStatus(data.livingStatus === s ? "" : s)}
-                                              />
-                                            ))}
+                                <div id="sec1-interview" className="space-y-4">
+                                  {showInlineHelp && <div className="text-xs text-slate-400 mb-2">Ask the customer these questions before going out to the home.</div>}
+
+                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                                    <div className="text-sm font-bold text-sky-600">Is anything still wet or damaged?</div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {[
+                                        { id: "wet", stateKey: "damageWasWet", label: "Still Wet", active: !!data.damageWasWet, onToggle: () => updateSmart("damageWasWet", data.damageWasWet ? "N" : "Y"), suggested: suggestWet },
+                                        { id: "mold", stateKey: "damageMoldMildew", label: "Visible Mold", active: !!data.damageMoldMildew, onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew) },
+                                        { id: "structural", stateKey: "structuralElectricDamage", label: "Structural Damage", active: data.structuralElectricDamage === "Y", onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y") },
+                                        { id: "lights", stateKey: "noLights", label: "No Electricity", active: !!data.noLights, onToggle: () => updateSmart("noLights", !data.noLights) },
+                                        { id: "heat", stateKey: "noHeat", label: "No Heat", active: !!data.noHeat, onToggle: () => updateSmart("noHeat", !data.noHeat) },
+                                        { id: "boarded", stateKey: "boardedUp", label: "Boarded Up", active: !!data.boardedUp, onToggle: () => updateSmart("boardedUp", !data.boardedUp) },
+                                      ].map(item => {
+                                        const autoFillHint = conditionAutoFillHints[item.stateKey];
+                                        return (
+                                          <div key={item.id} className="flex flex-col items-start gap-1">
+                                            <ToggleMulti label={item.label} checked={item.active} onChange={item.onToggle} className={`!px-4 !py-2.5 !text-sm ${item.suggested ? "suggested-field" : ""}`} />
+                                            {autoFillHint && <span className="ml-2 text-[10px] font-semibold text-sky-600 fade-in">+ {autoFillHint} added to load</span>}
                                           </div>
-                                        </Field>
-                                      </div>
-                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200"><Field label={<span className="text-sky-600">Delivery + Storage Timeline</span>}><div className="flex flex-wrap gap-2">{["Deliver to Temp", "Deliver to Move", "Deliver to home ASAP", "Long-Term Storage"].map(s => (<ToggleMulti key={s} label={s} checked={data.processType === s} onChange={()=>update("processType", data.processType === s ? "" : s)} />))}</div></Field></div>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
-                                      <div className="text-sm font-semibold text-sky-600 mb-3">Packout Summary</div>
+
+                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                                    <div className="text-sm font-bold text-sky-600">What repairs are being done to the home?</div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {["Just Cleaning", "Clean and Paint", "Cosmetic Damage", "Major Structural Damage", "Refinish Floors", "Replace Floors", "Complete Rebuild"].map(s => (
+                                        <ToggleMulti key={s} label={s} checked={data.repairsSummary === s} onChange={()=>update("repairsSummary", data.repairsSummary === s ? "" : s)} className="!px-4 !py-2.5 !text-sm" />
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                                      <div className="text-sm font-bold text-sky-600">Where is the customer living?</div>
                                       <div className="flex flex-wrap gap-2">
-                                        {["Remove Rugs", "Remove Window Treatments", "Remove Hardware", "Remove Furniture", "Remove Electronics"].map(s => (
-                                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={()=>update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} />
+                                        {["Staying in home", "Moving", "Hotel", "Neighbor", "Relative", "Rental", "Other Home"].map(s => (
+                                          <ToggleMulti key={s} label={s} checked={data.livingStatus === s} onChange={() => updateLivingStatus(data.livingStatus === s ? "" : s)} className="!px-3 !py-2 !text-sm" />
                                         ))}
                                       </div>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                                      <div className="text-sm font-bold text-sky-600">When do they need their final delivery returned?</div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {["Deliver to Temp", "Deliver to Move", "Deliver to home ASAP", "Long-Term Storage"].map(s => (
+                                          <ToggleMulti key={s} label={s} checked={data.processType === s} onChange={()=>update("processType", data.processType === s ? "" : s)} className="!px-3 !py-2 !text-sm" />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                                    <div className="text-sm font-bold text-sky-600">What are we picking up?</div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {["Rugs", "Window Treatments", "Hardware", "Furniture", "Electronics", "Clothing", "Bedding", "Draperies"].map(s => (
+                                        <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={()=>update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} className="!px-4 !py-2.5 !text-sm" />
+                                      ))}
+                                    </div>
                                   </div>
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
                                       <div className="text-sm font-semibold text-sky-600 mb-1">Suggested Groups</div>
@@ -9726,53 +9695,64 @@ export default function App(){
                                         })}
                                       </div>
                                   </div>
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                    <div className="text-sm font-semibold text-sky-600 mb-3">Preferences & Care</div>
-                                    <div className="space-y-4">
-                                      <div className="flex items-center justify-between"><Field label="Medical Issues?" /><ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => update("familyMedicalIssues", v)} /></div>
-                                      {data.familyMedicalIssues === "Y" && (
-                                        <Textarea value={data.familyMedicalNote || ""} onChange={e=>update("familyMedicalNote", e.target.value)} placeholder="Details..." />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="Soap Allergies?" smart /><ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => update("soapFragAllergies", v)} /></div>
-                                      {data.soapFragAllergies === "Y" && (
-                                        <Textarea value={data.soapFragNote || ""} onChange={e=>update("soapFragNote", e.target.value)} placeholder="Allergy details..." />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="Self Cleaning?" /><ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} /></div>
-                                      {data.selfCleaning === "Y" && (
-                                        <Textarea value={data.selfCleaningNote || ""} onChange={e=>update("selfCleaningNote", e.target.value)} placeholder="What will they clean?" />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="Donate Items?" /><ToggleGroup options={["Y","N"]} value={data.donateSalvation || ""} onChange={v => update("donateSalvation", v)} /></div>
-                                      {data.donateSalvation === "Y" && (
-                                        <Textarea value={data.donateSalvationNote || ""} onChange={e=>update("donateSalvationNote", e.target.value)} placeholder="Items to donate..." />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="Use Dry Cleaner?" /><ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => update("useDryCleaner", v)} /></div>
-                                      {data.useDryCleaner === "Yes" && (
-                                        <Textarea value={data.useDryCleanerNote || ""} onChange={e=>update("useDryCleanerNote", e.target.value)} placeholder="Dry cleaner notes..." />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="How do you dry laundry?" smart /><ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => updateHowDry(v)} /></div>
-                                      {data.howDryLaundry && data.howDryLaundry !== "Dryer" && (
-                                        <div className="text-xs suggested-text">Smart handling code applied based on laundry preference.</div>
-                                      )}
-                                      <div className="flex items-center justify-between">
-                                        <Field label="Need Storage?" />
-                                      <div className={`rounded-lg p-1 ${suggestStorage ? 'suggested-field' : ''} ${highlightStorageFromProcess ? 'attention-outline' : ''}`}>
-                                        <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => update("storageNeeded", v)} />
+                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+                                    <div className="text-sm font-bold text-sky-600">Customer preferences & health</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                                        <span className="text-sm text-slate-700">Any medical issues?</span>
+                                        <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => update("familyMedicalIssues", v)} />
                                       </div>
+                                      <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                                        <span className="text-sm text-slate-700">Soap or fragrance allergies?</span>
+                                        <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => update("soapFragAllergies", v)} />
                                       </div>
-                                      {suggestStorage && <div className="text-xs suggested-text">Suggested based on structural damage or process goal.</div>}
-                                      {highlightStorageFromProcess && (
-                                        <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-                                          Long-Term Storage selected → confirm Need Storage.
-                                        </div>
-                                      )}
-                                      {data.storageNeeded === "Y" && (
-                                        <div className="flex items-center gap-2">
-                                          <Input className={`w-24 ${suggestStorageMonths ? 'suggested-field' : ''}`} value={data.storageMonths || ""} onChange={e=>update("storageMonths", e.target.value)} placeholder="#" />
-                                          <span className="text-xs text-slate-500">months</span>
-                                          {suggestStorageMonths && <span className="text-[10px] font-bold suggested-pill rounded-full px-2 py-0.5">Suggested</span>}
-                                        </div>
-                                      )}
                                     </div>
+                                    {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e=>update("familyMedicalNote", e.target.value)} placeholder="What medical issues should we be aware of?" />}
+                                    {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e=>update("soapFragNote", e.target.value)} placeholder="What are they allergic to?" />}
+
+                                    <div className="text-sm font-bold text-sky-600 pt-2">Cleaning preferences</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                                        <span className="text-sm text-slate-700">Will they clean anything themselves?</span>
+                                        <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} />
+                                      </div>
+                                      <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                                        <span className="text-sm text-slate-700">Want to donate unsalvageable items?</span>
+                                        <ToggleGroup options={["Y","N"]} value={data.donateSalvation || ""} onChange={v => update("donateSalvation", v)} />
+                                      </div>
+                                    </div>
+                                    {data.selfCleaning === "Y" && <Input value={data.selfCleaningNote || ""} onChange={e=>update("selfCleaningNote", e.target.value)} placeholder="What will they clean themselves?" />}
+                                    {data.donateSalvation === "Y" && <Input value={data.donateSalvationNote || ""} onChange={e=>update("donateSalvationNote", e.target.value)} placeholder="What items to donate?" />}
+
+                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                                      <span className="text-sm text-slate-700">Do they use a dry cleaner?</span>
+                                      <ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => update("useDryCleaner", v)} />
+                                    </div>
+
+                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                                      <span className="text-sm text-slate-700">How do they dry laundry?</span>
+                                      <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => updateHowDry(v)} />
+                                    </div>
+                                    {data.howDryLaundry && data.howDryLaundry !== "Dryer" && (
+                                      <div className="text-[10px] text-sky-600 font-semibold">Handling code auto-applied for {data.howDryLaundry.toLowerCase()} preference.</div>
+                                    )}
+
+                                    <div className="text-sm font-bold text-sky-600 pt-2">Storage</div>
+                                    <div className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${suggestStorage ? 'border-amber-300 bg-amber-50' : highlightStorageFromProcess ? 'border-orange-300 bg-orange-50' : 'border-slate-100 bg-slate-50/50'}`}>
+                                      <div>
+                                        <span className="text-sm text-slate-700">Will they need storage?</span>
+                                        {suggestStorage && <div className="text-[10px] text-amber-600 font-semibold">Suggested based on structural damage or timeline.</div>}
+                                        {highlightStorageFromProcess && <div className="text-[10px] text-orange-600 font-semibold">Long-Term Storage selected — confirm here.</div>}
+                                      </div>
+                                      <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => update("storageNeeded", v)} />
+                                    </div>
+                                    {data.storageNeeded === "Y" && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm text-slate-600">How many months?</span>
+                                        <Input className={`w-20 ${suggestStorageMonths ? 'suggested-field' : ''}`} value={data.storageMonths || ""} onChange={e=>update("storageMonths", e.target.value)} placeholder="#" />
+                                        {suggestStorageMonths && <span className="text-[10px] font-bold suggested-pill rounded-full px-2 py-0.5">Suggested</span>}
+                                      </div>
+                                    )}
                                   </div>
                                   {/* Repairs Summary moved into section above */}
                                 </div>
@@ -9975,6 +9955,69 @@ export default function App(){
 
                     <Section id="sec3" noeSection="address" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onHeaderClick={()=>handleToggleSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}>
                       <div className="space-y-4">
+                        {(() => {
+                          const DEMO_RESULTS = [
+                            { street: "148 Amsterdam Ave", city: "Hawthorne", state: "NY", zip: "10532", display: "148 Amsterdam Ave, Hawthorne, NY 10532" },
+                            { street: "25 Main St", city: "Bloomingdale", state: "NJ", zip: "07403", display: "25 Main St, Bloomingdale, NJ 07403" },
+                            { street: "1616 Springfield Ave", city: "Pennsauken", state: "NJ", zip: "08110", display: "1616 Springfield Ave, Pennsauken, NJ 08110" },
+                            { street: "17 Wausau St", city: "Ogdensburg", state: "NJ", zip: "07439", display: "17 Wausau St, Ogdensburg, NJ 07439" },
+                            { street: "42 Park Ave", apt: "4B", city: "New York", state: "NY", zip: "10016", display: "42 Park Ave #4B, New York, NY 10016" },
+                            { street: "100 Broadway", apt: "12F", city: "New York", state: "NY", zip: "10005", display: "100 Broadway #12F, New York, NY 10005" },
+                          ];
+                          const pendingAddress = pendingAddressFromGoogle; const setPendingAddress = setPendingAddressFromGoogle;
+                          const confirmAddress = (type) => {
+                            if (!pendingAddress) return;
+                            const isDuplicate = data.addresses.some(a =>
+                              a.street?.trim().toLowerCase() === pendingAddress.street?.trim().toLowerCase() &&
+                              a.city?.trim().toLowerCase() === pendingAddress.city?.trim().toLowerCase() &&
+                              a.zip?.trim() === pendingAddress.zip?.trim()
+                            );
+                            if (isDuplicate) { setToast?.("This address is already on the order"); setPendingAddress(null); return; }
+                            const primaryHasData = !!(data.addresses?.[0]?.street?.trim());
+                            if (!primaryHasData) {
+                              updateAddr(data.addresses[0].id, { ...pendingAddress, isPrimary: true, isLossSite: true, type });
+                              setToast?.("Primary address added");
+                            } else {
+                              const newAddr = initAddress({ ...pendingAddress, isPrimary: false, isLossSite: false, type });
+                              setData(p => ({ ...p, addresses: [...p.addresses, newAddr] }));
+                              setToast?.(`${type} address added`);
+                            }
+                            setPendingAddress(null);
+                          };
+                          return (
+                            <div className="rounded-lg border border-sky-100 bg-sky-50/50 p-3 space-y-3">
+                              <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider">Find address on Google</div>
+                              <SearchSelect
+                                value=""
+                                onChange={v => {
+                                  const match = DEMO_RESULTS.find(r => r.display === v);
+                                  if (match) setPendingAddress(match);
+                                }}
+                                onQueryChange={() => {}}
+                                options={DEMO_RESULTS.map(r => ({ label: r.display, value: r.display, type: "address" }))}
+                                placeholder="Start typing an address..."
+                                clearOnCommit
+                                maxResults={5}
+                                autoComplete="off"
+                              />
+                              {pendingAddress && (
+                                <div className="rounded-lg border-2 border-amber-300 bg-amber-50/50 p-4 space-y-3">
+                                  <div className="text-sm font-bold text-slate-800">{pendingAddress.display}</div>
+                                  <div className="text-xs font-semibold text-amber-700">Select address type to add to order:</div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {["House", "Apartment", "Garden Apartment", "Row House", "Hotel", "Rental", "Temp", "Work", "Other"].map(t => (
+                                      <button key={t} type="button" onClick={() => confirmAddress(t)}
+                                        className="rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all"
+                                      >{t}</button>
+                                    ))}
+                                  </div>
+                                  <button type="button" onClick={() => setPendingAddress(null)} className="text-xs font-bold text-slate-400 hover:text-slate-600">Cancel</button>
+                                </div>
+                              )}
+                              {!pendingAddress && showInlineHelp && <div className="text-[10px] text-slate-400">Search for an address, then select the type to add it.</div>}
+                            </div>
+                          );
+                        })()}
                         {data.addresses.map((a,i)=><AddressItem key={a.id} addr={a} total={data.addresses.length} updateAddr={updateAddr} onRemove={removeAddr} index={i} highlightMissing={data.highlightMissing} auditOn={auditOn} onVerify={verifyAddressDemo} ToggleMulti={ToggleMulti} rentOrOwn={data.rentOrOwn} rentCoverageLimit={data.rentCoverageLimit} onRentOrOwnChange={(v)=>update("rentOrOwn", v)} onRentCoverageChange={(v)=>update("rentCoverageLimit", v)} forceShowCoords={i===0 ? showPrimaryCoords : false} autoOpenForTypePrompt={pendingAddressTypePromptId === a.id} autoFocusTypePrompt={pendingAddressTypePromptId === a.id} onTypePromptFocused={handleAddressTypePromptFocused} />)}
                         <div className="pt-2"><button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button></div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
