@@ -1740,6 +1740,29 @@ const DEFAULT_FORM={
 // --- UI PRIMITIVES ---
 const Chevron = ({open}) => <span className={`text-slate-400 transition-transform duration-200 ${open?"rotate-90":""}`}>›</span>;
 
+const SummaryLine = ({ label, value, className }) => {
+  if (!value) return null;
+  return (
+    <div className={`flex items-baseline gap-2 ${className || ""}`}>
+      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">{label}</span>
+      <span className="text-sm text-slate-700">{value}</span>
+    </div>
+  );
+};
+
+const SectionSummary = ({ lines, onEdit }) => (
+  <div className="px-4 py-3 space-y-1.5 cursor-pointer hover:bg-sky-50/30 transition-colors rounded-lg" onClick={onEdit}>
+    {lines.filter(Boolean).length > 0 ? (
+      lines.filter(Boolean).map((line, idx) => (
+        <SummaryLine key={idx} label={line.label} value={line.value} />
+      ))
+    ) : (
+      <div className="text-xs text-slate-400 italic">No data entered yet — click to edit</div>
+    )}
+    <div className="text-[10px] text-sky-600 font-bold mt-1">Click to edit</div>
+  </div>
+);
+
 const Field = ({label,children,subtle,missing, className, action, smart, id, noeField}) => (
   <div id={id} className={`flex flex-col gap-1.5 ${className||""}`} data-noe-field={noeField || undefined} data-noe-label={label || undefined}>
     <div className="flex items-center justify-between">
@@ -3355,7 +3378,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 };
 
 // --- UNIFIED FLOATING HEADER (PROGRESS HEADER) ---
-const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
+const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, summaryMode, setSummaryMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
     const steps = [
         { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }, { id: "interview", label: "Interview" }, { id: "codes", label: "Codes" }] },
         { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
@@ -3529,6 +3552,15 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                 {entryMode !== 'detailed' && <div className="flex-1"></div>}
 
                 <div className="min-w-[120px] flex justify-end gap-2 relative">
+                    {entryMode === 'detailed' && setSummaryMode && (
+                      <button
+                        onClick={() => setSummaryMode(v => !v)}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${summaryMode ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-400 hover:border-emerald-300'}`}
+                        title={summaryMode ? "Switch to Edit Mode" : "Switch to Summary Mode"}
+                      >
+                        {summaryMode ? "📋 Summary" : "📋"}
+                      </button>
+                    )}
                     <button
                         onClick={() => setShowCoaching(v => !v)}
                         className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${showCoaching ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-400 hover:border-violet-300'}`}
@@ -3633,7 +3665,7 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, onAudit, auditOn, se
 };
 
 
-const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaretClick, children, badges, className, compact, noeSection }) => {
+const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaretClick, children, badges, className, compact, noeSection, summary }) => {
   const handleHeaderClick = () => {
     if (onHeaderClick) {
       onHeaderClick();
@@ -3684,6 +3716,7 @@ const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaret
         </button>
       </div>
       {isOpen && <div className={`border-t border-slate-100 ${compact ? 'p-3 sm:p-4' : 'p-4 sm:p-6'} fade-in`}>{children}</div>}
+      {!isOpen && summary && <div className="border-t border-slate-100">{summary}</div>}
     </div>
   );
 };
@@ -4779,6 +4812,7 @@ export default function App(){
   const [showInlineHelp, setShowInlineHelp] = useState(true);
   const [showCoaching, setShowCoaching] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
+  const [summaryMode, setSummaryMode] = useState(false);
   const [data, setData] = useState(() => {
     try {
       const s = localStorage.getItem("same-day-scope-v52");
@@ -9373,6 +9407,8 @@ export default function App(){
             showCoaching={showCoaching}
             setShowCoaching={setShowCoaching}
             compactMode={compactMode}
+            summaryMode={summaryMode}
+            setSummaryMode={setSummaryMode}
             setCompactMode={setCompactMode}
             onReset={handleReset}
             currentUser={data.currentUser}
@@ -9428,10 +9464,21 @@ export default function App(){
                       id="sec1"
                       noeSection="order"
                       title="1. Order & Interview"
-                      helpText="Enter job basics + call details (source, scope/needs, internal codes if known)."
+                      helpText={!summaryMode ? "Enter job basics + call details (source, scope/needs, internal codes if known)." : ""}
                       isOpen={openSections.sec1}
                       onHeaderClick={()=>handleToggleSection('sec1')}
                       onCaretClick={()=>handleToggleSection('sec1')}
+                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec1')} lines={[
+                        { label: "Order", value: [data.orderName, recordTypeLabel !== "Select Type" ? recordTypeLabel : ""].filter(Boolean).join(" | ") },
+                        { label: "Type", value: [data.primaryLossType, ...(data.secondaryContaminants || [])].filter(Boolean).join(" + ") || null },
+                        { label: "Services", value: (data.serviceOfferings || []).join(", ") || null },
+                        { label: "Source", value: [data.referrer, data.referringCompany].filter(Boolean).join(" — ") || null },
+                        { label: "Rep", value: data.salesRep ? data.salesRep.split(",")[0] : null },
+                        { label: "Conditions", value: conditionSummary || null },
+                        { label: "Repairs", value: data.repairsSummary || null },
+                        { label: "Living", value: data.livingStatus || null },
+                        { label: "Storage", value: data.storageNeeded === "Y" ? `Yes${data.storageMonths ? ` (${data.storageMonths} months)` : ""}` : null },
+                      ]} /> : null}
                       badges={
                         <div className="flex items-center gap-2">
                           {recordTypeLabel !== "Select Type" && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">{recordTypeLabel}</span>}
@@ -10114,7 +10161,14 @@ export default function App(){
                         </div>
                     </Section>
 
-                    <Section id="sec2" noeSection="customer" title="2. Customer" helpText="Add the customer + any key contacts (spouse, tenant, neighbor, PM)." isOpen={openSections.sec2} onHeaderClick={()=>handleToggleSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}>
+                    <Section id="sec2" noeSection="customer" title="2. Customer" helpText={!summaryMode ? "Add the customer + any key contacts (spouse, tenant, neighbor, PM)." : ""} isOpen={openSections.sec2} onHeaderClick={()=>handleToggleSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}
+                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec2')} lines={
+                        data.customers.map((c, i) => ({
+                          label: c.isPrimary ? "Primary" : (c.type || `Contact ${i+1}`),
+                          value: [c.first, c.last].filter(Boolean).join(" ") + (c.phone ? ` • ${c.phone}` : "") + (c.email ? ` • ${c.email}` : "")
+                        }))
+                      } /> : null}
+                    >
                       <div className="space-y-4">
                         {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
@@ -10125,7 +10179,14 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec3" noeSection="address" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onHeaderClick={()=>handleToggleSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}>
+                    <Section id="sec3" noeSection="address" title="3. Address" helpText={!summaryMode ? "Enter the job site + any related locations (temp housing, hotel, alt delivery)." : ""} isOpen={openSections.sec3} onHeaderClick={()=>handleToggleSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}
+                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec3')} lines={
+                        data.addresses.filter(a => !a.inactive).map(a => ({
+                          label: a.isPrimary ? "Primary" : (a.type || "Address"),
+                          value: summarizeAddress(a)
+                        }))
+                      } /> : null}
+                    >
                       <div className="space-y-4">
                         {(() => {
                           const DEMO_RESULTS = [
@@ -10199,7 +10260,14 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec4" noeSection="billing" title="4. Billing & Companies" helpText="Who pays + who is involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onHeaderClick={()=>handleToggleSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
+                    <Section id="sec4" noeSection="billing" title="4. Billing & Companies" helpText={!summaryMode ? "Who pays + who is involved (billing, insurance, limits/approvals, all companies/contacts)." : ""} isOpen={openSections.sec4} onHeaderClick={()=>handleToggleSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}
+                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec4')} lines={[
+                        { label: "Billing", value: data.billingPayer || null },
+                        { label: "Insurance", value: data.insuranceCompany ? `${data.insuranceCompany}${data.insuranceAdjuster ? ` — ${data.insuranceAdjuster}` : ""}` : null },
+                        { label: "Claim #", value: data.claimNumber || null },
+                        { label: "Bill To", value: data.billingCompany ? `${data.billingCompany}${data.billingContact ? ` — ${data.billingContact}` : ""}` : null },
+                      ]} /> : null}
+                    >
                       <div className="grid gap-6">
                         {data.insuranceClaim === "Yes" && (
                           <div className="rounded-lg border border-sky-100 bg-sky-50/40 p-4">
@@ -10674,7 +10742,13 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec5" noeSection="schedule" title="5. Schedule" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}>
+                    <Section id="sec5" noeSection="schedule" title="5. Schedule" helpText={!summaryMode ? "Set the next appointment. Put everything the field team needs in Event Instructions." : ""} isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}
+                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec5')} lines={[
+                        { label: "Event", value: [data.scheduleType, data.pickupDate ? formatDateLabel(data.pickupDate) : "", data.pickupTime].filter(Boolean).join(" • ") || null },
+                        { label: "Assignee", value: data.eventAssignee || null },
+                        { label: "Instructions", value: stripEventSystemLines(data.eventInstructions || "").trim() ? stripEventSystemLines(data.eventInstructions || "").trim().slice(0, 100) + (stripEventSystemLines(data.eventInstructions || "").trim().length > 100 ? "..." : "") : null },
+                      ]} /> : null}
+                    >
                       <div className="space-y-6">
                         <SubSection id="sec5-schedule" title="Schedule" open={scheduleSubOpen} onToggle={(nextOpen) => setScheduleSubOpen(!!nextOpen)} compact={compactMode}>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
