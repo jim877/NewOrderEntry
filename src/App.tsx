@@ -7024,6 +7024,21 @@ export default function App(){
       });
     });
 
+    // Vendor/company placeholders
+    (data.vendors || []).forEach((v, idx) => {
+      if (v.incomplete) {
+        const label = v.contact || v.company || `Company ${idx + 1}`;
+        missing.push({
+          id: "sec4",
+          label: `Incomplete: ${label}`,
+          section: "sec4",
+          key: `placeholder-vendor-${v.id || idx}`,
+          category: "placeholders",
+          vendorIdx: idx,
+        });
+      }
+    });
+
     if(!primaryAddress.street) missing.push({ id: "sec3", label: "Street Address", section: "sec3", key: "addrStreet" });
     if(!primaryAddress.city) missing.push({ id: "sec3", label: "City", section: "sec3", key: "addrCity" });
     if(!primaryAddress.state) missing.push({ id: "sec3", label: "State", section: "sec3", key: "addrState" });
@@ -9650,6 +9665,47 @@ export default function App(){
                       </div>
                     </button>
                   )}
+                  {(() => {
+                    const placeholders = [
+                      ...(data.vendors || []).filter(v => v.incomplete).map((v, i) => ({
+                        label: v.contact || v.company || `Company ${i+1}`,
+                        section: "sec4",
+                        type: "company",
+                        idx: i,
+                      })),
+                      ...(data.customers || []).filter(c => isPlaceholderFlagActive(c?.placeholder)).map((c, i) => ({
+                        label: [c.first, c.last].filter(Boolean).join(" ") || `Customer ${i+1}`,
+                        section: "sec2",
+                        type: "customer",
+                      })),
+                      ...(data.addresses || []).filter(a => isAddressPlaceholder(a)).map((a, i) => ({
+                        label: summarizeAddress(a) || `Address ${i+1}`,
+                        section: "sec3",
+                        type: "address",
+                      })),
+                    ];
+                    if (!placeholders.length) return null;
+                    return (
+                      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-xs font-bold text-amber-700">{placeholders.length} item{placeholders.length !== 1 ? "s" : ""} need{placeholders.length === 1 ? "s" : ""} attention</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {placeholders.map((p, idx) => (
+                            <button
+                              key={`ph-${idx}`}
+                              type="button"
+                              onClick={() => jumpToSection(p.section)}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-all"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {orderNarrative.length > 0 && (
                     <div className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden" data-noe-section="narrative">
                       <button
