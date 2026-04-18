@@ -667,7 +667,7 @@ const SdsBrochurePage = ({ brand = BRAND, media = BRAND_CARES_MEDIA }) => (
   </SdsPageBlock>
 );
 
-export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsPhotos = [], sdsCoverPhoto = null, scopeBridge = {}, documentType = "approval", orderNarrative = [] }) {
+export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsPhotos = [], sdsCoverPhoto = null, scopeBridge = {}, documentType = "approval", orderNarrative = [], orderNarrativeProse = [] }) {
   const docSeverity = lossSeverity || {};
   const printRootRef = useRef(null);
   const responseCopy = getSdsResponseCopy(documentType);
@@ -1817,50 +1817,11 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
               </SdsPageBlock>
             );
           })()}
-          {(orderNarrative || []).length > 0 && (
+          {(orderNarrativeProse || []).length > 0 && (
             <SdsPageBlock brand={BRAND}>
               <SdsWidgetSection title="Project Narrative" subtitle="A summary of the scope and key details for this project.">
                 <div className="space-y-2 text-sm leading-relaxed text-slate-700">
-                  {(() => {
-                    const grouped = {};
-                    (orderNarrative || []).forEach(line => {
-                      const key = line.section;
-                      if (!grouped[key]) grouped[key] = [];
-                      grouped[key].push(line.text);
-                    });
-                    const prose = [];
-                    if (grouped["Loss"]) prose.push(grouped["Loss"].join(" "));
-                    const customerLines = [];
-                    if (grouped["Customer"]) customerLines.push(...grouped["Customer"]);
-                    if (grouped["Contact"]) customerLines.push(...grouped["Contact"].map(t => `Additional contact: ${t}`));
-                    if (customerLines.length) prose.push(customerLines.join(". ") + ".");
-                    if (grouped["Address"]) prose.push(`Location: ${grouped["Address"].join("; ")}.`);
-                    const companyParts = [];
-                    if (grouped["Referral"]) companyParts.push(`Referred by ${grouped["Referral"][0]}`);
-                    if (grouped["Insurance"]) companyParts.push(`Insurance: ${grouped["Insurance"][0]}`);
-                    Object.entries(grouped).forEach(([k, v]) => {
-                      if (!["Loss","Customer","Contact","Address","Referral","Insurance","Sales Rep","Claim #","Services","Conditions","Living","Storage","Repairs","Pack-out","Considerations","Pets","Laundry","Scheduled","Assignee","Notes"].includes(k)) {
-                        companyParts.push(`${k}: ${v[0]}`);
-                      }
-                    });
-                    if (companyParts.length) prose.push(companyParts.join(". ") + ".");
-                    if (grouped["Services"]) prose.push(`Services: ${grouped["Services"][0]}.`);
-                    const siteParts = [];
-                    if (grouped["Conditions"]) siteParts.push(`Site conditions: ${grouped["Conditions"][0]}`);
-                    if (grouped["Considerations"]) siteParts.push(grouped["Considerations"][0]);
-                    if (grouped["Pets"]) siteParts.push(`Pet on premises: ${grouped["Pets"][0]}`);
-                    if (grouped["Laundry"]) siteParts.push(grouped["Laundry"][0]);
-                    if (siteParts.length) prose.push(siteParts.join(". ") + ".");
-                    if (grouped["Living"]) {
-                      let livingLine = `Living situation: ${grouped["Living"][0]}`;
-                      if (grouped["Storage"]) livingLine += `. ${grouped["Storage"][0]}`;
-                      prose.push(livingLine + ".");
-                    }
-                    if (grouped["Repairs"]) prose.push(`Repairs: ${grouped["Repairs"][0]}.`);
-                    if (grouped["Pack-out"]) prose.push(`Pack-out: ${grouped["Pack-out"][0]}.`);
-                    if (grouped["Notes"]) prose.push(grouped["Notes"][0]);
-                    return prose.map((p, i) => <p key={i}>{p}</p>);
-                  })()}
+                  {(orderNarrativeProse || []).map((line, i) => <p key={i}>{line}</p>)}
                 </div>
               </SdsWidgetSection>
             </SdsPageBlock>

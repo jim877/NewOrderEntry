@@ -1740,6 +1740,96 @@ const DEFAULT_FORM={
 // --- UI PRIMITIVES ---
 const Chevron = ({open}) => <span className={`text-slate-400 transition-transform duration-200 ${open?"rotate-90":""}`}>›</span>;
 
+const buildNarrativeProse = (narrative = [], data = {}) => {
+  const g = {};
+  narrative.forEach(l => { if (!g[l.section]) g[l.section] = []; g[l.section].push(l.text); });
+  const p = [];
+
+  // Opening — loss description
+  if (g["Loss"]) {
+    p.push(`This is a ${g["Loss"][0]}`);
+  }
+
+  // Customer + Address
+  const primary = (data.customers || []).find(c => c.isPrimary) || (data.customers || [])[0];
+  const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0];
+  if (primary && (primary.first || primary.last)) {
+    const name = [primary.first, primary.last].filter(Boolean).join(" ");
+    const role = primary.policyHolder ? "The policyholder" : "The customer";
+    let custLine = `${role} is ${name}`;
+    if (primaryAddr && primaryAddr.street) custLine += ` at ${summarizeAddress(primaryAddr)}`;
+    if (primary.phone) custLine += `. They can be reached at ${primary.phone}`;
+    if (primary.email) custLine += ` (${primary.email})`;
+    custLine += ".";
+    p.push(custLine);
+  }
+  // Additional contacts
+  const others = (data.customers || []).filter((c, i) => i > 0 && (c.first || c.last));
+  others.forEach(c => {
+    const name = [c.first, c.last].filter(Boolean).join(" ");
+    const role = c.type || "additional contact";
+    let line = `${name} is ${role === "Husband" || role === "Wife" ? `the ${role.toLowerCase()}` : `an ${role.toLowerCase()}`}`;
+    if (c.email) line += ` (${c.email})`;
+    if (c.phone) line += `, reachable at ${c.phone}`;
+    p.push(line + ".");
+  });
+
+  // Referral + Insurance
+  const refParts = [];
+  if (g["Referral"]) refParts.push(`This order was referred by ${g["Referral"][0]}`);
+  if (g["Sales Rep"]) refParts.push(`assigned to ${g["Sales Rep"][0]}`);
+  if (refParts.length) p.push(refParts.join(", ") + ".");
+
+  if (g["Insurance"]) {
+    let ins = `The insurance carrier is ${g["Insurance"][0]}`;
+    if (g["Claim #"]) ins += `, claim #${g["Claim #"][0]}`;
+    p.push(ins + ".");
+  }
+
+  // Other companies
+  (data.vendors || []).forEach(v => {
+    if (v.company && v.type && !["Insurance"].includes(v.type)) {
+      let line = `${v.company} is the ${v.type.toLowerCase()}`;
+      if (v.contact) line += ` (contact: ${v.contact})`;
+      p.push(line + ".");
+    }
+  });
+
+  // Our services
+  if (g["Services"]) p.push(`Our scope of work includes ${g["Services"][0].toLowerCase()}.`);
+
+  // Conditions
+  if (g["Conditions"]) p.push(`At the home, the site is currently ${g["Conditions"][0]}`);
+
+  // Customer care
+  const careParts = [];
+  if (g["Considerations"]) careParts.push(g["Considerations"][0].toLowerCase());
+  if (g["Pets"]) careParts.push(`has a pet (${g["Pets"][0]})`);
+  if (g["Laundry"]) careParts.push(g["Laundry"][0].toLowerCase());
+  if (careParts.length) p.push(`The customer is ${careParts.join(", ")}.`);
+
+  // Living + Storage
+  if (g["Living"]) {
+    let living = `The customer is currently ${g["Living"][0] === "Staying in home" ? "staying in the home" : g["Living"][0] === "Temp Housing" ? "in temporary housing" : "permanently relocating"}`;
+    if (g["Storage"]) living += ` and will need ${g["Storage"][0].toLowerCase()}`;
+    p.push(living + ".");
+  }
+
+  // Structural repairs (not our work)
+  if (g["Repairs"]) p.push(`Structural repairs to the home include ${g["Repairs"][0].toLowerCase()} (performed by the contractor, not our team).`);
+
+  // Our packout
+  if (g["Pack-out"]) p.push(`We will be picking up ${g["Pack-out"][0].toLowerCase()}.`);
+
+  // Schedule
+  if (g["Scheduled"]) p.push(`The next appointment is ${g["Scheduled"][0]}.`);
+
+  // Notes
+  if (g["Notes"]) p.push(g["Notes"][0]);
+
+  return p;
+};
+
 const SummaryLine = ({ label, value, className }) => {
   if (!value) return null;
   return (
@@ -9591,33 +9681,7 @@ export default function App(){
                             </div>
                           ) : (
                             <div className="px-5 py-4 text-sm leading-relaxed text-slate-700 space-y-2">
-                              {(() => {
-                                const g = {};
-                                orderNarrative.forEach(l => { if (!g[l.section]) g[l.section] = []; g[l.section].push(l.text); });
-                                const p = [];
-                                if (g["Loss"]) p.push(g["Loss"][0]);
-                                const cust = [...(g["Customer"] || []), ...(g["Contact"] || []).map(t => `Additional contact: ${t}`)];
-                                if (cust.length) p.push(cust.join(". ") + ".");
-                                if (g["Address"]) p.push(`Location: ${g["Address"].join("; ")}.`);
-                                const co = [];
-                                if (g["Referral"]) co.push(`Referred by ${g["Referral"][0]}`);
-                                if (g["Insurance"]) co.push(`Insurance: ${g["Insurance"][0]}`);
-                                if (g["Claim #"]) co.push(`Claim #${g["Claim #"][0]}`);
-                                if (co.length) p.push(co.join(". ") + ".");
-                                if (g["Services"]) p.push(`Services: ${g["Services"][0]}.`);
-                                const site = [];
-                                if (g["Conditions"]) site.push(`Site: ${g["Conditions"][0]}`);
-                                if (g["Considerations"]) site.push(g["Considerations"][0]);
-                                if (g["Pets"]) site.push(`Pet: ${g["Pets"][0]}`);
-                                if (g["Laundry"]) site.push(g["Laundry"][0]);
-                                if (site.length) p.push(site.join(". ") + ".");
-                                if (g["Living"]) { let l = g["Living"][0]; if (g["Storage"]) l += `. ${g["Storage"][0]}`; p.push(l + "."); }
-                                if (g["Repairs"]) p.push(`Repairs: ${g["Repairs"][0]}.`);
-                                if (g["Pack-out"]) p.push(`Pack-out: ${g["Pack-out"][0]}.`);
-                                if (g["Scheduled"]) p.push(`Scheduled: ${g["Scheduled"][0]}.`);
-                                if (g["Notes"]) p.push(g["Notes"][0]);
-                                return p.map((t, i) => <p key={i}>{t}</p>);
-                              })()}
+                              {buildNarrativeProse(orderNarrative, data).map((t, i) => <p key={i}>{t}</p>)}
                             </div>
                           )}
                           <div className="flex items-center gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
@@ -11799,6 +11863,7 @@ export default function App(){
               scopeBridge={scopeBridgeState}
               documentType="approval"
               orderNarrative={orderNarrative}
+              orderNarrativeProse={buildNarrativeProse(orderNarrative, data)}
             />
           </div>
         </div>
