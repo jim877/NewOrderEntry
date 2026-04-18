@@ -3812,7 +3812,7 @@ const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaret
 };
 
 // --- SUB-COMPONENTS ---
-const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts }) => {
+const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts, sdsConsiderations = [], householdAnimals = "" }) => {
   const toggleList = (list, value) => list.includes(value) ? list.filter(v=>v!==value) : [...list, value];
   const [householdName, setHouseholdName] = useState("");
   const customerDisplayName = [c.first, c.last].filter(hasMeaningfulValue).join(" ").trim();
@@ -3831,6 +3831,20 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
     updateCust(c.id, { quickNotes: nextNotes, note: nextNoteText });
   };
   const isIncomplete = customerPlaceholder || !hasMeaningfulValue(c.last);
+  const petText = (householdAnimals || "").trim();
+  const hasPets = sdsConsiderations.includes("Pets") && c.isPrimary;
+  const getPetIcon = (text) => {
+    const t = (text || "").toLowerCase();
+    if (/\bdog\b|puppy|pup\b|golden|lab\b|shepherd|poodle|terrier|bulldog|beagle|husky|shih\s*tzu|chihuahua|dachshund|corgi|pitbull|rottweiler/.test(t)) return "🐕";
+    if (/\bcat\b|kitten|kitty|feline|tabby|persian|siamese|maine coon/.test(t)) return "🐈";
+    if (/\bbird\b|parrot|parakeet|cockatiel|canary|finch/.test(t)) return "🐦";
+    if (/\bfish\b|aquarium|tank/.test(t)) return "🐟";
+    if (/\brabbit\b|bunny/.test(t)) return "🐇";
+    if (/\bhamster|guinea|gerbil/.test(t)) return "🐹";
+    if (/\bsnake|lizard|reptile|gecko|iguana|turtle|tortoise/.test(t)) return "🐍";
+    if (/\bhorse|pony/.test(t)) return "🐴";
+    return "🐾";
+  };
   return (
     <div
       data-audit-key={customerPlaceholder ? `placeholder-customer-${c.id}` : undefined}
@@ -3874,7 +3888,12 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
 	            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-600">{index + 1}</div>
 	            <div className="flex flex-col">
 	              <span className={`text-sm font-semibold ${customerDisplayName ? "text-slate-800" : (customerPlaceholder ? "placeholder-text" : "text-slate-800")}`}>{customerDisplayName || "Customer"}</span>
-	              <span className={`text-[10px] ${customerPlaceholder ? "placeholder-text" : "text-slate-500"}`}>{customerRoleLabel}</span>
+	              <div className="flex items-center gap-2">
+	                <span className={`text-[10px] ${customerPlaceholder ? "placeholder-text" : "text-slate-500"}`}>{customerRoleLabel}</span>
+	                {hasPets && petText && (
+	                  <span className="text-[10px] text-slate-600" title={petText}>{getPetIcon(petText)} {petText}</span>
+	                )}
+	              </div>
 	            </div>
               {customerPlaceholder && (
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>
@@ -10517,7 +10536,7 @@ export default function App(){
                       } /> : null}
                     >
                       <div className="space-y-4">
-                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} />)}
+                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec2')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
