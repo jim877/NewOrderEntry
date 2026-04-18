@@ -9574,13 +9574,43 @@ export default function App(){
                         <Chevron open={narrativeOpen} />
                       </button>
                       {narrativeOpen && (
-                        <div className="px-5 py-4 border-t border-slate-100 space-y-1.5 fade-in">
-                          {orderNarrative.map((line, idx) => (
-                            <div key={idx} className="flex items-baseline gap-2">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20 shrink-0 text-right">{line.section}</span>
-                              <span className="text-sm text-slate-700">{line.text}</span>
-                            </div>
-                          ))}
+                        <div className="border-t border-slate-100 fade-in">
+                          <div className="px-5 py-4 space-y-1.5">
+                            {orderNarrative.map((line, idx) => (
+                              <div key={idx} className="flex items-baseline gap-2">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20 shrink-0 text-right">{line.section}</span>
+                                <span className="text-sm text-slate-700">{line.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nlt = (data.orderName ? `NLT: ${data.orderName}\n\n` : "") + orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
+                                navigator.clipboard?.writeText(nlt).then(() => setToast("NLT copied to clipboard")).catch(() => {
+                                  const ta = document.createElement("textarea"); ta.value = nlt; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+                                  setToast("NLT copied to clipboard");
+                                });
+                              }}
+                              className="rounded-full border border-sky-200 bg-sky-50 px-4 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100"
+                            >
+                              📋 Copy as NLT
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const narrative = orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
+                                const existing = stripEventSystemLines(data.eventInstructions || "").trim();
+                                const combined = existing ? `${existing}\n\n--- Order Summary ---\n${narrative}` : `--- Order Summary ---\n${narrative}`;
+                                update("eventInstructions", composeEventInstructions(combined, data, conditionSummary));
+                                setToast("Narrative added to Event Instructions");
+                              }}
+                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-300 hover:text-sky-700"
+                            >
+                              Send to Event Instructions
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
