@@ -2787,13 +2787,14 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
     updateMany(patch);
     if (nextCompany) triggerAutoFlash?.("referringCompany");
     if (nextContact) triggerAutoFlash?.("referrer");
-    onPromptRoleAssignment?.({
-      company: nextCompany,
-      contact: nextContact,
-      source: "referrer",
-      preferredRoles: ["referrer"],
-      forceRoles: ["referrer"]
-    });
+    // Role badges are now inline on the referrer card — no blocking popup needed
+    // onPromptRoleAssignment?.({
+    //   company: nextCompany,
+    //   contact: nextContact,
+    //   source: "referrer",
+    //   preferredRoles: ["referrer"],
+    //   forceRoles: ["referrer"]
+    // });
   };
   const toggleReferrerRole = (roleId) => {
     const company = data.referringCompany || "";
@@ -3289,6 +3290,11 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec1', sub: 'source', label: 'Sales Rep', keywords: 'sales rep representative rep' },
 
     { id: 'sec1', label: 'Notes & Instructions', keywords: 'notes instructions event notes' },
+    { id: 'sec1', sub: 'interview', label: 'Pets', keywords: 'pets animals dog cat bird fish household' },
+    { id: 'sec1', sub: 'interview', label: 'Special Considerations', keywords: 'elderly pregnancy baby hearing impaired respiratory premium brands skin sensitivity considerations' },
+    { id: 'sec1', sub: 'interview', label: 'Conditions', keywords: 'still wet mold structural damage no electricity no heat boarded up conditions' },
+    { id: 'sec1', sub: 'interview', label: 'Living Situation', keywords: 'living staying moving temp housing hotel displaced' },
+    { id: 'sec1', sub: 'interview', label: 'Storage', keywords: 'storage long term months' },
     { id: 'sec2', label: 'Customer Section', keywords: 'customer section' },
     { id: 'sec2', label: 'Customer Type', keywords: 'customer type relationship' },
     { id: 'sec2', label: 'First Name', keywords: 'first name' },
