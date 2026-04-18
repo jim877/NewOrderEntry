@@ -4814,6 +4814,7 @@ export default function App(){
   const [compactMode, setCompactMode] = useState(false);
   const [summaryMode, setSummaryMode] = useState(false);
   const [narrativeOpen, setNarrativeOpen] = useState(true);
+  const [narrativeView, setNarrativeView] = useState("table");
   const [data, setData] = useState(() => {
     try {
       const s = localStorage.getItem("same-day-scope-v52");
@@ -9575,14 +9576,50 @@ export default function App(){
                       </button>
                       {narrativeOpen && (
                         <div className="border-t border-slate-100 fade-in">
-                          <div className="px-5 py-4 space-y-1.5">
-                            {orderNarrative.map((line, idx) => (
-                              <div key={idx} className="flex items-baseline gap-2">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20 shrink-0 text-right">{line.section}</span>
-                                <span className="text-sm text-slate-700">{line.text}</span>
-                              </div>
-                            ))}
+                          <div className="flex items-center gap-2 px-5 pt-3">
+                            <button type="button" onClick={() => setNarrativeView("table")} className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${narrativeView === "table" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400"}`}>Table</button>
+                            <button type="button" onClick={() => setNarrativeView("narrative")} className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${narrativeView === "narrative" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400"}`}>Narrative</button>
                           </div>
+                          {narrativeView === "table" ? (
+                            <div className="px-5 py-4 space-y-1.5">
+                              {orderNarrative.map((line, idx) => (
+                                <div key={idx} className="flex items-baseline gap-2">
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20 shrink-0 text-right">{line.section}</span>
+                                  <span className="text-sm text-slate-700">{line.text}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="px-5 py-4 text-sm leading-relaxed text-slate-700 space-y-2">
+                              {(() => {
+                                const g = {};
+                                orderNarrative.forEach(l => { if (!g[l.section]) g[l.section] = []; g[l.section].push(l.text); });
+                                const p = [];
+                                if (g["Loss"]) p.push(g["Loss"][0]);
+                                const cust = [...(g["Customer"] || []), ...(g["Contact"] || []).map(t => `Additional contact: ${t}`)];
+                                if (cust.length) p.push(cust.join(". ") + ".");
+                                if (g["Address"]) p.push(`Location: ${g["Address"].join("; ")}.`);
+                                const co = [];
+                                if (g["Referral"]) co.push(`Referred by ${g["Referral"][0]}`);
+                                if (g["Insurance"]) co.push(`Insurance: ${g["Insurance"][0]}`);
+                                if (g["Claim #"]) co.push(`Claim #${g["Claim #"][0]}`);
+                                if (co.length) p.push(co.join(". ") + ".");
+                                if (g["Services"]) p.push(`Services: ${g["Services"][0]}.`);
+                                const site = [];
+                                if (g["Conditions"]) site.push(`Site: ${g["Conditions"][0]}`);
+                                if (g["Considerations"]) site.push(g["Considerations"][0]);
+                                if (g["Pets"]) site.push(`Pet: ${g["Pets"][0]}`);
+                                if (g["Laundry"]) site.push(g["Laundry"][0]);
+                                if (site.length) p.push(site.join(". ") + ".");
+                                if (g["Living"]) { let l = g["Living"][0]; if (g["Storage"]) l += `. ${g["Storage"][0]}`; p.push(l + "."); }
+                                if (g["Repairs"]) p.push(`Repairs: ${g["Repairs"][0]}.`);
+                                if (g["Pack-out"]) p.push(`Pack-out: ${g["Pack-out"][0]}.`);
+                                if (g["Scheduled"]) p.push(`Scheduled: ${g["Scheduled"][0]}.`);
+                                if (g["Notes"]) p.push(g["Notes"][0]);
+                                return p.map((t, i) => <p key={i}>{t}</p>);
+                              })()}
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
                             <button
                               type="button"
@@ -11761,6 +11798,7 @@ export default function App(){
               sdsCoverPhoto={mergedSdsCoverPhoto}
               scopeBridge={scopeBridgeState}
               documentType="approval"
+              orderNarrative={orderNarrative}
             />
           </div>
         </div>
