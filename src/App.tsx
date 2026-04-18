@@ -3818,7 +3818,7 @@ const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaret
 };
 
 // --- SUB-COMPONENTS ---
-const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts, sdsConsiderations = [], householdAnimals = "" }) => {
+const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts, sdsConsiderations = [], householdAnimals = "", onUpdatePets }) => {
   const toggleList = (list, value) => list.includes(value) ? list.filter(v=>v!==value) : [...list, value];
   const [householdName, setHouseholdName] = useState("");
   const customerDisplayName = [c.first, c.last].filter(hasMeaningfulValue).join(" ").trim();
@@ -3962,7 +3962,41 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
            >
              📝 Add Note
            </button>
+           {c.isPrimary && (
+             <button
+               type="button"
+               onClick={() => updateCust(c.id, { showPetsPanel: !c.showPetsPanel })}
+               className={`rounded-full border px-3 py-1 text-[10px] font-bold ${c.showPetsPanel ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}
+             >
+               {hasPets ? `${getPetIcon(petText)} Pets` : "🐾 Pets"}
+             </button>
+           )}
          </div>
+
+         {/* Pets — expanded only when clicked */}
+         {c.showPetsPanel && c.isPrimary && (
+           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pets in the household</div>
+             <div className="grid grid-cols-3 gap-2">
+               <div className="col-span-1">
+                 <Select value={(petText.match(/\b(dog|cat|bird|fish|rabbit|hamster|snake|lizard|turtle|horse|other)\b/i) || [""])[0].toLowerCase() || ""} onChange={e => {
+                   const type = e.target.value;
+                   const existingName = petText.replace(/^(dog|cat|bird|fish|rabbit|hamster|snake|lizard|turtle|horse|other)\b\s*/i, "").trim();
+                   const newAnimals = type ? (existingName ? `${type} ${existingName}` : type) : existingName;
+                   onUpdatePets?.(newAnimals, sdsConsiderations.includes("Pets") ? sdsConsiderations : [...sdsConsiderations, "Pets"]);
+                 }}>
+                   <option value="">Type...</option>
+                   {["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Snake", "Lizard", "Turtle", "Horse", "Other"].map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}
+                 </Select>
+               </div>
+               <div className="col-span-2">
+                 <Input value={householdAnimals} onChange={e => {
+                   onUpdatePets?.(e.target.value, e.target.value.trim() && !sdsConsiderations.includes("Pets") ? [...sdsConsiderations, "Pets"] : sdsConsiderations);
+                 }} placeholder="e.g. Spot, Shih Tzu — friendly" />
+               </div>
+             </div>
+           </div>
+         )}
 
          {/* Welcome text — expanded only when clicked */}
          {c.showWelcomePanel && (
@@ -10542,7 +10576,7 @@ export default function App(){
                       } /> : null}
                     >
                       <div className="space-y-4">
-                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} />)}
+                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} onUpdatePets={(animals, considerations) => { update("householdAnimals", animals); update("sdsConsiderations", considerations); }} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec2')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
