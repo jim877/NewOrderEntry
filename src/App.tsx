@@ -3830,10 +3830,12 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
     const nextNoteText = [base, line].filter(Boolean).join("\n");
     updateCust(c.id, { quickNotes: nextNotes, note: nextNoteText });
   };
+  const isIncomplete = customerPlaceholder || !hasMeaningfulValue(c.last);
   return (
     <div
       data-audit-key={customerPlaceholder ? `placeholder-customer-${c.id}` : undefined}
-      className={`group relative rounded-lg sm:rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-sky-300 hover:shadow-md ${customerPlaceholder ? "placeholder-shell" : (c.isPrimary ? "border-sky-400 ring-1 ring-sky-50" : "border-slate-200")}`}
+      data-customer-id={c.id}
+      className={`group relative rounded-lg sm:rounded-xl border p-3 sm:p-5 shadow-sm transition-all hover:shadow-md ${isIncomplete ? "border-amber-300 bg-amber-50/30 hover:border-amber-400" : customerPlaceholder ? "placeholder-shell bg-white" : c.isPrimary ? "border-sky-400 ring-1 ring-sky-50 bg-white" : "border-slate-200 bg-white hover:border-sky-300"}`}
     >
       {c.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
       {total > 1 && !c._showMenu && ( <button onClick={() => updateCust(c.id, { _showMenu: true })} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
@@ -3887,91 +3889,85 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
 
       {open && (
       <div className="grid gap-4 pl-1 sm:pl-2">
-         <div className="w-full sm:w-1/2">
-            <div className="mb-1 flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-500">Type</label>
-              {c.type && (
-                <button
-                  type="button"
-                  onClick={() => updateCust(c.id, { type: "" })}
-                  className="text-[10px] font-semibold text-slate-400 hover:text-rose-600"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <SearchSelect value={c.type || ""} onChange={(v)=>updateCust(c.id,{type:v})} options={CUSTOMER_TYPES} listId={`customer-type-${c.id}`} placeholder="Search relationship..." maxResults={CUSTOMER_TYPES.length} />
+         {/* PRIMARY FIELDS — always visible */}
+         <div className="grid grid-cols-5 gap-3">
+           <div className="col-span-1">
+             <Field label="Type">
+               <SearchSelect value={c.type || ""} onChange={(v)=>updateCust(c.id,{type:v})} options={CUSTOMER_TYPES} placeholder="Type..." maxResults={CUSTOMER_TYPES.length} />
+             </Field>
+           </div>
+           <div className="col-span-2 sm:col-span-1">
+             <Field label="First Name"><Input data-audit-key="custFirst" className={index===0 && auditOn && highlightMissing?.custFirst ? "audit-missing" : ""} value={c.first} onChange={e=>updateCust(c.id,{first:e.target.value})} /></Field>
+           </div>
+           <div className="col-span-2 sm:col-span-1">
+             <Field label="Last Name"><Input data-audit-key="custLast" className={!hasMeaningfulValue(c.last) ? "attention-outline" : ""} value={c.last} onChange={e=>updateCust(c.id,{last:e.target.value})} /></Field>
+           </div>
+           <div className="col-span-2 sm:col-span-1">
+             <Field label="Phone"><Input data-audit-key="custPhone" type="tel" value={c.phone} onChange={e=>updateCust(c.id,{phone: formatPhoneNumber(e.target.value)})} maxLength={14} placeholder="(555) 123-4567" /></Field>
+           </div>
+           <div className="col-span-3 sm:col-span-1">
+             <Field label="Email"><Input data-audit-key="custEmail" type="email" value={c.email} onChange={e=>updateCust(c.id,{email:e.target.value})} placeholder="email@example.com" /></Field>
+           </div>
          </div>
 
-         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="First Name"><Input data-audit-key="custFirst" className={index===0 && auditOn && highlightMissing?.custFirst ? "audit-missing" : ""} value={c.first} onChange={e=>updateCust(c.id,{first:e.target.value})} /></Field>
-            <Field label="Last Name"><Input data-audit-key="custLast" className={index===0 && auditOn && highlightMissing?.custLast ? "audit-missing" : ""} value={c.last} onChange={e=>updateCust(c.id,{last:e.target.value})} /></Field>
+         {/* Preferred contact — compact inline */}
+         <div className="flex items-center gap-2 flex-wrap">
+           <span className="text-[10px] font-bold text-slate-400 uppercase">Contact via:</span>
+           {["Phone", "Email", "Text", "Do Not Contact"].map(m => (
+             <ToggleMulti key={m} label={m} checked={m === "Do Not Contact" ? !!c.doNotContact : c.preferredContact === m} onChange={() => {
+               if (m === "Do Not Contact") updateCust(c.id, { doNotContact: !c.doNotContact, preferredContact: !c.doNotContact ? "" : c.preferredContact });
+               else updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false });
+             }} className="!text-[10px] !px-2 !py-1" colorClass={m === "Do Not Contact" ? "!bg-rose-50 !border-rose-300 !text-rose-700" : ""} />
+           ))}
          </div>
 
-         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-             <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between items-center"><label className="text-sm font-semibold text-slate-700">Phone</label><button className="text-xs text-sky-600 font-bold hover:text-sky-700">+ Add</button></div>
-                <div className="flex gap-2">
-                    <div className="w-1/3"><Select value={c.phoneType} onChange={(e) => updateCust(c.id, { phoneType: e.target.value })}><option>Mobile</option><option>Home</option><option>Work</option></Select></div>
-                    <Input data-audit-key="custPhone" className={`flex-1 ${index===0 && auditOn && highlightMissing?.custPhone ? "audit-missing" : ""}`} type="tel" value={c.phone} onChange={e=>updateCust(c.id,{phone: formatPhoneNumber(e.target.value)})} maxLength={14} placeholder="(555) 123-4567" />
-                </div>
+         {/* SECONDARY — compact action buttons */}
+         <div className="flex items-center gap-2 flex-wrap">
+           <button
+             type="button"
+             onClick={() => updateCust(c.id, { showWelcomePanel: !c.showWelcomePanel })}
+             className={`rounded-full border px-3 py-1 text-[10px] font-bold ${c.showWelcomePanel ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}
+           >
+             📱 Send Welcome Text
+           </button>
+           <button
+             type="button"
+             onClick={() => updateCust(c.id, { showQuickNotes: !c.showQuickNotes })}
+             className={`rounded-full border px-3 py-1 text-[10px] font-bold ${c.showQuickNotes ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}
+           >
+             📝 Add Note
+           </button>
+         </div>
+
+         {/* Welcome text — expanded only when clicked */}
+         {c.showWelcomePanel && (
+           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-semibold text-slate-600">
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendBrochure} onChange={e=>updateCust(c.id,{sendBrochure:e.target.checked})} /> Brochure</label>
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendRushGuide} onChange={e=>updateCust(c.id,{sendRushGuide:e.target.checked})} /> Rush Guide</label>
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendAuthLink} onChange={e=>updateCust(c.id,{sendAuthLink:e.target.checked})} /> Auth Form</label>
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendCosLink} onChange={e=>updateCust(c.id,{sendCosLink:e.target.checked})} /> COS Link</label>
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendGoogleReviewLink} onChange={e=>updateCust(c.id,{sendGoogleReviewLink:e.target.checked})} /> Google Review</label>
              </div>
-             <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between items-center"><label className="text-sm font-semibold text-slate-700">Email</label><button className="text-xs text-sky-600 font-bold hover:text-sky-700">+ Add</button></div>
-                <Input data-audit-key="custEmail" className={index===0 && auditOn && highlightMissing?.custEmail ? "audit-missing" : ""} type="email" value={c.email} onChange={e=>updateCust(c.id,{email:e.target.value})} placeholder="user@example.com" />
+             <div className="flex items-center justify-between">
+               {!hasMobile && <span className="text-[10px] text-amber-600">Add mobile # to send</span>}
+               {c.doNotContact && <span className="text-[10px] text-rose-600">Do Not Contact enabled</span>}
+               <button onClick={() => onSendWelcome?.(c.id)} disabled={!canSendWelcome} className={`rounded-full px-3 py-1 text-[10px] font-bold ${canSendWelcome ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>Send</button>
              </div>
-         </div>
+           </div>
+         )}
 
-         <Field label="Preferred Contact Method">
-             <div className="flex flex-wrap gap-2">
-                 {["Phone", "Email", "Text", "Do Not Contact"].map(m => (
-                     <ToggleMulti key={m} label={m} checked={m === "Do Not Contact" ? !!c.doNotContact : c.preferredContact === m} onChange={() => {
-                       if (m === "Do Not Contact") updateCust(c.id, { doNotContact: !c.doNotContact, preferredContact: !c.doNotContact ? "" : c.preferredContact });
-                       else updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false });
-                     }} colorClass={m === "Do Not Contact" ? "!bg-rose-50 !border-rose-300 !text-rose-700" : "!bg-sky-500 !border-sky-500 !text-white"} />
-                 ))}
-             </div>
-         </Field>
-
-         <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-             <button onClick={() => updateCust(c.id, { showWelcomePanel: !c.showWelcomePanel })} className="flex w-full items-center justify-between">
-               <span className="text-sm font-bold text-slate-700">Send Welcome Text</span>
-               <span className="text-slate-400 text-lg">{c.showWelcomePanel ? "▾" : "›"}</span>
-             </button>
-             {c.showWelcomePanel && (
-               <div className="space-y-3">
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendBrochure} onChange={e=>updateCust(c.id,{sendBrochure:e.target.checked})} /> Send Brochure</label>
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendRushGuide} onChange={e=>updateCust(c.id,{sendRushGuide:e.target.checked})} /> Send Rush Guide</label>
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendAuthLink} onChange={e=>updateCust(c.id,{sendAuthLink:e.target.checked})} /> Authorization Form Link</label>
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendCosLink} onChange={e=>updateCust(c.id,{sendCosLink:e.target.checked})} /> COS Link</label>
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendGoogleReviewLink} onChange={e=>updateCust(c.id,{sendGoogleReviewLink:e.target.checked})} /> Google Review Link</label>
-                 </div>
-                 <div className="flex items-center justify-end">
-                   <button onClick={() => onSendWelcome?.(c.id)} disabled={!canSendWelcome} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${canSendWelcome ? 'bg-sky-500 text-white hover:bg-sky-500' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>Send</button>
-                 </div>
-                 {!hasMobile && (
-                   <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                     Add a mobile phone number to send texts.
-                   </div>
-                 )}
-                 {c.doNotContact && (
-                   <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-                     Do Not Contact is enabled. Sending is disabled.
-                   </div>
-                 )}
-               </div>
-             )}
-         </div>
-
-         <Field label="Notes">
-             <div className="flex flex-wrap gap-1.5 mb-2">
+         {/* Notes — expanded only when clicked */}
+         {c.showQuickNotes && (
+           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+             <div className="flex flex-wrap gap-1.5">
                {CUSTOMER_QUICK_NOTES.map(n => (
                  <ToggleMulti key={n} label={n} checked={(c.quickNotes || []).includes(n)} onChange={() => toggleQuickNote(n)} className="!text-[10px] !px-2 !py-1" />
                ))}
              </div>
              <Input value={c.note} onChange={e => updateCust(c.id, { note: e.target.value })} placeholder="Additional notes..." />
-         </Field>
+           </div>
+         )}
 
          {c.isPrimary && (
            <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 space-y-3">
@@ -9673,13 +9669,18 @@ export default function App(){
                         type: "company",
                         idx: i,
                       })),
-                      ...(data.customers || []).filter(c => isPlaceholderFlagActive(c?.placeholder)).map((c, i) => ({
+                      ...(data.customers || []).filter(c => {
+                        if (isPlaceholderFlagActive(c?.placeholder)) return true;
+                        // Incomplete if missing last name
+                        const hasName = hasMeaningfulValue(c?.first) && hasMeaningfulValue(c?.last);
+                        return !hasName;
+                      }).map((c, i) => ({
                         label: [c.first, c.last].filter(Boolean).join(" ") || `Customer ${i+1}`,
                         section: "sec2",
                         type: "customer",
                       })),
-                      ...(data.addresses || []).filter(a => isAddressPlaceholder(a)).map((a, i) => ({
-                        label: summarizeAddress(a) || `Address ${i+1}`,
+                      ...(data.addresses || []).filter(a => !a.inactive && isAddressPlaceholder(a) && !hasMeaningfulValue(a.street)).map((a, i) => ({
+                        label: "No address yet",
                         section: "sec3",
                         type: "address",
                       })),
@@ -9688,14 +9689,21 @@ export default function App(){
                     return (
                       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <div className="text-xs font-bold text-amber-700">{placeholders.length} item{placeholders.length !== 1 ? "s" : ""} need{placeholders.length === 1 ? "s" : ""} attention</div>
+                          <div className="text-xs font-bold text-amber-700">{placeholders.length} placeholder{placeholders.length !== 1 ? "s" : ""} needing attention</div>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {placeholders.map((p, idx) => (
                             <button
                               key={`ph-${idx}`}
                               type="button"
-                              onClick={() => jumpToSection(p.section)}
+                              onClick={() => {
+                                jumpToSection(p.section);
+                                // Expand the section and scroll to the placeholder after a brief delay
+                                setTimeout(() => {
+                                  const el = document.querySelector(`[data-customer-id], [data-address-item-id], [data-audit-key*="placeholder"]`);
+                                  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                }, 300);
+                              }}
                               className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-all"
                             >
                               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
