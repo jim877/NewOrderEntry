@@ -12077,13 +12077,9 @@ export default function App(){
         </div>
       )}
       {addCompanyModalOpen && (
+          <div className="mb-4">
           <div
-            className="fixed inset-0 z-[110] flex items-start justify-center bg-slate-900/30 backdrop-blur-sm p-4 pt-12 sm:pt-20"
-            onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); setAddCompanyPanel(""); }}
-          >
-          <div
-            className="w-full max-w-5xl min-h-[34rem] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-visible fade-in sm:min-h-[40rem]"
-            onClick={(e)=>e.stopPropagation()}
+            className="w-full rounded-2xl bg-white border-2 border-sky-200 shadow-sm overflow-visible fade-in"
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -12097,15 +12093,23 @@ export default function App(){
                 setAddCompanyQuery("");
                 setAddCompanyPanel("");
               }
+              if (e.key === "Escape") {
+                setAddCompanyModalOpen(false);
+                setShowTypePicker(false);
+                setAddCompanyType("");
+                setNewCompanyDraft({ contact: "", company: "" });
+                setAddContactExisting({ contact: "", company: "" });
+                setCompanyModalCloseArmed(false);
+                setAddCompanyQuery("");
+                setAddCompanyPanel("");
+              }
             }}
           >
-            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
-              <div>
-                <div className="text-lg font-bold text-white">Add Existing Companies and Contacts</div>
-              </div>
+            <div className="bg-sky-50 border-b border-sky-200 px-5 py-3 flex items-center justify-between rounded-t-2xl">
+              <div className="text-sm font-bold text-sky-700">Add Existing Companies and Contacts</div>
               <button
                 onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); setAddCompanyPanel(""); }}
-                className="rounded-full border border-sky-200 px-3 py-1 text-[10px] font-bold text-white/90 hover:bg-sky-600"
+                className="rounded-full border border-sky-200 px-3 py-1 text-[10px] font-bold text-sky-600 hover:bg-sky-100"
               >
                 Close
               </button>
@@ -12258,7 +12262,7 @@ export default function App(){
           </div>
         </div>
       )}
-      
+
       {confirmDetails && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
               <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
