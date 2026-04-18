@@ -4813,6 +4813,7 @@ export default function App(){
   const [showCoaching, setShowCoaching] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
   const [summaryMode, setSummaryMode] = useState(false);
+  const [narrativeOpen, setNarrativeOpen] = useState(true);
   const [data, setData] = useState(() => {
     try {
       const s = localStorage.getItem("same-day-scope-v52");
@@ -7603,6 +7604,106 @@ export default function App(){
   }, [data.scopeBridge, data.suggestedGroups]);
   const scopeBridgeSnippet = useMemo(() => buildScopeBridgeSnippet(scopeBridgeState), [scopeBridgeState]);
 
+  // --- Live Order Narrative ---
+  const orderNarrative = useMemo(() => {
+    const lines = [];
+    // Loss type
+    if (data.primaryLossType) {
+      let lossLine = `${data.primaryLossType} loss`;
+      const causes = (data.lossDetails?.[data.primaryLossType]?.causes || []);
+      const origins = (data.lossDetails?.[data.primaryLossType]?.origins || []);
+      if (causes.length) lossLine += ` (${causes.join(", ").toLowerCase()})`;
+      if (origins.length) lossLine += ` originating in ${origins.join(", ").toLowerCase()}`;
+      if ((data.secondaryContaminants || []).length) {
+        lossLine += `, with secondary ${(data.secondaryContaminants || []).join(", ").toLowerCase()}`;
+      }
+      lossLine += ".";
+      lines.push({ section: "Loss", text: lossLine });
+    }
+    // Customer
+    const customers = (data.customers || []).filter(c => hasMeaningfulValue(c.first) || hasMeaningfulValue(c.last));
+    customers.forEach((c, i) => {
+      const name = [c.first, c.last].filter(Boolean).join(" ");
+      const details = [c.phone, c.email].filter(Boolean).join(", ");
+      const role = c.isPrimary ? "Customer" : (c.type || "Contact");
+      lines.push({ section: role, text: `${name}${details ? " — " + details : ""}` });
+    });
+    // Address
+    const addrs = (data.addresses || []).filter(a => !a.inactive && hasMeaningfulValue(a.street));
+    addrs.forEach(a => {
+      const label = a.isPrimary ? "Address" : (a.type || "Address");
+      lines.push({ section: label, text: summarizeAddress(a) });
+    });
+    // Source
+    if (data.referrer || data.referringCompany) {
+      lines.push({ section: "Referral", text: [data.referrer, data.referringCompany].filter(Boolean).join(" at ") });
+    }
+    if (data.salesRep) {
+      lines.push({ section: "Sales Rep", text: data.salesRep.split(",")[0] });
+    }
+    // Insurance
+    if (data.insuranceCompany) {
+      let ins = data.insuranceCompany;
+      if (data.insuranceAdjuster) ins += ` — Adjuster: ${data.insuranceAdjuster}`;
+      lines.push({ section: "Insurance", text: ins });
+    }
+    if (data.claimNumber) lines.push({ section: "Claim #", text: data.claimNumber });
+    // Vendors
+    (data.vendors || []).forEach(v => {
+      if (v.company || v.contact) {
+        lines.push({ section: v.type || "Company", text: [v.company, v.contact].filter(Boolean).join(" — ") });
+      }
+    });
+    // Services
+    if ((data.serviceOfferings || []).length) {
+      lines.push({ section: "Services", text: (data.serviceOfferings || []).join(", ") });
+    }
+    // Conditions
+    const conditions = [];
+    if (data.damageWasWet === "Y" || data.damageWasWet === true) conditions.push("still wet");
+    if (data.damageMoldMildew) conditions.push("visible mold");
+    if (data.structuralElectricDamage === "Y") conditions.push("structural damage");
+    if (data.noLights) conditions.push("no electricity");
+    if (data.noHeat) conditions.push("no heat");
+    if (data.boardedUp) conditions.push("boarded up");
+    if (conditions.length) {
+      lines.push({ section: "Conditions", text: conditions.join(", ") + "." });
+    }
+    // Living / Storage
+    if (data.livingStatus) lines.push({ section: "Living", text: data.livingStatus });
+    if (data.storageNeeded === "Y") {
+      lines.push({ section: "Storage", text: `Long-term storage${data.storageMonths ? `, approximately ${data.storageMonths} months` : ""}` });
+    }
+    // Repairs
+    if (data.repairsSummary) lines.push({ section: "Repairs", text: data.repairsSummary });
+    // Packout
+    if ((data.packoutSummary || []).length) {
+      lines.push({ section: "Pack-out", text: (data.packoutSummary || []).join(", ") });
+    }
+    // Considerations
+    const considerations = (data.sdsConsiderations || []).filter(c => c !== "Pets");
+    if (considerations.length) {
+      lines.push({ section: "Considerations", text: considerations.join(", ") });
+    }
+    if ((data.sdsConsiderations || []).includes("Pets") && data.householdAnimals) {
+      lines.push({ section: "Pets", text: data.householdAnimals });
+    }
+    // Laundry
+    if (data.howDryLaundry && data.howDryLaundry !== "Dryer") {
+      lines.push({ section: "Laundry", text: `Customer ${data.howDryLaundry.toLowerCase()}s clothing` });
+    }
+    // Schedule
+    if (data.scheduleType || data.pickupDate) {
+      const parts = [data.scheduleType, data.pickupDate ? formatDateLabel(data.pickupDate) : "", data.pickupTime].filter(Boolean);
+      lines.push({ section: "Scheduled", text: parts.join(" — ") });
+    }
+    if (data.eventAssignee) lines.push({ section: "Assignee", text: data.eventAssignee });
+    // Custom notes
+    const customNotes = stripEventSystemLines(data.eventInstructions || "").trim();
+    if (customNotes) lines.push({ section: "Notes", text: customNotes });
+    return lines;
+  }, [data]);
+
   // --- Photo Scope Bridge: read photos from Photo Scope localStorage ---
   const [photoScopeData, setPhotoScopeData] = useState(() => {
     try { const raw = localStorage.getItem("noe-scope-photos"); return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -9457,6 +9558,32 @@ export default function App(){
                         <span className="text-[10px] font-bold text-slate-400">Open</span>
                       </div>
                     </button>
+                  )}
+                  {orderNarrative.length > 0 && (
+                    <div className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden" data-noe-section="narrative">
+                      <button
+                        type="button"
+                        onClick={() => setNarrativeOpen(v => !v)}
+                        className="w-full flex items-center justify-between px-5 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">📄</span>
+                          <span className="text-sm font-bold text-slate-700">Live Order Narrative</span>
+                          <span className="text-[10px] text-slate-400">{orderNarrative.length} details captured</span>
+                        </div>
+                        <Chevron open={narrativeOpen} />
+                      </button>
+                      {narrativeOpen && (
+                        <div className="px-5 py-4 border-t border-slate-100 space-y-1.5 fade-in">
+                          {orderNarrative.map((line, idx) => (
+                            <div key={idx} className="flex items-baseline gap-2">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20 shrink-0 text-right">{line.section}</span>
+                              <span className="text-sm text-slate-700">{line.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                   <div className={compactMode ? "space-y-3" : "space-y-4"}>
 
