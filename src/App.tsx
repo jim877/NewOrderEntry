@@ -10581,29 +10581,36 @@ export default function App(){
                           compact={compactMode}
                           className={auditOn && auditTargets.subsections.has("companies") ? "audit-outline" : ""}
                           action={
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => { setCompaniesSubOpen(true); setAddCompanyModalOpen(true); }}
-                                className="rounded-full bg-sky-500 px-4 py-1.5 text-xs font-bold text-white shadow hover:bg-sky-600"
-                              >
-                                + Quick add
-                              </button>
-                              <button
-                                onClick={() => setAddNewSystemModal({
-                                  firstName: "", lastName: "", title: "", phone: "", email: "",
-                                  companyName: "", companyType: "", companyPhone: "", companyWebsite: "", companyAddress: "",
-                                  isNewCompany: false, source: "detailed-companies",
-                                })}
-                                className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-300 hover:text-sky-700"
-                              >
-                                + New to system
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => setAddNewSystemModal({
+                                firstName: "", lastName: "", title: "", phone: "", email: "",
+                                companyName: "", companyType: "", companyPhone: "", companyWebsite: "", companyAddress: "",
+                                isNewCompany: false, source: "detailed-companies",
+                              })}
+                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-300 hover:text-sky-700"
+                            >
+                              + New to system
+                            </button>
                           }
                         >
-                          <div className="mb-4">
+                          <div className="mb-4 space-y-3">
+                            <div className="rounded-lg border border-slate-200 bg-white p-3">
+                              <SearchSelect
+                                value=""
+                                onChange={v => {
+                                  const parsed = parseCombinedContact(v);
+                                  const type = autoTypeForCompany(parsed.company);
+                                  addCompanyFromSearch(type, v);
+                                  setToast(`Added ${parsed.contact ? parsed.contact + " at " : ""}${parsed.company || v}`);
+                                }}
+                                onQueryChange={() => {}}
+                                options={combinedContactOptions}
+                                placeholder="Search existing contacts and companies to add..."
+                                clearOnCommit
+                                maxResults={12}
+                              />
+                            </div>
                             <div className="flex items-start justify-between gap-3">
-                              <div className="pt-1 text-[11px] text-slate-500">Click a company type to add this company type.</div>
                               <div className="flex items-center gap-2">
                                 {pendingCompanyRoleCount > 0 && (
                                   <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">
@@ -11819,8 +11826,8 @@ export default function App(){
       {toast && <Toast message={toast} onClose={()=>setToast("")} />}
       {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} />}
       {showSdsPreview && (
-        <div className="fixed inset-0 z-[200] bg-white flex flex-col">
-          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 shadow-sm">
+        <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setShowSdsPreview(false); }} tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
+          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 shadow-md z-10 relative">
             <button
               type="button"
               onClick={() => setShowSdsPreview(false)}
