@@ -2806,7 +2806,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       </Field>
       {showInlineHelp && data.leadSourceCategory === "Referral" && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> The referrer is the first person who called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead — we may not yet be able to contact the customer.
+          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> The referrer is the first person who called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead — we may not yet be able to contact the customer.
         </div>
       )}
 
@@ -4269,13 +4269,13 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     </div>
                     {showInlineHelp && (
                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
-                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button>
                         <span className="font-bold">Coaching:</span> This is the primary peril — the damage that happened first. For example, a kitchen fire extinguished with water is a Fire loss with Water as a secondary contaminant.
                       </div>
                     )}
                     {showInlineHelp && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
-                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
                       </div>
                     )}
                   </Field>
@@ -9521,7 +9521,7 @@ export default function App(){
                                 <Field label="What caused the loss?" missing={data.highlightMissing.orderTypes} smart>
                                   {showCoaching && !data.primaryLossType && (
                                     <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-2">
-                                      <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button>
+                                      <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button>
                                       <span className="font-bold">Coaching:</span> Select the primary peril — the damage that happened first. For example, a kitchen fire extinguished with water is a Fire loss with Water as a secondary contaminant.
                                     </div>
                                   )}
@@ -9552,7 +9552,7 @@ export default function App(){
                                     <div className="text-[11px] text-slate-400">Primary: <span className="font-semibold text-slate-600">{data.primaryLossType}</span>. Select additional contaminants below if applicable.</div>
                                     {LOSS_TYPE_COACHING[data.primaryLossType] && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
                                       </div>
                                     )}
                                   </>
@@ -9717,22 +9717,22 @@ export default function App(){
                                     </div>
                                     {showCoaching && (data.damageWasWet === "Y" || data.damageWasWet === true) && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Tell the customer we need to get out there ASAP. Wet items left untreated can develop mold, which may not be covered by insurance. Ask them to keep colors separated and avoid mixing wet items together.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Tell the customer we need to get out there ASAP. Wet items left untreated can develop mold, which may not be covered by insurance. Ask them to keep colors separated and avoid mixing wet items together.
                                       </div>
                                     )}
                                     {showCoaching && !!data.damageMoldMildew && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Visible mold requires immediate attention. Ask if anyone in the household has respiratory concerns. PPE will be required for our team. Mold coverage should be confirmed with the adjuster.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Visible mold requires immediate attention. Ask if anyone in the household has respiratory concerns. PPE will be required for our team. Mold coverage should be confirmed with the adjuster.
                                       </div>
                                     )}
                                     {showCoaching && !!data.noLights && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> No electricity means we need to bring portable lighting. Ask if there's a generator on site.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> No electricity means we need to bring portable lighting. Ask if there's a generator on site.
                                       </div>
                                     )}
                                     {showCoaching && !!data.boardedUp && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Boarded up home — confirm access arrangements. Ask who has the key or access code. Will fire department or restoration company need to provide access?
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Boarded up home — confirm access arrangements. Ask who has the key or access code. Will fire department or restoration company need to provide access?
                                       </div>
                                     )}
                                   </div>
@@ -9742,12 +9742,12 @@ export default function App(){
                                     {showCoaching && <div className="text-[10px] text-slate-400">Select all that apply. This helps estimate timeline and storage needs.</div>}
                                     {showCoaching && (data.repairsSummary || "").includes("Complete Rebuild") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Complete rebuild means the customer will be displaced for an extended period. Confirm long-term storage needs and set expectations on timeline. Ask if they have a temporary living arrangement.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Complete rebuild means the customer will be displaced for an extended period. Confirm long-term storage needs and set expectations on timeline. Ask if they have a temporary living arrangement.
                                       </div>
                                     )}
                                     {showCoaching && (data.repairsSummary || "").includes("Major Structural") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Major structural damage may mean limited access to parts of the home. Ask which areas are affected and if a contractor has assessed the structure. We may need to coordinate access with the contractor.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Major structural damage may mean limited access to parts of the home. Ask which areas are affected and if a contractor has assessed the structure. We may need to coordinate access with the contractor.
                                       </div>
                                     )}
                                     <div className="flex flex-wrap gap-2">
@@ -9775,17 +9775,17 @@ export default function App(){
                                       </div>
                                       {data.livingStatus === "Temp Housing" && showCoaching && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Ask: "Where are you staying — hotel, rental, trailer, or with family?" Get the temp address and add it in the Address section. Ask how long they expect to be displaced — this determines storage timeline.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Ask: "Where are you staying — hotel, rental, trailer, or with family?" Get the temp address and add it in the Address section. Ask how long they expect to be displaced — this determines storage timeline.
                                         </div>
                                       )}
                                       {data.livingStatus === "Moving" && showCoaching && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer is permanently relocating. Get the new address for final delivery. Ask: "When do you expect to be in the new home?" This determines our delivery timeline. All items will be delivered to the new address, not the loss site.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer is permanently relocating. Get the new address for final delivery. Ask: "When do you expect to be in the new home?" This determines our delivery timeline. All items will be delivered to the new address, not the loss site.
                                         </div>
                                       )}
                                       {data.livingStatus === "Staying in home" && showCoaching && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer is living in the home during work. Be mindful of scheduling around their routine. Ask about work hours and best times for pickup/delivery. We may need to work room-by-room.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer is living in the home during work. Be mindful of scheduling around their routine. Ask about work hours and best times for pickup/delivery. We may need to work room-by-room.
                                         </div>
                                       )}
                                     </div>
@@ -9803,12 +9803,12 @@ export default function App(){
                                       </div>
                                       {showCoaching && data.processType === "Long-Term Storage" && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Long-term storage — confirm with the customer they understand monthly storage fees. Ask for an estimated return date so we can plan ahead. Set a reminder to follow up.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Long-term storage — confirm with the customer they understand monthly storage fees. Ask for an estimated return date so we can plan ahead. Set a reminder to follow up.
                                         </div>
                                       )}
                                       {showCoaching && data.processType === "Deliver ASAP" && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer wants items back quickly. Prioritize processing. Confirm the delivery address is ready to receive items.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer wants items back quickly. Prioritize processing. Confirm the delivery address is ready to receive items.
                                         </div>
                                       )}
                                     </div>
@@ -9818,8 +9818,33 @@ export default function App(){
                                     <div className="text-sm font-bold text-sky-600">What are we picking up?</div>
                                     {showCoaching && <div className="text-[10px] text-slate-400">Select all items we'll be removing from the home.</div>}
                                     <div className="flex flex-wrap gap-2">
-                                      {["Rugs", "Draperies", "Draperies w/ Rods", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
+                                      {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
                                         <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={()=>update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} className="!px-4 !py-2.5 !text-sm" />
+                                      ))}
+                                    </div>
+                                    {showCoaching && (data.packoutSummary || []).includes("Window Treatments") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Window treatments selected — ask if we need a tall ladder. Confirm ceiling heights and rod types (are we taking the rods too?). Note in the load list below.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.packoutSummary || []).includes("Rugs") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Rugs selected — ask if any are wet or heavy. Wet rugs require extra manpower and immediate attention. Note in the load list below if extra help is needed.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.packoutSummary || []).includes("Furniture") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Furniture selected — confirm how many pieces and if any are oversized. May need extra manpower, dollies, and floor protection. Note in the load list below.
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                                    <div className="text-sm font-bold text-sky-600">What do we need to bring?</div>
+                                    {showCoaching && <div className="text-[10px] text-slate-400">Special equipment or extra resources needed for this job.</div>}
+                                    <div className="flex flex-wrap gap-2">
+                                      {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
+                                        <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className="!px-4 !py-2.5 !text-sm" />
                                       ))}
                                     </div>
                                   </div>
@@ -9829,21 +9854,21 @@ export default function App(){
                                     {showCoaching && <div className="text-[10px] text-slate-400">Note anything about the customer or household that affects how we handle the project.</div>}
                                     {showCoaching && (data.sdsConsiderations || []).includes("Elderly") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Elderly customer — be patient and speak clearly. They may need extra time and assistance. Consider labeling boxes clearly for easy identification. Offer to help with packing/unpacking.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Elderly customer — be patient and speak clearly. They may need extra time and assistance. Consider labeling boxes clearly for easy identification. Offer to help with packing/unpacking.
                                       </div>
                                     )}
                                     {showCoaching && (data.sdsConsiderations || []).includes("Pregnancy") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer is pregnant — avoid strong chemicals and fumes. Schedule work to minimize disruption. Use fragrance-free products.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer is pregnant — avoid strong chemicals and fumes. Schedule work to minimize disruption. Use fragrance-free products.
                                       </div>
                                     )}
                                     {showCoaching && (data.sdsConsiderations || []).includes("Respiratory Concerns") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Respiratory concerns — use hypoallergenic products. Notify the processing team. Ask about specific triggers.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Respiratory concerns — use hypoallergenic products. Notify the processing team. Ask about specific triggers.
                                       </div>
                                     )}
                                     <div className="flex flex-wrap gap-2">
-                                      {["Elderly", "Pregnancy", "Baby/Infant", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
+                                      {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
                                         <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s))} className="!px-4 !py-2.5 !text-sm" />
                                       ))}
                                     </div>
@@ -9950,7 +9975,7 @@ export default function App(){
                                     )}
                                     {showCoaching && data.howDryLaundry === "Air-Dry" && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={() => setShowCoaching(false)} className="float-right ml-2 text-violet-400 hover:text-violet-600 font-bold" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer air-dries clothing — we must not machine dry any items. All items will be tagged for air-dry. This is important to avoid shrinkage and damage claims.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer air-dries clothing — we must not machine dry any items. All items will be tagged for air-dry. This is important to avoid shrinkage and damage claims.
                                       </div>
                                     )}
 
