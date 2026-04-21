@@ -1619,6 +1619,85 @@ const stringListMatches = (a = [], b = []) => {
   return a.every((item) => right.has(`${item}`));
 };
 
+// --- FIELD CONFIGURATION ---
+const FIELD_CONFIG_SECTIONS = [
+  { id: "order", label: "Order" },
+  { id: "source", label: "Source" },
+  { id: "interview", label: "Interview" },
+  { id: "customer", label: "Customer" },
+  { id: "address", label: "Address" },
+  { id: "billing", label: "Billing & Insurance" },
+  { id: "schedule", label: "Schedule" },
+  { id: "codes", label: "Codes & Processing" },
+];
+
+const DEFAULT_FIELD_CONFIG = {
+  // --- Order ---
+  orderName:              { label: "Order Name",           section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, coaching: "Auto-generated from LastName-TownST. Lock to prevent changes." },
+  orderTypes:             { label: "Order Type",           section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, checkFn: "hasPrimaryOrderTypeDecision", coaching: "Pick the primary peril — what happened first." },
+  nonRestorationSubtype:  { label: "Non-Restoration Type", section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "primaryLossType", equals: "Non-Restoration" }, checkFn: "hasRequiredNonRestorationSubtype" },
+  leadSourceCategory:     { label: "Lead Source",          section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true },
+  referringCompany:       { label: "Referring Company",    section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "leadSourceCategory", equals: "Referral" } },
+  referrer:               { label: "Referrer",             section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "leadSourceCategory", equals: "Referral" } },
+  leadSourceDetail:       { label: "Lead Source Detail",   section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "leadSourceCategory", oneOf: ["Marketing", "Internal"] } },
+  moldCoverageConfirm:    { label: "Mold Coverage",        section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "orderTypes", includes: "Mold" } },
+
+  // --- Customer ---
+  custFirst:  { label: "Customer First Name", section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].first" },
+  custLast:   { label: "Customer Last Name",  section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].last" },
+  custPhone:  { label: "Customer Phone",      section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].phone" },
+  custEmail:  { label: "Customer Email",      section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].email" },
+
+  // --- Address ---
+  addrStreet: { label: "Street Address", section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].street" },
+  addrCity:   { label: "City",           section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].city" },
+  addrState:  { label: "State",          section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].state" },
+  addrZip:    { label: "Zip",            section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].zip" },
+  addrLat:    { label: "Latitude",       section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].lat" },
+  addrLng:    { label: "Longitude",      section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].lng" },
+  rentCoverageLimit: { label: "Rent Coverage", section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "rentOrOwn", equals: "Rent" } },
+
+  // --- Billing & Insurance ---
+  billingPayer:      { label: "Bill To (Payer)",   section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "always", visible: true },
+  pricePlatform:     { label: "Pricing Platform",  section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
+  priceList:         { label: "Price List",         section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
+  multiplier:        { label: "Price Multiplier",   section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
+  estimateRequested: { label: "Estimate Requested", section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
+
+  // --- Interview Questions ---
+  damageWasWet:              { label: "Still Wet?",                section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, coaching: "Urgent — untreated wet items develop mold." },
+  damageMoldMildew:          { label: "Visible Mold?",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, coaching: "Ask about respiratory issues. Our team needs PPE." },
+  structuralElectricDamage:  { label: "Structural Damage?",       section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
+  noLights:                  { label: "No Electricity?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, coaching: "Bring portable lighting." },
+  noHeat:                    { label: "No Heat?",                 section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
+  boardedUp:                 { label: "Boarded Up?",              section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, coaching: "Confirm access — who has the key or code?" },
+  repairsSummary:            { label: "Repairs",                  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
+  livingStatus:              { label: "Living Situation",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
+  processType:               { label: "Delivery Destination",     section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
+  packoutSummary:            { label: "What Are We Picking Up?",  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
+  loadList:                  { label: "What To Bring",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+  sdsConsiderations:         { label: "Special Considerations",   section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+  familyMedicalIssues:       { label: "Medical Issues?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+  soapFragAllergies:         { label: "Soap/Fragrance Allergies?",section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+  selfCleaning:              { label: "Self-Cleaning?",           section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+  useDryCleaner:             { label: "Use Dry Cleaner?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+  howDryLaundry:             { label: "How Dry Laundry?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+  storageNeeded:             { label: "Storage Needed?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+  suggestedGroups:           { label: "Suggested Groups",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+
+  // --- Codes (post-inspection) ---
+  interview:     { label: "Interview Section",  section: "sec1", category: "codes", requiredInAudit: true, requiredAtStatus: "Pickup Complete", visible: true, checkFn: "interviewCompleted" },
+  codes:         { label: "Codes Section",       section: "sec1", category: "codes", requiredInAudit: true, requiredAtStatus: "Pickup Complete", visible: true, checkFn: "codesCompleted" },
+};
+
+const DEFAULT_BLOCKER_RULES = [
+  { id: "auth",         enabled: true, trigger: "No authorization on file",              blockerText: "Won't Sign Authorization" },
+  { id: "custEstimate", enabled: true, trigger: "Customer requests estimate before work", blockerText: "Customer Wants Estimate" },
+  { id: "adjEstimate",  enabled: true, trigger: "Adjuster requests estimate before work", blockerText: "Adjuster Wants Estimate" },
+  { id: "specialDocs",  enabled: true, trigger: "Special paperwork required by carrier",  blockerText: "Special paperwork required" },
+  { id: "unknownIns",   enabled: true, trigger: "Insurance company set to Not Yet Known", blockerText: "Insurance Company Not Yet Known" },
+];
+
 const DEFAULT_FORM={
   isLead: null,
   isRestorationProject: "",
@@ -1665,6 +1744,7 @@ const DEFAULT_FORM={
   serviceOfferings: [],
   groupAddressLinks: {},
   lossSeverity: initLossSeverity(),
+  interviewLog: {},
   vendors:[],
   vendorDetails:{},
   showReferralVendor: true,
@@ -2294,9 +2374,9 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
   );
 };
 
-const Toast = ({message,onClose})=>{
+const Toast = ({message,onClose,panelOffset=0})=>{
   useEffect(()=>{ const id=setTimeout(onClose,3500); return ()=>clearTimeout(id);},[onClose]);
-  return(<div className="fade-in fixed bottom-28 left-1/2 z-[90] -translate-x-1/2 rounded-2xl bg-slate-800/95 backdrop-blur px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2"><span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>{message}</div>)
+  return(<div className="fade-in fixed bottom-28 z-[90] rounded-2xl bg-slate-800/95 backdrop-blur px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2" style={{ left: `calc((100% - ${panelOffset}px) / 2)`, transform: 'translateX(-50%)' }}><span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>{message}</div>)
 };
 
 const Switch = ({ checked, onChange }) => (
@@ -2308,14 +2388,14 @@ const Switch = ({ checked, onChange }) => (
     </button>
 );
 
-const SmartNotification = ({ message, onReject, onClose }) => {
+const SmartNotification = ({ message, onReject, onClose, panelOffset = 0 }) => {
     useEffect(() => {
         const timer = setTimeout(onClose, 4000);
         return () => clearTimeout(timer);
     }, [onClose]);
 
     return (
-        <div className="fixed bottom-24 left-1/2 z-[90] -translate-x-1/2 flex items-center gap-4 rounded-lg bg-slate-900 px-4 py-3 text-white shadow-2xl slide-up border border-slate-700">
+        <div className="fixed bottom-24 z-[90] flex items-center gap-4 rounded-lg bg-slate-900 px-4 py-3 text-white shadow-2xl slide-up border border-slate-700" style={{ left: `calc((100% - ${panelOffset}px) / 2)`, transform: 'translateX(-50%)' }}>
             <div className="flex items-center gap-3">
                 <div className="text-orange-500 font-bold text-lg">⚡</div>
                 <span className="text-sm font-medium">{message}</span>
@@ -3266,7 +3346,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec1', sub: 'order', label: 'Cause', keywords: 'cause origin' },
     { id: 'sec1', sub: 'order', label: 'Origin', keywords: 'origin location' },
     { id: 'sec1', sub: 'order', label: 'Severity', keywords: 'severity rejects' },
-    { id: 'sec1', sub: 'interview', label: 'Interview', keywords: 'interview living staying temp moving repairs packout conditions' },
+    { id: 'sec1', label: 'Interview', keywords: 'interview living staying temp moving repairs packout conditions', navAction: 'openInterview' },
     { id: 'sec1', sub: 'codes', label: 'Order Codes', keywords: 'handling severity quality box damp det detergent allergy wet ppe' },
     { id: 'sec1', sub: 'codes', label: 'Order Instructions', keywords: 'instructions tagging cleaning packing delivery communication scheduling pickup billing collections' },
     { id: 'sec1', sub: 'source', label: 'Source', keywords: 'source referral marketing internal method sales rep' },
@@ -3276,11 +3356,11 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 
     { id: 'sec1', label: 'Event Instructions', keywords: 'notes instructions event notes' },
     { id: 'sec2', label: 'Household', keywords: 'pets animals dog cat bird fish household children child baby infant elderly housekeeper caretaker tenant roommate', navAction: 'openPets' },
-    { id: 'sec1', sub: 'interview', label: 'Special Considerations', keywords: 'elderly pregnancy baby hearing impaired respiratory premium brands skin sensitivity considerations allergy allergies soap detergent fragrance' },
-    { id: 'sec1', sub: 'interview', label: 'Soap & Fragrance Allergies', keywords: 'soap fragrance allergy allergies detergent sensitive skin hypoallergenic det special' },
-    { id: 'sec1', sub: 'interview', label: 'Conditions', keywords: 'still wet mold structural damage no electricity no heat boarded up conditions' },
-    { id: 'sec1', sub: 'interview', label: 'Living Situation', keywords: 'living staying moving temp housing hotel displaced' },
-    { id: 'sec1', sub: 'interview', label: 'Storage', keywords: 'storage long term months' },
+    { id: 'sec1', label: 'Special Considerations', keywords: 'elderly pregnancy baby hearing impaired respiratory premium brands skin sensitivity considerations allergy allergies soap detergent fragrance' },
+    { id: 'sec1', label: 'Soap & Fragrance Allergies', keywords: 'soap fragrance allergy allergies detergent sensitive skin hypoallergenic det special' },
+    { id: 'sec1', label: 'Conditions', keywords: 'still wet mold structural damage no electricity no heat boarded up conditions' },
+    { id: 'sec1', label: 'Living Situation', keywords: 'living staying moving temp housing hotel displaced' },
+    { id: 'sec1', label: 'Storage', keywords: 'storage long term months' },
     { id: 'sec2', label: 'Customer Section', keywords: 'customer section' },
     { id: 'sec2', label: 'Customer Type', keywords: 'customer type relationship' },
     { id: 'sec2', label: 'First Name', keywords: 'first name' },
@@ -3459,9 +3539,9 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 };
 
 // --- UNIFIED FLOATING HEADER (PROGRESS HEADER) ---
-const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, onShowSds, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
+const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, onShowSds, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount, onOpenFieldConfig, interviewPanelOpen, actionItemsOpen }) => {
     const steps = [
-        { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }, { id: "interview", label: "Interview" }, { id: "codes", label: "Codes" }] },
+        { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }] },
         { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
         { id: 'sec3', label: 'Address', subsections: [{ id: "address", label: "Addresses" }] },
         { id: 'sec4', label: 'Billing', subsections: [{ id: "companies", label: "Companies and Contacts" }, { id: "billing", label: "Billing" }, { id: "finance", label: "Finance" }, { id: "insurance", label: "Insurance" }] },
@@ -3541,7 +3621,7 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-white/60 backdrop-blur-xl border-b border-slate-200 shadow-md shadow-slate-900/5">
+        <header className="fixed top-0 left-0 z-50 bg-white/60 backdrop-blur-xl border-b border-slate-200 shadow-md shadow-slate-900/5" style={{ right: (interviewPanelOpen || actionItemsOpen) ? '480px' : '0', transition: 'right 0.2s ease' }}>
             <div className="max-w-6xl mx-auto px-4 pt-4 pb-6 flex items-center justify-between gap-6">
                 <div className="flex items-center gap-4 min-w-[120px]">
                      <button onClick={() => setEntryMode('start')} className="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-full hover:bg-slate-100">
@@ -3683,6 +3763,13 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                                 <span>Test Data Presets</span>
                                 <span>{presetCount ? `(${presetCount})` : "▤"}</span>
                             </button>
+                            <button
+                                onClick={onOpenFieldConfig}
+                                className="w-full mt-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all hover:bg-slate-50 text-slate-600"
+                            >
+                                <span>Field Configuration</span>
+                                <span>⚙</span>
+                            </button>
                             <div className="mt-2 px-3 py-2">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Current User</label>
                                 <Input value={currentUser || ""} onChange={e=>setCurrentUser(e.target.value)} placeholder="Name" className="mt-1 !py-1.5 !text-xs" />
@@ -3696,14 +3783,35 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
 };
 
 // --- FLOATING CAPSULE BAR (Bottom) ---
-const FloatingCapsule = ({ entryMode, setEntryMode, onSave, onAudit, auditOn, setShowSearch, onPlan, modeButtonFlash }) => {
+const FloatingCapsule = ({ entryMode, setEntryMode, onSave, setShowSearch, onInterview, interviewPanelOpen, onActionItems, actionItemsOpen, actionItemCount, modeButtonFlash }) => {
     return (
-        <div className="fixed bottom-4 sm:bottom-8 left-0 right-0 z-50 flex justify-center pointer-events-none fade-in" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="fixed bottom-4 sm:bottom-8 left-0 z-50 flex justify-center pointer-events-none fade-in" style={{ right: (interviewPanelOpen || actionItemsOpen) ? '480px' : '0', paddingBottom: "env(safe-area-inset-bottom)", transition: 'right 0.2s ease' }}>
             <div className="pointer-events-auto bg-white border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.15)] shadow-slate-700/30 rounded-full flex items-center p-1.5 gap-1 sm:gap-2 px-2 sm:px-3">
 
                 <button data-noe-action="search" onClick={() => setShowSearch(true)} className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 bg-slate-50">
                     <span className="text-base">🔍</span>
                     <span className="text-xs sm:text-sm font-bold hidden sm:inline">Search</span>
+                </button>
+
+                <button
+                    data-noe-action="interview"
+                    onClick={onInterview}
+                    className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all ${interviewPanelOpen ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'hover:bg-violet-50 text-slate-600 hover:text-violet-600 bg-slate-50'}`}
+                >
+                    <span className="text-base">🎤</span>
+                    <span className="text-xs sm:text-sm font-bold">Interview</span>
+                </button>
+
+                <button
+                    data-noe-action="action-items"
+                    onClick={onActionItems}
+                    className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-amber-50 text-slate-600 hover:text-amber-600 bg-slate-50 relative"
+                >
+                    <span className="text-base">⚡</span>
+                    <span className="text-xs sm:text-sm font-bold">Action Items</span>
+                    {actionItemCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1">{actionItemCount}</span>
+                    )}
                 </button>
 
                 <button
@@ -3714,16 +3822,6 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, onAudit, auditOn, se
                 >
                     <span className="text-base">{entryMode === 'quick' ? '📝' : '⚡'}</span>
                     <span className="text-xs sm:text-sm font-bold">{entryMode === 'quick' ? 'Detailed' : 'Quick'}</span>
-                </button>
-
-                <button data-noe-action="audit" data-noe-active={auditOn} onClick={onAudit} className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all ${auditOn ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'hover:bg-sky-50 text-slate-600 hover:text-sky-600'}`}>
-                    <span className="text-base">📋</span>
-                    <span className="text-xs sm:text-sm font-bold">{auditOn ? 'Audit On' : 'Audit'}</span>
-                </button>
-
-                <button data-noe-action="plan" onClick={onPlan} className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 bg-slate-50">
-                    <span className="text-base">🧭</span>
-                    <span className="text-xs sm:text-sm font-bold">Plan</span>
                 </button>
 
                 <button data-noe-action="save" onClick={onSave} className="flex items-center justify-center h-10 px-4 sm:px-6 gap-1.5 rounded-full bg-sky-500 text-white shadow-lg shadow-sky-200 hover:bg-sky-600 transition-all">
@@ -4939,6 +5037,9 @@ export default function App(){
     } catch(e) { return DEFAULT_FORM; }
   });
   const recordWord = data.isLead === true ? "Lead" : "Order";
+  const [interviewPanelOpen, setInterviewPanelOpen] = useState(false);
+  const [interviewExpanded, setInterviewExpanded] = useState({});
+  const [actionItemsOpen, setActionItemsOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const TEST_PRESETS_KEY = "noe-test-presets";
@@ -4978,6 +5079,17 @@ export default function App(){
       ];
     }
   });
+  const [fieldConfig, setFieldConfig] = useState(() => {
+    try { const s = localStorage.getItem("noe-field-config-v1"); return s ? { ...DEFAULT_FIELD_CONFIG, ...JSON.parse(s) } : { ...DEFAULT_FIELD_CONFIG }; }
+    catch { return { ...DEFAULT_FIELD_CONFIG }; }
+  });
+  const [blockerRules, setBlockerRules] = useState(() => {
+    try { const s = localStorage.getItem("noe-blocker-rules-v1"); return s ? JSON.parse(s) : [...DEFAULT_BLOCKER_RULES]; }
+    catch { return [...DEFAULT_BLOCKER_RULES]; }
+  });
+  const [showFieldConfig, setShowFieldConfig] = useState(false);
+  const [configSelectedKeys, setConfigSelectedKeys] = useState(new Set());
+  const isFieldVisible = (key) => fieldConfig[key]?.visible !== false;
   const [openSections, setOpenSections] = useState({sec1:true, sec2:false, sec3:false, sec4:false, sec5:false}); 
   const [modal, setModal] = useState({type:"",value:"",onSave:null});
   const [openCodes, setOpenCodes] = useState(false);
@@ -5259,6 +5371,8 @@ export default function App(){
   useEffect(()=>{ localStorage.setItem("companies-registry",JSON.stringify(companies)); },[companies]);
   useEffect(()=>{ localStorage.setItem("contacts-registry",JSON.stringify(contacts)); },[contacts]);
   useEffect(()=>{ localStorage.setItem("same-day-scope-v52", JSON.stringify(data)); },[data]);
+  useEffect(()=>{ localStorage.setItem("noe-field-config-v1", JSON.stringify(fieldConfig)); },[fieldConfig]);
+  useEffect(()=>{ localStorage.setItem("noe-blocker-rules-v1", JSON.stringify(blockerRules)); },[blockerRules]);
   useEffect(()=>{ localStorage.setItem("sample-contacts", JSON.stringify(sampleContacts)); },[sampleContacts]);
   const [householdEditOpen, setHouseholdEditOpen] = useState(false);
 
@@ -6640,7 +6754,10 @@ export default function App(){
         openSearchSubsection(item.sub, item.id);
       }
     }, 80);
-    if (item.navAction === 'openPets') {
+    if (item.navAction === 'openInterview') {
+      setInterviewPanelOpen(true);
+      return;
+    } else if (item.navAction === 'openPets') {
       setTimeout(() => {
         const el = document.getElementById("household-pets");
         if (el) {
@@ -7060,64 +7177,62 @@ export default function App(){
     const missing = [];
     const primaryCustomer = (data.customers || [])[0] || {};
     const primaryAddress = (data.addresses || [])[0] || {};
+    const statusIndex = ORDER_STATUSES.indexOf(data.orderStatus);
 
-    if(!data.orderName) missing.push({ id: "sec1", label: "Order Name", section: "sec1", key: "orderName" });
-    if(!hasPrimaryOrderTypeDecision(data.orderTypes || [])) missing.push({ id: "sec1", label: "Order Type", section: "sec1", key: "orderTypes" });
-    if(!hasRequiredNonRestorationSubtype(data.orderTypes || [])) missing.push({ id: "sec1", label: "Non-Restoration Type", section: "sec1", key: "nonRestorationSubtype" });
-    if(!data.leadSourceCategory) missing.push({ id: "sec1", label: "Lead Source", section: "sec1", key: "leadSourceCategory" });
-    if(data.leadSourceCategory === "Referral") {
-      if(!data.referringCompany) missing.push({ id: "sec1", label: "Referring Company", section: "sec1", key: "referringCompany" });
-      if(!data.referrer) missing.push({ id: "sec1", label: "Referrer", section: "sec1", key: "referrer" });
-    }
-    if((data.leadSourceCategory === "Marketing" || data.leadSourceCategory === "Internal") && !data.leadSourceDetail) {
-      missing.push({ id: "sec1", label: "Lead Source Detail", section: "sec1", key: "leadSourceDetail" });
-    }
-    if(!data.billingPayer) missing.push({ id: "sec4", label: "Bill To (Payer)", section: "sec4", key: "billingPayer" });
+    // Named check functions for complex validations
+    const checkFns = {
+      hasPrimaryOrderTypeDecision: () => hasPrimaryOrderTypeDecision(data.orderTypes || []),
+      hasRequiredNonRestorationSubtype: () => hasRequiredNonRestorationSubtype(data.orderTypes || []),
+      interviewCompleted: () => !!(data.livingStatus || data.processType || data.repairsSummary || (data.packoutSummary||[]).length || data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp),
+      codesCompleted: () => !!((data.severityCodes||[]).length || data.qualityCode || (data.handlingCodes||[]).length),
+    };
 
-    if(!primaryCustomer.first) missing.push({ id: "sec2", label: "Customer First Name", section: "sec2", key: "custFirst" });
-    if(!primaryCustomer.last) missing.push({ id: "sec2", label: "Customer Last Name", section: "sec2", key: "custLast" });
-    if(!primaryCustomer.phone) missing.push({ id: "sec2", label: "Customer Phone", section: "sec2", key: "custPhone" });
-    if(!primaryCustomer.email) missing.push({ id: "sec2", label: "Customer Email", section: "sec2", key: "custEmail" });
+    // Resolve value from key or dataPath
+    const resolveValue = (key, cfg) => {
+      if (cfg.dataPath) {
+        if (cfg.dataPath.startsWith("customers[0].")) return primaryCustomer[cfg.dataPath.split(".")[1]];
+        if (cfg.dataPath.startsWith("addresses[0].")) return primaryAddress[cfg.dataPath.split(".")[1]];
+      }
+      return data[key];
+    };
 
-    (data.customers || []).forEach((customer, idx) => {
-      if (!isPlaceholderFlagActive(customer?.placeholder)) return;
-      const customerLabel = [customer?.first, customer?.last].filter(hasMeaningfulValue).join(" ").trim() || `Customer ${idx + 1}`;
-      missing.push({
-        id: "sec2",
-        label: `Resolve Placeholder: ${customerLabel}`,
-        section: "sec2",
-        key: `placeholder-customer-${customer?.id || idx}`,
-        category: "placeholders"
-      });
-    });
+    // Evaluate condition guard
+    const conditionMet = (cond) => {
+      if (!cond) return true;
+      if (cond.equals) return data[cond.field] === cond.equals;
+      if (cond.oneOf) return (cond.oneOf || []).includes(data[cond.field]);
+      if (cond.includes) return (data[cond.field] || []).includes(cond.includes);
+      return true;
+    };
 
-    // Vendor/company placeholders
-    (data.vendors || []).forEach((v, idx) => {
-      if (v.incomplete) {
-        const label = v.contact || v.company || `Company ${idx + 1}`;
-        missing.push({
-          id: "sec4",
-          label: `Incomplete: ${label}`,
-          section: "sec4",
-          key: `placeholder-vendor-${v.id || idx}`,
-          category: "placeholders",
-          vendorIdx: idx,
-        });
+    // Check status gate
+    const statusGateMet = (requiredAtStatus) => {
+      if (!requiredAtStatus || requiredAtStatus === "always") return true;
+      if (requiredAtStatus === "never") return false;
+      const gateIndex = ORDER_STATUSES.indexOf(requiredAtStatus);
+      return gateIndex >= 0 && statusIndex >= gateIndex;
+    };
+
+    // Config-driven field checks
+    Object.entries(fieldConfig).forEach(([key, cfg]) => {
+      if (!cfg.requiredInAudit) return;
+      if (!statusGateMet(cfg.requiredAtStatus)) return;
+      if (!conditionMet(cfg.condition)) return;
+
+      let isEmpty;
+      if (cfg.checkFn && checkFns[cfg.checkFn]) {
+        isEmpty = !checkFns[cfg.checkFn]();
+      } else {
+        isEmpty = !resolveValue(key, cfg);
+      }
+
+      if (isEmpty) {
+        missing.push({ id: cfg.section, label: cfg.label, section: cfg.section, key });
       }
     });
 
-    if(!primaryAddress.street) missing.push({ id: "sec3", label: "Street Address", section: "sec3", key: "addrStreet" });
-    if(!primaryAddress.city) missing.push({ id: "sec3", label: "City", section: "sec3", key: "addrCity" });
-    if(!primaryAddress.state) missing.push({ id: "sec3", label: "State", section: "sec3", key: "addrState" });
-    if(!primaryAddress.zip) missing.push({ id: "sec3", label: "Zip", section: "sec3", key: "addrZip" });
-    if(!primaryAddress.lng) missing.push({ id: "sec3", label: "Longitude", section: "sec3", key: "addrLng" });
-    if(!primaryAddress.lat) missing.push({ id: "sec3", label: "Latitude", section: "sec3", key: "addrLat" });
-    if((data.orderTypes || []).includes("Mold") && !data.moldCoverageConfirm) missing.push({ id: "sec1", label: "Mold Coverage", section: "sec1", key: "moldCoverageConfirm" });
-    if(data.rentOrOwn === "Rent" && !data.rentCoverageLimit) missing.push({ id: "sec3", label: "Rent Coverage", section: "sec3", key: "rentCoverageLimit" });
-
-    const needsPickupAudit = ["Pickup Complete","Ready to Bill"].includes(data.orderStatus);
-    const needsFinanceAudit = ["Intake Complete","Ready to Bill"].includes(data.orderStatus);
-    if (needsPickupAudit) {
+    // Dynamic severity checks (special case — keys depend on order types)
+    if (["Pickup Complete","Ready to Bill"].includes(data.orderStatus)) {
       const severityGroupsNeeded = (data.orderTypes || []).reduce((acc, t) => {
         const group = t === "Dust/Debris" ? "Dust" : t;
         if (SEVERITY_GROUPS.includes(group)) acc.add(group);
@@ -7127,50 +7242,29 @@ export default function App(){
         const hasCode = (data.severityCodes || []).some(c => c.startsWith(group + "-"));
         if (!hasCode) missing.push({ id: "sec1", label: `${group} Severity`, section: "sec1", key: `severity-${group.toLowerCase()}` });
       });
-      const interviewCompleted = !!(data.livingStatus || data.processType || data.repairsSummary || (data.packoutSummary||[]).length || data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp);
-      if (!interviewCompleted) missing.push({ id: "sec1", label: "Interview Section", section: "sec1", key: "interview" });
-      const codesCompleted = !!((data.severityCodes||[]).length || data.qualityCode || (data.handlingCodes||[]).length);
-      if (!codesCompleted) missing.push({ id: "sec1", label: "Codes Section", section: "sec1", key: "codes" });
-    }
-    if (needsFinanceAudit) {
-      if (!data.pricePlatform) missing.push({ id: "sec4", label: "Pricing Platform", section: "sec4", key: "pricePlatform" });
-      if (!data.priceList) missing.push({ id: "sec4", label: "Price List", section: "sec4", key: "priceList" });
-      if (!data.multiplier) missing.push({ id: "sec4", label: "Price Multiplier", section: "sec4", key: "multiplier" });
-      if (!data.estimateRequested) missing.push({ id: "sec4", label: "Estimate Requested", section: "sec4", key: "estimateRequested" });
     }
 
+    // Structural placeholder checks (not field-config driven)
+    (data.customers || []).forEach((customer, idx) => {
+      if (!isPlaceholderFlagActive(customer?.placeholder)) return;
+      const customerLabel = [customer?.first, customer?.last].filter(hasMeaningfulValue).join(" ").trim() || `Customer ${idx + 1}`;
+      missing.push({ id: "sec2", label: `Resolve Placeholder: ${customerLabel}`, section: "sec2", key: `placeholder-customer-${customer?.id || idx}`, category: "placeholders" });
+    });
+    (data.vendors || []).forEach((v, idx) => {
+      if (v.incomplete) {
+        missing.push({ id: "sec4", label: `Incomplete: ${v.contact || v.company || `Company ${idx + 1}`}`, section: "sec4", key: `placeholder-vendor-${v.id || idx}`, category: "placeholders", vendorIdx: idx });
+      }
+    });
     (data.addresses || []).forEach((addr, idx) => {
       if (!isAddressPlaceholder(addr)) return;
-      const addressLabel = addr?.type || (idx === 0 ? "Primary Address" : `Address ${idx + 1}`);
-      missing.push({
-        id: "sec3",
-        label: `Resolve Placeholder: ${addressLabel}`,
-        section: "sec3",
-        key: `placeholder-address-${addr.id}`,
-        category: "placeholders"
-      });
+      missing.push({ id: "sec3", label: `Resolve Placeholder: ${addr?.type || (idx === 0 ? "Primary Address" : `Address ${idx + 1}`)}`, section: "sec3", key: `placeholder-address-${addr.id}`, category: "placeholders" });
     });
-
     Object.entries(data.additionalCompanies || {}).forEach(([type, rawEntry]) => {
       const entry = syncCompanyEntryPlaceholders(rawEntry || {});
-      const companyPending = isCompanyPlaceholder(entry);
-      if (companyPending) {
-        missing.push({
-          id: "sec4",
-          label: `Resolve Placeholder: ${type} company`,
-          section: "sec4",
-          key: `placeholder-company-${normalizePlaceholderKeyPart(type)}`,
-          category: "placeholders"
-        });
-      }
-      if (!companyPending && companyTypeRequiresContact(type) && isContactPlaceholder(entry)) {
-        missing.push({
-          id: "sec4",
-          label: `Resolve Placeholder: ${type} contact`,
-          section: "sec4",
-          key: `placeholder-contact-${normalizePlaceholderKeyPart(type)}`,
-          category: "placeholders"
-        });
+      if (isCompanyPlaceholder(entry)) {
+        missing.push({ id: "sec4", label: `Resolve Placeholder: ${type} company`, section: "sec4", key: `placeholder-company-${normalizePlaceholderKeyPart(type)}`, category: "placeholders" });
+      } else if (companyTypeRequiresContact(type) && isContactPlaceholder(entry)) {
+        missing.push({ id: "sec4", label: `Resolve Placeholder: ${type} contact`, section: "sec4", key: `placeholder-contact-${normalizePlaceholderKeyPart(type)}`, category: "placeholders" });
       }
     });
 
@@ -9721,10 +9815,13 @@ export default function App(){
             setCurrentUser={(v)=>update("currentUser", v)}
             setShowSampleDataModal={setShowSampleDataModal}
             onOpenPresets={() => setShowPresetModal(true)}
+            onOpenFieldConfig={() => setShowFieldConfig(true)}
+            interviewPanelOpen={interviewPanelOpen}
+            actionItemsOpen={actionItemsOpen}
             presetCount={testPresets.length}
         />
 
-        <div ref={appContentRef} data-noe-mode={entryMode} data-noe-app="new-order-entry" className={`min-h-screen bg-slate-50 pb-32 font-sans fade-in scale-in ${compactMode ? 'compact-mode' : ''} ${entryMode === 'detailed' ? 'pt-28' : 'pt-24'}`}>
+        <div ref={appContentRef} data-noe-mode={entryMode} data-noe-app="new-order-entry" className={`min-h-screen bg-slate-50 pb-32 font-sans fade-in scale-in ${compactMode ? 'compact-mode' : ''} ${entryMode === 'detailed' ? 'pt-28' : 'pt-24'}`} style={(interviewPanelOpen || actionItemsOpen) ? { marginRight: '480px', transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}>
             
             <div className="absolute inset-x-0 top-0 h-[320px] bg-gradient-to-b from-sky-50/50 to-transparent pointer-events-none" />
 
@@ -9764,97 +9861,7 @@ export default function App(){
                       </div>
                     </button>
                   )}
-                  {(() => {
-                    const placeholders = [
-                      ...(data.vendors || []).filter(v => v.incomplete).map((v, i) => ({
-                        label: v.contact || v.company || `Company ${i+1}`,
-                        section: "sec4",
-                        type: "company",
-                        idx: i,
-                      })),
-                      ...(data.customers || []).filter(c => {
-                        if (isPlaceholderFlagActive(c?.placeholder)) return true;
-                        const hasName = hasMeaningfulValue(c?.first) && hasMeaningfulValue(c?.last);
-                        const hasContact = hasMeaningfulValue(c?.phone) || hasMeaningfulValue(c?.email);
-                        return !hasName || !hasContact;
-                      }).map((c, i) => ({
-                        label: [c.first, c.last].filter(Boolean).join(" ") || `Customer ${i+1}`,
-                        section: "sec2",
-                        type: "customer",
-                      })),
-                      ...(data.addresses || []).filter(a => !a.inactive && isAddressPlaceholder(a) && !hasMeaningfulValue(a.street)).map((a, i) => ({
-                        label: "No address yet",
-                        section: "sec3",
-                        type: "address",
-                      })),
-                    ];
-                    if (!placeholders.length) return null;
-                    return (
-                      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="text-xs font-bold text-amber-700">{placeholders.length} placeholder{placeholders.length !== 1 ? "s" : ""} needing attention</div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {placeholders.map((p, idx) => (
-                            <button
-                              key={`ph-${idx}`}
-                              type="button"
-                              onClick={() => {
-                                // Force-open the target section
-                                setOpenSections(prev => ({
-                                  sec1: p.section === "sec1",
-                                  sec2: p.section === "sec2",
-                                  sec3: p.section === "sec3",
-                                  sec4: p.section === "sec4",
-                                  sec5: p.section === "sec5"
-                                }));
-                                setActiveSection(p.section);
-                                setVisitedSections(prevV => new Set([...prevV, p.section]));
-                                // Open relevant subsections for sec4 companies
-                                if (p.section === "sec4") setTimeout(() => setCompaniesSubOpen(true), 50);
-                                // Scroll to section first, then find the specific placeholder
-                                setTimeout(() => {
-                                  const sectionEl = document.getElementById(p.section);
-                                  if (sectionEl) sectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
-                                  setTimeout(() => {
-                                    let el;
-                                    if (p.type === "customer") {
-                                      const target = (data.customers || []).filter(c => {
-                                        if (isPlaceholderFlagActive(c?.placeholder)) return true;
-                                        return !(hasMeaningfulValue(c?.first) && hasMeaningfulValue(c?.last));
-                                      });
-                                      const matchId = target[0]?.id;
-                                      if (matchId) {
-                                        updateCust(matchId, { _forceOpen: true });
-                                        el = document.querySelector(`[data-customer-id="${matchId}"]`);
-                                      }
-                                      if (!el) el = document.querySelector(`[data-customer-id]`);
-                                    } else if (p.type === "address") {
-                                      const addrTarget = (data.addresses || []).find(a => !a.inactive && isAddressPlaceholder(a) && !hasMeaningfulValue(a.street));
-                                      if (addrTarget) updateAddr(addrTarget.id, { _forceOpen: true });
-                                      el = document.querySelector(`[data-audit-key*="placeholder-address"]`);
-                                    } else if (p.type === "company") {
-                                      el = document.querySelector(`[data-audit-key*="placeholder-vendor"], [data-audit-key*="placeholder-company"]`);
-                                    }
-                                    if (el) {
-                                      el.scrollIntoView({ behavior: "smooth", block: "center" });
-                                      el.classList.remove("audit-pulse");
-                                      void el.offsetWidth;
-                                      el.classList.add("audit-pulse");
-                                    }
-                                  }, 250);
-                                }, 150);
-                              }}
-                              className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-all"
-                            >
-                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                              {p.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {/* Placeholder strip removed — now in Action Items panel */}
                   {inlineAlert && (
                     <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3 fade-in">
                       <div className="flex items-start justify-between gap-3">
@@ -9876,7 +9883,7 @@ export default function App(){
                     <Section
                       id="sec1"
                       noeSection="order"
-                      title={`1. ${recordWord} & Interview`}
+                      title={`1. ${recordWord}`}
                       helpText="Enter job basics + call details (source, scope/needs, internal codes if known)."
                       isOpen={openSections.sec1}
                       onHeaderClick={()=>handleToggleSection('sec1')}
@@ -10105,422 +10112,36 @@ export default function App(){
                             <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showCoaching} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} onPromptRoleAssignment={openRoleAssignmentPrompt} />
                             </SubSection>
 
-                            <SubSection id="sec1-interview-panel" title="Interview" open={interviewSubOpen} onToggle={(nextOpen) => setInterviewSubOpen(!!nextOpen)} compact={compactMode}>
-                                <div id="sec1-interview" className="space-y-4">
-                                  {showCoaching && <div className="text-xs text-slate-400 mb-2">Ask the customer these questions before going out to the home.</div>}
-
-                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                                    <div className="text-sm font-bold text-sky-600">Is anything still wet or damaged?</div>
-                                    {showCoaching && <div className="text-[10px] text-slate-400">Ask the customer about current conditions at the home. These affect what we bring and how we prioritize.</div>}
-                                    <div className="flex flex-wrap gap-2">
-                                      {[
-                                        { id: "wet", stateKey: "damageWasWet", label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true, onToggle: () => updateSmart("damageWasWet", (data.damageWasWet === "Y" || data.damageWasWet === true) ? "N" : "Y"), suggested: suggestWet },
-                                        { id: "mold", stateKey: "damageMoldMildew", label: "Visible Mold", active: !!data.damageMoldMildew, onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew) },
-                                        { id: "structural", stateKey: "structuralElectricDamage", label: "Structural Damage", active: data.structuralElectricDamage === "Y", onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y") },
-                                        { id: "lights", stateKey: "noLights", label: "No Electricity", active: !!data.noLights, onToggle: () => updateSmart("noLights", !data.noLights) },
-                                        { id: "heat", stateKey: "noHeat", label: "No Heat", active: !!data.noHeat, onToggle: () => updateSmart("noHeat", !data.noHeat) },
-                                        { id: "boarded", stateKey: "boardedUp", label: "Boarded Up", active: !!data.boardedUp, onToggle: () => updateSmart("boardedUp", !data.boardedUp) },
-                                      ].map(item => {
-                                        const autoFillHint = conditionAutoFillHints[item.stateKey];
-                                        return (
-                                          <div key={item.id} className="flex flex-col items-start gap-1">
-                                            <ToggleMulti label={item.label} checked={item.active} onChange={item.onToggle} className={`!px-4 !py-2.5 !text-sm ${item.suggested ? "suggested-field" : ""}`} />
-                                            {autoFillHint && <span className="ml-2 text-[10px] font-semibold text-sky-600 fade-in">+ {autoFillHint} added to load</span>}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                    {showCoaching && (data.damageWasWet === "Y" || data.damageWasWet === true) && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Still Wet:</span> Urgent — tell customer we need to come ASAP. Untreated wet items develop mold (may not be covered). Keep colors separated.
-                                      </div>
-                                    )}
-                                    {showCoaching && !!data.damageMoldMildew && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Visible Mold:</span> Immediate attention needed. Ask about respiratory issues in household. Our team needs PPE. Confirm mold coverage with adjuster.
-                                      </div>
-                                    )}
-                                    {showCoaching && !!data.noLights && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">No Electricity:</span> Bring portable lighting. Ask if there's a generator on site.
-                                      </div>
-                                    )}
-                                    {showCoaching && !!data.boardedUp && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Boarded Up:</span> Confirm access — who has the key or code? May need fire dept or restoration company to let us in.
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                                    <div className="text-sm font-bold text-sky-600">What repairs are being done to the home?</div>
-                                    {showCoaching && <div className="text-[10px] text-slate-400">Select all that apply. This helps estimate timeline and storage needs.</div>}
-                                    <div className="flex flex-wrap gap-2">
-                                      {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
-                                        <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
-                                          const current = (data.repairsSummary || "").split(", ").filter(Boolean);
-                                          const next = current.includes(s) ? current.filter(x => x !== s) : [...current, s];
-                                          update("repairsSummary", next.join(", "));
-                                        }} className="!px-4 !py-2.5 !text-sm" />
-                                      ))}
-                                    </div>
-                                    {showCoaching && (data.repairsSummary || "").includes("Just Cleaning") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Just Cleaning:</span> No construction — items return quickly. Confirm turnaround expectations with customer. Short storage if any.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.repairsSummary || "").includes("Paint") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Paint:</span> Coordinate timing with painter — items may need to stay out until paint cures. Protect items from overspray during pickup.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.repairsSummary || "").includes("Refinish Floors") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Refinish Floors:</span> All furniture must be moved. Floors need 2–3 days to cure before items return. Coordinate delivery timing with contractor.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.repairsSummary || "").includes("Replace Floors") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Replace Floors:</span> Extended timeline — old floors removed, new floors installed. Full packout likely. Confirm which rooms and storage duration.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.repairsSummary || "").includes("Cosmetic") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Cosmetic Damage:</span> Minor repairs — patch, paint, trim. Items may only need to move within the room. Ask which rooms are affected.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.repairsSummary || "").includes("Major Structural") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Major Structural:</span> Limited access likely. Ask which areas are affected. Coordinate access with contractor.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.repairsSummary || "").includes("Complete Rebuild") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Complete Rebuild:</span> Customer will be displaced long-term. Confirm storage needs and timeline. Ask about temp living.
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                                      <div className="text-sm font-bold text-sky-600">Where is the customer living?</div>
-                                      <div className="flex flex-wrap gap-2">
-                                        {[
-                                          { label: "Staying in home", title: "Customer remains in the home during the project." },
-                                          { label: "Hotel", title: "Displaced to a hotel — temporary, will return to primary address." },
-                                          { label: "Temp", title: "Displaced to a temporary home (rental, trailer, family) — will return to primary address." },
-                                          { label: "Moving", title: "Permanently relocating — will NOT return. Final delivery goes to a new address." },
-                                        ].map(s => (
-                                          <ToggleMulti key={s.label} label={s.label} title={s.title} checked={data.livingStatus === s.label} onChange={() => updateLivingStatus(data.livingStatus === s.label ? "" : s.label)} className="!px-3 !py-2 !text-sm" />
-                                        ))}
-                                      </div>
-                                      {data.livingStatus === "Hotel" && showCoaching && (
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Hotel:</span> Get the hotel name and room number. Ask how long they expect to stay. Deliveries may need to go to the loss site instead.
-                                        </div>
-                                      )}
-                                      {data.livingStatus === "Temp" && showCoaching && (
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Temp Home:</span> Get the temporary address for deliveries. Ask how long and when they expect to return.
-                                        </div>
-                                      )}
-                                      {data.livingStatus === "Moving" && showCoaching && (
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Moving:</span> Get the new address — all items deliver there, not the loss site. Ask when they'll be in the new home.
-                                        </div>
-                                      )}
-                                      {data.livingStatus === "Staying in home" && showCoaching && (
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Staying in Home:</span> Schedule around their routine. Ask about best times. May need to work room-by-room.
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                                      <div className="text-sm font-bold text-sky-600">Where should we deliver items when ready?</div>
-                                      <div className="flex flex-wrap gap-2">
-                                        {[
-                                          { label: "Return to Home ASAP", value: "Deliver ASAP", title: "Return items to the loss site as soon as possible." },
-                                          { label: "To Temp Address", value: "Deliver to Temp", title: "Deliver to temporary housing location." },
-                                          { label: "To New Home", value: "Deliver to New Home", title: "Customer is moving — deliver to the new address." },
-                                          { label: "Store Until Home Repaired", value: "Long-Term Storage", title: "Store until the home is repaired and ready for delivery (may be months)." },
-                                        ].map(s => (
-                                          <ToggleMulti key={s.value} label={s.label} title={s.title} checked={data.processType === s.value} onChange={()=>update("processType", data.processType === s.value ? "" : s.value)} className="!px-3 !py-2 !text-sm" />
-                                        ))}
-                                      </div>
-                                      {showCoaching && data.processType === "Long-Term Storage" && (
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Storage:</span> Confirm customer understands monthly fees. Get estimated return date. Set a follow-up reminder.
-                                        </div>
-                                      )}
-                                      {showCoaching && data.processType === "Deliver ASAP" && (
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">No Storage:</span> Prioritize processing. Confirm delivery address is ready.
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                                    <div className="text-sm font-bold text-sky-600">What are we picking up?</div>
-                                    {showCoaching && <div className="text-[10px] text-slate-400">Select all items we'll be removing from the home.</div>}
-                                    <div className="flex flex-wrap gap-2">
-                                      {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
-                                        <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={()=>update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} className="!px-4 !py-2.5 !text-sm" />
-                                      ))}
-                                    </div>
-                                    {showCoaching && (data.packoutSummary || []).includes("Window Treatments") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Window Treatments:</span> Need a tall ladder? Confirm ceiling heights. Taking the rods too? Note in load list below.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.packoutSummary || []).includes("Rugs") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Rugs:</span> Any wet or heavy rugs? Wet = extra manpower + immediate attention. Note in load list below.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.packoutSummary || []).includes("Furniture") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Furniture:</span> How many pieces? Any oversized? May need extra help, dollies, floor protection. Note below.
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                                    <div className="text-sm font-bold text-sky-600">What do we need to bring?</div>
-                                    {showCoaching && <div className="text-[10px] text-slate-400">Special equipment or extra resources needed for this job.</div>}
-                                    <div className="flex flex-wrap gap-2">
-                                      {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
-                                        <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className="!px-4 !py-2.5 !text-sm" />
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                                    <div className="text-sm font-bold text-sky-600">Special considerations</div>
-                                    {showCoaching && <div className="text-[10px] text-slate-400">Note anything about the customer or household that affects how we handle the project.</div>}
-                                    <div className="flex flex-wrap gap-2">
-                                      {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
-                                        <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s))} className="!px-4 !py-2.5 !text-sm" />
-                                      ))}
-                                    </div>
-                                    {showCoaching && (data.sdsConsiderations || []).includes("Elderly") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Elderly:</span> Be patient, speak clearly. Label boxes clearly. Offer packing/unpacking help.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.sdsConsiderations || []).includes("Pregnancy") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Pregnancy/Baby:</span> Avoid chemicals and fumes. Use fragrance-free products. Minimize disruption.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.sdsConsiderations || []).includes("Respiratory Concerns") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Allergies:</span> Use hypoallergenic products. Ask about specific triggers. Notify processing team.
-                                      </div>
-                                    )}
-                                    {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
-                                      <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
-                                        <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes — add now while discussing</div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {[["Det","special detergent requested"], ["NoDC","Do not Dry Clean"], ["Low","dry on low heat"], ["NoDry","cannot be dried in dryer"], ["PPE","wear PPE when handling"], ["Hand","hand finish pressed items"]].map(([code, desc]) => (
-                                            <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} className="!text-[10px] !px-2 !py-1" />
-                                          ))}
-                                        </div>
-                                        <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities (e.g. no bleach, fragrance-free only)" className="!text-xs !py-1.5" />
-                                      </div>
-                                    )}
-                                    {(data.sdsConsiderations || []).includes("Pets") && (
-                                      <Input value={data.householdAnimals || ""} onChange={e => update("householdAnimals", e.target.value)} placeholder="What pets? (e.g. Dog named Spot, Shih Tzu)" />
-                                    )}
-                                  </div>
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
-                                      <div className="text-sm font-semibold text-sky-600 mb-1">Suggested Groups</div>
-                                      {showCoaching && (data.suggestedGroups || []).length === 0 && (
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-3">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Groups:</span> Ask where the customer will be staying, how long they'll be out, and which seasons they'll miss. This determines how to batch items — rush essentials now, hold seasonal items for later, or store long-term.
-                                        </div>
-                                      )}
-                                      {showCoaching && (data.suggestedGroups || []).length > 0 && <div className="text-[11px] text-slate-400 mb-3">Processing groups define how items are batched (e.g., rush vs. long-term). Link a group to a specific pickup address if needed.</div>}
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        {["RD","RFD","STD","STFD","LTD","LTFD"].map(g => {
-                                          const selected = (data.suggestedGroups || []).includes(g);
-                                          const link = getGroupLink(g);
-                                          const linkedAddr = (data.addresses || []).find(a => a.id === link.addressId);
-                                          if (!selected) {
-                                            return (
-                                              <ToggleMulti
-                                                key={g}
-                                                label={g}
-                                                title={SUGGESTED_GROUP_HELP[g]}
-                                                checked={false}
-                                                onChange={() => {
-                                                  const next = toggleMulti(data.suggestedGroups || [], g);
-                                                  update("suggestedGroups", next);
-                                                }}
-                                              />
-                                            );
-                                          }
-
-                                          return (
-                                            <div key={g} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-sky-50 px-2 py-1" title={SUGGESTED_GROUP_HELP[g]}>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  const next = toggleMulti(data.suggestedGroups || [], g);
-                                                  update("suggestedGroups", next);
-                                                  if (!next.includes(g)) clearGroupLink(g);
-                                                }}
-                                                className="text-xs font-bold text-sky-700"
-                                              >
-                                                {g}
-                                              </button>
-                                              <select
-                                                value={link?.addressId || ""}
-                                                onChange={e => setGroupLink(g, { addressId: e.target.value })}
-                                                className="text-[10px] text-slate-600 border-none bg-transparent outline-none cursor-pointer py-0 pl-0 pr-4 -mr-2"
-                                              >
-                                                <option value="">Deliver to...</option>
-                                                {(data.addresses || []).filter(a => !a.inactive && hasMeaningfulValue(a.street)).map(a => (
-                                                  <option key={a.id} value={a.id}>{a.type || "Address"} — {a.street}</option>
-                                                ))}
-                                              </select>
-                                            </div>
-                                          );
-                                        })}
-                                        <span className="w-px h-6 bg-slate-300 mx-1 self-center" />
-                                        {["Inhome","TLI","Test","Dispose","Storage Only"].map(g => {
-                                          const selected = (data.suggestedGroups || []).includes(g);
-                                          const link = getGroupLink(g);
-                                          const linkedAddr = (data.addresses || []).find(a => a.id === link.addressId);
-                                          if (!selected) {
-                                            return (
-                                              <ToggleMulti
-                                                key={g}
-                                                label={g}
-                                                title={SUGGESTED_GROUP_HELP[g]}
-                                                checked={false}
-                                                onChange={() => {
-                                                  const next = toggleMulti(data.suggestedGroups || [], g);
-                                                  update("suggestedGroups", next);
-                                                }}
-                                              />
-                                            );
-                                          }
-
-                                          return (
-                                            <div
-                                              key={g}
-                                              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-sky-50 px-2 py-1"
-                                              title={SUGGESTED_GROUP_HELP[g]}
-                                            >
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  const next = toggleMulti(data.suggestedGroups || [], g);
-                                                  update("suggestedGroups", next);
-                                                  if (!next.includes(g)) clearGroupLink(g);
-                                                }}
-                                                className="text-xs font-bold text-sky-700"
-                                              >
-                                                {g}
-                                              </button>
-                                              <select
-                                                value={link?.addressId || ""}
-                                                onChange={e => setGroupLink(g, { addressId: e.target.value })}
-                                                className="text-[10px] text-slate-600 border-none bg-transparent outline-none cursor-pointer py-0 pl-0 pr-4 -mr-2"
-                                              >
-                                                <option value="">Deliver to...</option>
-                                                {(data.addresses || []).filter(a => !a.inactive && hasMeaningfulValue(a.street)).map(a => (
-                                                  <option key={a.id} value={a.id}>{a.type || "Address"} — {a.street}</option>
-                                                ))}
-                                              </select>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                  </div>
-                                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
-                                    <div className="text-sm font-bold text-sky-600">Customer preferences & health</div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                      <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-                                        <span className="text-sm text-slate-700">Any medical issues?</span>
-                                        <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => update("familyMedicalIssues", v)} />
-                                      </div>
-                                      <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-                                        <span className="text-sm text-slate-700">Soap or fragrance allergies?</span>
-                                        <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => update("soapFragAllergies", v)} />
-                                      </div>
-                                    </div>
-                                    {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e=>update("familyMedicalNote", e.target.value)} placeholder="What medical issues should we be aware of?" />}
-                                    {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e=>update("soapFragNote", e.target.value)} placeholder="What are they allergic to?" />}
-
-                                    <div className="text-sm font-bold text-sky-600 pt-2">Cleaning preferences</div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                      <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-                                        <span className="text-sm text-slate-700">Will they clean anything themselves?</span>
-                                        <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} />
-                                      </div>
-                                    </div>
-                                    {data.selfCleaning === "Y" && (
-                                      <div className="space-y-1.5">
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
-                                            const note = data.selfCleaningNote || "";
-                                            const active = note.toLowerCase().includes(item.toLowerCase());
-                                            return (
-                                              <button key={item} type="button" onClick={() => {
-                                                if (active) {
-                                                  update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", "));
-                                                } else {
-                                                  update("selfCleaningNote", note ? `${note}, ${item}` : item);
-                                                }
-                                              }} className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold transition-colors ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}>{item}</button>
-                                            );
-                                          })}
-                                        </div>
-                                        <Input value={data.selfCleaningNote || ""} onChange={e=>update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." />
-                                      </div>
-                                    )}
-
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-                                      <span className="text-sm text-slate-700">Do they use a dry cleaner?</span>
-                                      <ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => update("useDryCleaner", v)} />
-                                    </div>
-
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-                                      <span className="text-sm text-slate-700">How do they dry laundry?</span>
-                                      <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => updateHowDry(v)} />
-                                    </div>
-                                    {data.howDryLaundry && data.howDryLaundry !== "Dryer" && (
-                                      <div className="text-[10px] text-sky-600 font-semibold">Handling code auto-applied for {data.howDryLaundry.toLowerCase()} preference.</div>
-                                    )}
-                                    {showCoaching && data.howDryLaundry === "Air-Dry" && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Air Dry:</span> Do NOT machine dry. All items tagged air-dry only. Prevents shrinkage and damage claims.
-                                      </div>
-                                    )}
-
-                                    <div className="text-sm font-bold text-sky-600 pt-2">Storage</div>
-                                    <div className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${suggestStorage ? 'border-amber-300 bg-amber-50' : highlightStorageFromProcess ? 'border-orange-300 bg-orange-50' : 'border-slate-100 bg-slate-50/50'}`}>
-                                      <div>
-                                        <span className="text-sm text-slate-700">Will they need storage?</span>
-                                        {suggestStorage && <div className="text-[10px] text-amber-600 font-semibold">Suggested based on structural damage or timeline.</div>}
-                                        {highlightStorageFromProcess && <div className="text-[10px] text-orange-600 font-semibold">Long-Term Storage selected — confirm here.</div>}
-                                      </div>
-                                      <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => update("storageNeeded", v)} />
-                                    </div>
-                                    {data.storageNeeded === "Y" && (
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-sm text-slate-600">How many months?</span>
-                                        <Input className={`w-20 ${suggestStorageMonths ? 'suggested-field' : ''}`} value={data.storageMonths || ""} onChange={e=>update("storageMonths", e.target.value)} placeholder="#" />
-                                        {suggestStorageMonths && <span className="text-[10px] font-bold suggested-pill rounded-full px-2 py-0.5">Suggested</span>}
-                                      </div>
-                                    )}
-                                  </div>
-                                  {/* Repairs Summary moved into section above */}
+                            {/* Interview moved to slide-out panel — accessible from floating pill */}
+                            <button
+                              type="button"
+                              onClick={() => setInterviewPanelOpen(true)}
+                              className="w-full rounded-xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-left hover:bg-violet-50 transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base">🎤</span>
+                                  <span className="text-sm font-bold text-violet-700">Interview</span>
+                                  {(data.damageWasWet || data.damageMoldMildew || data.livingStatus || data.repairsSummary || (data.packoutSummary||[]).length) && (
+                                    <span className="text-[10px] text-violet-500">In progress</span>
+                                  )}
                                 </div>
-                            </SubSection>
+                                <span className="text-xs font-bold text-violet-600">Open →</span>
+                              </div>
+                              {(data.livingStatus || data.repairsSummary || (data.packoutSummary||[]).length > 0) && (
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  {data.livingStatus && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">{data.livingStatus}</span>}
+                                  {data.repairsSummary && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">{data.repairsSummary.split(", ")[0]}</span>}
+                                  {(data.packoutSummary||[]).length > 0 && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">{(data.packoutSummary||[]).length} items</span>}
+                                </div>
+                              )}
+                            </button>
 
+                            {/* Interview content moved to slide-out panel */}
+
+                            {/* Dead interview code removed */}
+                            {/* Codes — hidden during intake, shown post-inspection */}
+                            {["Pickup Complete","Tagging Complete","Ready to Bill"].includes(data.orderStatus) && (
                             <SubSection id="sec1-codes-panel" title="Codes" open={codesSubOpen} onToggle={(nextOpen) => { const next = !!nextOpen; setCodesSubOpen(next); if(next) setOpenCodes(true); }} compact={compactMode}>
                                 <div id="sec1-codes">
                                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:border-sky-300">
@@ -10707,6 +10328,7 @@ export default function App(){
                                   </div>
                                 </div>
                             </SubSection>
+                            )}
                         </div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec1')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
@@ -11990,69 +11612,411 @@ export default function App(){
             </div>
         </div>
 
-        <FloatingCapsule 
-            entryMode={entryMode} 
-            setEntryMode={setEntryMode} 
-            onSave={handleSaveClick} 
-            onPlan={() => setPlanModalOpen(true)}
-            onAudit={() => {
-              setAuditOn(prev => {
-                const next = !prev;
-                setAuditOpen(next);
-                if (next) runAudit();
-                return next;
-              });
-            }}
-            auditOn={auditOn}
+        <FloatingCapsule
+            entryMode={entryMode}
+            setEntryMode={setEntryMode}
+            onSave={handleSaveClick}
             setShowSearch={setShowSearch}
+            onInterview={() => setInterviewPanelOpen(v => !v)}
+            interviewPanelOpen={interviewPanelOpen}
+            onActionItems={() => setActionItemsOpen(v => !v)}
+            actionItemsOpen={actionItemsOpen}
+            actionItemCount={(() => { try { return computeAuditMissing().length; } catch { return 0; } })()}
             modeButtonFlash={modeButtonFlash}
         />
 
-        {(auditOpen || auditOn) && (
-          <div className="fixed right-4 top-28 z-[80] w-[170px] rounded-2xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200">
-              <div className="text-sm font-bold text-slate-800">Audit</div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (auditOn) {
-                      setAuditOn(false);
-                      setAuditOpen(false);
-                    } else {
-                      setAuditOn(true);
-                      setAuditOpen(true);
-                      runAudit();
-                    }
-                  }}
-                  className={`text-[10px] font-bold px-2 py-1 rounded-full border ${auditOn ? 'audit-pill' : 'border-slate-200 text-slate-400'}`}
-                >
-                  {auditOn ? 'ON' : 'OFF'}
-                </button>
-                <button className="text-slate-400 hover:text-slate-600" onClick={() => { setAuditOn(false); setAuditOpen(false); }}>×</button>
-              </div>
-            </div>
-            <div className="px-3 py-2 text-[11px] text-slate-500 flex items-center justify-between">
-              <span>Critical fields + placeholders:</span>
-              <span className="font-bold text-slate-600">{auditPercent}% complete</span>
-            </div>
-            <div className="max-h-[520px] overflow-y-auto custom-scroll px-3 pb-3 space-y-2">
-              {auditMissing.length === 0 ? (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">All critical fields complete.</div>
-              ) : (
-                auditMissing.map((item, idx) => (
-                  <button
-                    key={`${item.key}-${idx}`}
-                    onClick={() => focusAuditItem(item)}
-                    className={`w-full text-left rounded-lg px-3 py-2 border hover:border-sky-300 hover:bg-sky-50 ${(item.key || "").startsWith("placeholder-") ? "audit-placeholder-pill" : "border-slate-200"}`}
-                  >
-                    <div className="text-xs font-bold text-slate-700">{item.label}</div>
-                    <div className="text-[10px] text-slate-400">{item.category === "placeholders" ? "Placeholder Queue" : "Go to section"}</div>
+        {/* Interview Docked Side Panel */}
+        {interviewPanelOpen && (
+          <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] z-[110] bg-white shadow-2xl flex flex-col border-l border-slate-200">
+              {(() => {
+                const interviewQuestions = [
+                  { key: "conditions", title: "Is anything still wet or damaged?", configKey: "damageWasWet",
+                    isAnswered: () => data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp,
+                    summary: () => [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural" : "", data.noLights ? "No Power" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""].filter(Boolean).join(", ") },
+                  { key: "repairs", title: "What repairs are being done?", configKey: "repairsSummary",
+                    isAnswered: () => !!data.repairsSummary,
+                    summary: () => data.repairsSummary || "" },
+                  { key: "living", title: "Where is the customer living?", configKey: "livingStatus",
+                    isAnswered: () => !!data.livingStatus,
+                    summary: () => data.livingStatus || "" },
+                  { key: "delivery", title: "Where should we make final delivery?", configKey: "processType",
+                    isAnswered: () => !!data.processType,
+                    summary: () => data.processType || "" },
+                  { key: "packout", title: "What are we picking up?", configKey: "packoutSummary",
+                    isAnswered: () => (data.packoutSummary || []).length > 0,
+                    summary: () => (data.packoutSummary || []).join(", ") },
+                  { key: "loadList", title: "What do we need to bring?", configKey: "loadList",
+                    isAnswered: () => (data.loadList || []).length > 0,
+                    summary: () => (data.loadList || []).join(", ") },
+                  { key: "considerations", title: "Special considerations", configKey: "sdsConsiderations",
+                    isAnswered: () => (data.sdsConsiderations || []).length > 0,
+                    summary: () => (data.sdsConsiderations || []).join(", ") },
+                  { key: "preferences", title: "Customer preferences", configKey: "familyMedicalIssues",
+                    isAnswered: () => data.familyMedicalIssues || data.soapFragAllergies || data.selfCleaning || data.howDryLaundry || data.storageNeeded,
+                    summary: () => [data.familyMedicalIssues === "Y" ? "Medical" : "", data.soapFragAllergies === "Y" ? "Allergies" : "", data.selfCleaning === "Y" ? "Self-clean" : "", data.howDryLaundry && data.howDryLaundry !== "Dryer" ? data.howDryLaundry : "", data.storageNeeded === "Y" ? "Storage" : ""].filter(Boolean).join(", ") },
+                ];
+                const visibleQuestions = interviewQuestions.filter(q => isFieldVisible(q.configKey));
+                const answeredCount = visibleQuestions.filter(q => q.isAnswered()).length;
+                const logAnswer = (key) => {
+                  setData(p => ({ ...p, interviewLog: { ...(p.interviewLog || {}), [key]: { user: p.currentUser || "Unknown", at: formatShortTimestamp() } } }));
+                };
+                const getLog = (key) => (data.interviewLog || {})[key];
+                return (
+                  <>
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-violet-50 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🎤</span>
+                      <span className="text-sm font-bold text-violet-800">Interview</span>
+                      <span className="text-xs text-violet-500">{answeredCount} of {visibleQuestions.length}</span>
+                    </div>
+                    <button onClick={() => setInterviewPanelOpen(false)} className="text-violet-400 hover:text-violet-600 text-lg font-bold">×</button>
+                  </div>
+                  </> );
+              })()}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {showCoaching && <div className="text-xs text-slate-400 mb-2">Ask the customer these questions during or before the initial visit.</div>}
+
+                {isFieldVisible("damageWasWet") && (() => {
+                  const answered = data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp;
+                  const summary = [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural" : "", data.noLights ? "No Power" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""].filter(Boolean).join(", ");
+                  const log = (data.interviewLog || {}).conditions;
+                  const expanded = !answered || interviewExpanded.conditions;
+                  return <div className={`rounded-xl border ${answered ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
+                  <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: !p.conditions})); if (!log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                    <div className="text-sm font-bold text-sky-600">Is anything still wet or damaged?</div>
+                    {answered && !expanded && <div className="flex items-center gap-2"><span className="text-xs text-emerald-600">{summary}</span>{log && <span className="text-[9px] text-slate-300">{log.user} · {log.at}</span>}</div>}
                   </button>
-                ))
+                  {expanded && <div className="px-4 pb-4 space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "wet", label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true, onToggle: () => updateSmart("damageWasWet", (data.damageWasWet === "Y" || data.damageWasWet === true) ? "N" : "Y") },
+                      { id: "mold", label: "Visible Mold", active: !!data.damageMoldMildew, onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew) },
+                      { id: "structural", label: "Structural Damage", active: data.structuralElectricDamage === "Y", onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y") },
+                      { id: "lights", label: "No Electricity", active: !!data.noLights, onToggle: () => updateSmart("noLights", !data.noLights) },
+                      { id: "heat", label: "No Heat", active: !!data.noHeat, onToggle: () => updateSmart("noHeat", !data.noHeat) },
+                      { id: "boarded", label: "Boarded Up", active: !!data.boardedUp, onToggle: () => updateSmart("boardedUp", !data.boardedUp) },
+                    ].map(item => (
+                      <ToggleMulti key={item.id} label={item.label} checked={item.active} onChange={item.onToggle} className="!px-3 !py-2 !text-sm" />
+                    ))}
+                  </div>
+                  </div>}
+                </div>;
+                })()}
+
+                {isFieldVisible("repairsSummary") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                  <div className="text-sm font-bold text-sky-600">What repairs are being done?</div>
+                  <div className="flex flex-wrap gap-2">
+                    {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
+                      <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
+                        const current = (data.repairsSummary || "").split(", ").filter(Boolean);
+                        const next = current.includes(s) ? current.filter(x => x !== s) : [...current, s];
+                        update("repairsSummary", next.join(", "));
+                      }} className="!px-3 !py-2 !text-sm" />
+                    ))}
+                  </div>
+                </div>}
+
+                {(isFieldVisible("livingStatus") || isFieldVisible("processType")) && <div className="grid grid-cols-1 gap-3">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                    <div className="text-sm font-bold text-sky-600">Where is the customer living?</div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "Staying in home" }, { label: "Hotel" }, { label: "Temp" }, { label: "Moving" },
+                      ].map(s => (
+                        <ToggleMulti key={s.label} label={s.label} checked={data.livingStatus === s.label} onChange={() => updateLivingStatus(data.livingStatus === s.label ? "" : s.label)} className="!px-3 !py-1.5 !text-xs" />
+                      ))}
+                    </div>
+                    {livingAddressPrompt.open && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 space-y-2">
+                        <div className="text-xs font-bold text-amber-800">Add {livingAddressPrompt.type} address?</div>
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={closeLivingAddressPrompt} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-50">Not Now</button>
+                          <button type="button" onClick={() => addLivingAddressFromPrompt("placeholder")} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">Create Placeholder</button>
+                          <button type="button" onClick={() => addLivingAddressFromPrompt("full")} className="rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Enter Address Now</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                    <div className="text-sm font-bold text-sky-600">Where should we make final delivery?</div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "Return to Home ASAP", value: "Deliver ASAP" },
+                        { label: "To Temp Address", value: "Deliver to Temp" },
+                        { label: "To New Home", value: "Deliver to New Home" },
+                        { label: "Store Until Home Repaired", value: "Long-Term Storage" },
+                      ].map(s => (
+                        <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => update("processType", data.processType === s.value ? "" : s.value)} className="!px-3 !py-1.5 !text-xs" />
+                      ))}
+                    </div>
+                  </div>
+                </div>}
+
+                {isFieldVisible("packoutSummary") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                  <div className="text-sm font-bold text-sky-600">What are we picking up?</div>
+                  <div className="flex flex-wrap gap-2">
+                    {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
+                      <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} className="!px-3 !py-2 !text-sm" />
+                    ))}
+                  </div>
+                </div>}
+
+                {isFieldVisible("loadList") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                  <div className="text-sm font-bold text-sky-600">What do we need to bring?</div>
+                  <div className="flex flex-wrap gap-2">
+                    {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
+                      <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className="!px-3 !py-2 !text-sm" />
+                    ))}
+                  </div>
+                </div>}
+
+                {isFieldVisible("sdsConsiderations") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                  <div className="text-sm font-bold text-sky-600">Special considerations</div>
+                  <div className="flex flex-wrap gap-2">
+                    {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
+                      <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s))} className="!px-3 !py-2 !text-sm" />
+                    ))}
+                  </div>
+                  {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
+                    <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
+                      <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[["Det","special detergent"], ["NoDC","no dry clean"], ["Low","low heat"], ["NoDry","no dryer"], ["PPE","wear PPE"], ["Hand","hand finish"]].map(([code, desc]) => (
+                          <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} className="!text-[10px] !px-2 !py-1" />
+                        ))}
+                      </div>
+                      <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities" className="!text-xs !py-1.5" />
+                    </div>
+                  )}
+                </div>}
+
+                {isFieldVisible("familyMedicalIssues") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                  <div className="text-sm font-bold text-sky-600">Customer preferences</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                      <span className="text-xs text-slate-700">Medical issues?</span>
+                      <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => update("familyMedicalIssues", v)} />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                      <span className="text-xs text-slate-700">Soap/fragrance allergies?</span>
+                      <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => update("soapFragAllergies", v)} />
+                    </div>
+                  </div>
+                  {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e => update("familyMedicalNote", e.target.value)} placeholder="What medical issues?" className="!text-xs" />}
+                  {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="What allergies?" className="!text-xs" />}
+                  <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                    <span className="text-xs text-slate-700">Self-clean anything?</span>
+                    <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} />
+                  </div>
+                  {data.selfCleaning === "Y" && (
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap gap-1.5">
+                        {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
+                          const active = (data.selfCleaningNote || "").toLowerCase().includes(item.toLowerCase());
+                          return <button key={item} type="button" onClick={() => { const note = data.selfCleaningNote || ""; if (active) update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", ")); else update("selfCleaningNote", note ? `${note}, ${item}` : item); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{item}</button>;
+                        })}
+                      </div>
+                      <Input value={data.selfCleaningNote || ""} onChange={e => update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                    <span className="text-xs text-slate-700">How do they dry laundry?</span>
+                    <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => updateHowDry(v)} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                    <span className="text-xs text-slate-700">Need storage?</span>
+                    <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => update("storageNeeded", v)} />
+                  </div>
+                  {data.storageNeeded === "Y" && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-600">How many months?</span>
+                      <Input className="w-20 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" />
+                    </div>
+                  )}
+                </div>}
+              </div>
+              <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+                <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-violet-500 px-5 py-2 text-sm font-bold text-white hover:bg-violet-600">Done</button>
+              </div>
+          </div>
+        )}
+
+        {/* Action Items Panel */}
+        {actionItemsOpen && (() => {
+          const missing = computeAuditMissing();
+          const blockers = (scopeBridgeState.pendingIssues || []).filter(Boolean);
+          const placeholders = [
+            ...(data.customers || []).filter(c => {
+              if (isPlaceholderFlagActive(c?.placeholder)) return true;
+              const hasName = hasMeaningfulValue(c?.first) && hasMeaningfulValue(c?.last);
+              const hasContact = hasMeaningfulValue(c?.phone) || hasMeaningfulValue(c?.email);
+              return !hasName || (hasMeaningfulValue(c?.first) && !hasContact);
+            }).map(c => ({ label: [c.first, c.last].filter(Boolean).join(" ") || "Customer", section: "sec2", type: "customer" })),
+            ...(data.addresses || []).filter(a => !a.inactive && isAddressPlaceholder(a)).map(a => ({ label: a.type || "Address", section: "sec3", type: "address" })),
+            ...(data.vendors || []).filter(v => v.incomplete).map(v => ({ label: v.contact || v.company || "Company", section: "sec4", type: "company" })),
+          ];
+          return (
+            <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] z-[110] bg-white shadow-2xl flex flex-col border-l border-slate-200">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-amber-50 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚡</span>
+                    <span className="text-sm font-bold text-amber-800">Action Items</span>
+                    <span className="text-xs text-amber-600">{missing.length + placeholders.length + blockers.length} items</span>
+                  </div>
+                  <button onClick={() => setActionItemsOpen(false)} className="text-amber-400 hover:text-amber-600 text-lg font-bold">×</button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {placeholders.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Placeholders</div>
+                      <div className="space-y-1">
+                        {placeholders.map((p, i) => (
+                          <button key={`ph-${i}`} onClick={() => { setActionItemsOpen(false); setOpenSections(prev => ({ sec1: p.section === "sec1", sec2: p.section === "sec2", sec3: p.section === "sec3", sec4: p.section === "sec4", sec5: p.section === "sec5" })); setActiveSection(p.section); }} className="w-full text-left rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-800 hover:bg-amber-50">
+                            <span className="font-bold">{p.label}</span> <span className="text-amber-600">— {p.type}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {missing.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Missing Fields</div>
+                      <div className="space-y-1">
+                        {missing.map((m, i) => (
+                          <button key={`m-${i}`} onClick={() => { setActionItemsOpen(false); focusAuditItem(m); }} className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 hover:bg-sky-50 hover:border-sky-300">
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {blockers.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Blockers</div>
+                      <div className="space-y-1">
+                        {blockers.map((b, i) => (
+                          <button key={`b-${i}`} onClick={() => { setActionItemsOpen(false); jumpToSection("sec5"); setTimeout(() => setScheduleBridgeOpen(true), 150); }} className="w-full text-left rounded-lg border border-rose-200 bg-rose-50/50 px-3 py-2 text-xs text-rose-800 hover:bg-rose-50">
+                            {b}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {data.reminderEnabled && data.reminderDate && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Reminders</div>
+                      <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2 text-xs text-sky-800">
+                        Reminder set for {data.reminderDate}{data.reminderTime ? ` at ${data.reminderTime}` : ""}
+                      </div>
+                    </div>
+                  )}
+                  {placeholders.length === 0 && missing.length === 0 && blockers.length === 0 && (
+                    <div className="text-center py-8 text-sm text-slate-400">No action items — looking good!</div>
+                  )}
+                </div>
+            </div>
+          );
+        })()}
+
+        {/* Field Configuration Page */}
+        {showFieldConfig && (
+          <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setShowFieldConfig(false); }} tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
+            <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-2 shadow-sm z-10">
+              <span className="text-sm font-bold text-slate-700">Field Configuration</span>
+              <span className="text-xs text-slate-400">{Object.keys(fieldConfig).length} fields</span>
+              <div className="flex-1" />
+              {configSelectedKeys.size > 0 && (
+                <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-lg px-3 py-1.5">
+                  <span className="text-xs font-bold text-sky-700">{configSelectedKeys.size} selected</span>
+                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], requiredInAudit: true}; }); return next; }); }} className="rounded-full border border-sky-300 bg-white px-2 py-0.5 text-[10px] font-bold text-sky-700 hover:bg-sky-50">Required: On</button>
+                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], requiredInAudit: false}; }); return next; }); }} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:bg-slate-50">Required: Off</button>
+                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], visible: true}; }); return next; }); }} className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">Show</button>
+                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], visible: false}; }); return next; }); }} className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-bold text-rose-600 hover:bg-rose-50">Hide</button>
+                  <button onClick={() => setConfigSelectedKeys(new Set())} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
+                </div>
               )}
+              <button onClick={() => { setFieldConfig({...DEFAULT_FIELD_CONFIG}); setBlockerRules([...DEFAULT_BLOCKER_RULES]); setToast("Reset to defaults"); }} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200">Reset Defaults</button>
+              <button onClick={() => setShowFieldConfig(false)} className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">Close</button>
+            </div>
+            <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto w-full space-y-6">
+              {FIELD_CONFIG_SECTIONS.map(section => {
+                const keys = Object.keys(fieldConfig).filter(k => fieldConfig[k].category === section.id);
+                if (!keys.length) return null;
+                const allSelected = keys.every(k => configSelectedKeys.has(k));
+                return (
+                  <div key={section.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-100">
+                      <input type="checkbox" checked={allSelected} onChange={() => {
+                        setConfigSelectedKeys(prev => {
+                          const next = new Set(prev);
+                          if (allSelected) keys.forEach(k => next.delete(k));
+                          else keys.forEach(k => next.add(k));
+                          return next;
+                        });
+                      }} className="h-4 w-4 rounded" />
+                      <span className="text-sm font-bold text-slate-700">{section.label}</span>
+                      <span className="text-xs text-slate-400">{keys.length} fields</span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {keys.map(key => {
+                        const cfg = fieldConfig[key];
+                        const selected = configSelectedKeys.has(key);
+                        return (
+                          <div key={key} className={`flex items-center gap-3 px-4 py-2 text-sm ${!cfg.visible ? 'bg-slate-50/50 opacity-60' : ''}`}>
+                            <input type="checkbox" checked={selected} onChange={() => {
+                              setConfigSelectedKeys(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+                            }} className="h-3.5 w-3.5 rounded" />
+                            <span className="text-xs font-semibold text-slate-700 w-44 truncate" title={key}>{cfg.label}</span>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], visible: !prev[key].visible}}))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${cfg.visible ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-600'}`}>
+                                {cfg.visible ? 'Visible' : 'Hidden'}
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], requiredInAudit: !prev[key].requiredInAudit}}))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${cfg.requiredInAudit ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-400'}`}>
+                                {cfg.requiredInAudit ? 'Required' : 'Optional'}
+                              </button>
+                            </div>
+                            <select value={cfg.requiredAtStatus || "always"} onChange={e => setFieldConfig(prev => ({...prev, [key]: {...prev[key], requiredAtStatus: e.target.value}}))} className="text-[10px] border border-slate-200 rounded px-1.5 py-0.5 text-slate-600 bg-white">
+                              <option value="always">Always</option>
+                              <option value="never">Never</option>
+                              <option value="Intake Complete">Intake Complete</option>
+                              <option value="Pickup Complete">Pickup Complete</option>
+                              <option value="Tagging Complete">Tagging Complete</option>
+                              <option value="Ready to Bill">Ready to Bill</option>
+                            </select>
+                            {cfg.condition && <span className="text-[9px] text-slate-400 truncate" title={JSON.stringify(cfg.condition)}>Conditional</span>}
+                            <div className="flex-1" />
+                            <span className="text-[9px] text-slate-300 font-mono">{key}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Blocker Rules */}
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                  <span className="text-sm font-bold text-slate-700">Auto-Blocker Rules</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {blockerRules.map((rule, idx) => (
+                    <div key={rule.id} className="flex items-center gap-3 px-4 py-2">
+                      <button onClick={() => setBlockerRules(prev => prev.map((r, i) => i === idx ? {...r, enabled: !r.enabled} : r))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${rule.enabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-400'}`}>
+                        {rule.enabled ? 'Enabled' : 'Disabled'}
+                      </button>
+                      <span className="text-xs font-semibold text-slate-700">{rule.blockerText}</span>
+                      <span className="text-[10px] text-slate-400 flex-1">{rule.trigger}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Old audit sidebar removed — now in Action Items panel */}
       
       {orderInstructionModal.isOpen && (
         <div className="fixed inset-0 z-[128] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
@@ -12150,8 +12114,8 @@ export default function App(){
           </div>
         </div>
       )}
-      {toast && <Toast message={toast} onClose={()=>setToast("")} />}
-      {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} />}
+      {toast && <Toast message={toast} onClose={()=>setToast("")} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
+      {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
       {showSdsPreview && (
         <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setShowSdsPreview(false); }} tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
           <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-2 shadow-sm z-10 relative">
@@ -12986,7 +12950,7 @@ export default function App(){
           </div>
       )}
 
-      {livingAddressPrompt.open && (
+      {livingAddressPrompt.open && !interviewPanelOpen && (
         <div className="fixed inset-0 z-[109] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5">
             <h3 className="text-lg font-bold text-slate-900 mb-2">Add {livingAddressPrompt.type} Address?</h3>
