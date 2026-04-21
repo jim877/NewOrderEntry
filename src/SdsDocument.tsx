@@ -422,11 +422,16 @@ const getSdsResponseCopy = (documentType = "approval") => {
 const SdsProjectSummarySection = ({
   orderName,
   primaryCustomerName,
+  primaryCustomerPhone,
+  primaryCustomerEmail,
   address,
   insuranceCompany,
   insuranceAdjuster,
   formattedDateOfLoss,
   claimNumber,
+  policyNumber,
+  nationalCarrier,
+  primaryLossType,
   serviceOfferings = [],
   orderTypes = [],
   lossDetails = {},
@@ -490,14 +495,16 @@ const SdsProjectSummarySection = ({
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-2">
           <SdsSummaryField label="Order Name" value={orderName} />
-          <SdsSummaryField label="Customer" value={primaryCustomerName} />
+          {primaryLossType && <SdsSummaryField label="Loss Type" value={orderTypes.length > 1 ? orderTypes.join(", ") : primaryLossType} />}
+          <SdsSummaryField label="Customer" value={[primaryCustomerName, primaryCustomerPhone, primaryCustomerEmail].filter(Boolean).join(" · ")} />
           <SdsSummaryField label="Address" value={address} />
         </div>
         <div className="space-y-2">
-          <SdsSummaryField label="Insurance Company" value={insuranceCompany} />
+          <SdsSummaryField label="Insurance Company" value={nationalCarrier && nationalCarrier !== insuranceCompany ? `${insuranceCompany} (${nationalCarrier})` : insuranceCompany} />
           <SdsSummaryField label="Adjuster" value={insuranceAdjuster} />
           <SdsSummaryField label="Date of Loss" value={formattedDateOfLoss} />
           <SdsSummaryField label="Claim Number" value={claimNumber} />
+          {policyNumber && <SdsSummaryField label="Policy Number" value={policyNumber} />}
         </div>
       </div>
       <div className={`mt-3 grid gap-3 ${statusGridClass}`}>
@@ -667,7 +674,7 @@ const SdsBrochurePage = ({ brand = BRAND, media = BRAND_CARES_MEDIA }) => (
   </SdsPageBlock>
 );
 
-export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsPhotos = [], sdsCoverPhoto = null, scopeBridge = {}, documentType = "approval", orderNarrative = [], orderNarrativeProse = [] }) {
+export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", policyNumber = "", nationalCarrier = "", primaryLossType = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsPhotos = [], sdsCoverPhoto = null, scopeBridge = {}, documentType = "approval", orderNarrative = [], orderNarrativeProse = [] }) {
   const docSeverity = lossSeverity || {};
   const printRootRef = useRef(null);
   const responseCopy = getSdsResponseCopy(documentType);
@@ -825,16 +832,18 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     });
   }, [visibleSections, docSeverity, orderTypes, orderSeverityBySection]);
 
-  const primaryCustomerName = useMemo(() => {
+  const primaryCustomer = useMemo(() => {
     const list = Array.isArray(customers) ? customers : [];
-    const primary = list.find((c) => c?.isPrimary) || list[0] || {};
-    const first = String(primary?.first || "").trim();
-    const last = String(primary?.last || "").trim();
+    return list.find((c) => c?.isPrimary) || list[0] || {};
+  }, [customers]);
+  const primaryCustomerName = useMemo(() => {
+    const first = String(primaryCustomer?.first || "").trim();
+    const last = String(primaryCustomer?.last || "").trim();
     const combined = [first, last].filter(Boolean).join(" ");
     if (combined) return combined;
-    const fallback = String(primary?.name || "").trim();
+    const fallback = String(primaryCustomer?.name || "").trim();
     return fallback || "";
-  }, [customers]);
+  }, [primaryCustomer]);
 
   const formattedDateOfLoss = useMemo(() => {
     const raw = String(dateOfLoss || "").trim();
@@ -1127,6 +1136,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     "Moving": "sds-icon-img sds-icon-img--moving",
     "Rolling Racks": "sds-icon-img sds-icon-img--rolling-racks",
     "Expert Stain Removal": "sds-icon-img sds-icon-img--expert-stain",
+    "Pets": "sds-icon-img sds-icon-img--pets",
   };
   const getSdsIconImageClass = (item) =>
     SDS_ICON_CLASS_OVERRIDES[item] || "sds-icon-img";
@@ -1149,8 +1159,8 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
           <div className="flex flex-wrap gap-3">
             {iconItems.map(item => (
               <div key={item} className="flex flex-col items-center gap-1">
-                <div className="sds-icon-tile">
-                  <img src={SDS_ICON_MAP[item]} alt={item} className={getSdsIconImageClass(item)} />
+                <div className="sds-icon-tile" style={item === "Pets" ? { overflow: "hidden" } : undefined}>
+                  <img src={SDS_ICON_MAP[item]} alt={item} className={getSdsIconImageClass(item)} style={item === "Pets" ? { objectFit: "cover", objectPosition: "top center", transform: "scale(1.25) translateY(-10%)" } : undefined} />
                 </div>
                 <div className="text-[11px] font-semibold text-slate-600 text-center max-w-[120px]">{item}</div>
               </div>
@@ -1377,14 +1387,16 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-2">
           <SummaryField label="Order Name" value={orderName} />
-          <SummaryField label="Customer" value={primaryCustomerName} />
+          {primaryLossType && <SummaryField label="Loss Type" value={orderTypes.length > 1 ? orderTypes.join(", ") : primaryLossType} />}
+          <SummaryField label="Customer" value={[primaryCustomerName, primaryCustomer?.phone, primaryCustomer?.email].filter(Boolean).join(" · ")} />
           <SummaryField label="Address" value={address} />
         </div>
         <div className="space-y-2">
-          <SummaryField label="Insurance Company" value={insuranceCompany} />
+          <SummaryField label="Insurance Company" value={nationalCarrier && nationalCarrier !== insuranceCompany ? `${insuranceCompany} (${nationalCarrier})` : insuranceCompany} />
           <SummaryField label="Adjuster" value={insuranceAdjuster} />
           <SummaryField label="Date of Loss" value={formattedDateOfLoss} />
           <SummaryField label="Claim Number" value={claimNumber} />
+          {policyNumber && <SummaryField label="Policy Number" value={policyNumber} />}
         </div>
       </div>
       <div className="mt-4 rounded-xl border border-sky-100 bg-white p-3">
@@ -1602,6 +1614,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
           justify-content: center;
           border-radius: 16px;
           background: transparent;
+          overflow: hidden;
         }
         .sds-icon-img {
           width: 100%;
@@ -1633,6 +1646,12 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
           transform: scale(0.88);
           transform-origin: center;
         }
+        .sds-icon-img--pets {
+          object-fit: cover !important;
+          object-position: top center !important;
+          transform: scale(1.15) translateY(-8%);
+          transform-origin: top center;
+        }
       `}</style>
 
       <div ref={printRootRef} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-slate-200 print-container print-scroll sds-print-root">
@@ -1659,11 +1678,16 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
             <SdsProjectSummarySection
               orderName={orderName}
               primaryCustomerName={primaryCustomerName}
+              primaryCustomerPhone={primaryCustomer?.phone || ""}
+              primaryCustomerEmail={primaryCustomer?.email || ""}
               address={address}
               insuranceCompany={insuranceCompany}
               insuranceAdjuster={insuranceAdjuster}
               formattedDateOfLoss={formattedDateOfLoss}
               claimNumber={claimNumber}
+              policyNumber={policyNumber}
+              nationalCarrier={nationalCarrier}
+              primaryLossType={primaryLossType}
               serviceOfferings={noeServiceOfferings}
               orderTypes={orderTypes}
               lossDetails={lossDetails}

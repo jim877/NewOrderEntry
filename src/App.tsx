@@ -112,8 +112,8 @@ const STYLES = `
   .placeholder-shell {
       border-width: 2px !important;
       border-style: dotted !important;
-      border-color: #f59e0b !important;
-      background: linear-gradient(135deg, #fff7ed 0%, #ffffff 68%);
+      border-color: #fbbf24 !important;
+      background: #fffbeb !important;
   }
   .placeholder-chip {
       border: 1px dotted #f59e0b;
@@ -168,6 +168,7 @@ const STYLES = `
   .compact-mode .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.4rem !important; }
 
   html { scroll-behavior: smooth; }
+  .google-address-search input:focus { outline: none !important; box-shadow: none !important; ring: none !important; }
 `;
 
 // --- UTILS ---
@@ -434,7 +435,7 @@ const VENDOR_TYPES=["Art","Contents","Moving","Mitigation","Contractor","Consult
 const SALES_REPS=["Dave Fenyo, Sales Rep","Jim Fenyo","Josh Cintron, Sales Rep"];
 const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Textiles","TLI","Expert Stain Removal"];
 const SUGGESTED_GROUPS = ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"];
-const LIVING_STATUS_ADDRESS_TYPES = ["Moving", "Hotel", "Neighbor", "Relative", "Rental", "Other Home"];
+const LIVING_STATUS_ADDRESS_TYPES = ["Moving", "Hotel", "Temp", "Neighbor", "Relative", "Rental", "Other Home"];
 const SUGGESTED_GROUP_HELP = {
   RD: "Rush Delivery (within 1 week)",
   RFD: "Rush Final Delivery (all within 1 week)",
@@ -933,34 +934,30 @@ const EntityPreferencePanel = ({
     if (!entries.length) return null;
     const collapsed = collapsedState[groupKey];
     return (
-      <div key={`instruction-group-${groupKey}`} className="rounded-lg border border-slate-200 bg-white">
+      <div key={`instruction-group-${groupKey}`} className="rounded-lg border border-slate-100 bg-slate-50/50">
         <button
           type="button"
           onClick={() => toggleGroup(groupKey, seenKey ? [seenKey] : [])}
-          className="flex w-full items-center justify-between gap-3 rounded-t-lg border-b border-amber-100 bg-amber-50/60 px-3 py-2 text-left"
+          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50 transition-colors rounded-lg"
         >
-          <span className="text-[13px] font-medium text-slate-700">{title}</span>
-          <span className="text-base font-semibold leading-none text-amber-700">{collapsed ? "+" : "-"}</span>
+          <span className="text-[11px] font-bold text-slate-500">{title}</span>
+          <Chevron open={!collapsed} />
         </button>
         {!collapsed ? (
-          <div className="px-3 py-2">
-            <div className="space-y-1.5">
+          <div className="px-3 py-2 border-t border-slate-100">
+            <div className="space-y-1">
               {entries.map((item) => (
                 item.isPaperwork ? (
                   <div
                     key={`${groupKey}-${item.type}-${item.text}`}
-                    className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-[13px] leading-6 text-amber-900"
+                    className="flex items-start gap-2 text-xs text-slate-700"
                   >
-                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-                    <div>
-                      <span className="font-semibold text-amber-900">Special paperwork required:</span>
-                      <span>{` ${item.text}`}</span>
-                    </div>
+                    <span className="text-amber-600 shrink-0">📄</span>
+                    <span><span className="font-bold text-slate-800">Paperwork:</span> {item.text}</span>
                   </div>
                 ) : (
-                  <div key={`${groupKey}-${item.type}-${item.text}`} className="text-[13px] leading-6 text-slate-700">
-                    <span className="font-semibold text-slate-900">{`${item.type}:`}</span>
-                    <span>{` ${item.text}`}</span>
+                  <div key={`${groupKey}-${item.type}-${item.text}`} className="text-xs text-slate-600">
+                    <span className="font-bold text-slate-700">{item.type}:</span> {item.text}
                   </div>
                 )
               ))}
@@ -1491,9 +1488,10 @@ function initAddress(overrides={}){
 
 const isAddressPlaceholder = (addr = {}) => {
   if (isPlaceholderFlagActive(addr?.placeholder)) return true;
-  const street = (addr?.street || "").trim().toUpperCase();
+  const street = (addr?.street || "").trim();
   const type = (addr?.type || "").trim().toLowerCase();
-  return street === "TBD" || type.includes("placeholder");
+  if (!street) return true;
+  return street.toUpperCase() === "TBD" || type.includes("placeholder");
 };
 
 const entryContactList = (entry = {}) => {
@@ -1799,7 +1797,7 @@ const buildNarrativeProse = (narrative = [], data = {}) => {
   if (g["Services"]) p.push(`Our scope of work includes ${g["Services"][0].toLowerCase()}.`);
 
   // Conditions
-  if (g["Conditions"]) p.push(`At the home, the site is currently ${g["Conditions"][0]}`);
+  if (g["Conditions"]) p.push(`At the home, the site currently has ${g["Conditions"][0]}`);
 
   // Customer care
   const careParts = [];
@@ -1810,7 +1808,7 @@ const buildNarrativeProse = (narrative = [], data = {}) => {
 
   // Living + Storage
   if (g["Living"]) {
-    let living = `The customer is currently ${g["Living"][0] === "Staying in home" ? "staying in the home" : g["Living"][0] === "Temp Housing" ? "in temporary housing" : "permanently relocating"}`;
+    let living = `The customer is currently ${g["Living"][0] === "Staying in home" ? "staying in the home" : g["Living"][0] === "Hotel" ? "staying in a hotel" : g["Living"][0] === "Temp" ? "in a temporary home" : g["Living"][0] === "Moving" ? "permanently relocating" : "in temporary housing"}`;
     if (g["Storage"]) living += ` and will need ${g["Storage"][0].toLowerCase()}`;
     p.push(living + ".");
   }
@@ -1830,28 +1828,15 @@ const buildNarrativeProse = (narrative = [], data = {}) => {
   return p;
 };
 
-const SummaryLine = ({ label, value, className }) => {
-  if (!value) return null;
+const CoachingTip = ({ tipKey, dismissed, onDismiss, children, className }) => {
+  if (dismissed.has(tipKey)) return null;
   return (
-    <div className={`flex items-baseline gap-2 ${className || ""}`}>
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">{label}</span>
-      <span className="text-sm text-slate-700">{value}</span>
+    <div className={`rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 ${className || ""}`}>
+      <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDismiss(tipKey); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
+      {children}
     </div>
   );
 };
-
-const SectionSummary = ({ lines, onEdit }) => (
-  <div className="px-4 py-3 space-y-1.5 cursor-pointer hover:bg-sky-50/30 transition-colors rounded-lg" onClick={onEdit}>
-    {lines.filter(Boolean).length > 0 ? (
-      lines.filter(Boolean).map((line, idx) => (
-        <SummaryLine key={idx} label={line.label} value={line.value} />
-      ))
-    ) : (
-      <div className="text-xs text-slate-400 italic">No data entered yet — click to edit</div>
-    )}
-    <div className="text-[10px] text-sky-600 font-bold mt-1">Click to edit</div>
-  </div>
-);
 
 const Field = ({label,children,subtle,missing, className, action, smart, id, noeField}) => (
   <div id={id} className={`flex flex-col gap-1.5 ${className||""}`} data-noe-field={noeField || undefined} data-noe-label={label || undefined}>
@@ -2296,7 +2281,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onAddNew(query.trim()); setOpen(false); }}
+              onClick={() => { onAddNew(query.trim()); setQuery(""); setOpen(false); }}
               className="w-full text-left px-3 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-50 border-t border-slate-100 flex items-center gap-2"
             >
               <span className="text-base">+</span>
@@ -2343,7 +2328,7 @@ const SmartNotification = ({ message, onReject, onClose }) => {
 
 const pillBase = "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-all duration-200 cursor-pointer select-none";
 const pillInactive = "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50";
-const pillActive = "bg-sky-50 border-sky-500 text-sky-700 font-bold shadow-sm animate-outline-fade-purple"; 
+const pillActive = "bg-sky-50 border-sky-300 text-sky-700 font-bold shadow-sm"; 
 
 const ToggleGroup = ({ options, value, onChange, noeField }) => (
   <div className="flex flex-wrap gap-2" data-noe-field={noeField || undefined} data-noe-value={value || undefined}>
@@ -2897,7 +2882,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       </Field>
       {showInlineHelp && data.leadSourceCategory === "Referral" && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> The referrer called us with this order. If assigned, we can begin. If only a lead, we cannot contact the customer yet.
+          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Referrer:</span> The referrer reached out with this order. If assigned, we can begin. If only a lead, we cannot contact the customer yet.
         </div>
       )}
 
@@ -3282,16 +3267,17 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec1', sub: 'order', label: 'Origin', keywords: 'origin location' },
     { id: 'sec1', sub: 'order', label: 'Severity', keywords: 'severity rejects' },
     { id: 'sec1', sub: 'interview', label: 'Interview', keywords: 'interview living staying temp moving repairs packout conditions' },
-    { id: 'sec1', sub: 'codes', label: 'Order Codes', keywords: 'handling severity quality box damp' },
+    { id: 'sec1', sub: 'codes', label: 'Order Codes', keywords: 'handling severity quality box damp det detergent allergy wet ppe' },
     { id: 'sec1', sub: 'codes', label: 'Order Instructions', keywords: 'instructions tagging cleaning packing delivery communication scheduling pickup billing collections' },
     { id: 'sec1', sub: 'source', label: 'Source', keywords: 'source referral marketing internal method sales rep' },
     { id: 'sec1', sub: 'source', label: 'Referrer (Contact or Company)', keywords: 'referrer referring company contact' },
     { id: 'sec1', sub: 'source', label: 'Method', keywords: 'method call email form meeting text tpa' },
     { id: 'sec1', sub: 'source', label: 'Sales Rep', keywords: 'sales rep representative rep' },
 
-    { id: 'sec1', label: 'Notes & Instructions', keywords: 'notes instructions event notes' },
-    { id: 'sec1', sub: 'interview', label: 'Pets', keywords: 'pets animals dog cat bird fish household' },
-    { id: 'sec1', sub: 'interview', label: 'Special Considerations', keywords: 'elderly pregnancy baby hearing impaired respiratory premium brands skin sensitivity considerations' },
+    { id: 'sec1', label: 'Event Instructions', keywords: 'notes instructions event notes' },
+    { id: 'sec2', label: 'Household', keywords: 'pets animals dog cat bird fish household children child baby infant elderly housekeeper caretaker tenant roommate', navAction: 'openPets' },
+    { id: 'sec1', sub: 'interview', label: 'Special Considerations', keywords: 'elderly pregnancy baby hearing impaired respiratory premium brands skin sensitivity considerations allergy allergies soap detergent fragrance' },
+    { id: 'sec1', sub: 'interview', label: 'Soap & Fragrance Allergies', keywords: 'soap fragrance allergy allergies detergent sensitive skin hypoallergenic det special' },
     { id: 'sec1', sub: 'interview', label: 'Conditions', keywords: 'still wet mold structural damage no electricity no heat boarded up conditions' },
     { id: 'sec1', sub: 'interview', label: 'Living Situation', keywords: 'living staying moving temp housing hotel displaced' },
     { id: 'sec1', sub: 'interview', label: 'Storage', keywords: 'storage long term months' },
@@ -3328,7 +3314,6 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec4', sub: 'insurance', label: 'Adjuster', keywords: 'adjuster' },
     { id: 'sec4', sub: 'insurance', label: 'Claim #', keywords: 'claim # claim number' },
     { id: 'sec4', sub: 'insurance', label: 'Date of Loss', keywords: 'date of loss' },
-    { id: 'sec4', sub: 'insurance', label: 'Work Order #', keywords: 'work order number' },
     { id: 'sec4', sub: 'insurance', label: 'Policy #', keywords: 'policy number' },
     { id: 'sec4', sub: 'insurance', label: 'Order Specific Email', keywords: 'order specific email insurance email' },
     { id: 'sec4', sub: 'insurance', label: 'Contents Limit', keywords: 'contents limit coverage' },
@@ -3474,7 +3459,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 };
 
 // --- UNIFIED FLOATING HEADER (PROGRESS HEADER) ---
-const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, summaryMode, setSummaryMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
+const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, onShowSds, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
     const steps = [
         { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }, { id: "interview", label: "Interview" }, { id: "codes", label: "Codes" }] },
         { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
@@ -3568,7 +3553,7 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                            <div className="flex items-center bg-slate-100 rounded-full p-0.5 gap-0.5">
                              <button className="rounded-full px-2.5 py-1 text-[10px] font-bold bg-white text-sky-700 shadow-sm">Order</button>
                              <button onClick={() => setEntryMode('same-day-scope')} className="rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Scope</button>
-                             <button onClick={() => setShowSdsPreview(true)} className="rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">SDS</button>
+                             <button onClick={onShowSds} className="rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">SDS</button>
                            </div>
                          </div>
                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">{version}</span>
@@ -3648,15 +3633,6 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                 {entryMode !== 'detailed' && <div className="flex-1"></div>}
 
                 <div className="min-w-[120px] flex justify-end gap-2 relative">
-                    {entryMode === 'detailed' && setSummaryMode && (
-                      <button
-                        onClick={() => setSummaryMode(v => !v)}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${summaryMode ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-400 hover:border-emerald-300'}`}
-                        title={summaryMode ? "Switch to Edit Mode" : "Switch to Summary Mode"}
-                      >
-                        {summaryMode ? "📋 Summary" : "📋"}
-                      </button>
-                    )}
                     <button
                         onClick={() => setShowCoaching(v => !v)}
                         className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${showCoaching ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-400 hover:border-violet-300'}`}
@@ -3761,7 +3737,7 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, onAudit, auditOn, se
 };
 
 
-const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaretClick, children, badges, className, compact, noeSection, summary }) => {
+const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaretClick, children, badges, className, compact, noeSection }) => {
   const handleHeaderClick = () => {
     if (onHeaderClick) {
       onHeaderClick();
@@ -3812,17 +3788,31 @@ const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaret
         </button>
       </div>
       {isOpen && <div className={`border-t border-slate-100 ${compact ? 'p-3 sm:p-4' : 'p-4 sm:p-6'} fade-in`}>{children}</div>}
-      {!isOpen && summary && <div className="border-t border-slate-100">{summary}</div>}
     </div>
   );
 };
 
 // --- SUB-COMPONENTS ---
-const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts, sdsConsiderations = [], householdAnimals = "", onUpdatePets }) => {
+const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts, sdsConsiderations = [], householdAnimals = "", onUpdatePets, household = [] }) => {
   const toggleList = (list, value) => list.includes(value) ? list.filter(v=>v!==value) : [...list, value];
-  const [householdName, setHouseholdName] = useState("");
   const customerDisplayName = [c.first, c.last].filter(hasMeaningfulValue).join(" ").trim();
   const [open, setOpen] = useState(!customerDisplayName);
+  useEffect(() => {
+    if (c._forceOpen) {
+      setOpen(true);
+      updateCust(c.id, { _forceOpen: false });
+      setTimeout(() => {
+        const card = document.querySelector(`[data-customer-id="${c.id}"]`);
+        if (!card) return;
+        if (!hasMeaningfulValue(c.type)) {
+          const typeInput = card.querySelector('input[placeholder="Type..."], [class*="SearchSelect"] input');
+          if (typeInput) { typeInput.focus(); return; }
+        }
+        const firstInput = card.querySelector('input[data-audit-key="custFirst"], input:not([type="hidden"])');
+        if (firstInput) firstInput.focus();
+      }, 150);
+    }
+  }, [c._forceOpen]);
   const customerPlaceholder = isPlaceholderFlagActive(c.placeholder);
   const customerRoleLabel = hasMeaningfulValue(c.type) ? c.type : (c.isPrimary ? "Primary" : "Relationship");
   const hasMobile = (c.phone || "").replace(/[^\d]/g, "").length >= 10;
@@ -3836,9 +3826,8 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
     const nextNoteText = [base, line].filter(Boolean).join("\n");
     updateCust(c.id, { quickNotes: nextNotes, note: nextNoteText });
   };
-  const isIncomplete = customerPlaceholder || !hasMeaningfulValue(c.last);
-  const petText = (householdAnimals || "").trim();
-  const hasPets = sdsConsiderations.includes("Pets") && c.isPrimary;
+  const hasContact = hasMeaningfulValue(c.phone) || hasMeaningfulValue(c.email);
+  const isIncomplete = customerPlaceholder || !hasMeaningfulValue(c.last) || (hasMeaningfulValue(c.first) && !hasContact);
   const getPetIcon = (text) => {
     const t = (text || "").toLowerCase();
     if (/\bdog\b|puppy|pup\b|golden|lab\b|shepherd|poodle|terrier|bulldog|beagle|husky|shih\s*tzu|chihuahua|dachshund|corgi|pitbull|rottweiler/.test(t)) return "🐕";
@@ -3849,16 +3838,16 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
     if (/\bhamster|guinea|gerbil/.test(t)) return "🐹";
     if (/\bsnake|lizard|reptile|gecko|iguana|turtle|tortoise/.test(t)) return "🐍";
     if (/\bhorse|pony/.test(t)) return "🐴";
-    return "🐾";
+    return "🐕";
   };
   return (
     <div
       data-audit-key={customerPlaceholder ? `placeholder-customer-${c.id}` : undefined}
       data-customer-id={c.id}
-      className={`group relative rounded-lg sm:rounded-xl border p-3 sm:p-5 shadow-sm transition-all hover:shadow-md ${isIncomplete ? "border-amber-300 bg-amber-50/30 hover:border-amber-400" : customerPlaceholder ? "placeholder-shell bg-white" : c.isPrimary ? "border-sky-400 ring-1 ring-sky-50 bg-white" : "border-slate-200 bg-white hover:border-sky-300"}`}
+      className={`group relative rounded-lg sm:rounded-xl border ${open ? 'p-3 sm:p-5' : 'px-3 py-2 sm:px-4 sm:py-2.5'} shadow-sm transition-all hover:shadow-md ${isIncomplete ? "placeholder-shell" : customerPlaceholder ? "placeholder-shell" : c.isPrimary ? "border-sky-300 bg-white" : "border-slate-200 bg-white hover:border-sky-300"}`}
     >
       {c.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
-      {total > 1 && !c._showMenu && ( <button onClick={() => updateCust(c.id, { _showMenu: true })} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
+      {total > 1 && !c._showMenu && ( <button onClick={() => { if (!hasMeaningfulValue(c.first) && !hasMeaningfulValue(c.last) && !hasMeaningfulValue(c.phone) && !hasMeaningfulValue(c.email)) { onRemove(c.id, index); } else { updateCust(c.id, { _showMenu: true }); } }} className={`absolute ${open ? 'right-3 top-3 h-7 w-7' : 'right-2 top-2 h-5 w-5 text-xs'} grid place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors`}>×</button> )}
       {c._showMenu && (
         <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => updateCust(c.id, { _showMenu: false })}>
           <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -3869,14 +3858,14 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
             <div className="p-3 space-y-1">
               <button onClick={() => updateCust(c.id, { _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
               <button onClick={() => updateCust(c.id, { inactive: true, _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50">Make Inactive</button>
-              <button onClick={() => { if (window.confirm(`Permanently delete ${customerDisplayName || "this customer"}?`)) onRemove(c.id, index); else updateCust(c.id, { _showMenu: false }); }} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
+              <button onClick={() => { onRemove(c.id, index); }} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
             </div>
           </div>
         </div>
       )}
       
       <div
-        className="mb-4 flex cursor-pointer flex-col gap-3 pl-1 sm:pl-2 sm:flex-row sm:items-center sm:justify-between"
+        className={`${open ? 'mb-4' : 'mb-0'} flex cursor-pointer flex-col gap-2 pl-1 sm:pl-2 sm:flex-row sm:items-center sm:justify-between`}
         onClick={(e) => {
           if (isHeaderToggleIgnoredTarget(e.target)) return;
           setOpen(v => !v);
@@ -3891,24 +3880,21 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
 	            >
               <Chevron open={open} />
             </button>
-	            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-600">{index + 1}</div>
+	            <div className={`flex items-center justify-center rounded-full bg-sky-100 font-bold text-sky-600 ${open ? 'h-8 w-8 text-xs' : 'h-6 w-6 text-[10px]'}`}>{index + 1}</div>
 	            <div className="flex flex-col">
 	              <span className={`text-sm font-semibold ${customerDisplayName ? "text-slate-800" : (customerPlaceholder ? "placeholder-text" : "text-slate-800")}`}>{customerDisplayName || "Customer"}</span>
-	              <div className="flex items-center gap-2">
-	                <span className={`text-[10px] ${customerPlaceholder ? "placeholder-text" : "text-slate-500"}`}>{customerRoleLabel}</span>
-	                {hasPets && petText && (
-	                  <span className="text-[10px] text-slate-600" title={petText}>{getPetIcon(petText)} {petText}</span>
-	                )}
-	              </div>
+	              <span className={`text-[10px] ${customerPlaceholder ? "placeholder-text" : "text-slate-500"}`}>{customerRoleLabel}</span>
 	            </div>
               {customerPlaceholder && (
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>
               )}
+              {c.doNotContact && <span className="rounded-full bg-rose-100 border border-rose-300 px-2 py-0.5 text-[10px] font-bold text-rose-700">Do Not Contact</span>}
+              {c.contactViaRep && <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700">Via Rep</span>}
 	         </div>
-	         <div className="flex flex-wrap gap-2">
-	            <ToggleMulti className="!py-1 !px-3 sm:!px-3 !text-xs" label="Primary" title={ROLE_COACHING["Primary"]} checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
-            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Policy Holder" title={ROLE_COACHING["Policyholder"]} checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder })} />
-            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay })} />
+	         <div className="flex flex-wrap gap-1.5">
+	            <ToggleMulti className={`${open ? '!py-1 !px-3' : '!py-0.5 !px-2'} !text-[10px]`} label="Primary" title={ROLE_COACHING["Primary"]} checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
+            <ToggleMulti className={`${open ? '!py-1 !px-2 sm:!px-3' : '!py-0.5 !px-2'} !text-[10px]`} label="Policy Holder" title={ROLE_COACHING["Policyholder"]} checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder })} />
+            <ToggleMulti className={`${open ? '!py-1 !px-2 sm:!px-3' : '!py-0.5 !px-2'} !text-[10px]`} label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay })} />
          </div>
       </div>
 
@@ -3925,7 +3911,7 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
              <Field label="First Name"><Input data-audit-key="custFirst" className={index===0 && auditOn && highlightMissing?.custFirst ? "audit-missing" : ""} value={c.first} onChange={e=>updateCust(c.id,{first:e.target.value})} /></Field>
            </div>
            <div className="col-span-2 sm:col-span-1">
-             <Field label="Last Name"><Input data-audit-key="custLast" className={!hasMeaningfulValue(c.last) ? "attention-outline" : ""} value={c.last} onChange={e=>updateCust(c.id,{last:e.target.value})} /></Field>
+             <Field label="Last Name"><Input data-audit-key="custLast" className={hasMeaningfulValue(c.first) && !hasMeaningfulValue(c.last) ? "attention-outline" : ""} value={c.last} onChange={e=>updateCust(c.id,{last:e.target.value})} /></Field>
            </div>
            <div className="col-span-2 sm:col-span-1">
              <Field label="Phone"><Input data-audit-key="custPhone" type="tel" value={c.phone} onChange={e=>updateCust(c.id,{phone: formatPhoneNumber(e.target.value)})} maxLength={14} placeholder="(555) 123-4567" /></Field>
@@ -3937,14 +3923,22 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
 
          {/* Preferred contact — compact inline */}
          <div className="flex items-center gap-2 flex-wrap">
-           <span className="text-[10px] font-bold text-slate-400 uppercase">Contact via:</span>
-           {["Phone", "Email", "Text", "Do Not Contact"].map(m => (
-             <ToggleMulti key={m} label={m} checked={m === "Do Not Contact" ? !!c.doNotContact : c.preferredContact === m} onChange={() => {
-               if (m === "Do Not Contact") updateCust(c.id, { doNotContact: !c.doNotContact, preferredContact: !c.doNotContact ? "" : c.preferredContact });
-               else updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false });
-             }} className="!text-[10px] !px-2 !py-1" colorClass={m === "Do Not Contact" ? "!bg-rose-50 !border-rose-300 !text-rose-700" : ""} />
+           <span className="text-[10px] font-bold text-slate-400 uppercase">Preferred method:</span>
+           {["Phone", "Email", "Text"].map(m => (
+             <ToggleMulti key={m} label={m} checked={c.preferredContact === m} onChange={() => {
+               updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false, contactViaRep: false });
+             }} className="!text-[10px] !px-2 !py-1" />
            ))}
+           <span className="w-px h-4 bg-slate-200 mx-0.5" />
+           <ToggleMulti label="Contact via Rep" checked={!!c.contactViaRep} onChange={() => updateCust(c.id, { contactViaRep: !c.contactViaRep, doNotContact: false, preferredContact: "" })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-amber-50 !border-amber-300 !text-amber-700" />
+           <ToggleMulti label="Do Not Contact" checked={!!c.doNotContact} onChange={() => updateCust(c.id, { doNotContact: !c.doNotContact, contactViaRep: false, preferredContact: "" })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-rose-50 !border-rose-300 !text-rose-700" />
          </div>
+         {c.contactViaRep && (
+           <div className="text-[10px] text-amber-600 pl-1">All communication for this contact should go through their representative.</div>
+         )}
+         {c.doNotContact && (
+           <div className="text-[10px] text-rose-600 pl-1">This person is flagged as Do Not Contact — the system will block outreach.</div>
+         )}
 
          {/* SECONDARY — compact action buttons */}
          <div className="flex items-center gap-2 flex-wrap">
@@ -3962,41 +3956,7 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
            >
              📝 Add Note
            </button>
-           {c.isPrimary && (
-             <button
-               type="button"
-               onClick={() => updateCust(c.id, { showPetsPanel: !c.showPetsPanel })}
-               className={`rounded-full border px-3 py-1 text-[10px] font-bold ${c.showPetsPanel ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}
-             >
-               {hasPets ? `${getPetIcon(petText)} Pets` : "🐾 Pets"}
-             </button>
-           )}
          </div>
-
-         {/* Pets — expanded only when clicked */}
-         {c.showPetsPanel && c.isPrimary && (
-           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
-             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pets in the household</div>
-             <div className="grid grid-cols-3 gap-2">
-               <div className="col-span-1">
-                 <Select value={(petText.match(/\b(dog|cat|bird|fish|rabbit|hamster|snake|lizard|turtle|horse|other)\b/i) || [""])[0].toLowerCase() || ""} onChange={e => {
-                   const type = e.target.value;
-                   const existingName = petText.replace(/^(dog|cat|bird|fish|rabbit|hamster|snake|lizard|turtle|horse|other)\b\s*/i, "").trim();
-                   const newAnimals = type ? (existingName ? `${type} ${existingName}` : type) : existingName;
-                   onUpdatePets?.(newAnimals, sdsConsiderations.includes("Pets") ? sdsConsiderations : [...sdsConsiderations, "Pets"]);
-                 }}>
-                   <option value="">Type...</option>
-                   {["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Snake", "Lizard", "Turtle", "Horse", "Other"].map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}
-                 </Select>
-               </div>
-               <div className="col-span-2">
-                 <Input value={householdAnimals} onChange={e => {
-                   onUpdatePets?.(e.target.value, e.target.value.trim() && !sdsConsiderations.includes("Pets") ? [...sdsConsiderations, "Pets"] : sdsConsiderations);
-                 }} placeholder="e.g. Spot, Shih Tzu — friendly" />
-               </div>
-             </div>
-           </div>
-         )}
 
          {/* Welcome text — expanded only when clicked */}
          {c.showWelcomePanel && (
@@ -4028,61 +3988,6 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
            </div>
          )}
 
-         {c.isPrimary && (
-           <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 space-y-3">
-               <div className="flex items-center justify-between">
-                   <span className="text-sm font-bold text-emerald-800">Household</span>
-               </div>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                 <Field label="Number of Members">
-                   <Input type="number" value={c.householdCount || ""} onChange={e=>updateCust(c.id,{householdCount:e.target.value})} placeholder="#" />
-                 </Field>
-                <Field label="Pets">
-                  <Input value={c.householdAnimals || ""} onChange={e=>updateCust(c.id,{householdAnimals:e.target.value})} placeholder="Enter type and names" />
-                </Field>
-               </div>
-               <Field label="Quick Add Names">
-                 <div className="flex gap-2">
-                   <Input
-                     value={householdName}
-                     onChange={e=>setHouseholdName(e.target.value)}
-                     placeholder="Name"
-                     onKeyDown={(e) => {
-                       if (e.key === "Enter") {
-                         e.preventDefault();
-                         const name = householdName.trim();
-                         if (!name) return;
-                         const next = [...(c.householdMembers || []), name];
-                         updateCust(c.id, { householdMembers: next });
-                         setHouseholdName("");
-                       }
-                     }}
-                   />
-                   <button
-                     onClick={() => {
-                       const name = householdName.trim();
-                       if (!name) return;
-                       const next = [...(c.householdMembers || []), name];
-                       updateCust(c.id, { householdMembers: next });
-                       setHouseholdName("");
-                     }}
-                     className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-                   >
-                     Add
-                   </button>
-                 </div>
-                 {(c.householdMembers || []).length > 0 && (
-                   <div className="mt-2 flex flex-wrap gap-2">
-                     {(c.householdMembers || []).map((n, idx) => (
-                       <span key={`${n}-${idx}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                         {n}
-                       </span>
-                     ))}
-                   </div>
-                 )}
-               </Field>
-           </div>
-         )}
 
          <div className="flex justify-end">
            <button
@@ -4103,6 +4008,31 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
 const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing, index, onVerify, auditOn, rentOrOwn, rentCoverageLimit, onRentOrOwnChange, onRentCoverageChange, forceShowCoords, autoOpenForTypePrompt, autoFocusTypePrompt, onTypePromptFocused }) => {
   const [coordsOpen, setCoordsOpen] = useState(false);
   const [open, setOpen] = useState(false);
+  const prevOpenRef = useRef(false);
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      setTimeout(() => {
+        const card = document.querySelector(`[data-address-item-id="${addr.id}"]`);
+        if (!card) return;
+        const wrapper = card.querySelector('.google-address-search');
+        const searchInput = wrapper?.querySelector('input');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.style.borderColor = "#0ea5e9";
+          searchInput.style.outline = "none";
+          searchInput.style.boxShadow = "none";
+          setTimeout(() => { searchInput.style.borderColor = ""; }, 2500);
+        }
+      }, 150);
+    }
+    prevOpenRef.current = open;
+  }, [open]);
+  useEffect(() => {
+    if (addr._forceOpen) {
+      setOpen(true);
+      updateAddr(addr.id, { _forceOpen: false });
+    }
+  }, [addr._forceOpen]);
   const typeSelectRef = useRef(null);
   const placeholder = isAddressPlaceholder(addr);
   useEffect(() => {
@@ -4132,13 +4062,13 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
     <div
       data-address-item-id={addr.id}
       data-audit-key={placeholder ? `placeholder-address-${addr.id}` : undefined}
-      className={`group relative overflow-hidden rounded-lg sm:rounded-xl border ${open ? 'p-3 sm:p-5' : 'p-2 sm:p-3'} shadow-sm transition-all hover:shadow-md ${addr.inactive ? "bg-slate-50 opacity-60 border-slate-200" : placeholder ? "placeholder-shell bg-white" : addr.isPrimary ? "bg-white border-sky-400 ring-1 ring-sky-50" : "bg-white border-slate-200"}`}
+      className={`group relative overflow-hidden rounded-lg sm:rounded-xl border ${open ? 'p-3 sm:p-5' : 'px-3 py-2 sm:px-4 sm:py-2.5'} shadow-sm transition-all hover:shadow-md ${addr.inactive ? "bg-slate-50 opacity-60 border-slate-200" : placeholder ? "placeholder-shell bg-white" : addr.isPrimary ? "bg-white border-sky-400 ring-1 ring-sky-50" : "bg-white border-slate-200"}`}
     >
       {addr.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
       {total > 1 && !addr.inactive && (
         <button
           onClick={() => updateAddr(addr.id, { _showMenu: true })}
-          className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+          className={`absolute ${open ? 'right-3 top-3 h-7 w-7' : 'right-2 top-2 h-5 w-5 text-xs'} grid place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors`}
           title="Remove or deactivate address"
         >×</button>
       )}
@@ -4151,8 +4081,10 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
             </div>
             <div className="p-3 space-y-1">
               <button onClick={() => updateAddr(addr.id, { _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button onClick={() => updateAddr(addr.id, { inactive: true, isPrimary: false, isLossSite: false, _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50">Make Inactive</button>
-              <button onClick={() => { if (window.confirm("Permanently delete this address?")) onRemove(addr.id); else updateAddr(addr.id, { _showMenu: false }); }} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
+              {hasMeaningfulValue(addr.street) && (
+                <button onClick={() => updateAddr(addr.id, { inactive: true, isPrimary: false, isLossSite: false, _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50">Make Inactive</button>
+              )}
+              <button onClick={() => { if (hasMeaningfulValue(addr.street) ? window.confirm("Permanently delete this address?") : true) onRemove(addr.id); else updateAddr(addr.id, { _showMenu: false }); }} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
             </div>
           </div>
         </div>
@@ -4184,7 +4116,7 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
          </button>
          <div className="flex flex-col min-w-0">
            <div className="flex items-center gap-2">
-             <span className={`text-base font-bold truncate ${placeholder ? "placeholder-text" : "text-slate-800"}`}>{addr.type || "Address"}</span>
+             <span className={`${open ? 'text-base' : 'text-sm'} font-bold truncate ${placeholder ? "placeholder-text" : "text-slate-800"}`}>{addr.type || "Address"}</span>
              {verified
                ? <span title="This address was found and confirmed via Google Maps." className="rounded-full bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700 cursor-help shrink-0">✓</span>
                : null
@@ -4195,14 +4127,41 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
          <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
            {addr.inactive && <span className="rounded-full bg-slate-200 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-500">Inactive</span>}
            {placeholder && !addr.inactive && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>}
-           <button type="button" onClick={() => updateAddr(addr.id, { isPrimary: !addr.isPrimary })} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${addr.isPrimary ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-sky-300'}`}>Primary</button>
-           <button type="button" onClick={() => updateAddr(addr.id, { isLossSite: !addr.isLossSite })} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${addr.isLossSite ? 'bg-rose-100 border-rose-300 text-rose-700' : 'bg-white border-slate-200 text-slate-400 hover:border-rose-300'}`}>Loss Site</button>
+           <button type="button" onClick={() => updateAddr(addr.id, { isPrimary: !addr.isPrimary })} className={`rounded-full ${open ? 'px-2 py-0.5' : 'px-1.5 py-0.5'} text-[10px] font-bold border ${addr.isPrimary ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-sky-300'}`}>Primary</button>
+           {(addr.isPrimary || addr.isLossSite || open) && (
+             <button type="button" onClick={() => updateAddr(addr.id, { isLossSite: !addr.isLossSite })} className={`rounded-full ${open ? 'px-2 py-0.5' : 'px-1.5 py-0.5'} text-[10px] font-bold border ${addr.isLossSite ? 'bg-rose-100 border-rose-300 text-rose-700' : 'bg-white border-slate-200 text-slate-400 hover:border-rose-300'}`}>Loss Site</button>
+           )}
          </div>
       </div>
       {open && (
-      <div className="space-y-4 pl-1 sm:pl-2">
+      <div className="space-y-4 pl-1 sm:pl-2 mt-3">
         {/* Core Address — always visible */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          {/* Google search inside the address card */}
+          {(() => {
+            const DEMO_RESULTS = [
+              { street: "148 Amsterdam Ave", city: "Hawthorne", state: "NY", zip: "10532", display: "148 Amsterdam Ave, Hawthorne, NY 10532" },
+              { street: "25 Main St", city: "Bloomingdale", state: "NJ", zip: "07403", display: "25 Main St, Bloomingdale, NJ 07403" },
+              { street: "1616 Springfield Ave", city: "Pennsauken", state: "NJ", zip: "08110", display: "1616 Springfield Ave, Pennsauken, NJ 08110" },
+              { street: "17 Wausau St", city: "Ogdensburg", state: "NJ", zip: "07439", display: "17 Wausau St, Ogdensburg, NJ 07439" },
+              { street: "42 Park Ave", apt: "4B", city: "New York", state: "NY", zip: "10016", display: "42 Park Ave #4B, New York, NY 10016" },
+            ];
+            return (
+              <SearchSelect
+                value=""
+                onChange={v => {
+                  const match = DEMO_RESULTS.find(r => r.display === v);
+                  if (match) updateAddr(addr.id, { street: match.street, apt: match.apt || "", city: match.city, state: match.state, zip: match.zip, lat: "40.0", lng: "-74.0" });
+                }}
+                options={DEMO_RESULTS.map(r => ({ label: r.display, value: r.display, type: "address" }))}
+                placeholder="🔍  Find address on Google..."
+                clearOnCommit
+                maxResults={5}
+                autoComplete="off"
+                className="google-address-search !border-sky-300 !rounded-lg !py-3 !shadow-none !ring-0"
+              />
+            );
+          })()}
           <div className="grid grid-cols-4 gap-3">
             <div className="col-span-3"><Field label="Street"><Input data-audit-key="addrStreet" className={index===0 && auditOn && highlightMissing?.addrStreet ? "audit-missing" : ""} value={addr.street} onChange={e=>updateAddr(addr.id,{street:e.target.value})} /></Field></div>
             <div className="col-span-1"><Field label="Apt / Unit"><Input value={addr.apt} onChange={e=>updateAddr(addr.id,{apt:e.target.value})} placeholder="Apt #" /></Field></div>
@@ -4279,6 +4238,7 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
 
 // --- QUICK ENTRY COMPONENT ---
 const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment, toggleNonRestorationPrimary, toggleRestorationType, selectNonRestorationSubtype, onSwitchToDetailed }) => {
+    const recordWord = data.isLead === true ? "Lead" : "Order";
     const [eventNoteDraft, setEventNoteDraft] = useState("");
     const [showQuickInstructions, setShowQuickInstructions] = useState(false);
     const [showLoadListPanel, setShowLoadListPanel] = useState(false);
@@ -4290,6 +4250,8 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
     const [quickCompanyDraftCompany, setQuickCompanyDraftCompany] = useState("");
     const [quickCompanyDraftContact, setQuickCompanyDraftContact] = useState("");
     const [addNewModal, setAddNewModal] = useState(null);
+    const [dismissedTips, setDismissedTips] = useState(new Set());
+    const dismissTip = (key) => setDismissedTips(prev => new Set([...prev, key]));
 
     // Reset add-company state when data is cleared
     const vendorCount = (data.vendors || []).length;
@@ -4345,12 +4307,24 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
     return (
         <div className="space-y-6 fade-in pt-4">
+            {showInlineHelp && (
+              <div className="rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3 flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  <strong className="text-slate-700">Quick Entry</strong> — capture the basics fast. Need more fields? <button type="button" onClick={onSwitchToDetailed} className="font-bold text-sky-600 hover:text-sky-700 underline underline-offset-2">Switch to Detailed</button> anytime, or add extra details in Event Instructions below.
+                </p>
+                {onSwitchToDetailed && (
+                  <button type="button" onClick={onSwitchToDetailed} className="shrink-0 rounded-full border border-sky-300 bg-white px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-50 transition-all">
+                    Detailed Entry
+                  </button>
+                )}
+              </div>
+            )}
             <div id="quick-questions" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28">
               <div className="mb-4">
                 <input
                   value={data.orderName || ""}
                   onChange={e => updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })}
-                  placeholder="Order Name (e.g. Baker-PennsaukenNJ)"
+                  placeholder={`${recordWord} Name (e.g. Baker-PennsaukenNJ)`}
                   className="w-full text-lg font-bold text-sky-700 border-none outline-none bg-transparent placeholder:text-slate-300 placeholder:font-normal"
                   data-noe-field="orderName"
                 />
@@ -4392,6 +4366,12 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   </div>
                   <div className="border-t border-slate-100 pt-4 space-y-4">
                   <Field label="What caused the loss?">
+                    {showInlineHelp && !data.primaryLossType && !dismissedTips.has("Loss Type") && (
+                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-2">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Loss Type"); e.target.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
+                        🎓 <span className="font-bold">Loss Type:</span> Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map((ot) => (
                         <ToggleMulti
@@ -4412,15 +4392,9 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         />
                       ))}
                     </div>
-                    {showInlineHelp && (
-                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button>
-                        <span className="font-bold">Coaching:</span> Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.
-                      </div>
-                    )}
                     {showInlineHelp && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">{data.primaryLossType}:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
                       </div>
                     )}
                   </Field>
@@ -4442,7 +4416,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   {data.primaryLossType && !nonRestorationSelected && (
                     <Field label="Additional contaminants?">
                       <div className="flex flex-wrap gap-2">
-                        {LOSS_TYPES.filter(t => t !== data.primaryLossType && t !== "Other").map(t => (
+                        {LOSS_TYPES.filter(t => t !== data.primaryLossType).map(t => (
                           <ToggleMulti
                             key={t}
                             label={t}
@@ -4489,6 +4463,46 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
                   <div className="border-t border-slate-100 pt-4 space-y-3">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Companies & Contacts on this Order</div>
+                    <SearchSelect
+                      value=""
+                      onChange={v => {
+                        const parsed = parseCombinedContact?.(v) || { contact: "", company: "" };
+                        const companyName = parsed.company || v;
+                        const contactName = parsed.contact || "";
+                        const existing = (data.vendors || []).some(x =>
+                          normalizeCompany(x.company || "") === normalizeCompany(companyName) &&
+                          normalizeContact(x.contact || "") === normalizeContact(contactName)
+                        );
+                        if (existing) { setToast?.(`${contactName ? contactName + " at " : ""}${companyName} is already on this order`); return; }
+                        const isKnown = combinedContactOptions.some(opt =>
+                          normalizeCompany(opt.value || "") === normalizeCompany(v) ||
+                          normalizeContact(opt.value || "") === normalizeContact(v)
+                        );
+                        const inferredType = inferCompanyTypeFromName(companyName);
+                        const entry = {
+                          company: companyName,
+                          contact: contactName,
+                          type: isKnown && inferredType !== "Other" ? inferredType : "",
+                          id: safeUid(),
+                          incomplete: !isKnown,
+                        };
+                        update("vendors", [...(data.vendors || []), entry]);
+                        setToast?.(isKnown
+                          ? `Added ${contactName ? contactName + " at " : ""}${companyName}`
+                          : `Added "${v}" as placeholder — tap Complete to add full details`
+                        );
+                      }}
+                      onQueryChange={() => {}}
+                      options={combinedContactOptions}
+                      placeholder="🔍  Search contacts and companies to add..."
+                      clearOnCommit
+                      onAddNew={v => {
+                        const entry = { company: "", contact: v, type: "", id: safeUid(), incomplete: true };
+                        update("vendors", [...(data.vendors || []), entry]);
+                        setToast?.(`Added "${v}" as placeholder — tap to complete details`);
+                      }}
+                      className="!border-sky-300 !rounded-lg"
+                    />
                     {quickAddedCompanies.length > 0 && (
                       <div className="space-y-2">
                         {quickAddedCompanies.map((v, idx) => {
@@ -4584,49 +4598,6 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         })}
                       </div>
                     )}
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
-                      <SearchSelect
-                        value=""
-                        onChange={v => {
-                          const parsed = parseCombinedContact?.(v) || { contact: "", company: "" };
-                          const companyName = parsed.company || v;
-                          const contactName = parsed.contact || "";
-                          const existing = (data.vendors || []).some(x =>
-                            normalizeCompany(x.company || "") === normalizeCompany(companyName) &&
-                            normalizeContact(x.contact || "") === normalizeContact(contactName)
-                          );
-                          if (existing) { setToast?.(`${contactName ? contactName + " at " : ""}${companyName} is already on this order`); return; }
-                          // Check if this is a known contact/company or a free-typed unknown
-                          const isKnown = combinedContactOptions.some(opt =>
-                            normalizeCompany(opt.value || "") === normalizeCompany(v) ||
-                            normalizeContact(opt.value || "") === normalizeContact(v)
-                          );
-                          const inferredType = inferCompanyTypeFromName(companyName);
-                          const entry = {
-                            company: companyName,
-                            contact: contactName,
-                            type: isKnown && inferredType !== "Other" ? inferredType : "",
-                            id: safeUid(),
-                            incomplete: !isKnown,
-                          };
-                          update("vendors", [...(data.vendors || []), entry]);
-                          setToast?.(isKnown
-                            ? `Added ${contactName ? contactName + " at " : ""}${companyName}`
-                            : `Added "${v}" as placeholder — tap Complete to add full details`
-                          );
-                        }}
-                        onQueryChange={() => {}}
-                        options={combinedContactOptions}
-                        placeholder="Search existing contacts and companies to add..."
-                        clearOnCommit
-                        onAddNew={v => {
-                          const entry = { company: "", contact: v, type: "", id: safeUid(), incomplete: true };
-                          update("vendors", [...(data.vendors || []), entry]);
-                          setToast?.(`Added "${v}" as placeholder — tap to complete details`);
-                        }}
-                      />
-                      <div className="text-[10px] text-slate-400">Select to add. Not found? Click "+ Add" to save as placeholder.</div>
-                    </div>
                   </div>
               </div>
             </div>
@@ -4679,12 +4650,11 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
             </div>
 
             <div id="quick-scheduling" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="scheduling">
-                <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Scheduling</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                     <button onClick={() => update('scheduleType', 'Scope')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Scope' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">📋</span><span className="font-bold text-xs">Scope</span></button>
-                     <button onClick={() => update('scheduleType', 'Pickup')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Pickup' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🚚</span><span className="font-bold text-xs">Pickup</span></button>
-                     <button onClick={() => update('scheduleType', 'In-Home')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'In-Home' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🏡</span><span className="font-bold text-xs">In-Home</span></button>
-                     <button onClick={() => update('scheduleType', 'Meeting')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Meeting' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🗓️</span><span className="font-bold text-xs">Meeting</span></button>
+                <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Schedule & Event Instructions</h3>
+                <div className="mb-4">
+                  <Field label="Event Type">
+                    <ToggleGroup options={["Scope","Pickup","In-Home","Meeting"]} value={data.scheduleType} onChange={v => update("scheduleType", v)} />
+                  </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 mb-4">
                     <Field
@@ -4728,47 +4698,29 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     TBD — on the calendar but time not yet confirmed.
                   </div>
                 )}
-            </div>
-
-            <div id="quick-instructions" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="event-instructions">
-                <h3 className="mb-1 text-sm font-bold uppercase text-sky-600">Notes & Instructions</h3>
-                {showInlineHelp && <p className="text-xs text-slate-400 mb-3">Add anything the field team or office needs to know — conditions, special requests, access info, customer preferences, what to bring.</p>}
-                <AutoGrowTextarea
-                  value={stripEventSystemLines(data.eventInstructions || "")}
-                  onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
-                  placeholder="e.g. Fire started in basement. Water in basement too. Boarded up, no electricity — bring lights. Customer is elderly, does not text. Dog on premises. Air-dries all clothing. Will need to pack out rugs, draperies with rods, all clothing."
-                  className="!min-h-[140px]"
-                />
-                <div className="mt-3">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Customer Contact</div>
-                  <div className="flex flex-wrap gap-2">
-                    <ToggleMulti label="Already contacted" checked={data.eventCustomerContacted === "done"} onChange={() => updateMany({ eventCustomerContacted: data.eventCustomerContacted === "done" ? "" : "done", scheduleStatus: "" })} className="!text-[10px] !px-2.5 !py-1" />
-                    <ToggleMulti label="Rep will contact" checked={data.eventCustomerContacted === "rep"} onChange={() => updateMany({ eventCustomerContacted: data.eventCustomerContacted === "rep" ? "" : "rep", scheduleStatus: "" })} className="!text-[10px] !px-2.5 !py-1" />
-                    <ToggleMulti label="Office please contact" checked={data.eventCustomerContacted === "office"} onChange={() => updateMany({ eventCustomerContacted: data.eventCustomerContacted === "office" ? "" : "office", scheduleStatus: "Office will contact" })} className="!text-[10px] !px-2.5 !py-1" />
-                    <ToggleMulti label="Enter only — do not contact" checked={data.eventCustomerContacted === "enter-only"} onChange={() => updateMany({ eventCustomerContacted: data.eventCustomerContacted === "enter-only" ? "" : "enter-only", scheduleStatus: "" })} className="!text-[10px] !px-2.5 !py-1" />
+                <div className="border-t border-slate-100 pt-4 mt-4">
+                  <div className="text-sm font-bold text-slate-700 mb-1">Event Instructions</div>
+                  {showInlineHelp && <p className="text-xs text-slate-400 mb-2">What the field team needs to know — conditions, access, customer preferences, what to bring.</p>}
+                  <AutoGrowTextarea
+                    value={stripEventSystemLines(data.eventInstructions || "")}
+                    onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
+                    placeholder="e.g. Fire started in basement. Water in basement too. Boarded up, no electricity — bring lights. Customer is elderly, does not text. Dog on premises."
+                    className="!min-h-[100px]"
+                  />
+                </div>
+                <div className="border-t border-slate-100 pt-3 mt-3 space-y-3">
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Who is contacting the customer?</div>
+                    <div className="flex flex-wrap gap-2">
+                      <ToggleMulti label="Already contacted" checked={data.contactAssignment === "done"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "done" ? "" : "done" })} className="!text-[10px] !px-2.5 !py-1" />
+                      <ToggleMulti label="Rep will contact" checked={data.contactAssignment === "rep"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "rep" ? "" : "rep" })} className="!text-[10px] !px-2.5 !py-1" />
+                      <ToggleMulti label="Office please contact" checked={data.contactAssignment === "office"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "office" ? "" : "office" })} className="!text-[10px] !px-2.5 !py-1" />
+                      <ToggleMulti label="Enter only — do not contact" checked={data.contactAssignment === "enter-only"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "enter-only" ? "" : "enter-only" })} className="!text-[10px] !px-2.5 !py-1" />
+                    </div>
                   </div>
                 </div>
             </div>
 
-            <div className="rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50/80 to-white p-5 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <div className="text-sm font-bold text-slate-700">Have more details?</div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Insurance, adjuster, conditions, contacts, vendors, scope instructions — switch to Detailed to capture everything. Or put the details in the notes field above so nothing is lost.
-                  </p>
-                </div>
-                {onSwitchToDetailed && (
-                  <button
-                    type="button"
-                    onClick={onSwitchToDetailed}
-                    className="shrink-0 rounded-lg border border-sky-300 bg-white px-5 py-2.5 text-sm font-bold text-sky-700 shadow-sm hover:bg-sky-50 hover:border-sky-400 transition-all"
-                  >
-                    Switch to Detailed
-                  </button>
-                )}
-              </div>
-            </div>
 
             {addNewModal && (
               <div className="fixed inset-0 z-[140] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-8 sm:pt-16 overflow-auto"
@@ -4956,10 +4908,12 @@ export default function App(){
   const [entryMode, setEntryMode] = useState("start"); 
   const [showInlineHelp, setShowInlineHelp] = useState(true);
   const [showCoaching, setShowCoaching] = useState(true);
+  const [dismissedTips, setDismissedTips] = useState(new Set());
+  const dismissTip = (key) => setDismissedTips(prev => new Set([...prev, key]));
+  const tipVisible = (key) => showCoaching && !dismissedTips.has(key);
   const [compactMode, setCompactMode] = useState(false);
-  const [summaryMode, setSummaryMode] = useState(false);
-  const [narrativeOpen, setNarrativeOpen] = useState(true);
-  const [narrativeView, setNarrativeView] = useState("table");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewView, setPreviewView] = useState("narrative");
   const [data, setData] = useState(() => {
     try {
       const s = localStorage.getItem("same-day-scope-v52");
@@ -4984,6 +4938,7 @@ export default function App(){
       };
     } catch(e) { return DEFAULT_FORM; }
   });
+  const recordWord = data.isLead === true ? "Lead" : "Order";
   const [toast, setToast] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const TEST_PRESETS_KEY = "noe-test-presets";
@@ -5040,6 +4995,7 @@ export default function App(){
   const [visitedSections, setVisitedSections] = useState(new Set(['sec1']));
 
   const [alertModal, setAlertModal] = useState(createAlertModalState);
+  const [inlineAlert, setInlineAlert] = useState(null);
   const [smartNotification, setSmartNotification] = useState(null);
   const [conditionAutoFillHints, setConditionAutoFillHints] = useState({});
   const [smartConfirm, setSmartConfirm] = useState(createSmartConfirmState);
@@ -5236,7 +5192,6 @@ export default function App(){
   const [auditOn, setAuditOn] = useState(false);
   const [auditMissing, setAuditMissing] = useState([]);
   const [auditPercent, setAuditPercent] = useState(0);
-  const [saveSummaryOpen, setSaveSummaryOpen] = useState(false);
   const [saveSummaryLines, setSaveSummaryLines] = useState([]);
   const [saveSummaryMissing, setSaveSummaryMissing] = useState([]);
   const [saveExportLines, setSaveExportLines] = useState([]);
@@ -5305,6 +5260,7 @@ export default function App(){
   useEffect(()=>{ localStorage.setItem("contacts-registry",JSON.stringify(contacts)); },[contacts]);
   useEffect(()=>{ localStorage.setItem("same-day-scope-v52", JSON.stringify(data)); },[data]);
   useEffect(()=>{ localStorage.setItem("sample-contacts", JSON.stringify(sampleContacts)); },[sampleContacts]);
+  const [householdEditOpen, setHouseholdEditOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -6195,24 +6151,35 @@ export default function App(){
   const addLivingAddressFromPrompt = useCallback((mode) => {
     const type = livingAddressPrompt.type;
     if (!type) return;
-    const added = ensureAddressType(type, { placeholder: mode === "placeholder" });
+    const added = ensureAddressType(type, { placeholder: true });
     setLivingAddressPrompt({ open: false, type: "" });
     if (!added) {
       setToast(`${type} address already exists.`);
       return;
     }
+    if (mode === "placeholder") {
+      // Stay where we are — just add quietly
+      setToast(`${type} placeholder added — you can enter the address later.`);
+      return;
+    }
+    // "full" mode — navigate to sec3, open the card, focus search
     setOpenSections(prev => ({ ...prev, sec3: true }));
     setVisitedSections(prevV => new Set([...prevV, "sec3"]));
     setActiveSection("sec3");
     setTimeout(() => {
-      const section = document.getElementById("sec3");
-      section?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
-    setToast(
-      mode === "placeholder"
-        ? `${type} placeholder address added.`
-        : `${type} address row added.`
-    );
+      const newAddr = (data.addresses || []).find(a => a.type === type && !a.street);
+      if (newAddr) updateAddr(newAddr.id, { _forceOpen: true });
+      setTimeout(() => {
+        const el = document.querySelector(`[data-address-item-id="${newAddr?.id}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.remove("audit-pulse");
+          void el.offsetWidth;
+          el.classList.add("audit-pulse");
+        }
+      }, 200);
+    }, 150);
+    setToast(`${type} address added — enter the address or use Google search above.`);
   }, [livingAddressPrompt.type]);
 
   const closeLivingAddressPrompt = useCallback(() => {
@@ -6430,6 +6397,17 @@ export default function App(){
       }
   };
 
+  // Auto-suggest DET handling code when allergy-related considerations are selected
+  useEffect(() => {
+    const considerations = data.sdsConsiderations || [];
+    const needsDet = considerations.some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c));
+    const hasDet = (data.handlingCodes || []).includes("Det");
+    if (needsDet && !hasDet) {
+      setData(prev => ({ ...prev, handlingCodes: [...(prev.handlingCodes || []), "Det"] }));
+      setSmartNotification({ message: "Smart Update: Added Det (special detergent) handling code based on customer sensitivity." });
+    }
+  }, [data.sdsConsiderations]);
+
   const rejectSmartAction = () => {
       if (smartNotification) {
           setData(prev => ({
@@ -6539,7 +6517,10 @@ export default function App(){
     if (resolvedSection === "sec4") {
       if (resolvedKey === "billing") setBillingSubOpen(true);
       else if (resolvedKey === "finance") setFinanceSubOpen(true);
-      else if (resolvedKey === "insurance") setInsuranceSubOpen(true);
+      else if (resolvedKey === "insurance") {
+        setInsuranceSubOpen(true);
+        if (data.insuranceClaim !== "Yes") update("insuranceClaim", "Yes");
+      }
       else setCompaniesSubOpen(true);
       return;
     }
@@ -6581,23 +6562,30 @@ export default function App(){
     });
   }, [jumpToSection, openSearchSubsection, scrollToSubsection]);
 
-  const focusSearchLabel = (label) => {
+  const focusSearchLabel = (label, retries = 5) => {
     if (!label) return;
     const normalize = (s) => (s || "").toString().toLowerCase().replace(/\s+/g, " ").trim();
     const target = normalize(label);
-    const labels = Array.from(document.querySelectorAll("label"));
-    let match = labels.find(l => normalize(l.textContent).includes(target));
-    if (!match) {
-      const el = document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
-      match = el ? el.closest("label") || el : null;
-    }
-    const el = match || document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("audit-pulse");
-      setTimeout(() => el.classList.remove("audit-pulse"), 2400);
-      if (el.focus) el.focus();
-    }
+    const tryFind = (remaining) => {
+      const labels = Array.from(document.querySelectorAll("label"));
+      let match = labels.find(l => normalize(l.textContent).includes(target));
+      if (!match) {
+        const el = document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
+        match = el ? el.closest("label") || el : null;
+      }
+      const el = match || document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("audit-pulse");
+        setTimeout(() => el.classList.remove("audit-pulse"), 2400);
+        if (el.focus) el.focus();
+        return;
+      }
+      if (remaining > 0) {
+        setTimeout(() => tryFind(remaining - 1), 150);
+      }
+    };
+    tryFind(retries);
   };
 
   const handleSearchNavigate = (item) => {
@@ -6613,37 +6601,60 @@ export default function App(){
       // Also check if the search label matches Quick Entry sections
       const labelLower = (item.label || "").toLowerCase();
       if (labelLower.includes("note") || labelLower.includes("instruction") || labelLower.includes("event")) {
-        document.getElementById("quick-instructions")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("quick-scheduling")?.scrollIntoView({ behavior: "smooth", block: "start" });
         return;
       }
-      const quickId = quickMap[item.id];
+      const quickId = item.navAction ? null : quickMap[item.id];
       if (quickId) {
         document.getElementById(quickId)?.scrollIntoView({ behavior: "smooth", block: "start" });
       } else {
-        // Field not in Quick Entry — offer to switch
+        // Field not in Quick Entry — switch to detailed
         setEntryMode("detailed");
         setTimeout(() => {
           if (item.id) jumpToSection(item.id, { scroll: !item.sub });
-          setTimeout(() => {
-            if (item.sub) {
-              openSearchSubsection(item.sub, item.id);
-              requestAnimationFrame(() => scrollToSubsection(item.sub, item.id));
-            }
-          }, 80);
+          if (item.navAction === 'openPets') {
+            setTimeout(() => {
+              const el = document.getElementById("household-pets");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                el.classList.remove("audit-pulse");
+                void el.offsetWidth;
+                el.classList.add("audit-pulse");
+              }
+            }, 200);
+          } else {
+            setTimeout(() => {
+              if (item.sub) {
+                openSearchSubsection(item.sub, item.id);
+                requestAnimationFrame(() => scrollToSubsection(item.sub, item.id));
+              }
+            }, 80);
+          }
         }, 100);
       }
       return;
     }
-    if (item.id) jumpToSection(item.id, { scroll: !item.sub });
+    if (item.id) jumpToSection(item.id, { scroll: false });
     setTimeout(() => {
       if (item.sub) {
         openSearchSubsection(item.sub, item.id);
-        requestAnimationFrame(() => scrollToSubsection(item.sub, item.id));
       }
     }, 80);
-    setTimeout(() => {
-      if (item.label) focusSearchLabel(item.label);
-    }, 220);
+    if (item.navAction === 'openPets') {
+      setTimeout(() => {
+        const el = document.getElementById("household-pets");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.remove("audit-pulse");
+          void el.offsetWidth;
+          el.classList.add("audit-pulse");
+        }
+      }, 400);
+    } else {
+      setTimeout(() => {
+        if (item.label) focusSearchLabel(item.label, 10);
+      }, 400);
+    }
   };
 
   const handleConfirmClick = () => {
@@ -6833,6 +6844,7 @@ export default function App(){
       } else {
         setBillingSubOpen(true);
         setInsuranceSubOpen(true);
+        if (data.insuranceClaim !== "Yes") update("insuranceClaim", "Yes");
       }
     }
     if (item.key === "addrLat" || item.key === "addrLng") {
@@ -6895,9 +6907,9 @@ export default function App(){
     setToast("Address verified (demo).");
   }, [updateAddr]);
   
-  const removeCust = useCallback((id, index) => { 
-    if(index===0) setAlertModal({ isOpen: true, message: "Cannot delete primary customer.", onConfirm: null });
-    else setAlertModal({ isOpen: true, message: "Remove this customer?", onConfirm: () => setData(p=>({...p,customers:p.customers.filter(x=>x.id!==id)})) });
+  const removeCust = useCallback((id, index) => {
+    if(index===0) { setToast("Cannot delete primary customer."); return; }
+    setData(p=>({...p,customers:p.customers.filter(x=>x.id!==id)}));
   }, []);
   const removeAddr = useCallback((id) => {
     setData(p=>({...p,addresses:p.addresses.filter(a=>a.id!==id)}));
@@ -7041,7 +7053,7 @@ export default function App(){
     setSaveSummaryMissing(missing);
     setSaveSummaryLines(orderNarrative.map(l => `${l.section}: ${l.text}`));
     setSaveExportLines(buildFullExportLines());
-    setSaveSummaryOpen(true);
+    setPreviewOpen(true);
   };
 
   const computeAuditMissing = () => {
@@ -7573,14 +7585,10 @@ export default function App(){
     if (!unseen) return;
     seenAttentionAlertKeysRef.current.add(unseen.key);
     markInstructionKeysSeen(unseen.entityKey ? [unseen.entityKey] : []);
-    setAlertModal({
-      isOpen: true,
+    setInlineAlert({
       title: unseen.title,
       message: unseen.message,
       details: unseen.details,
-      confirmLabel: "OK",
-      dismissLabel: "Close",
-      onConfirm: null,
     });
   }, [orderAttentionAlerts, markInstructionKeysSeen]);
 
@@ -7849,9 +7857,27 @@ export default function App(){
     if ((data.sdsConsiderations || []).includes("Pets") && data.householdAnimals) {
       lines.push({ section: "Pets", text: data.householdAnimals });
     }
-    // Laundry
+    // Interview details
+    if (data.familyMedicalIssues === "Y") {
+      lines.push({ section: "Medical", text: data.familyMedicalNote || "Medical issues reported" });
+    }
+    if (data.soapFragAllergies === "Y") {
+      lines.push({ section: "Allergies", text: data.soapFragNote || "Soap/fragrance allergies reported" });
+    }
+    if (data.selfCleaning === "Y") {
+      lines.push({ section: "Self-Clean", text: data.selfCleaningNote || "Customer will clean some items themselves" });
+    }
+    if (data.useDryCleaner && data.useDryCleaner !== "No") {
+      lines.push({ section: "Dry Cleaner", text: data.useDryCleaner === "Yes" ? "Uses a dry cleaner" : "Rarely uses dry cleaner" });
+    }
     if (data.howDryLaundry && data.howDryLaundry !== "Dryer") {
-      lines.push({ section: "Laundry", text: `Customer ${data.howDryLaundry.toLowerCase()}s clothing` });
+      lines.push({ section: "Laundry", text: data.howDryLaundry === "Air-Dry" ? "Customer air-dries clothing — do not machine dry" : "Customer prefers low heat drying" });
+    }
+    if (data.processType) {
+      lines.push({ section: "Delivery", text: data.processType });
+    }
+    if ((data.handlingCodes || []).length) {
+      lines.push({ section: "Handling", text: (data.handlingCodes || []).join(", ") });
     }
     // Schedule
     if (data.scheduleType || data.pickupDate) {
@@ -8633,6 +8659,25 @@ export default function App(){
       return next;
     });
   };
+
+  // Auto-fill insurance from referrer when referring company is an insurance carrier
+  useEffect(() => {
+    const company = data.referringCompany || "";
+    const contact = data.referrer || "";
+    if (!company) return;
+    const companyType = inferCompanyTypeFromName(company);
+    if (companyType !== "Insurance") return;
+    // Only auto-fill if insurance fields are empty
+    if (data.insuranceCompany && data.insuranceCompany !== company) return;
+    const updates = {};
+    if (!data.insuranceCompany) updates.insuranceCompany = company;
+    if (!data.insuranceAdjuster && contact) updates.insuranceAdjuster = contact;
+    if (!data.insuranceClaim) updates.insuranceClaim = "Yes";
+    if (Object.keys(updates).length) {
+      setData(prev => ({ ...prev, ...updates }));
+      setToast("Insurance auto-filled from referrer.");
+    }
+  }, [data.referringCompany, data.referrer]);
 
   const suggestedReferrerRoles = useMemo(() => {
     const roles = [];
@@ -9660,7 +9705,7 @@ export default function App(){
             completedSections={completedSections}
             onJump={jumpToSection} 
             onJumpSub={jumpToSectionAndSubsection}
-            title={entryMode === 'quick' ? 'Quick Entry' : 'New Order'} 
+            title={entryMode === 'quick' ? (data.orderName || 'Quick Entry') : (data.orderName || 'New Order')} 
             version="v55"
             entryMode={entryMode}
             setEntryMode={setEntryMode}
@@ -9669,8 +9714,7 @@ export default function App(){
             showCoaching={showCoaching}
             setShowCoaching={setShowCoaching}
             compactMode={compactMode}
-            summaryMode={summaryMode}
-            setSummaryMode={setSummaryMode}
+            onShowSds={() => setShowSdsPreview(true)}
             setCompactMode={setCompactMode}
             onReset={handleReset}
             currentUser={data.currentUser}
@@ -9730,9 +9774,9 @@ export default function App(){
                       })),
                       ...(data.customers || []).filter(c => {
                         if (isPlaceholderFlagActive(c?.placeholder)) return true;
-                        // Incomplete if missing last name
                         const hasName = hasMeaningfulValue(c?.first) && hasMeaningfulValue(c?.last);
-                        return !hasName;
+                        const hasContact = hasMeaningfulValue(c?.phone) || hasMeaningfulValue(c?.email);
+                        return !hasName || !hasContact;
                       }).map((c, i) => ({
                         label: [c.first, c.last].filter(Boolean).join(" ") || `Customer ${i+1}`,
                         section: "sec2",
@@ -9756,12 +9800,50 @@ export default function App(){
                               key={`ph-${idx}`}
                               type="button"
                               onClick={() => {
-                                jumpToSection(p.section);
-                                // Expand the section and scroll to the placeholder after a brief delay
+                                // Force-open the target section
+                                setOpenSections(prev => ({
+                                  sec1: p.section === "sec1",
+                                  sec2: p.section === "sec2",
+                                  sec3: p.section === "sec3",
+                                  sec4: p.section === "sec4",
+                                  sec5: p.section === "sec5"
+                                }));
+                                setActiveSection(p.section);
+                                setVisitedSections(prevV => new Set([...prevV, p.section]));
+                                // Open relevant subsections for sec4 companies
+                                if (p.section === "sec4") setTimeout(() => setCompaniesSubOpen(true), 50);
+                                // Scroll to section first, then find the specific placeholder
                                 setTimeout(() => {
-                                  const el = document.querySelector(`[data-customer-id], [data-address-item-id], [data-audit-key*="placeholder"]`);
-                                  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-                                }, 300);
+                                  const sectionEl = document.getElementById(p.section);
+                                  if (sectionEl) sectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                                  setTimeout(() => {
+                                    let el;
+                                    if (p.type === "customer") {
+                                      const target = (data.customers || []).filter(c => {
+                                        if (isPlaceholderFlagActive(c?.placeholder)) return true;
+                                        return !(hasMeaningfulValue(c?.first) && hasMeaningfulValue(c?.last));
+                                      });
+                                      const matchId = target[0]?.id;
+                                      if (matchId) {
+                                        updateCust(matchId, { _forceOpen: true });
+                                        el = document.querySelector(`[data-customer-id="${matchId}"]`);
+                                      }
+                                      if (!el) el = document.querySelector(`[data-customer-id]`);
+                                    } else if (p.type === "address") {
+                                      const addrTarget = (data.addresses || []).find(a => !a.inactive && isAddressPlaceholder(a) && !hasMeaningfulValue(a.street));
+                                      if (addrTarget) updateAddr(addrTarget.id, { _forceOpen: true });
+                                      el = document.querySelector(`[data-audit-key*="placeholder-address"]`);
+                                    } else if (p.type === "company") {
+                                      el = document.querySelector(`[data-audit-key*="placeholder-vendor"], [data-audit-key*="placeholder-company"]`);
+                                    }
+                                    if (el) {
+                                      el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                      el.classList.remove("audit-pulse");
+                                      void el.offsetWidth;
+                                      el.classList.add("audit-pulse");
+                                    }
+                                  }, 250);
+                                }, 150);
                               }}
                               className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-all"
                             >
@@ -9773,70 +9855,20 @@ export default function App(){
                       </div>
                     );
                   })()}
-                  {orderNarrative.length > 0 && (
-                    <div className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden" data-noe-section="narrative">
-                      <button
-                        type="button"
-                        onClick={() => setNarrativeOpen(v => !v)}
-                        className="w-full flex items-center justify-between px-5 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">📄</span>
-                          <span className="text-sm font-bold text-slate-700">Live Order Narrative</span>
-                          <span className="text-[10px] text-slate-400">{orderNarrative.length} details captured</span>
-                        </div>
-                        <Chevron open={narrativeOpen} />
-                      </button>
-                      {narrativeOpen && (
-                        <div className="border-t border-slate-100 fade-in">
-                          <div className="flex items-center gap-2 px-5 pt-3">
-                            <button type="button" onClick={() => setNarrativeView("table")} className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${narrativeView === "table" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400"}`}>Table</button>
-                            <button type="button" onClick={() => setNarrativeView("narrative")} className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${narrativeView === "narrative" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400"}`}>Narrative</button>
-                          </div>
-                          {narrativeView === "table" ? (
-                            <div className="px-5 py-4 space-y-1.5">
-                              {orderNarrative.map((line, idx) => (
-                                <div key={idx} className="flex items-baseline gap-2">
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20 shrink-0 text-right">{line.section}</span>
-                                  <span className="text-sm text-slate-700">{line.text}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="px-5 py-4 text-sm leading-relaxed text-slate-700 space-y-2">
-                              {buildNarrativeProse(orderNarrative, data).map((t, i) => <p key={i}>{t}</p>)}
-                            </div>
+                  {inlineAlert && (
+                    <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3 fade-in">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-bold text-amber-800">{inlineAlert.title}</div>
+                          <div className="text-xs text-amber-700 mt-0.5">{inlineAlert.message}</div>
+                          {inlineAlert.details?.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5">
+                              {inlineAlert.details.map((d, i) => <li key={i} className="text-[11px] text-amber-700">• {d}</li>)}
+                            </ul>
                           )}
-                          <div className="flex items-center gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const nlt = (data.orderName ? `NLT: ${data.orderName}\n\n` : "") + orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
-                                navigator.clipboard?.writeText(nlt).then(() => setToast("NLT copied to clipboard")).catch(() => {
-                                  const ta = document.createElement("textarea"); ta.value = nlt; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
-                                  setToast("NLT copied to clipboard");
-                                });
-                              }}
-                              className="rounded-full border border-sky-200 bg-sky-50 px-4 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100"
-                            >
-                              📋 Copy as NLT
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const narrative = orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
-                                const existing = stripEventSystemLines(data.eventInstructions || "").trim();
-                                const combined = existing ? `${existing}\n\n--- Order Summary ---\n${narrative}` : `--- Order Summary ---\n${narrative}`;
-                                update("eventInstructions", composeEventInstructions(combined, data, conditionSummary));
-                                setToast("Narrative added to Event Instructions");
-                              }}
-                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-300 hover:text-sky-700"
-                            >
-                              Send to Event Instructions
-                            </button>
-                          </div>
                         </div>
-                      )}
+                        <button type="button" onClick={() => setInlineAlert(null)} className="text-amber-400 hover:text-amber-600 font-bold text-sm shrink-0">×</button>
+                      </div>
                     </div>
                   )}
                   <div className={compactMode ? "space-y-3" : "space-y-4"}>
@@ -9844,22 +9876,11 @@ export default function App(){
                     <Section
                       id="sec1"
                       noeSection="order"
-                      title="1. Order & Interview"
-                      helpText={!summaryMode ? "Enter job basics + call details (source, scope/needs, internal codes if known)." : ""}
+                      title={`1. ${recordWord} & Interview`}
+                      helpText="Enter job basics + call details (source, scope/needs, internal codes if known)."
                       isOpen={openSections.sec1}
                       onHeaderClick={()=>handleToggleSection('sec1')}
                       onCaretClick={()=>handleToggleSection('sec1')}
-                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec1')} lines={[
-                        { label: "Order", value: [data.orderName, recordTypeLabel !== "Select Type" ? recordTypeLabel : ""].filter(Boolean).join(" | ") },
-                        { label: "Type", value: [data.primaryLossType, ...(data.secondaryContaminants || [])].filter(Boolean).join(" + ") || null },
-                        { label: "Services", value: (data.serviceOfferings || []).join(", ") || null },
-                        { label: "Source", value: [data.referrer, data.referringCompany].filter(Boolean).join(" — ") || null },
-                        { label: "Rep", value: data.salesRep ? data.salesRep.split(",")[0] : null },
-                        { label: "Conditions", value: conditionSummary || null },
-                        { label: "Repairs", value: data.repairsSummary || null },
-                        { label: "Living", value: data.livingStatus || null },
-                        { label: "Storage", value: data.storageNeeded === "Y" ? `Yes${data.storageMonths ? ` (${data.storageMonths} months)` : ""}` : null },
-                      ]} /> : null}
                       badges={
                         <div className="flex items-center gap-2">
                           {recordTypeLabel !== "Select Type" && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">{recordTypeLabel}</span>}
@@ -9871,8 +9892,8 @@ export default function App(){
                       className={auditOn && auditTargets.sections.has("sec1") ? "audit-outline" : ""}
                     >
                         <div className={`grid ${compactMode ? 'gap-3' : 'gap-5'}`}>
-                            <SubSection id="sec1-order" title="Order" open={orderSubOpen} onToggle={(nextOpen) => setOrderSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("order") ? "audit-outline" : ""}>
-                                <Field label={<span>Order Name <span className="font-normal text-slate-400 text-xs ml-1">(Auto-generated)</span></span>} missing={data.highlightMissing?.orderName}>
+                            <SubSection id="sec1-order" title={recordWord} open={orderSubOpen} onToggle={(nextOpen) => setOrderSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("order") ? "audit-outline" : ""}>
+                                <Field label={<span>{recordWord} Name <span className="font-normal text-slate-400 text-xs ml-1">(Auto-generated)</span></span>} missing={data.highlightMissing?.orderName}>
                                   <div className="flex gap-2">
                                       <Input
                                         ref={orderNameInputRef}
@@ -9895,15 +9916,15 @@ export default function App(){
                                       { label: "Lead", title: "Potential project; incomplete information or no billing yet." }
                                     ]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
                                   </Field>
-                                  <Field label="Order Status">
+                                  <Field label={`${recordWord} Status`}>
                                     <ToggleGroup options={ORDER_STATUSES} value={data.orderStatus} onChange={v => update("orderStatus", v)} />
                                   </Field>
                                 </div>
                                 <Field label="What caused the loss?" missing={data.highlightMissing.orderTypes} smart>
-                                  {showCoaching && !data.primaryLossType && (
+                                  {showCoaching && !data.primaryLossType && !dismissedTips.has("Loss Type") && (
                                     <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-2">
-                                      <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button>
-                                      <span className="font-bold">Coaching:</span> Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.
+                                      <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Loss Type"); e.target.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
+                                      🎓 <span className="font-bold">Loss Type:</span> Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.
                                     </div>
                                   )}
                                   <div className="flex flex-wrap gap-2" data-audit-key="orderTypes">
@@ -9933,7 +9954,7 @@ export default function App(){
                                     <div className="text-[11px] text-slate-400">Primary: <span className="font-semibold text-slate-600">{data.primaryLossType}</span>. Select additional contaminants below if applicable.</div>
                                     {LOSS_TYPE_COACHING[data.primaryLossType] && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">{data.primaryLossType}:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
                                       </div>
                                     )}
                                   </>
@@ -9956,7 +9977,7 @@ export default function App(){
                                 {data.primaryLossType && !isNonRestorationProject && (
                                   <Field label="Additional contaminants?">
                                     <div className="flex flex-wrap gap-2">
-                                      {LOSS_TYPES.filter(t => t !== data.primaryLossType && t !== "Other").map(t => (
+                                      {LOSS_TYPES.filter(t => t !== data.primaryLossType).map(t => (
                                         <ToggleMulti
                                           key={t}
                                           label={t}
@@ -9974,12 +9995,24 @@ export default function App(){
                                     {showCoaching && <div className="text-[11px] text-slate-400">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
                                   </Field>
                                 )}
-                                {(attentionWater || attentionMold) && (
-                                  <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
-                                    {attentionWater && !(data.orderTypes||[]).includes("Water") && <div>Still Wet selected → consider adding Water as a contaminant.</div>}
-                                    {attentionWater && (data.orderTypes||[]).includes("Water") && <div>Water confirmed — review severity in Codes section below.</div>}
-                                    {attentionMold && !(data.orderTypes||[]).includes("Mold") && <div>Visible Mold selected → consider adding Mold as a contaminant.</div>}
-                                    {attentionMold && (data.orderTypes||[]).includes("Mold") && <div>Mold confirmed — review severity and Mold coverage limit in Insurance.</div>}
+                                {attentionWater && !(data.orderTypes||[]).includes("Water") && !dismissedTips.has("Water Suggestion") && (
+                                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Water Suggestion:</span> Still Wet was selected — consider adding Water as a contaminant.
+                                  </div>
+                                )}
+                                {attentionWater && (data.orderTypes||[]).includes("Water") && !dismissedTips.has("Water Confirmed") && (
+                                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Water Confirmed:</span> Review severity in Codes section below.
+                                  </div>
+                                )}
+                                {attentionMold && !(data.orderTypes||[]).includes("Mold") && !dismissedTips.has("Mold Suggestion") && (
+                                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Mold Suggestion:</span> Visible Mold was selected — consider adding Mold as a contaminant.
+                                  </div>
+                                )}
+                                {attentionMold && (data.orderTypes||[]).includes("Mold") && !dismissedTips.has("Mold Confirmed") && (
+                                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Mold Confirmed:</span> Review severity and <button type="button" onClick={(e) => { e.stopPropagation(); jumpToSectionAndSubsection("sec4", "insurance"); }} className="underline underline-offset-2 font-bold text-violet-800 hover:text-violet-900">Mold coverage limit in Insurance</button>.
                                   </div>
                                 )}
                                 {(data.orderTypes || []).filter(t => LOSS_TYPES.includes(t)).map(type => {
@@ -10012,6 +10045,7 @@ export default function App(){
                                                 <div className="p-4 grid gap-4 border-t border-sky-100 bg-white">
                                                     {hasSeverity && !isNonRestorationProject && (
                                                         <Field label="Severity" subtle>
+                                                            {showCoaching && !(data.severityCodes || []).length && <div className="text-[10px] text-slate-400 mb-1">Typically entered after the site inspection, not during intake.</div>}
                                                             <div className={`rounded-lg ${needsSeverityCode ? "border border-orange-200 bg-orange-50/60 p-2" : ""}`}>
                                                               <div className="flex gap-2" data-audit-key={`severity-${severityGroup.toLowerCase()}`}>{SEVERITY_LEVELS.map(level => { const code = `${severityGroup}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`h-9 w-9 rounded-lg text-sm font-bold transition-all border ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : needsSeverityCode ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100' : 'bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-200'} ${attentionForSeverity && !needsSeverityCode ? 'attention-outline' : ''}`}>{level}</button>); })}</div>
                                                               {needsSeverityCode && (
@@ -10098,22 +10132,22 @@ export default function App(){
                                     </div>
                                     {showCoaching && (data.damageWasWet === "Y" || data.damageWasWet === true) && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Urgent — tell customer we need to come ASAP. Untreated wet items develop mold (may not be covered). Keep colors separated.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Still Wet:</span> Urgent — tell customer we need to come ASAP. Untreated wet items develop mold (may not be covered). Keep colors separated.
                                       </div>
                                     )}
                                     {showCoaching && !!data.damageMoldMildew && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Immediate attention needed. Ask about respiratory issues in household. Our team needs PPE. Confirm mold coverage with adjuster.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Visible Mold:</span> Immediate attention needed. Ask about respiratory issues in household. Our team needs PPE. Confirm mold coverage with adjuster.
                                       </div>
                                     )}
                                     {showCoaching && !!data.noLights && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Bring portable lighting. Ask if there's a generator on site.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">No Electricity:</span> Bring portable lighting. Ask if there's a generator on site.
                                       </div>
                                     )}
                                     {showCoaching && !!data.boardedUp && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Confirm access — who has the key or code? May need fire dept or restoration company to let us in.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Boarded Up:</span> Confirm access — who has the key or code? May need fire dept or restoration company to let us in.
                                       </div>
                                     )}
                                   </div>
@@ -10121,16 +10155,6 @@ export default function App(){
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">What repairs are being done to the home?</div>
                                     {showCoaching && <div className="text-[10px] text-slate-400">Select all that apply. This helps estimate timeline and storage needs.</div>}
-                                    {showCoaching && (data.repairsSummary || "").includes("Complete Rebuild") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Customer will be displaced long-term. Confirm storage needs and timeline. Ask about temp living.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.repairsSummary || "").includes("Major Structural") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Limited access likely. Ask which areas are affected. Coordinate access with contractor.
-                                      </div>
-                                    )}
                                     <div className="flex flex-wrap gap-2">
                                       {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
                                         <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
@@ -10140,6 +10164,41 @@ export default function App(){
                                         }} className="!px-4 !py-2.5 !text-sm" />
                                       ))}
                                     </div>
+                                    {showCoaching && (data.repairsSummary || "").includes("Just Cleaning") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Just Cleaning:</span> No construction — items return quickly. Confirm turnaround expectations with customer. Short storage if any.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.repairsSummary || "").includes("Paint") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Paint:</span> Coordinate timing with painter — items may need to stay out until paint cures. Protect items from overspray during pickup.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.repairsSummary || "").includes("Refinish Floors") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Refinish Floors:</span> All furniture must be moved. Floors need 2–3 days to cure before items return. Coordinate delivery timing with contractor.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.repairsSummary || "").includes("Replace Floors") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Replace Floors:</span> Extended timeline — old floors removed, new floors installed. Full packout likely. Confirm which rooms and storage duration.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.repairsSummary || "").includes("Cosmetic") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Cosmetic Damage:</span> Minor repairs — patch, paint, trim. Items may only need to move within the room. Ask which rooms are affected.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.repairsSummary || "").includes("Major Structural") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Major Structural:</span> Limited access likely. Ask which areas are affected. Coordinate access with contractor.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.repairsSummary || "").includes("Complete Rebuild") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Complete Rebuild:</span> Customer will be displaced long-term. Confirm storage needs and timeline. Ask about temp living.
+                                      </div>
+                                    )}
                                   </div>
 
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -10148,48 +10207,54 @@ export default function App(){
                                       <div className="flex flex-wrap gap-2">
                                         {[
                                           { label: "Staying in home", title: "Customer remains in the home during the project." },
-                                          { label: "Temp Housing", title: "Displaced temporarily (hotel, rental, trailer, family) — will return to primary address." },
+                                          { label: "Hotel", title: "Displaced to a hotel — temporary, will return to primary address." },
+                                          { label: "Temp", title: "Displaced to a temporary home (rental, trailer, family) — will return to primary address." },
                                           { label: "Moving", title: "Permanently relocating — will NOT return. Final delivery goes to a new address." },
                                         ].map(s => (
                                           <ToggleMulti key={s.label} label={s.label} title={s.title} checked={data.livingStatus === s.label} onChange={() => updateLivingStatus(data.livingStatus === s.label ? "" : s.label)} className="!px-3 !py-2 !text-sm" />
                                         ))}
                                       </div>
-                                      {data.livingStatus === "Temp Housing" && showCoaching && (
+                                      {data.livingStatus === "Hotel" && showCoaching && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Ask where they're staying and for how long. Get the temp address for the Address section.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Hotel:</span> Get the hotel name and room number. Ask how long they expect to stay. Deliveries may need to go to the loss site instead.
+                                        </div>
+                                      )}
+                                      {data.livingStatus === "Temp" && showCoaching && (
+                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Temp Home:</span> Get the temporary address for deliveries. Ask how long and when they expect to return.
                                         </div>
                                       )}
                                       {data.livingStatus === "Moving" && showCoaching && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Get the new address — all items deliver there, not the loss site. Ask when they'll be in the new home.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Moving:</span> Get the new address — all items deliver there, not the loss site. Ask when they'll be in the new home.
                                         </div>
                                       )}
                                       {data.livingStatus === "Staying in home" && showCoaching && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Schedule around their routine. Ask about best times. May need to work room-by-room.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Staying in Home:</span> Schedule around their routine. Ask about best times. May need to work room-by-room.
                                         </div>
                                       )}
                                     </div>
                                     <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                                      <div className="text-sm font-bold text-sky-600">When do they need their final delivery returned?</div>
+                                      <div className="text-sm font-bold text-sky-600">Where should we deliver items when ready?</div>
                                       <div className="flex flex-wrap gap-2">
                                         {[
-                                          { label: "Deliver ASAP", title: "Return items as soon as possible." },
-                                          { label: "Deliver to Temp", title: "Deliver to temporary housing location." },
-                                          { label: "Deliver to New Home", title: "Customer is moving — deliver to the new address." },
-                                          { label: "Long-Term Storage", title: "Store until customer is ready (may be months)." },
+                                          { label: "Return to Home ASAP", value: "Deliver ASAP", title: "Return items to the loss site as soon as possible." },
+                                          { label: "To Temp Address", value: "Deliver to Temp", title: "Deliver to temporary housing location." },
+                                          { label: "To New Home", value: "Deliver to New Home", title: "Customer is moving — deliver to the new address." },
+                                          { label: "Store Until Home Repaired", value: "Long-Term Storage", title: "Store until the home is repaired and ready for delivery (may be months)." },
                                         ].map(s => (
-                                          <ToggleMulti key={s.label} label={s.label} title={s.title} checked={data.processType === s.label} onChange={()=>update("processType", data.processType === s.label ? "" : s.label)} className="!px-3 !py-2 !text-sm" />
+                                          <ToggleMulti key={s.value} label={s.label} title={s.title} checked={data.processType === s.value} onChange={()=>update("processType", data.processType === s.value ? "" : s.value)} className="!px-3 !py-2 !text-sm" />
                                         ))}
                                       </div>
                                       {showCoaching && data.processType === "Long-Term Storage" && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Confirm customer understands monthly fees. Get estimated return date. Set a follow-up reminder.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Storage:</span> Confirm customer understands monthly fees. Get estimated return date. Set a follow-up reminder.
                                         </div>
                                       )}
                                       {showCoaching && data.processType === "Deliver ASAP" && (
                                         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Prioritize processing. Confirm delivery address is ready.
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">No Storage:</span> Prioritize processing. Confirm delivery address is ready.
                                         </div>
                                       )}
                                     </div>
@@ -10205,17 +10270,17 @@ export default function App(){
                                     </div>
                                     {showCoaching && (data.packoutSummary || []).includes("Window Treatments") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Need a tall ladder? Confirm ceiling heights. Taking the rods too? Note in load list below.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Window Treatments:</span> Need a tall ladder? Confirm ceiling heights. Taking the rods too? Note in load list below.
                                       </div>
                                     )}
                                     {showCoaching && (data.packoutSummary || []).includes("Rugs") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Any wet or heavy rugs? Wet = extra manpower + immediate attention. Note in load list below.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Rugs:</span> Any wet or heavy rugs? Wet = extra manpower + immediate attention. Note in load list below.
                                       </div>
                                     )}
                                     {showCoaching && (data.packoutSummary || []).includes("Furniture") && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> How many pieces? Any oversized? May need extra help, dollies, floor protection. Note below.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Furniture:</span> How many pieces? Any oversized? May need extra help, dollies, floor protection. Note below.
                                       </div>
                                     )}
                                   </div>
@@ -10233,35 +10298,97 @@ export default function App(){
                                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                     <div className="text-sm font-bold text-sky-600">Special considerations</div>
                                     {showCoaching && <div className="text-[10px] text-slate-400">Note anything about the customer or household that affects how we handle the project.</div>}
-                                    {showCoaching && (data.sdsConsiderations || []).includes("Elderly") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Be patient, speak clearly. Label boxes clearly. Offer packing/unpacking help.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.sdsConsiderations || []).includes("Pregnancy") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Avoid chemicals and fumes. Use fragrance-free products. Minimize disruption.
-                                      </div>
-                                    )}
-                                    {showCoaching && (data.sdsConsiderations || []).includes("Respiratory Concerns") && (
-                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Use hypoallergenic products. Ask about specific triggers. Notify processing team.
-                                      </div>
-                                    )}
                                     <div className="flex flex-wrap gap-2">
                                       {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
                                         <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s))} className="!px-4 !py-2.5 !text-sm" />
                                       ))}
                                     </div>
+                                    {showCoaching && (data.sdsConsiderations || []).includes("Elderly") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Elderly:</span> Be patient, speak clearly. Label boxes clearly. Offer packing/unpacking help.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.sdsConsiderations || []).includes("Pregnancy") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Pregnancy/Baby:</span> Avoid chemicals and fumes. Use fragrance-free products. Minimize disruption.
+                                      </div>
+                                    )}
+                                    {showCoaching && (data.sdsConsiderations || []).includes("Respiratory Concerns") && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Allergies:</span> Use hypoallergenic products. Ask about specific triggers. Notify processing team.
+                                      </div>
+                                    )}
+                                    {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
+                                      <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
+                                        <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes — add now while discussing</div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {[["Det","special detergent requested"], ["NoDC","Do not Dry Clean"], ["Low","dry on low heat"], ["NoDry","cannot be dried in dryer"], ["PPE","wear PPE when handling"], ["Hand","hand finish pressed items"]].map(([code, desc]) => (
+                                            <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} className="!text-[10px] !px-2 !py-1" />
+                                          ))}
+                                        </div>
+                                        <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities (e.g. no bleach, fragrance-free only)" className="!text-xs !py-1.5" />
+                                      </div>
+                                    )}
                                     {(data.sdsConsiderations || []).includes("Pets") && (
                                       <Input value={data.householdAnimals || ""} onChange={e => update("householdAnimals", e.target.value)} placeholder="What pets? (e.g. Dog named Spot, Shih Tzu)" />
                                     )}
                                   </div>
                                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
                                       <div className="text-sm font-semibold text-sky-600 mb-1">Suggested Groups</div>
-                                      {showCoaching && <div className="text-[11px] text-slate-400 mb-3">Processing groups define how items are batched (e.g., rush vs. long-term). Link a group to a specific pickup address if needed.</div>}
-                                      <div className="flex flex-wrap gap-2">
-                                        {SUGGESTED_GROUPS.map(g => {
+                                      {showCoaching && (data.suggestedGroups || []).length === 0 && (
+                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-3">
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Groups:</span> Ask where the customer will be staying, how long they'll be out, and which seasons they'll miss. This determines how to batch items — rush essentials now, hold seasonal items for later, or store long-term.
+                                        </div>
+                                      )}
+                                      {showCoaching && (data.suggestedGroups || []).length > 0 && <div className="text-[11px] text-slate-400 mb-3">Processing groups define how items are batched (e.g., rush vs. long-term). Link a group to a specific pickup address if needed.</div>}
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {["RD","RFD","STD","STFD","LTD","LTFD"].map(g => {
+                                          const selected = (data.suggestedGroups || []).includes(g);
+                                          const link = getGroupLink(g);
+                                          const linkedAddr = (data.addresses || []).find(a => a.id === link.addressId);
+                                          if (!selected) {
+                                            return (
+                                              <ToggleMulti
+                                                key={g}
+                                                label={g}
+                                                title={SUGGESTED_GROUP_HELP[g]}
+                                                checked={false}
+                                                onChange={() => {
+                                                  const next = toggleMulti(data.suggestedGroups || [], g);
+                                                  update("suggestedGroups", next);
+                                                }}
+                                              />
+                                            );
+                                          }
+
+                                          return (
+                                            <div key={g} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-sky-50 px-2 py-1" title={SUGGESTED_GROUP_HELP[g]}>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const next = toggleMulti(data.suggestedGroups || [], g);
+                                                  update("suggestedGroups", next);
+                                                  if (!next.includes(g)) clearGroupLink(g);
+                                                }}
+                                                className="text-xs font-bold text-sky-700"
+                                              >
+                                                {g}
+                                              </button>
+                                              <select
+                                                value={link?.addressId || ""}
+                                                onChange={e => setGroupLink(g, { addressId: e.target.value })}
+                                                className="text-[10px] text-slate-600 border-none bg-transparent outline-none cursor-pointer py-0 pl-0 pr-4 -mr-2"
+                                              >
+                                                <option value="">Deliver to...</option>
+                                                {(data.addresses || []).filter(a => !a.inactive && hasMeaningfulValue(a.street)).map(a => (
+                                                  <option key={a.id} value={a.id}>{a.type || "Address"} — {a.street}</option>
+                                                ))}
+                                              </select>
+                                            </div>
+                                          );
+                                        })}
+                                        <span className="w-px h-6 bg-slate-300 mx-1 self-center" />
+                                        {["Inhome","TLI","Test","Dispose","Storage Only"].map(g => {
                                           const selected = (data.suggestedGroups || []).includes(g);
                                           const link = getGroupLink(g);
                                           const linkedAddr = (data.addresses || []).find(a => a.id === link.addressId);
@@ -10283,7 +10410,7 @@ export default function App(){
                                           return (
                                             <div
                                               key={g}
-                                              className="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-sky-50 px-2 py-1"
+                                              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-sky-50 px-2 py-1"
                                               title={SUGGESTED_GROUP_HELP[g]}
                                             >
                                               <button
@@ -10293,21 +10420,20 @@ export default function App(){
                                                   update("suggestedGroups", next);
                                                   if (!next.includes(g)) clearGroupLink(g);
                                                 }}
-                                                className="rounded-full border border-sky-300 bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700 hover:bg-sky-200"
+                                                className="text-xs font-bold text-sky-700"
                                               >
                                                 {g}
                                               </button>
-                                              <span className="h-4 w-px bg-sky-200" />
-                                              <button
-                                                type="button"
-                                                onClick={() => openGroupLinkModal(g)}
-                                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${link?.addressId ? "border-sky-300 bg-white text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
-                                                title="Link group to address/date"
+                                              <select
+                                                value={link?.addressId || ""}
+                                                onChange={e => setGroupLink(g, { addressId: e.target.value })}
+                                                className="text-[10px] text-slate-600 border-none bg-transparent outline-none cursor-pointer py-0 pl-0 pr-4 -mr-2"
                                               >
-                                                <span>📍</span>
-                                                <span>{link?.addressId ? (linkedAddr?.type || "Address") : "Link"}</span>
-                                                {link?.date ? <span>• {link.date}</span> : null}
-                                              </button>
+                                                <option value="">Deliver to...</option>
+                                                {(data.addresses || []).filter(a => !a.inactive && hasMeaningfulValue(a.street)).map(a => (
+                                                  <option key={a.id} value={a.id}>{a.type || "Address"} — {a.street}</option>
+                                                ))}
+                                              </select>
                                             </div>
                                           );
                                         })}
@@ -10334,13 +10460,27 @@ export default function App(){
                                         <span className="text-sm text-slate-700">Will they clean anything themselves?</span>
                                         <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} />
                                       </div>
-                                      <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-                                        <span className="text-sm text-slate-700">Want to donate unsalvageable items?</span>
-                                        <ToggleGroup options={["Y","N"]} value={data.donateSalvation || ""} onChange={v => update("donateSalvation", v)} />
-                                      </div>
                                     </div>
-                                    {data.selfCleaning === "Y" && <Input value={data.selfCleaningNote || ""} onChange={e=>update("selfCleaningNote", e.target.value)} placeholder="What will they clean themselves?" />}
-                                    {data.donateSalvation === "Y" && <Input value={data.donateSalvationNote || ""} onChange={e=>update("donateSalvationNote", e.target.value)} placeholder="What items to donate?" />}
+                                    {data.selfCleaning === "Y" && (
+                                      <div className="space-y-1.5">
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
+                                            const note = data.selfCleaningNote || "";
+                                            const active = note.toLowerCase().includes(item.toLowerCase());
+                                            return (
+                                              <button key={item} type="button" onClick={() => {
+                                                if (active) {
+                                                  update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", "));
+                                                } else {
+                                                  update("selfCleaningNote", note ? `${note}, ${item}` : item);
+                                                }
+                                              }} className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold transition-colors ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}>{item}</button>
+                                            );
+                                          })}
+                                        </div>
+                                        <Input value={data.selfCleaningNote || ""} onChange={e=>update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." />
+                                      </div>
+                                    )}
 
                                     <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
                                       <span className="text-sm text-slate-700">Do they use a dry cleaner?</span>
@@ -10356,7 +10496,7 @@ export default function App(){
                                     )}
                                     {showCoaching && data.howDryLaundry === "Air-Dry" && (
                                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowCoaching(false); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Hide all coaching tips">×</button><span className="font-bold">Coaching:</span> Do NOT machine dry. All items tagged air-dry only. Prevents shrinkage and damage claims.
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Air Dry:</span> Do NOT machine dry. All items tagged air-dry only. Prevents shrinkage and damage claims.
                                       </div>
                                     )}
 
@@ -10417,7 +10557,7 @@ export default function App(){
                                             {(data.primaryLossType || (data.orderTypes||[]).some(t => ["Fire","Water","Puffback"].includes(t))) && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">DETAILED SEVERITY</div>
-                                                {showCoaching && <div className="text-xs text-slate-500 mb-3">Rate specific contaminant levels. 0 = None, 3 = Severe. Used in the SDS document.</div>}
+                                                {showCoaching && <div className="text-xs text-slate-500 mb-3">Rate specific contaminant levels. 0 = None, 3 = Severe. Typically completed after the site inspection — not during intake.</div>}
                                                 <div className="grid gap-4 sm:grid-cols-2">
                                                   {[
                                                     { key: "fire", label: "Fire", fields: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"], colorStart: "#fef3c7", colorEnd: "#f97316" },
@@ -10434,6 +10574,13 @@ export default function App(){
                                                     return (
                                                       <div key={section.key} className="rounded-lg border border-slate-200 p-3">
                                                         <div className="text-xs font-bold text-slate-600 mb-2">{section.label} Contaminants</div>
+                                                        <div className="flex items-center gap-3 mb-1">
+                                                          <span className="w-28 shrink-0" />
+                                                          <div className="flex-1 flex justify-between text-[9px] text-slate-400 font-bold px-1">
+                                                            <span>0 None</span><span>1 Low</span><span>2 Moderate</span><span>3 Severe</span>
+                                                          </div>
+                                                          <span className="w-4" />
+                                                        </div>
                                                         <div className="space-y-2">
                                                           {section.fields.map(field => {
                                                             const val = (sectionData.values || {})[field] || 0;
@@ -10567,17 +10714,151 @@ export default function App(){
                         </div>
                     </Section>
 
-                    <Section id="sec2" noeSection="customer" title="2. Customer" helpText={!summaryMode ? "Add the customer + any key contacts (spouse, tenant, neighbor, PM)." : ""} isOpen={openSections.sec2} onHeaderClick={()=>handleToggleSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}
-                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec2')} lines={
-                        data.customers.map((c, i) => ({
-                          label: c.isPrimary ? "Primary" : (c.type || `Contact ${i+1}`),
-                          value: [c.first, c.last].filter(Boolean).join(" ") + (c.phone ? ` • ${c.phone}` : "") + (c.email ? ` • ${c.email}` : "")
-                        }))
-                      } /> : null}
+                    <Section id="sec2" noeSection="customer" title="2. Customer" helpText="The primary person(s) we are performing work for and their contacts or representatives." isOpen={openSections.sec2} onHeaderClick={()=>handleToggleSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}
                     >
                       <div className="space-y-4">
-                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} onUpdatePets={(animals, considerations) => { update("householdAnimals", animals); update("sdsConsiderations", considerations); }} />)}
+                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} onUpdatePets={(animals, considerations) => { update("householdAnimals", animals); update("sdsConsiderations", considerations); }} household={data.household || []} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
+                        {/* Household — people + pets at the household level */}
+                        {(() => {
+                          const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Snake", "Lizard", "Turtle", "Horse", "Other"];
+                          const personTypes = ["Child", "Infant", "Elderly", "Housekeeper", "Caretaker", "Tenant", "Roommate", "Other"];
+                          const members = data.household || [];
+                          const people = members.filter(m => m.category === "person");
+                          const pets = members.filter(m => m.category === "pet");
+
+                          const setHousehold = (next) => {
+                            update("household", next);
+                            // Sync householdAnimals string for narrative/SDS compatibility
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                            const sdsC = data.sdsConsiderations || [];
+                            if (petStr && !sdsC.includes("Pets")) update("sdsConsiderations", [...sdsC, "Pets"]);
+                            if (!petStr && sdsC.includes("Pets")) update("sdsConsiderations", sdsC.filter(s => s !== "Pets"));
+                          };
+
+                          const addMember = (category, type) => {
+                            const newId = safeUid();
+                            setHousehold([...members, { id: newId, category, type: type || (category === "pet" ? "Dog" : "Child"), name: "" }]);
+                            setTimeout(() => {
+                              const input = document.querySelector(`[data-household-id="${newId}"]`);
+                              if (input) input.focus();
+                            }, 50);
+                          };
+                          const updateMember = (id, field, val) => {
+                            setHousehold(members.map(m => m.id === id ? { ...m, [field]: val } : m));
+                          };
+                          const removeMember = (id) => {
+                            setHousehold(members.filter(m => m.id !== id));
+                          };
+                          const promoteToCustomer = (member) => {
+                            const nameParts = (member.name || "").trim().split(/\s+/);
+                            const first = nameParts[0] || "";
+                            const last = nameParts.slice(1).join(" ") || "";
+                            setData(p => ({
+                              ...p,
+                              customers: [...p.customers, initCustomer({ first, last, type: member.type || "Household" })],
+                              household: (p.household || []).filter(m => m.id !== member.id),
+                            }));
+                            setToast(`${member.name || "Member"} promoted to customer`);
+                          };
+
+                          const getPetIcon = (text) => {
+                            const t = (text || "").toLowerCase();
+                            if (/\bdog\b/.test(t)) return "🐕";
+                            if (/\bcat\b/.test(t)) return "🐈";
+                            if (/\bbird\b/.test(t)) return "🐦";
+                            if (/\bfish\b/.test(t)) return "🐟";
+                            if (/\brabbit\b/.test(t)) return "🐇";
+                            if (/\bhamster\b/.test(t)) return "🐹";
+                            if (/\bsnake|lizard|turtle\b/.test(t)) return "🐍";
+                            if (/\bhorse\b/.test(t)) return "🐴";
+                            return "🐕";
+                          };
+                          const getPersonIcon = (type) => {
+                            const t = (type || "").toLowerCase();
+                            if (/child|infant|baby/.test(t)) return "👶";
+                            if (/elderly/.test(t)) return "🧓";
+                            if (/housekeeper|caretaker/.test(t)) return "🏠";
+                            return "👤";
+                          };
+
+                          return (
+                            <div id="household-pets" className={`rounded-xl border bg-white shadow-sm ${householdEditOpen ? 'border-slate-200 px-4 py-3' : 'border-slate-100 px-4 py-2.5 cursor-pointer hover:border-slate-200 transition-colors'}`} data-noe-subsection="household" onClick={!householdEditOpen ? () => setHouseholdEditOpen(true) : undefined}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">🏠</span>
+                                <span className="text-xs font-bold text-slate-700">Other Household Members</span>
+                                <div className="flex-1" />
+                                {householdEditOpen && (
+                                  <>
+                                    <Select value="" onClick={e => e.stopPropagation()} onChange={e => { if (e.target.value) addMember("person", e.target.value); }} className="!w-auto !text-xs !py-1.5 !text-sky-600 !border-sky-200 !bg-sky-50/50">
+                                      <option value="">👤 + Person</option>
+                                      {personTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </Select>
+                                    <Select value="" onClick={e => e.stopPropagation()} onChange={e => { if (e.target.value) addMember("pet", e.target.value); }} className="!w-auto !text-xs !py-1.5 !text-sky-600 !border-sky-200 !bg-sky-50/50">
+                                      <option value="">🐕 + Pet</option>
+                                      {petTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </Select>
+                                  </>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-0.5 mb-1">Children, pets, and others at the home who aren't a contact on the order.</div>
+                              {!householdEditOpen ? (
+                                /* Compact read-only view */
+                                members.length > 0 ? (
+                                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                                    {members.map(m => {
+                                      const icon = m.category === "pet" ? getPetIcon(m.type) : getPersonIcon(m.type);
+                                      const label = m.name ? `${m.type} (${m.name.split(/\s+/)[0]})` : m.type;
+                                      return <span key={m.id} className="text-xs text-slate-600">{icon} {label}</span>;
+                                    })}
+                                  </div>
+                                ) : null
+                              ) : (
+                                /* Expanded edit view */
+                                <>
+                                  {members.length > 0 && (
+                                    <div className="space-y-1">
+                                      {people.length > 0 && (
+                                        <>
+                                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">People ({people.length})</div>
+                                          {people.map((m) => (
+                                            <div key={m.id} className="flex items-center gap-1.5 h-8">
+                                              <span className="text-sm shrink-0">{getPersonIcon(m.type)}</span>
+                                              <span className="text-[11px] font-semibold text-slate-600 w-[72px] shrink-0 truncate">{m.type || "Person"}</span>
+                                              <input data-household-id={m.id} value={m.name || ""} onChange={e => updateMember(m.id, "name", e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (m.name?.trim()) setHouseholdEditOpen(false); } }} placeholder="Name, notes" className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-sky-400" />
+                                              {m.name && (
+                                                <button type="button" onClick={() => promoteToCustomer(m)} className="text-[10px] font-bold text-sky-600 hover:text-sky-700 shrink-0 whitespace-nowrap" title="Promote to customer with contact details">Make Contact</button>
+                                              )}
+                                              <button type="button" onClick={() => removeMember(m.id)} className="text-slate-400 hover:text-rose-500 text-xs shrink-0" title="Remove">✕</button>
+                                            </div>
+                                          ))}
+                                        </>
+                                      )}
+                                      {pets.length > 0 && (
+                                        <>
+                                          {people.length > 0 && <div className="border-t border-slate-100 my-0.5" />}
+                                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pets ({pets.length})</div>
+                                          {pets.map((m) => (
+                                            <div key={m.id} className="flex items-center gap-1.5 h-8">
+                                              <span className="text-sm shrink-0">{getPetIcon(m.type)}</span>
+                                              <span className="text-[11px] font-semibold text-slate-600 w-[72px] shrink-0 truncate">{m.type || "Pet"}</span>
+                                              <input data-household-id={m.id} value={m.name || ""} onChange={e => updateMember(m.id, "name", e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (m.name?.trim()) setHouseholdEditOpen(false); } }} placeholder="Name, breed, notes" className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-sky-400" />
+                                              <button type="button" onClick={() => removeMember(m.id)} className="text-slate-400 hover:text-rose-500 text-xs shrink-0" title="Remove">✕</button>
+                                            </div>
+                                          ))}
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="flex justify-end pt-2 mt-2 border-t border-slate-100">
+                                    <button type="button" onClick={() => setHouseholdEditOpen(false)} className="text-xs font-bold text-slate-500 hover:text-slate-700">Done</button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec2')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
                           <button onClick={() => goToNextSection('sec2')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec2')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
@@ -10585,78 +10866,9 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec3" noeSection="address" title="3. Address" helpText={!summaryMode ? "Enter the job site + any related locations (temp housing, hotel, alt delivery)." : ""} isOpen={openSections.sec3} onHeaderClick={()=>handleToggleSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}
-                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec3')} lines={
-                        data.addresses.filter(a => !a.inactive).map(a => ({
-                          label: a.isPrimary ? "Primary" : (a.type || "Address"),
-                          value: summarizeAddress(a)
-                        }))
-                      } /> : null}
+                    <Section id="sec3" noeSection="address" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onHeaderClick={()=>handleToggleSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}
                     >
                       <div className="space-y-4">
-                        {(() => {
-                          const DEMO_RESULTS = [
-                            { street: "148 Amsterdam Ave", city: "Hawthorne", state: "NY", zip: "10532", display: "148 Amsterdam Ave, Hawthorne, NY 10532" },
-                            { street: "25 Main St", city: "Bloomingdale", state: "NJ", zip: "07403", display: "25 Main St, Bloomingdale, NJ 07403" },
-                            { street: "1616 Springfield Ave", city: "Pennsauken", state: "NJ", zip: "08110", display: "1616 Springfield Ave, Pennsauken, NJ 08110" },
-                            { street: "17 Wausau St", city: "Ogdensburg", state: "NJ", zip: "07439", display: "17 Wausau St, Ogdensburg, NJ 07439" },
-                            { street: "42 Park Ave", apt: "4B", city: "New York", state: "NY", zip: "10016", display: "42 Park Ave #4B, New York, NY 10016" },
-                            { street: "100 Broadway", apt: "12F", city: "New York", state: "NY", zip: "10005", display: "100 Broadway #12F, New York, NY 10005" },
-                          ];
-                          const pendingAddress = pendingAddressFromGoogle; const setPendingAddress = setPendingAddressFromGoogle;
-                          const confirmAddress = (type) => {
-                            if (!pendingAddress) return;
-                            const isDuplicate = data.addresses.some(a =>
-                              a.street?.trim().toLowerCase() === pendingAddress.street?.trim().toLowerCase() &&
-                              a.city?.trim().toLowerCase() === pendingAddress.city?.trim().toLowerCase() &&
-                              a.zip?.trim() === pendingAddress.zip?.trim()
-                            );
-                            if (isDuplicate) { setToast?.("This address is already on the order"); setPendingAddress(null); return; }
-                            const primaryHasData = !!(data.addresses?.[0]?.street?.trim());
-                            if (!primaryHasData) {
-                              updateAddr(data.addresses[0].id, { ...pendingAddress, isPrimary: true, isLossSite: true, type });
-                              setToast?.("Primary address added");
-                            } else {
-                              const newAddr = initAddress({ ...pendingAddress, isPrimary: false, isLossSite: false, type });
-                              setData(p => ({ ...p, addresses: [...p.addresses, newAddr] }));
-                              setToast?.(`${type} address added`);
-                            }
-                            setPendingAddress(null);
-                          };
-                          return (
-                            <div className="rounded-lg border border-sky-100 bg-sky-50/50 p-3 space-y-3">
-                              <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider">Find address on Google</div>
-                              <SearchSelect
-                                value=""
-                                onChange={v => {
-                                  const match = DEMO_RESULTS.find(r => r.display === v);
-                                  if (match) setPendingAddress(match);
-                                }}
-                                onQueryChange={() => {}}
-                                options={DEMO_RESULTS.map(r => ({ label: r.display, value: r.display, type: "address" }))}
-                                placeholder="Start typing an address..."
-                                clearOnCommit
-                                maxResults={5}
-                                autoComplete="off"
-                              />
-                              {pendingAddress && (
-                                <div className="rounded-lg border-2 border-amber-300 bg-amber-50/50 p-4 space-y-3">
-                                  <div className="text-sm font-bold text-slate-800">{pendingAddress.display}</div>
-                                  <div className="text-xs font-semibold text-amber-700">Select address type to add to order:</div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {["House", "Apartment", "Garden Apartment", "Row House", "Hotel", "Rental", "Temp", "Work", "Other"].map(t => (
-                                      <button key={t} type="button" onClick={() => confirmAddress(t)}
-                                        className="rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all"
-                                      >{t}</button>
-                                    ))}
-                                  </div>
-                                  <button type="button" onClick={() => setPendingAddress(null)} className="text-xs font-bold text-slate-400 hover:text-slate-600">Cancel</button>
-                                </div>
-                              )}
-                              {!pendingAddress && showCoaching && <div className="text-[10px] text-slate-400">Search for an address, then select the type to add it.</div>}
-                            </div>
-                          );
-                        })()}
                         {data.addresses.map((a,i)=><AddressItem key={a.id} addr={a} total={data.addresses.length} updateAddr={updateAddr} onRemove={removeAddr} index={i} highlightMissing={data.highlightMissing} auditOn={auditOn} onVerify={verifyAddressDemo} ToggleMulti={ToggleMulti} rentOrOwn={data.rentOrOwn} rentCoverageLimit={data.rentCoverageLimit} onRentOrOwnChange={(v)=>update("rentOrOwn", v)} onRentCoverageChange={(v)=>update("rentCoverageLimit", v)} forceShowCoords={i===0 ? showPrimaryCoords : false} autoOpenForTypePrompt={pendingAddressTypePromptId === a.id} autoFocusTypePrompt={pendingAddressTypePromptId === a.id} onTypePromptFocused={handleAddressTypePromptFocused} />)}
                         <div className="pt-2"><button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button></div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -10666,36 +10878,9 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec4" noeSection="billing" title="4. Billing & Companies" helpText={!summaryMode ? "Who pays + who is involved (billing, insurance, limits/approvals, all companies/contacts)." : ""} isOpen={openSections.sec4} onHeaderClick={()=>handleToggleSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}
-                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec4')} lines={[
-                        { label: "Billing", value: data.billingPayer || null },
-                        { label: "Insurance", value: data.insuranceCompany ? `${data.insuranceCompany}${data.insuranceAdjuster ? ` — ${data.insuranceAdjuster}` : ""}` : null },
-                        { label: "Claim #", value: data.claimNumber || null },
-                        { label: "Bill To", value: data.billingCompany ? `${data.billingCompany}${data.billingContact ? ` — ${data.billingContact}` : ""}` : null },
-                      ]} /> : null}
+                    <Section id="sec4" noeSection="billing" title="4. Billing & Companies" helpText="Who pays + who is involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onHeaderClick={()=>handleToggleSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}
                     >
                       <div className="grid gap-6">
-                        {data.insuranceClaim === "Yes" && (
-                          <div className="rounded-lg border border-sky-100 bg-sky-50/40 p-4">
-                            <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider mb-3">Insurance Quick Reference</div>
-                            <div className="grid gap-3 sm:grid-cols-4">
-                              <Field label="Claim #" noeField="claimNumber">
-                                <Input value={data.claimNumber || ""} onChange={e => update("claimNumber", e.target.value)} placeholder="Claim number" />
-                              </Field>
-                              <Field label="Policy #" noeField="policyNumber">
-                                <Input value={data.policyNumber || ""} onChange={e => update("policyNumber", e.target.value)} placeholder="Policy number" />
-                              </Field>
-                              <Field label="Date of Loss" noeField="dateOfLoss">
-                                <DatePicker value={data.dateOfLoss || ""} onChange={v => update("dateOfLoss", v)} />
-                              </Field>
-                              <Field label="Insurance Company" noeField="insuranceCompany">
-                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                  {data.insuranceCompany || "Not yet assigned"}
-                                </div>
-                              </Field>
-                            </div>
-                          </div>
-                        )}
                         <SubSection
                           id="sec4-companies"
                           title="Companies & Contacts"
@@ -11011,9 +11196,14 @@ export default function App(){
                             </div>
                           )}
                         </SubSection>
-                        <SubSection id="sec4-insurance" title="Insurance" open={insuranceSubOpen} onToggle={(nextOpen) => setInsuranceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
-                          <Field label="Insurance Claim?" smart action={<ToggleGroup options={["Yes","No"]} value={data.insuranceClaim} onChange={v=>update("insuranceClaim",v)} />} />
-                          <Field label="Direction of Payment"><ToggleGroup options={["Direct from Insurance","Check","Credit Card","Other"]} value={data.directionOfPayment} onChange={v=>update("directionOfPayment",v)} /></Field>
+                        <SubSection id="sec4-insurance" title={data.insuranceClaim === "No" ? "Insurance — No Claim" : "Insurance"} open={insuranceSubOpen} onToggle={(nextOpen) => setInsuranceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-slate-700">Insurance Claim? <span className="text-orange-500 text-xs">⚡</span></span>
+                            <ToggleGroup options={["Yes","No"]} value={data.insuranceClaim} onChange={v=>update("insuranceClaim",v)} />
+                          </div>
+                          {data.insuranceClaim !== "No" && (
+                            <Field label="Direction of Payment"><ToggleGroup options={["Direct from Insurance","Check","Credit Card","Other"]} value={data.directionOfPayment} onChange={v=>update("directionOfPayment",v)} /></Field>
+                          )}
                           {data.insuranceClaim==="Yes" && (
                             <div className="animate-purple-section-fade slide-up rounded-xl bg-white p-4 grid gap-4 shadow-sm">
                               {insuranceAssignmentLinked ? (
@@ -11116,6 +11306,9 @@ export default function App(){
                                   {data.insuranceCompany} satisfies the reporting placeholder requirement for this prototype.
                                 </div>
                               )}
+                              <Field label="Order Specific Email" subtle>
+                                <Input value={data.insuranceOrderEmail} onChange={e=>update("insuranceOrderEmail",e.target.value)} placeholder="special-email@carrier.com" />
+                              </Field>
                               <EntityPreferencePanel
                                 company={data.insuranceCompany}
                                 contact={data.insuranceAdjuster}
@@ -11125,24 +11318,18 @@ export default function App(){
                                 sessionInstructionKeys={sessionInstructionKeys}
                                 onMarkInstructionKeysSeen={markInstructionKeysSeen}
                               />
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-3 gap-4">
                                 <Field label="Claim #" noeField="claimNumber"><Input value={data.claimNumber} onChange={e=>update("claimNumber",e.target.value)} placeholder="e.g. CLM-1001" /></Field>
+                                <Field label="Policy #"><Input value={data.policyNumber} onChange={e=>update("policyNumber",e.target.value)} placeholder="Policy number" /></Field>
                                 <Field label="Date of Loss" noeField="dateOfLoss"><DatePicker value={data.dateOfLoss} onChange={(v)=>update("dateOfLoss", v)} /></Field>
                               </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <Field label="Work Order #"><Input value={data.workOrderNumber} onChange={e=>update("workOrderNumber",e.target.value)} placeholder="Work order" /></Field>
-                                <Field label="Policy #"><Input value={data.policyNumber} onChange={e=>update("policyNumber",e.target.value)} placeholder="Policy number" /></Field>
-                              </div>
-                              <Field label="Order Specific Email">
-                                <Input value={data.insuranceOrderEmail} onChange={e=>update("insuranceOrderEmail",e.target.value)} placeholder="special-email@carrier.com" />
-                              </Field>
                               <div className="grid grid-cols-2 gap-4">
                                 <Field label="Contents Limit ($)" noeField="contentsCoverageLimit"><Input value={data.contentsCoverageLimit} onChange={e=>update("contentsCoverageLimit",e.target.value)} placeholder="Policy coverage limit" /></Field>
                                 <Field label="Mold Limit ($)" noeField="moldLimit"><Input className={attentionMold ? "attention-fill" : ""} value={data.moldLimit} onChange={e=>update("moldLimit",e.target.value)} placeholder="Mold-specific limit" /></Field>
                               </div>
                               {attentionMold && (
                                 <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-                                  Visible Mold selected → confirm Mold Limit.
+                                  Confirm Mold Limit if this will be a mold claim.
                                 </div>
                               )}
                             </div>
@@ -11155,30 +11342,22 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec5" noeSection="schedule" title="5. Schedule & Blockers" helpText={!summaryMode ? "Set the next appointment. Put everything the field team needs in Event Instructions." : ""} isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}
-                      summary={summaryMode ? <SectionSummary onEdit={() => handleToggleSection('sec5')} lines={[
-                        { label: "Event", value: [data.scheduleType, data.pickupDate ? formatDateLabel(data.pickupDate) : "", data.pickupTime].filter(Boolean).join(" • ") || null },
-                        { label: "Assignee", value: data.eventAssignee || null },
-                        { label: "Instructions", value: stripEventSystemLines(data.eventInstructions || "").trim() ? stripEventSystemLines(data.eventInstructions || "").trim().slice(0, 100) + (stripEventSystemLines(data.eventInstructions || "").trim().length > 100 ? "..." : "") : null },
-                      ]} /> : null}
+                    <Section id="sec5" noeSection="schedule" title="5. Schedule & Blockers" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}
                     >
                       <div className="space-y-6">
                         <SubSection id="sec5-schedule" title="Schedule" open={scheduleSubOpen} onToggle={(nextOpen) => setScheduleSubOpen(!!nextOpen)} compact={compactMode}>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                          <button onClick={() => update('scheduleType', 'Scope')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Scope' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">📋</span><span className="font-bold text-xs">Scope Only</span></button>
-                          <button onClick={() => update('scheduleType', 'Pickup')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Pickup' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🚚</span><span className="font-bold text-xs">Pickup</span></button>
-                          <button onClick={() => update('scheduleType', 'In-Home')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'In-Home' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🏡</span><span className="font-bold text-xs">In-Home</span></button>
-                          <button onClick={() => update('scheduleType', 'Meeting')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Meeting' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🗓️</span><span className="font-bold text-xs">Meeting</span></button>
-                        </div>
+                        <Field label="Event Type">
+                          <ToggleGroup options={["Scope","Pickup","In-Home","Meeting"]} value={data.scheduleType} onChange={v => update("scheduleType", v)} />
+                        </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
                           <Field
                             label="Date"
                             action={
                               <button
                                 type="button"
-                                onClick={() => setNowDate()}
-                                className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                                title="Set to today"
+                                onClick={() => { setNowDate(); setNowTime(); updateMany({ eventFirm: true, pickupTimeTentative: false, scheduleStatus: "" }); }}
+                                className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold text-sky-700 hover:bg-sky-100"
+                                title="Set date to today, time to next half hour, and mark as firm"
                               >
                                 📅 Now
                               </button>
@@ -11189,14 +11368,24 @@ export default function App(){
                           <Field
                             label="Time"
                             action={
-                              <button
-                                type="button"
-                                onClick={() => setNowTime()}
-                                className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                                title="Set to now"
-                              >
-                                🕒 Now
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => updateMany({ pickupTime: '12:00 AM', pickupTimeTentative: true, eventFirm: false })}
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${data.pickupTime === '12:00 AM' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'border border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-700'}`}
+                                  title="Set time to TBD (12:00 AM placeholder)"
+                                >
+                                  TBD
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setNowTime(); updateMany({ eventFirm: true, pickupTimeTentative: false, scheduleStatus: "" }); }}
+                                  className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                                  title="Set to now and mark as firm"
+                                >
+                                  🕒 Now
+                                </button>
+                              </div>
                             }
                           >
                             <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseTick} />
@@ -11210,29 +11399,11 @@ export default function App(){
                             <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle" />
                           </Field>
                         </div>
-                        <Field label="Firm / Tentative">
-                          <div className="flex flex-wrap gap-2">
-                            <ToggleMulti
-                              label="Firm"
-                              checked={!!data.eventFirm}
-                              onChange={() => updateMany({ eventFirm: !data.eventFirm, pickupTimeTentative: false, scheduleStatus: !data.eventFirm ? "" : data.scheduleStatus })}
-                            />
-                            <ToggleMulti
-                              label="Tentative"
-                              checked={!!data.pickupTimeTentative}
-                              onChange={() => updateMany({ pickupTimeTentative: !data.pickupTimeTentative, eventFirm: false })}
-                              colorClass="!bg-orange-50 !border-orange-400 !text-orange-700"
-                            />
+                        {data.pickupTime === '12:00 AM' && (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 font-semibold">
+                            TBD — on the calendar but time not yet confirmed.
                           </div>
-                        </Field>
-                        <Field label="Scheduling Status">
-                          <div className="space-y-2">
-                            <div className={data.eventFirm ? "opacity-50 pointer-events-none" : ""}>
-                              <ToggleGroup options={["Schedule ASAP","Rep will Schedule"]} value={data.scheduleStatus} onChange={(v)=>updateMany({ scheduleStatus: v, eventFirm: false, pickupTimeTentative: false })} />
-                            </div>
-                            <div className="text-[11px] text-slate-400">What needs to happen next to confirm this appointment.</div>
-                          </div>
-                        </Field>
+                        )}
                         <Field label="Event Instructions">
                           <div className="relative rounded-lg border border-slate-200 bg-white p-3 space-y-3">
                             <div className="flex items-center justify-end gap-2">
@@ -11317,23 +11488,45 @@ export default function App(){
                                 </div>
                               </div>
                             )}
-                            <div className="mt-3 border-t border-slate-100 pt-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <ToggleMulti label="Customer Contacted" checked={!!data.eventCustomerContacted} onChange={() => update("eventCustomerContacted", !data.eventCustomerContacted)} className="!text-[10px] !px-2 !py-1" />
-                                <ToggleMulti label="Bill To Contacted" checked={!!data.eventBillToContacted} onChange={() => update("eventBillToContacted", !data.eventBillToContacted)} className="!text-[10px] !px-2 !py-1" />
+                            <div className="mt-3 border-t border-slate-100 pt-3 space-y-3">
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Who is contacting the customer?</div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <ToggleMulti label="Already contacted" checked={data.contactAssignment === "done"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "done" ? "" : "done" })} className="!text-[10px] !px-2.5 !py-1" />
+                                  <ToggleMulti label="Rep will contact" checked={data.contactAssignment === "rep"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "rep" ? "" : "rep" })} className="!text-[10px] !px-2.5 !py-1" />
+                                  <ToggleMulti label="Office please contact" checked={data.contactAssignment === "office"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "office" ? "" : "office" })} className="!text-[10px] !px-2.5 !py-1" />
+                                  <ToggleMulti label="Enter only — do not contact" checked={data.contactAssignment === "enter-only"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "enter-only" ? "" : "enter-only" })} className="!text-[10px] !px-2.5 !py-1" />
+                                </div>
                               </div>
-                              <div className="mt-2 flex items-center gap-2">
-                                <Input
-                                  ref={eventNoteInputRef}
-                                  value={eventNoteDraft}
-                                  onChange={e=>setEventNoteDraft(e.target.value)}
-                                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEventNote(eventNoteDraft); setEventNoteDraft(""); } }}
-                                  placeholder="e.g. Left voicemail, will try again at 2pm"
-                                />
-                                <button onClick={() => { addEventNote(eventNoteDraft); setEventNoteDraft(""); }} className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Add</button>
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Contact Log</div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button type="button" onClick={() => { const entry = { id: safeUid(), text: "Customer contact attempted", at: formatShortTimestamp(), user: data.currentUser || "Unknown" }; setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])] })); setToast("Contact attempt logged"); }} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-100">
+                                    Log Attempt
+                                  </button>
+                                  <button type="button" onClick={() => { const entry = { id: safeUid(), text: "Customer contacted", at: formatShortTimestamp(), user: data.currentUser || "Unknown" }; setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])], eventCustomerContacted: true })); setToast("Customer contacted"); }} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">
+                                    Customer Contacted
+                                  </button>
+                                  <button type="button" onClick={() => { const entry = { id: safeUid(), text: "Bill To contacted", at: formatShortTimestamp(), user: data.currentUser || "Unknown" }; setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])], eventBillToContacted: true })); setToast("Bill To contacted"); }} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">
+                                    Bill To Contacted
+                                  </button>
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Notes</div>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    ref={eventNoteInputRef}
+                                    value={eventNoteDraft}
+                                    onChange={e=>setEventNoteDraft(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEventNote(eventNoteDraft); setEventNoteDraft(""); } }}
+                                    placeholder="e.g. Left voicemail, will try again at 2pm"
+                                  />
+                                  <button onClick={() => { addEventNote(eventNoteDraft); setEventNoteDraft(""); }} className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600 shrink-0">Add</button>
+                                </div>
                               </div>
                               {(data.eventNotes || []).length === 0 ? (
-                                <div className="text-xs text-slate-400 mt-2">No scheduling notes yet.</div>
+                                null
                               ) : (
                                 <div className="space-y-2 mt-2">
                                   {(showAllEventNotes ? (data.eventNotes || []) : (data.eventNotes || []).slice(0, 4)).map(n => (
@@ -11357,18 +11550,29 @@ export default function App(){
                           </div>
                         </Field>
                         <Field label="Who are we meeting?"><div className="flex flex-wrap gap-2">{(knownPeople.length > 0) ? knownPeople.map(p => (<ToggleMulti key={p} label={p} checked={(data.meetingWith || []).includes(p)} onChange={() => update("meetingWith", toggleMulti(data.meetingWith || [], p))}/>)) : <span className="text-sm text-slate-400 italic">Add customers or contacts first</span>}</div></Field>
-                        <div className="grid sm:grid-cols-2 gap-4">
-                          <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">✅ Send Confirmation</button>
-                          <button onClick={openReminderModal} className={`rounded-lg border px-4 py-3 text-sm font-semibold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600"}`}>⏰ {data.reminderEnabled ? "Edit Reminder" : "Schedule Reminder"}</button>
-                        </div>
-                        <div className="flex items-center justify-start border-t border-slate-100 pt-3">
-                          <button
-                            onClick={() => { update("addCRMlog", true); openCrmModal(); }}
-                            className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                          >
-                            + Add CRM Log
-                          </button>
-                        </div>
+                        {/* Live Event Preview */}
+                        {(data.scheduleType || data.pickupDate || data.eventAssignee || stripEventSystemLines(data.eventInstructions || "").trim()) && (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-2">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Event Preview</div>
+                            <div className="space-y-1 text-xs text-slate-700">
+                              {data.scheduleType && <div><span className="font-bold text-slate-500 w-16 inline-block">Type:</span> {data.scheduleType}</div>}
+                              {data.pickupDate && <div><span className="font-bold text-slate-500 w-16 inline-block">Date:</span> {data.pickupDate}{data.pickupTime && data.pickupTime !== '12:00 AM' ? ` at ${data.pickupTime}` : ""}{data.pickupTime === '12:00 AM' ? " (TBD)" : ""}{data.pickupTimeTentative ? " — Tentative" : ""}</div>}
+                              {data.eventAssignee && <div><span className="font-bold text-slate-500 w-16 inline-block">Assignee:</span> {data.eventAssignee}{data.eventVehicle ? ` · ${data.eventVehicle}` : ""}</div>}
+                              {(data.meetingWith || []).length > 0 && <div><span className="font-bold text-slate-500 w-16 inline-block">Meeting:</span> {data.meetingWith.join(", ")}</div>}
+                              {(() => { const addr = (data.addresses || []).find(a => a.isPrimary) || {}; const line = [addr.street, addr.city, addr.state].filter(Boolean).join(", "); return line ? <div><span className="font-bold text-slate-500 w-16 inline-block">Address:</span> {line}</div> : null; })()}
+                            </div>
+                            {stripEventSystemLines(data.eventInstructions || "").trim() && (
+                              <div className="border-t border-slate-200 pt-2 mt-1">
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Instructions</div>
+                                <div className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">{stripEventSystemLines(data.eventInstructions || "").trim().slice(0, 300)}{stripEventSystemLines(data.eventInstructions || "").trim().length > 300 ? "..." : ""}</div>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                              <button onClick={handleConfirmClick} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">Send Confirmation</button>
+                              <button onClick={openReminderModal} className={`rounded-full border px-3 py-1 text-[10px] font-bold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}>{data.reminderEnabled ? "Edit Reminder" : "Set Reminder"}</button>
+                            </div>
+                          </div>
+                        )}
                         </SubSection>
                         <SubSection id="sec5-bridge" title="Scope Update and Blockers" open={scheduleBridgeOpen} onToggle={(nextOpen) => setScheduleBridgeOpen(!!nextOpen)} compact={compactMode} className={bridgeSectionClass}>
                           <div className="space-y-4">
@@ -11592,7 +11796,7 @@ export default function App(){
                                         onClick={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], item))}
                                         className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
-                                        <div className="h-[4.9rem] w-full flex items-center justify-center">
+                                        <div className="h-[4.9rem] w-full flex items-center justify-center overflow-hidden">
                                           <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
                                         <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
@@ -11617,7 +11821,7 @@ export default function App(){
                                         onClick={() => update("sdsObservations", toggleMulti(data.sdsObservations || [], item))}
                                         className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
-                                        <div className="h-[4.9rem] w-full flex items-center justify-center">
+                                        <div className="h-[4.9rem] w-full flex items-center justify-center overflow-hidden">
                                           <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
                                         <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
@@ -11642,7 +11846,7 @@ export default function App(){
                                         onClick={() => update("sdsServices", toggleMulti(data.sdsServices || [], item))}
                                         className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
-                                        <div className="h-[4.9rem] w-full flex items-center justify-center">
+                                        <div className="h-[4.9rem] w-full flex items-center justify-center overflow-hidden">
                                           <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
                                         <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
@@ -11950,26 +12154,19 @@ export default function App(){
       {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} />}
       {showSdsPreview && (
         <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setShowSdsPreview(false); }} tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
-          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 shadow-md z-10 relative">
-            <button
-              type="button"
-              onClick={() => setShowSdsPreview(false)}
-              className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-              title="Close SDS Preview"
-            >
-              <span className="text-lg font-bold">×</span>
-            </button>
+          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-2 shadow-sm z-10 relative">
             <div className="flex items-center bg-slate-100 rounded-full p-0.5 gap-0.5">
               <button onClick={() => { setShowSdsPreview(false); setEntryMode('detailed'); }} className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Order</button>
               <button onClick={() => { setShowSdsPreview(false); setEntryMode('same-day-scope'); }} className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Scope</button>
               <button className="rounded-full px-3 py-1.5 text-xs font-bold bg-white text-sky-700 shadow-sm">SDS</button>
             </div>
+            <div className="flex-1" />
             <button
               type="button"
               onClick={() => setShowSdsPreview(false)}
-              className="ml-auto rounded-full border border-slate-200 px-4 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 transition-colors"
             >
-              Close
+              ← Close SDS
             </button>
           </div>
           <div className="flex-1 overflow-auto p-4 max-w-4xl mx-auto w-full">
@@ -11979,6 +12176,10 @@ export default function App(){
               insuranceCompany={data.insuranceCompany || ""}
               insuranceAdjuster={data.insuranceAdjuster || ""}
               dateOfLoss={data.dateOfLoss || ""}
+              policyNumber={data.policyNumber || ""}
+              nationalCarrier={data.nationalCarrier || ""}
+              orderTypes={data.orderTypes || []}
+              primaryLossType={data.primaryLossType || ""}
               address={(() => { const a = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {}; return [a.street, a.city, a.state].filter(Boolean).join(", "); })()}
               selectedServices={data.sdsServices || []}
               noeServiceOfferings={data.serviceOfferings || []}
@@ -11994,6 +12195,7 @@ export default function App(){
               documentType="approval"
               orderNarrative={orderNarrative}
               orderNarrativeProse={buildNarrativeProse(orderNarrative, data)}
+              onClose={() => setShowSdsPreview(false)}
             />
           </div>
         </div>
@@ -12117,16 +12319,20 @@ export default function App(){
         </div>
       )}
 
-      {saveSummaryOpen && (
+      {previewOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="bg-sky-500 px-6 py-4">
-              <h3 className="text-xl font-bold text-white">Order Summary</h3>
+          <div className="w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden flex flex-col">
+            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-white">Review & Save</h3>
+                <div className="text-sky-100 text-xs mt-0.5">{orderNarrative.length} details captured{data.orderName ? ` — ${data.orderName}` : ""}</div>
+              </div>
+              <button onClick={() => setPreviewOpen(false)} className="text-white/70 hover:text-white text-lg font-bold">✕</button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto custom-scroll flex-1">
               {saveSummaryMissing.length > 0 && (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  <div className="font-bold mb-1">Missing Audit Fields</div>
+                  <div className="font-bold mb-1">Missing Fields ({saveSummaryMissing.length})</div>
                   <ul className="list-disc pl-5">
                     {saveSummaryMissing.map((m, idx) => (
                       <li key={`${m.key}-${idx}`}>{m.label}</li>
@@ -12134,22 +12340,57 @@ export default function App(){
                   </ul>
                 </div>
               )}
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="text-sm font-bold text-slate-700 mb-2">Entered Fields</div>
-                <div className="max-h-[320px] overflow-y-auto custom-scroll text-xs text-slate-700 space-y-1">
-                  {saveSummaryLines.length === 0 ? (
-                    <div className="text-slate-400">No fields entered yet.</div>
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <button type="button" onClick={() => setPreviewView("narrative")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "narrative" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>Narrative</button>
+                  <button type="button" onClick={() => setPreviewView("table")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "table" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>Table</button>
+                  <button type="button" onClick={() => setPreviewView("fields")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "fields" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>All Fields</button>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-5 py-4">
+                  {orderNarrative.length === 0 ? (
+                    <div className="text-sm text-slate-400 italic">No data entered yet.</div>
+                  ) : previewView === "narrative" ? (
+                    <div className="text-sm leading-relaxed text-slate-700 space-y-2">
+                      {buildNarrativeProse(orderNarrative, data).map((t, i) => <p key={i}>{t}</p>)}
+                    </div>
+                  ) : previewView === "table" ? (
+                    <div className="space-y-1.5">
+                      {orderNarrative.map((line, idx) => (
+                        <div key={idx} className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20 shrink-0 text-right">{line.section}</span>
+                          <span className="text-sm text-slate-700">{line.text}</span>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    saveSummaryLines.map((l, idx) => <div key={`${l}-${idx}`}>{l}</div>)
+                    <div className="text-xs text-slate-700 space-y-1 max-h-[320px] overflow-y-auto custom-scroll">
+                      {saveExportLines.length === 0 ? (
+                        <div className="text-slate-400">No fields entered yet.</div>
+                      ) : (
+                        saveExportLines.map((l, idx) => <div key={`${l}-${idx}`}>{l}</div>)
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => copyLines(saveSummaryLines)}
+                  className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100"
+                  onClick={() => {
+                    const nlt = (data.orderName ? `NLT: ${data.orderName}\n\n` : "") + orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
+                    copyLines(nlt.split("\n"));
+                  }}
                 >
-                  Copy Summary
+                  Copy as NLT
+                </button>
+                <button
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                  onClick={() => {
+                    const prose = buildNarrativeProse(orderNarrative, data).join("\n\n");
+                    copyLines(prose.split("\n"));
+                  }}
+                >
+                  Copy Narrative
                 </button>
                 <button
                   className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
@@ -12159,25 +12400,25 @@ export default function App(){
                 </button>
                 <button
                   className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => copyLines(saveExportLines)}
+                  onClick={() => {
+                    const narrative = orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
+                    const existing = stripEventSystemLines(data.eventInstructions || "").trim();
+                    const combined = existing ? `${existing}\n\n--- Order Summary ---\n${narrative}` : `--- Order Summary ---\n${narrative}`;
+                    update("eventInstructions", composeEventInstructions(combined, data, conditionSummary));
+                    setToast("Narrative added to Event Instructions");
+                  }}
                 >
-                  Copy All Fields
-                </button>
-                <button
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => downloadLines(saveExportLines, "order-all-fields.txt")}
-                >
-                  Download All Fields
+                  Send to Event Instructions
                 </button>
               </div>
             </div>
-            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
-              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setSaveSummaryOpen(false)}>Close</button>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 shrink-0">
+              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setPreviewOpen(false)}>Close</button>
               <button
                 className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
-                onClick={() => { setSaveSummaryOpen(false); validateGenerateScope(); }}
+                onClick={() => { setPreviewOpen(false); validateGenerateScope(); }}
               >
-                Continue Save
+                Save {recordWord}
               </button>
             </div>
           </div>
@@ -12752,13 +12993,6 @@ export default function App(){
             <div className="text-sm text-slate-600 mb-4">
               No <span className="font-semibold">{livingAddressPrompt.type}</span> address exists yet.
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Choose how to continue:
-              <div className="mt-2 space-y-1">
-                <div>• Add address now with type preselected</div>
-                <div>• Use a TBD placeholder for now</div>
-              </div>
-            </div>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
@@ -12770,16 +13004,16 @@ export default function App(){
               <button
                 type="button"
                 onClick={() => addLivingAddressFromPrompt("placeholder")}
-                className="rounded-lg border border-sky-300 bg-white px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-50"
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"
               >
-                Use TBD Placeholder
+                Create Placeholder
               </button>
               <button
                 type="button"
                 onClick={() => addLivingAddressFromPrompt("full")}
                 className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-white hover:bg-sky-600"
               >
-                Add Now
+                Enter Address Now
               </button>
             </div>
           </div>
@@ -13093,15 +13327,15 @@ export default function App(){
 
       {crmModal.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
+          <div className="w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden flex flex-col">
+            <div className="bg-sky-500 px-6 py-3 flex items-center justify-between shrink-0">
               <div>
-                <h3 className="text-xl font-bold text-white">Add CRM Log</h3>
-                <div className="text-sm text-sky-100">Capture outreach and follow-up actions.</div>
+                <h3 className="text-lg font-bold text-white">Add CRM Log</h3>
+                <div className="text-xs text-sky-100">Capture outreach and follow-up actions.</div>
               </div>
               <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" })}>×</button>
             </div>
-            <div className="p-6 space-y-5">
+            <div className="p-5 space-y-4 overflow-y-auto custom-scroll flex-1">
               <Field label="Type">
                 <Select value={crmModal.method} onChange={e=>setCrmModal(m=>({...m, method: e.target.value}))}>
                   {CONTACT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -13153,7 +13387,7 @@ export default function App(){
                 />
               </div>
             </div>
-            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+            <div className="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-200 shrink-0">
               <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" })}>Cancel</button>
               <button
                 className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
