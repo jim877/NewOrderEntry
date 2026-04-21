@@ -11703,137 +11703,208 @@ export default function App(){
                 </div>;
                 })()}
 
-                {isFieldVisible("repairsSummary") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                  <div className="text-sm font-bold text-sky-600">What repairs are being done?</div>
-                  <div className="flex flex-wrap gap-2">
-                    {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
-                      <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
-                        const current = (data.repairsSummary || "").split(", ").filter(Boolean);
-                        const next = current.includes(s) ? current.filter(x => x !== s) : [...current, s];
-                        update("repairsSummary", next.join(", "));
-                      }} className="!px-3 !py-2 !text-sm" />
-                    ))}
-                  </div>
-                </div>}
-
-                {(isFieldVisible("livingStatus") || isFieldVisible("processType")) && <div className="grid grid-cols-1 gap-3">
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                    <div className="text-sm font-bold text-sky-600">Where is the customer living?</div>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { label: "Staying in home" }, { label: "Hotel" }, { label: "Temp" }, { label: "Moving" },
-                      ].map(s => (
-                        <ToggleMulti key={s.label} label={s.label} checked={data.livingStatus === s.label} onChange={() => updateLivingStatus(data.livingStatus === s.label ? "" : s.label)} className="!px-3 !py-1.5 !text-xs" />
-                      ))}
-                    </div>
-                    {livingAddressPrompt.open && (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 space-y-2">
-                        <div className="text-xs font-bold text-amber-800">Add {livingAddressPrompt.type} address?</div>
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={closeLivingAddressPrompt} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-50">Not Now</button>
-                          <button type="button" onClick={() => addLivingAddressFromPrompt("placeholder")} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">Create Placeholder</button>
-                          <button type="button" onClick={() => addLivingAddressFromPrompt("full")} className="rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Enter Address Now</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                    <div className="text-sm font-bold text-sky-600">Where should we make final delivery?</div>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { label: "Return to Home ASAP", value: "Deliver ASAP" },
-                        { label: "To Temp Address", value: "Deliver to Temp" },
-                        { label: "To New Home", value: "Deliver to New Home" },
-                        { label: "Store Until Home Repaired", value: "Long-Term Storage" },
-                      ].map(s => (
-                        <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => update("processType", data.processType === s.value ? "" : s.value)} className="!px-3 !py-1.5 !text-xs" />
-                      ))}
-                    </div>
-                  </div>
-                </div>}
-
-                {isFieldVisible("packoutSummary") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                  <div className="text-sm font-bold text-sky-600">What are we picking up?</div>
-                  <div className="flex flex-wrap gap-2">
-                    {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
-                      <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} className="!px-3 !py-2 !text-sm" />
-                    ))}
-                  </div>
-                </div>}
-
-                {isFieldVisible("loadList") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                  <div className="text-sm font-bold text-sky-600">What do we need to bring?</div>
-                  <div className="flex flex-wrap gap-2">
-                    {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
-                      <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className="!px-3 !py-2 !text-sm" />
-                    ))}
-                  </div>
-                </div>}
-
-                {isFieldVisible("sdsConsiderations") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                  <div className="text-sm font-bold text-sky-600">Special considerations</div>
-                  <div className="flex flex-wrap gap-2">
-                    {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
-                      <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s))} className="!px-3 !py-2 !text-sm" />
-                    ))}
-                  </div>
-                  {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
-                    <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
-                      <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[["Det","special detergent"], ["NoDC","no dry clean"], ["Low","low heat"], ["NoDry","no dryer"], ["PPE","wear PPE"], ["Hand","hand finish"]].map(([code, desc]) => (
-                          <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} className="!text-[10px] !px-2 !py-1" />
+                {isFieldVisible("repairsSummary") && (() => {
+                  const answered = !!data.repairsSummary;
+                  const summary = data.repairsSummary || "";
+                  const log = (data.interviewLog || {}).repairs;
+                  const expanded = !answered || interviewExpanded.repairs;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                      <div className="text-sm font-bold text-sky-600">What repairs are being done?</div>
+                      {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-4 pb-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
+                            const current = (data.repairsSummary || "").split(", ").filter(Boolean);
+                            const next = current.includes(s) ? current.filter(x => x !== s) : [...current, s];
+                            update("repairsSummary", next.join(", "));
+                          }} className="!px-3 !py-2 !text-sm" />
                         ))}
                       </div>
-                      <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities" className="!text-xs !py-1.5" />
-                    </div>
-                  )}
-                </div>}
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
 
-                {isFieldVisible("familyMedicalIssues") && <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                  <div className="text-sm font-bold text-sky-600">Customer preferences</div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
-                      <span className="text-xs text-slate-700">Medical issues?</span>
-                      <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => update("familyMedicalIssues", v)} />
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
-                      <span className="text-xs text-slate-700">Soap/fragrance allergies?</span>
-                      <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => update("soapFragAllergies", v)} />
-                    </div>
-                  </div>
-                  {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e => update("familyMedicalNote", e.target.value)} placeholder="What medical issues?" className="!text-xs" />}
-                  {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="What allergies?" className="!text-xs" />}
-                  <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
-                    <span className="text-xs text-slate-700">Self-clean anything?</span>
-                    <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} />
-                  </div>
-                  {data.selfCleaning === "Y" && (
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap gap-1.5">
-                        {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
-                          const active = (data.selfCleaningNote || "").toLowerCase().includes(item.toLowerCase());
-                          return <button key={item} type="button" onClick={() => { const note = data.selfCleaningNote || ""; if (active) update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", ")); else update("selfCleaningNote", note ? `${note}, ${item}` : item); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{item}</button>;
-                        })}
+                {/* Living Status */}
+                {isFieldVisible("livingStatus") && (() => {
+                  const answered = !!data.livingStatus; const log = (data.interviewLog || {}).living; const expanded = !answered || interviewExpanded.living;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                      <div className="text-sm font-bold text-sky-600">Where is the customer living?</div>
+                      {answered && !expanded && <span className="text-xs text-emerald-600 ml-2">{data.livingStatus}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-4 pb-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {[{ label: "Staying in home" }, { label: "Hotel" }, { label: "Temp" }, { label: "Moving" }].map(s => (
+                          <ToggleMulti key={s.label} label={s.label} checked={data.livingStatus === s.label} onChange={() => { updateLivingStatus(data.livingStatus === s.label ? "" : s.label); if (s.label !== data.livingStatus) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="!px-3 !py-1.5 !text-xs" />
+                        ))}
                       </div>
-                      <Input value={data.selfCleaningNote || ""} onChange={e => update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
-                    <span className="text-xs text-slate-700">How do they dry laundry?</span>
-                    <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => updateHowDry(v)} />
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
-                    <span className="text-xs text-slate-700">Need storage?</span>
-                    <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => update("storageNeeded", v)} />
-                  </div>
-                  {data.storageNeeded === "Y" && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-600">How many months?</span>
-                      <Input className="w-20 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" />
-                    </div>
-                  )}
-                </div>}
+                      {livingAddressPrompt.open && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 space-y-2">
+                          <div className="text-xs font-bold text-amber-800">Add {livingAddressPrompt.type} address?</div>
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={closeLivingAddressPrompt} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-50">Not Now</button>
+                            <button type="button" onClick={() => addLivingAddressFromPrompt("placeholder")} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">Create Placeholder</button>
+                            <button type="button" onClick={() => addLivingAddressFromPrompt("full")} className="rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Enter Address Now</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Delivery */}
+                {isFieldVisible("processType") && (() => {
+                  const answered = !!data.processType; const log = (data.interviewLog || {}).delivery; const expanded = !answered || interviewExpanded.delivery;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, delivery: !p.delivery}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                      <div className="text-sm font-bold text-sky-600">Where should we make final delivery?</div>
+                      {answered && !expanded && <span className="text-xs text-emerald-600 ml-2">{data.processType}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-4 pb-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {[{ label: "Return to Home ASAP", value: "Deliver ASAP" }, { label: "To Temp Address", value: "Deliver to Temp" }, { label: "To New Home", value: "Deliver to New Home" }, { label: "Store Until Home Repaired", value: "Long-Term Storage" }].map(s => (
+                          <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => { update("processType", data.processType === s.value ? "" : s.value); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="!px-3 !py-1.5 !text-xs" />
+                        ))}
+                      </div>
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Packout */}
+                {isFieldVisible("packoutSummary") && (() => {
+                  const answered = (data.packoutSummary || []).length > 0; const summary = (data.packoutSummary || []).join(", "); const log = (data.interviewLog || {}).packout; const expanded = !answered || interviewExpanded.packout;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                      <div className="text-sm font-bold text-sky-600">What are we picking up?</div>
+                      {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-4 pb-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} className="!px-3 !py-2 !text-sm" />
+                        ))}
+                      </div>
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Load List */}
+                {isFieldVisible("loadList") && (() => {
+                  const answered = (data.loadList || []).length > 0; const summary = (data.loadList || []).join(", "); const log = (data.interviewLog || {}).loadList; const expanded = !answered || interviewExpanded.loadList;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                      <div className="text-sm font-bold text-sky-600">What do we need to bring?</div>
+                      {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-4 pb-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className="!px-3 !py-2 !text-sm" />
+                        ))}
+                      </div>
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Considerations */}
+                {isFieldVisible("sdsConsiderations") && (() => {
+                  const answered = (data.sdsConsiderations || []).length > 0; const summary = (data.sdsConsiderations || []).join(", "); const log = (data.interviewLog || {}).considerations; const expanded = !answered || interviewExpanded.considerations;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                      <div className="text-sm font-bold text-sky-600">Special considerations</div>
+                      {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-4 pb-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s))} className="!px-3 !py-2 !text-sm" />
+                        ))}
+                      </div>
+                      {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
+                        <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
+                          <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[["Det","special detergent"], ["NoDC","no dry clean"], ["Low","low heat"], ["NoDry","no dryer"], ["PPE","wear PPE"], ["Hand","hand finish"]].map(([code, desc]) => (
+                              <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} className="!text-[10px] !px-2 !py-1" />
+                            ))}
+                          </div>
+                          <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities" className="!text-xs !py-1.5" />
+                        </div>
+                      )}
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Customer Preferences */}
+                {isFieldVisible("familyMedicalIssues") && (() => {
+                  const answered = data.familyMedicalIssues || data.soapFragAllergies || data.selfCleaning || data.howDryLaundry || data.storageNeeded;
+                  const summary = [data.familyMedicalIssues === "Y" ? "Medical" : "", data.soapFragAllergies === "Y" ? "Allergies" : "", data.selfCleaning === "Y" ? "Self-clean" : "", data.howDryLaundry && data.howDryLaundry !== "Dryer" ? data.howDryLaundry : "", data.storageNeeded === "Y" ? "Storage" : ""].filter(Boolean).join(", ");
+                  const log = (data.interviewLog || {}).preferences; const expanded = !answered || interviewExpanded.preferences;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, preferences: !p.preferences}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                      <div className="text-sm font-bold text-sky-600">Customer preferences</div>
+                      {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-4 pb-4 space-y-3">
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">Medical issues?</span>
+                          <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => update("familyMedicalIssues", v)} />
+                        </div>
+                        {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e => update("familyMedicalNote", e.target.value)} placeholder="What medical issues?" className="!text-xs" />}
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">Soap/fragrance allergies?</span>
+                          <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => update("soapFragAllergies", v)} />
+                        </div>
+                        {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="What allergies?" className="!text-xs" />}
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">Self-clean anything?</span>
+                          <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} />
+                        </div>
+                        {data.selfCleaning === "Y" && (
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap gap-1.5">
+                              {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
+                                const active = (data.selfCleaningNote || "").toLowerCase().includes(item.toLowerCase());
+                                return <button key={item} type="button" onClick={() => { const note = data.selfCleaningNote || ""; if (active) update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", ")); else update("selfCleaningNote", note ? `${note}, ${item}` : item); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{item}</button>;
+                              })}
+                            </div>
+                            <Input value={data.selfCleaningNote || ""} onChange={e => update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">How do they dry laundry?</span>
+                          <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => updateHowDry(v)} />
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">Need storage?</span>
+                          <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => update("storageNeeded", v)} />
+                        </div>
+                        {data.storageNeeded === "Y" && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-600">How many months?</span>
+                            <Input className="w-20 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" />
+                          </div>
+                        )}
+                      </div>
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, preferences: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), preferences: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
               </div>
               <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
                 <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-violet-500 px-5 py-2 text-sm font-bold text-white hover:bg-violet-600">Done</button>
