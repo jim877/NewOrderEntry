@@ -1665,25 +1665,25 @@ const DEFAULT_FIELD_CONFIG = {
   estimateRequested: { label: "Estimate Requested", section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
 
   // --- Interview Questions ---
-  damageWasWet:              { label: "Still Wet?",                section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, coaching: "Urgent — untreated wet items develop mold." },
-  damageMoldMildew:          { label: "Visible Mold?",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, coaching: "Ask about respiratory issues. Our team needs PPE." },
-  structuralElectricDamage:  { label: "Structural Damage?",       section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
-  noLights:                  { label: "No Electricity?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, coaching: "Bring portable lighting." },
-  noHeat:                    { label: "No Heat?",                 section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
-  boardedUp:                 { label: "Boarded Up?",              section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, coaching: "Confirm access — who has the key or code?" },
-  repairsSummary:            { label: "Repairs",                  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
-  livingStatus:              { label: "Living Situation",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
-  processType:               { label: "Delivery Destination",     section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
-  packoutSummary:            { label: "What Are We Picking Up?",  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true },
-  loadList:                  { label: "What To Bring",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
-  sdsConsiderations:         { label: "Special Considerations",   section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
-  familyMedicalIssues:       { label: "Medical Issues?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
-  soapFragAllergies:         { label: "Soap/Fragrance Allergies?",section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
-  selfCleaning:              { label: "Self-Cleaning?",           section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
-  useDryCleaner:             { label: "Use Dry Cleaner?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
-  howDryLaundry:             { label: "How Dry Laundry?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
-  storageNeeded:             { label: "Storage Needed?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
-  suggestedGroups:           { label: "Suggested Groups",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true },
+  damageWasWet:              { label: "Still Wet?",                section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Urgent — untreated wet items develop mold." },
+  damageMoldMildew:          { label: "Visible Mold?",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Ask about respiratory issues. Our team needs PPE." },
+  structuralElectricDamage:  { label: "Structural Damage?",       section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
+  noLights:                  { label: "No Electricity?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Bring portable lighting." },
+  noHeat:                    { label: "No Heat?",                 section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
+  boardedUp:                 { label: "Boarded Up?",              section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Confirm access — who has the key or code?" },
+  repairsSummary:            { label: "Repairs",                  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
+  livingStatus:              { label: "Living Situation",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "single" },
+  processType:               { label: "Delivery Destination",     section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "single" },
+  packoutSummary:            { label: "What Are We Picking Up?",  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
+  loadList:                  { label: "What To Bring",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  sdsConsiderations:         { label: "Special Considerations",   section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  familyMedicalIssues:       { label: "Medical Issues?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  soapFragAllergies:         { label: "Soap/Fragrance Allergies?",section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  selfCleaning:              { label: "Self-Cleaning?",           section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  useDryCleaner:             { label: "Use Dry Cleaner?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
+  howDryLaundry:             { label: "How Dry Laundry?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
+  storageNeeded:             { label: "Storage Needed?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
+  suggestedGroups:           { label: "Suggested Groups",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
 
   // --- Codes (post-inspection) ---
   interview:     { label: "Interview Section",  section: "sec1", category: "codes", requiredInAudit: true, requiredAtStatus: "Pickup Complete", visible: true, checkFn: "interviewCompleted" },
@@ -11680,9 +11680,9 @@ export default function App(){
                   const answered = data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp;
                   const summary = [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural" : "", data.noLights ? "No Power" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""].filter(Boolean).join(", ");
                   const log = (data.interviewLog || {}).conditions;
-                  const expanded = !answered || interviewExpanded.conditions;
+                  const expanded = interviewExpanded.conditions !== false;
                   return <div className={`rounded-xl border ${answered ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
-                  <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: !p.conditions})); if (!log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                  <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: !p.conditions})); if (!log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50">
                     <div className="text-sm font-bold text-sky-600">Is anything still wet or damaged?</div>
                     {answered && !expanded && <div className="flex items-center gap-2"><span className="text-xs text-emerald-600">{summary}</span>{log && <span className="text-[9px] text-slate-300">{log.user} · {log.at}</span>}</div>}
                   </button>
@@ -11707,13 +11707,13 @@ export default function App(){
                   const answered = !!data.repairsSummary;
                   const summary = data.repairsSummary || "";
                   const log = (data.interviewLog || {}).repairs;
-                  const expanded = !answered || interviewExpanded.repairs;
+                  const expanded = interviewExpanded.repairs !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50">
                       <div className="text-sm font-bold text-sky-600">What repairs are being done?</div>
                       {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1.5 text-[9px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-4 pb-4 space-y-3">
                       <div className="flex flex-wrap gap-2">
                         {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
@@ -11733,11 +11733,11 @@ export default function App(){
                 {isFieldVisible("livingStatus") && (() => {
                   const answered = !!data.livingStatus; const log = (data.interviewLog || {}).living; const expanded = !answered || interviewExpanded.living;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50">
                       <div className="text-sm font-bold text-sky-600">Where is the customer living?</div>
                       {answered && !expanded && <span className="text-xs text-emerald-600 ml-2">{data.livingStatus}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1.5 text-[9px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-4 pb-4 space-y-3">
                       <div className="flex flex-wrap gap-2">
                         {[{ label: "Staying in home" }, { label: "Hotel" }, { label: "Temp" }, { label: "Moving" }].map(s => (
@@ -11762,11 +11762,11 @@ export default function App(){
                 {isFieldVisible("processType") && (() => {
                   const answered = !!data.processType; const log = (data.interviewLog || {}).delivery; const expanded = !answered || interviewExpanded.delivery;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, delivery: !p.delivery}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, delivery: !p.delivery}))} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50">
                       <div className="text-sm font-bold text-sky-600">Where should we make final delivery?</div>
                       {answered && !expanded && <span className="text-xs text-emerald-600 ml-2">{data.processType}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1.5 text-[9px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-4 pb-4 space-y-3">
                       <div className="flex flex-wrap gap-2">
                         {[{ label: "Return to Home ASAP", value: "Deliver ASAP" }, { label: "To Temp Address", value: "Deliver to Temp" }, { label: "To New Home", value: "Deliver to New Home" }, { label: "Store Until Home Repaired", value: "Long-Term Storage" }].map(s => (
@@ -11779,13 +11779,13 @@ export default function App(){
 
                 {/* Packout */}
                 {isFieldVisible("packoutSummary") && (() => {
-                  const answered = (data.packoutSummary || []).length > 0; const summary = (data.packoutSummary || []).join(", "); const log = (data.interviewLog || {}).packout; const expanded = !answered || interviewExpanded.packout;
+                  const answered = (data.packoutSummary || []).length > 0; const summary = (data.packoutSummary || []).join(", "); const log = (data.interviewLog || {}).packout; const expanded = interviewExpanded.packout !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50">
                       <div className="text-sm font-bold text-sky-600">What are we picking up?</div>
                       {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1.5 text-[9px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-4 pb-4 space-y-3">
                       <div className="flex flex-wrap gap-2">
                         {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
@@ -11799,13 +11799,13 @@ export default function App(){
 
                 {/* Load List */}
                 {isFieldVisible("loadList") && (() => {
-                  const answered = (data.loadList || []).length > 0; const summary = (data.loadList || []).join(", "); const log = (data.interviewLog || {}).loadList; const expanded = !answered || interviewExpanded.loadList;
+                  const answered = (data.loadList || []).length > 0; const summary = (data.loadList || []).join(", "); const log = (data.interviewLog || {}).loadList; const expanded = interviewExpanded.loadList !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50">
                       <div className="text-sm font-bold text-sky-600">What do we need to bring?</div>
                       {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1.5 text-[9px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-4 pb-4 space-y-3">
                       <div className="flex flex-wrap gap-2">
                         {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
@@ -11819,13 +11819,13 @@ export default function App(){
 
                 {/* Considerations */}
                 {isFieldVisible("sdsConsiderations") && (() => {
-                  const answered = (data.sdsConsiderations || []).length > 0; const summary = (data.sdsConsiderations || []).join(", "); const log = (data.interviewLog || {}).considerations; const expanded = !answered || interviewExpanded.considerations;
+                  const answered = (data.sdsConsiderations || []).length > 0; const summary = (data.sdsConsiderations || []).join(", "); const log = (data.interviewLog || {}).considerations; const expanded = interviewExpanded.considerations !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50">
                       <div className="text-sm font-bold text-sky-600">Special considerations</div>
                       {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1.5 text-[9px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-4 pb-4 space-y-3">
                       <div className="flex flex-wrap gap-2">
                         {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
@@ -11852,13 +11852,13 @@ export default function App(){
                 {isFieldVisible("familyMedicalIssues") && (() => {
                   const answered = data.familyMedicalIssues || data.soapFragAllergies || data.selfCleaning || data.howDryLaundry || data.storageNeeded;
                   const summary = [data.familyMedicalIssues === "Y" ? "Medical" : "", data.soapFragAllergies === "Y" ? "Allergies" : "", data.selfCleaning === "Y" ? "Self-clean" : "", data.howDryLaundry && data.howDryLaundry !== "Dryer" ? data.howDryLaundry : "", data.storageNeeded === "Y" ? "Storage" : ""].filter(Boolean).join(", ");
-                  const log = (data.interviewLog || {}).preferences; const expanded = !answered || interviewExpanded.preferences;
+                  const log = (data.interviewLog || {}).preferences; const expanded = interviewExpanded.preferences !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, preferences: !p.preferences}))} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50">
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, preferences: !p.preferences}))} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50">
                       <div className="text-sm font-bold text-sky-600">Customer preferences</div>
                       {answered && !expanded && <span className="text-xs text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-4 pb-2 text-[9px] text-slate-300">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1.5 text-[9px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-4 pb-4 space-y-3">
                       <div className="grid grid-cols-1 gap-3">
                         <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
