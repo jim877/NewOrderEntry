@@ -1698,6 +1698,60 @@ const DEFAULT_BLOCKER_RULES = [
   { id: "unknownIns",   enabled: true, trigger: "Insurance company set to Not Yet Known", blockerText: "Insurance Company Not Yet Known" },
 ];
 
+// --- INTERVIEW ANSWER ACTIONS ---
+const DEFAULT_INTERVIEW_ACTIONS = {
+  // Q1: Conditions
+  "Still Wet":          { coaching: "We will need to get out right away, separate the wet items by color and process them immediately using an anti-microbial to prevent mold growth.", actions: [{ type: "loadList", value: "Plastic Bags" }, { type: "handlingCode", value: "Wet" }] },
+  "Visible Mold":       { coaching: "Please don't disturb the mold and consider wearing safety gear. If your Insurance is considering this a 'Mold Claim' it may count against your mold limit.", actions: [{ type: "loadList", value: "Tyvek" }, { type: "handlingCode", value: "PPE" }, { type: "suggestOrderType", value: "Mold" }, { type: "openMoldLimit" }] },
+  "Structural Damage":  { coaching: "Please stay out of any unstable areas. Has there been a safety assessment?", actions: [{ type: "loadList", value: "Hard Hats" }, { type: "sdsObservation", value: "Structural Damage" }, { type: "blocker", value: "Safety Assessment needed" }, { type: "suggestGroup", value: "LTD" }] },
+  "No Electricity":     { coaching: "No problem, our crew will bring portable lights. Will you be able to pull your Rush items?", actions: [{ type: "loadList", value: "Lights" }] },
+  "No Heat":            { coaching: "", actions: [{ type: "loadList", value: "Heater" }] },
+  "Boarded Up":         { coaching: "Please confirm safe entry and available access.", actions: [{ type: "loadList", value: "Lights" }] },
+
+  // Q2: Repairs
+  "Just Cleaning":              { coaching: "Since it's just a cleaning, we should plan the essentials for a quick turnaround.", actions: [{ type: "eventInstruction", value: "Standard pack-out/pack-back" }, { type: "suggestGroup", value: "RFD" }] },
+  "Paint":                      { coaching: "We usually require waiting 48 hours after painting is finished before delivering to avoid odors or items sticking to the walls.", actions: [{ type: "eventInstruction", value: "Hold delivery until paint cures" }, { type: "suggestGroup", value: "STD" }] },
+  "Refinish Floors":            { coaching: "We will strictly follow your contractor's advice on floor curing times before we bring heavy furniture back in.", actions: [{ type: "loadList", value: "Floor Protection" }, { type: "suggestGroup", value: "STD" }] },
+  "Replace Floors":             { coaching: "We'll make sure to bring extra floor protection during delivery to keep your brand new floors pristine.", actions: [{ type: "eventInstruction", value: "Floor replacement" }, { type: "loadList", value: "Floor Protection" }, { type: "suggestGroup", value: "LTD" }] },
+  "Cosmetic Damage":            { coaching: "Once the minor repairs are wrapped up, just give us a call and we'll arrange your delivery.", actions: [{ type: "eventInstruction", value: "Minor repairs" }, { type: "suggestGroup", value: "LTD" }] },
+  "Major Structural Damage":    { coaching: "We can prep your belongings for safe, long-term storage in our facility.", actions: [{ type: "suggestGroup", value: "LTD" }, { type: "blocker", value: "Timeline TBD" }] },
+  "Complete Rebuild":           { coaching: "We can prep your belongings for safe, long-term storage in our facility.", actions: [{ type: "suggestGroup", value: "LTFD" }] },
+
+  // Q3: Living Status
+  "Staying in home":    { coaching: "We'll try to work as quietly as possible and expedite your household essentials like bedding, shower curtains and throw rugs. We also have temporary shades if you need privacy on the windows.", actions: [{ type: "eventInstruction", value: "Customer on-site" }] },
+  "Hotel":              { coaching: "We can deliver your rush items straight to the hotel.", actions: [{ type: "addressPlaceholder", value: "Hotel" }] },
+  "Temp":               { coaching: "We can deliver future seasonal items to this address.", actions: [{ type: "addressPlaceholder", value: "Temp" }] },
+  "Moving":             { coaching: "We'll update your file so your final delivery goes smoothly to your new permanent address. Will you be moving locally or will we need to coordinate a national move?", actions: [{ type: "addressPlaceholder", value: "Moving" }, { type: "blocker", value: "Final Delivery Date needed" }] },
+
+  // Q4: Delivery
+  "Deliver ASAP":           { coaching: "We will prioritize your most important items to get your house feeling like home again as fast as possible.", actions: [{ type: "eventInstruction", value: "Rush processing for essentials" }] },
+  "Deliver to Temp":        { coaching: "We'll coordinate with you to deliver exactly what you need to your temporary residence.", actions: [{ type: "eventInstruction", value: "Deliver to temporary address" }] },
+  "Deliver to New Home":    { coaching: "We will hold onto everything safely and deliver it straight to your new place when you are ready to move in.", actions: [{ type: "eventInstruction", value: "Deliver to new address" }] },
+  "Long-Term Storage":      { coaching: "We can provide safe, secure, long term storage until your home is ready.", actions: [{ type: "eventInstruction", value: "Hold for home completion" }] },
+
+  // Q5: Packout
+  "Rugs":               { coaching: "Ask about size, weight and heavy furniture that may need to be moved. We may need extra manpower.", actions: [] },
+  "Window Treatments":  { coaching: "Our team will carefully take down your drapes and blinds for specialized cleaning. Will we need any special ladders or equipment?", actions: [] },
+  "Clothing":           { coaching: "We'll kindly ask that you prioritize your rush items.", actions: [] },
+  "Bedding":            { coaching: "", actions: [] },
+  "Furniture":          { coaching: "We'll bring plenty of moving blankets and padding to protect the corners and surfaces of your furniture.", actions: [{ type: "loadList", value: "Blankets" }, { type: "loadList", value: "Dollies" }, { type: "loadList", value: "Extra Manpower" }] },
+  "Art":                { coaching: "We'll use specialized picture boxes and packing paper to keep your artwork completely safe.", actions: [{ type: "loadList", value: "Art Boxes" }] },
+  "Electronics":        { coaching: "Consider any rush electronics we may need.", actions: [{ type: "loadList", value: "TV Boxes" }, { type: "loadList", value: "Blankets" }] },
+  "Hardware":           { coaching: "", actions: [] },
+  "Appliances":         { coaching: "We will send heavy-duty dollies and extra hands to safely move your large appliances.", actions: [{ type: "loadList", value: "Dollies" }, { type: "loadList", value: "Extra Manpower" }] },
+
+  // Q7: Considerations
+  "Elderly":                { coaching: "", actions: [{ type: "sdsObservation", value: "Elderly resident" }, { type: "contactNote", value: "Elderly" }] },
+  "Pregnancy":              { coaching: "We will use baby-safe, hypoallergenic cleaning methods.", actions: [{ type: "handlingCode", value: "Det" }, { type: "contactNote", value: "Pregnancy" }] },
+  "Baby":                   { coaching: "We will use baby-safe, hypoallergenic cleaning methods and can rush essential baby items like cribs, strollers, and clothing.", actions: [{ type: "handlingCode", value: "Det" }, { type: "contactNote", value: "Baby in household" }] },
+  "Hearing Impaired":       { coaching: "", actions: [{ type: "contactNote", value: "Hearing Impaired" }] },
+  "Spanish Only":           { coaching: "", actions: [{ type: "eventInstruction", value: "Spanish speaking crew required" }, { type: "contactNote", value: "Spanish Only" }] },
+  "Respiratory Concerns":   { coaching: "We will strictly use mild, fragrance-free cleaning agents to protect your respiratory health.", actions: [{ type: "handlingCode", value: "Det" }, { type: "contactNote", value: "Respiratory Concerns" }] },
+  "Premium Brands":         { coaching: "We will route your high-end designer pieces for delicate hand-cleaning.", actions: [{ type: "sdsObservation", value: "Premium Brands" }] },
+  "Skin Sensitivity":       { coaching: "We will process your garments using 100% dye-free and fragrance-free detergents.", actions: [{ type: "handlingCode", value: "Det" }] },
+  "Pets":                   { coaching: "Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.", actions: [{ type: "sdsObservation", value: "Pets on site" }, { type: "eventInstruction", value: "Keep doors closed - pets on site" }] },
+};
+
 const DEFAULT_FORM={
   isLead: null,
   isRestorationProject: "",
@@ -5088,10 +5142,73 @@ export default function App(){
     try { const s = localStorage.getItem("noe-blocker-rules-v1"); return s ? JSON.parse(s) : [...DEFAULT_BLOCKER_RULES]; }
     catch { return [...DEFAULT_BLOCKER_RULES]; }
   });
+  const [interviewActions, setInterviewActions] = useState(() => {
+    try { const s = localStorage.getItem("noe-interview-actions-v1"); if (!s) return { ...DEFAULT_INTERVIEW_ACTIONS }; const saved = JSON.parse(s); const merged = { ...DEFAULT_INTERVIEW_ACTIONS }; Object.keys(merged).forEach(k => { if (saved[k]) merged[k] = { ...merged[k], ...saved[k] }; }); return merged; }
+    catch { return { ...DEFAULT_INTERVIEW_ACTIONS }; }
+  });
   const [showFieldConfig, setShowFieldConfig] = useState(false);
   const [configSelectedKeys, setConfigSelectedKeys] = useState(new Set());
   const [configSearch, setConfigSearch] = useState("");
   const isFieldVisible = (key) => fieldConfig[key]?.visible !== false;
+  const executeInterviewActions = (answerKey, isOn) => {
+    const config = interviewActions[answerKey];
+    if (!config || !config.actions) return;
+    if (!isOn) return; // only execute on selection, not deselection
+    const executed = [];
+    config.actions.forEach(action => {
+      switch (action.type) {
+        case "loadList":
+          setData(p => ({ ...p, loadList: Array.from(new Set([...(p.loadList || []), action.value])) }));
+          executed.push(`+ ${action.value} to load`);
+          break;
+        case "handlingCode":
+          setData(p => ({ ...p, handlingCodes: Array.from(new Set([...(p.handlingCodes || []), action.value])) }));
+          executed.push(`+ ${action.value} handling code`);
+          break;
+        case "eventInstruction": {
+          const note = action.value;
+          setData(p => {
+            const current = stripEventSystemLines(p.eventInstructions || "").trim();
+            if (current.includes(note)) return p;
+            const combined = current ? `${current}\n${note}` : note;
+            return { ...p, eventInstructions: composeEventInstructions(combined, p, conditionSummary) };
+          });
+          executed.push(`+ "${note}" to instructions`);
+          break;
+        }
+        case "sdsObservation":
+          setData(p => ({ ...p, sdsObservations: Array.from(new Set([...(p.sdsObservations || []), action.value])) }));
+          executed.push(`+ ${action.value} to SDS`);
+          break;
+        case "suggestGroup":
+          setData(p => ({ ...p, suggestedGroups: Array.from(new Set([...(p.suggestedGroups || []), action.value])) }));
+          executed.push(`Suggested ${action.value} group`);
+          break;
+        case "blocker":
+          setData(p => {
+            const current = p.scopeBridge?.pendingIssues || [];
+            if (current.includes(action.value)) return p;
+            return { ...p, scopeBridge: { ...(p.scopeBridge || {}), pendingIssues: [...current, action.value] } };
+          });
+          executed.push(`Blocker: ${action.value}`);
+          break;
+        case "contactNote":
+          // Add to primary customer note
+          setData(p => {
+            const custs = [...(p.customers || [])];
+            if (custs[0]) {
+              const existing = custs[0].note || "";
+              if (!existing.includes(action.value)) {
+                custs[0] = { ...custs[0], note: existing ? `${existing}, ${action.value}` : action.value };
+              }
+            }
+            return { ...p, customers: custs };
+          });
+          break;
+      }
+    });
+    if (executed.length) setToast(executed.join(" · "));
+  };
   const matchesInterviewSearch = (title, ...extras) => {
     const q = interviewSearch.trim().toLowerCase();
     if (!q) return true;
@@ -5392,6 +5509,7 @@ export default function App(){
   useEffect(()=>{ localStorage.setItem("same-day-scope-v52", JSON.stringify(data)); },[data]);
   useEffect(()=>{ localStorage.setItem("noe-field-config-v1", JSON.stringify(fieldConfig)); },[fieldConfig]);
   useEffect(()=>{ localStorage.setItem("noe-blocker-rules-v1", JSON.stringify(blockerRules)); },[blockerRules]);
+  useEffect(()=>{ localStorage.setItem("noe-interview-actions-v1", JSON.stringify(interviewActions)); },[interviewActions]);
   useEffect(()=>{ localStorage.setItem("sample-contacts", JSON.stringify(sampleContacts)); },[sampleContacts]);
   const [householdEditOpen, setHouseholdEditOpen] = useState(false);
 
@@ -11724,7 +11842,7 @@ export default function App(){
                       { id: "heat", label: "No Heat", active: !!data.noHeat, onToggle: () => updateSmart("noHeat", !data.noHeat) },
                       { id: "boarded", label: "Boarded Up", active: !!data.boardedUp, onToggle: () => updateSmart("boardedUp", !data.boardedUp) },
                     ].map(item => (
-                      <ToggleMulti key={item.id} label={item.label} checked={item.active} onChange={item.onToggle} className={`!px-3 !py-2 !text-sm ${isSearchMatch(item.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                      <ToggleMulti key={item.id} label={item.label} checked={item.active} onChange={() => { item.onToggle(); executeInterviewActions(item.label, !item.active); }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(item.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
                     ))}
                   </div>
                   {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
@@ -11748,8 +11866,10 @@ export default function App(){
                         {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
                           <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
                             const current = (data.repairsSummary || "").split(", ").filter(Boolean);
-                            const next = current.includes(s) ? current.filter(x => x !== s) : [...current, s];
+                            const isAdding = !current.includes(s);
+                            const next = isAdding ? [...current, s] : current.filter(x => x !== s);
                             update("repairsSummary", next.join(", "));
+                            executeInterviewActions(s, isAdding);
                           }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
@@ -11818,7 +11938,7 @@ export default function App(){
                     {expanded && <div className="px-4 pb-4 space-y-3">
                       <div className="flex flex-wrap gap-2">
                         {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => { const isAdding = !(data.packoutSummary || []).includes(s); update("packoutSummary", toggleMulti(data.packoutSummary || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
                       {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
@@ -11858,7 +11978,7 @@ export default function App(){
                     {expanded && <div className="px-4 pb-4 space-y-3">
                       <div className="flex flex-wrap gap-2">
                         {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s))} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                          <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => { const isAdding = !(data.sdsConsiderations || []).includes(s); update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
                       {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
