@@ -1847,6 +1847,8 @@ const DEFAULT_FORM={
   groupAddressLinks: {},
   lossSeverity: initLossSeverity(),
   interviewLog: {},
+  upcomingEvents: [],
+  rushInterests: [],
   vendors:[],
   vendorDetails:{},
   showReferralVendor: true,
@@ -10636,7 +10638,8 @@ export default function App(){
                                             <div key={m.id} className="flex items-center gap-1.5 h-8">
                                               <span className="text-sm shrink-0">{getPersonIcon(m.type)}</span>
                                               <span className="text-[11px] font-semibold text-slate-600 w-[72px] shrink-0 truncate">{m.type || "Person"}</span>
-                                              <input data-household-id={m.id} value={m.name || ""} onChange={e => updateMember(m.id, "name", e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (m.name?.trim()) setHouseholdEditOpen(false); } }} placeholder="Name, notes" className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-sky-400" />
+                                              <input data-household-id={m.id} value={m.name || ""} onChange={e => updateMember(m.id, "name", e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (m.name?.trim()) setHouseholdEditOpen(false); } }} placeholder="Name" className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-sky-400" />
+                                              <input value={m.age || ""} onChange={e => updateMember(m.id, "age", e.target.value)} placeholder="Age" className="w-12 rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-sky-400 text-center" />
                                               {m.name && (
                                                 <button type="button" onClick={() => promoteToCustomer(m)} className="text-[10px] font-bold text-sky-600 hover:text-sky-700 shrink-0 whitespace-nowrap" title="Promote to customer with contact details">Make Contact</button>
                                               )}
@@ -11845,6 +11848,8 @@ export default function App(){
                   { key: "dryCleaner", title: "Use dry cleaner?", configKey: "useDryCleaner", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
                   { key: "laundry", title: "How dry laundry?", configKey: "howDryLaundry", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
                   { key: "storage", title: "Need storage?", configKey: "storageNeeded", isAnswered: () => !!data.storageNeeded, summary: () => data.storageNeeded === "Y" ? "Yes" : "No" },
+                  { key: "interests", title: "Activities & interests", configKey: "rushInterests", isAnswered: () => (data.rushInterests || []).length > 0, summary: () => (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ") },
+                  { key: "events", title: "Upcoming events", configKey: "upcomingEvents", isAnswered: () => (data.upcomingEvents || []).length > 0, summary: () => (data.upcomingEvents || []).map(e => e.name || "Event").join(", ") },
                 ];
                 const visibleQuestions = interviewQuestions.filter(q => isFieldVisible(q.configKey));
                 const answeredCount = visibleQuestions.filter(q => q.isAnswered()).length;
@@ -12125,6 +12130,61 @@ export default function App(){
                     </div>
                   );
                 })}
+
+                {/* Activities & Interests */}
+                {(() => {
+                  const answered = (data.rushInterests || []).length > 0;
+                  const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ");
+                  const log = (data.interviewLog || {}).interests;
+                  const expanded = !answered || interviewExpanded.interests;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !p.interests}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-xs' : 'text-[11px]'} font-bold text-sky-600`}>{highlightSearch("Activities & interests")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        {RUSH_INTERESTS.map(i => {
+                          const active = (data.rushInterests || []).includes(i.id);
+                          return <button key={i.id} type="button" onClick={() => { update("rushInterests", active ? (data.rushInterests||[]).filter(x=>x!==i.id) : [...(data.rushInterests||[]), i.id]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`p-2 rounded-lg border text-center ${active ? 'border-teal-400 bg-teal-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                            <div className={`text-[10px] font-bold ${active ? 'text-teal-800' : 'text-slate-600'}`}>{i.label}</div>
+                            <div className="text-[9px] text-slate-400">{i.desc}</div>
+                          </button>;
+                        })}
+                      </div>
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Upcoming Events */}
+                {(() => {
+                  const answered = (data.upcomingEvents || []).length > 0;
+                  const summary = (data.upcomingEvents || []).map(e => e.name || "Event").join(", ");
+                  const log = (data.interviewLog || {}).events;
+                  const expanded = interviewExpanded.events !== false;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-xs' : 'text-[11px]'} font-bold text-sky-600`}>{highlightSearch("Upcoming trips & events")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      {showCoaching && <div className="text-[10px] text-slate-400">Any travel or formal events during the repair period? We'll make sure the right items are pulled and delivered on time.</div>}
+                      {(data.upcomingEvents || []).map(evt => (
+                        <div key={evt.id} className="p-2 rounded-lg border border-slate-200 bg-slate-50 grid grid-cols-3 gap-2 relative">
+                          <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents||[]).filter(e => e.id !== evt.id))} className="absolute top-1 right-1 text-slate-400 hover:text-rose-500 text-xs">×</button>
+                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Name</div><input value={evt.name||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" placeholder="e.g. Florida Trip" /></div>
+                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Type</div><select value={evt.type||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, type: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px] bg-white">{RUSH_EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
+                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Date</div><input type="date" value={evt.date||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, date: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" /></div>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "vacation_beach", date: "", name: ""}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full p-2 border-2 border-dashed border-slate-300 rounded-lg text-[10px] font-bold text-slate-500 hover:border-teal-400 hover:text-teal-600">+ Add Trip or Event</button>
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, events: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
                 {false && isFieldVisible("familyMedicalIssues") && (() => {
                   const answered = false;
                   const summary = "";
@@ -12392,20 +12452,30 @@ export default function App(){
           </div>
         )}
 
-        {/* Rush Guide */}
+        {/* Rush Guide — Auto-generated from order + interview data */}
         {rushGuideOpen && (() => {
-          // Pre-fill from order data
           const livingMap = { "Staying in home": "home", "Hotel": "hotel", "Temp": "temp", "Moving": "moving" };
           const repairMap = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
-          const orderSituation = livingMap[data.livingStatus] || rushGuideData.situation || "";
+          const orderSituation = livingMap[data.livingStatus] || "";
           const firstRepair = (data.repairsSummary || "").split(", ").filter(Boolean)[0] || "";
-          const orderRepairType = repairMap[firstRepair] || rushGuideData.repairType || "";
+          const orderRepairType = repairMap[firstRepair] || "";
           const household = data.household || [];
           const people = household.filter(m => m.category === "person");
           const pets = household.filter(m => m.category === "pet");
           const primaryCustomer = (data.customers || [])[0] || {};
-          const familyDefaults = { adults: Math.max(1, (data.customers || []).length), kids: people.filter(p => /child|infant/i.test(p.type)).length, babies: people.filter(p => /infant|baby/i.test(p.type)).length, pets: pets.length };
-          const family = { ...familyDefaults, ...(rushGuideData.family || {}) };
+          // Age-aware family composition
+          const babies = people.filter(p => { const age = parseInt(p.age); return /infant|baby/i.test(p.type) || (age >= 0 && age <= 2); }).length;
+          const kids = people.filter(p => { const age = parseInt(p.age); return /child/i.test(p.type) || (age > 2 && age <= 17); }).length;
+          const elderly = people.filter(p => { const age = parseInt(p.age); return /elderly/i.test(p.type) || age >= 65; }).length;
+          const adults = Math.max(1, (data.customers || []).length);
+          const totalPeople = adults + kids + babies;
+          const petCount = pets.length;
+          const petNames = pets.map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ");
+          const considerations = data.sdsConsiderations || [];
+          const packoutItems = data.packoutSummary || [];
+          const interests = data.rushInterests || [];
+          const events = data.upcomingEvents || [];
+          const conditions = { wet: data.damageWasWet === "Y" || data.damageWasWet === true, mold: !!data.damageMoldMildew, structural: data.structuralElectricDamage === "Y", noLights: !!data.noLights, boarded: !!data.boardedUp };
 
           const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === orderRepairType);
           const now = new Date();
@@ -12422,9 +12492,12 @@ export default function App(){
             "No Need to Bag: You do not need to photograph, bag, or list any items — we will do that for you!"
           ];
 
-          if (repairInfo) {
-            rushItems.push(`Clothing & undergarments to last ${family.adults + family.kids + family.babies} people a couple of weeks`);
+          if (repairInfo || orderSituation) {
+            // Core essentials
+            rushItems.push(`Clothing & undergarments to last ${totalPeople} people a couple of weeks`);
             rushItems.push("Daily footwear, sneakers, and belts");
+
+            // Living situation
             if (orderSituation === "hotel" || orderSituation === "temp") rushItems.push("Suitcases, duffel bags, or overnight bags");
             if (orderSituation === "home") {
               rushItems.push("Daily household essentials (towels, shower curtains)");
@@ -12437,26 +12510,47 @@ export default function App(){
             } else if (orderSituation === "temp") {
               reminders.push("Most rentals are furnished so you likely will not need full bedding or towels unless preferred.");
             }
-            if (family.babies > 0) { rushItems.push("Strollers, diaper bags, and car seats"); rushItems.push("Crib bedding, baby blankets, and sleep sacks"); }
-            if (family.kids > 0) rushItems.push("Favorite comfort toys or stuffed animals");
-            if (family.pets > 0) rushItems.push("Pet beds, leashes, and carrying crates");
-            if ((rushGuideData.interests || []).includes("school")) rushItems.push("School backpacks, uniforms, and kids sports gear");
 
+            // Family composition (age-aware)
+            if (babies > 0) { rushItems.push("Strollers, diaper bags, and car seats"); rushItems.push("Crib bedding, baby blankets, and sleep sacks"); }
+            if (kids > 0) { rushItems.push("Favorite comfort toys or stuffed animals"); }
+            if (elderly > 0) { rushItems.push("Medications, medical devices, and mobility aids"); reminders.push("We will be extra careful with fragile or sentimental items for elderly family members."); }
+            if (petCount > 0) rushItems.push(`Pet beds, leashes, and carrying crates${petNames ? ` (${petNames})` : ""}`);
+
+            // Considerations-driven items
+            if (considerations.includes("Pregnancy")) { rushItems.push("Maternity clothing and comfort items"); reminders.push("All items will be cleaned with baby-safe, hypoallergenic products."); }
+            if (considerations.includes("Premium Brands")) { reminders.push("Your high-end designer pieces will be routed for delicate hand-cleaning."); }
+
+            // Packout items → what's being picked up affects what needs rushing
+            if (packoutItems.includes("Clothing")) rushItems.push("Prioritize your most-needed clothing for the Rush delivery");
+            if (packoutItems.includes("Bedding") && orderSituation === "home") rushItems.push("Temporary bedding while yours is being cleaned");
+            if (packoutItems.includes("Electronics")) rushItems.push("Identify any electronics you need immediately (chargers, laptops)");
+
+            // Conditions-driven urgency
+            if (conditions.wet) reminders.push("URGENT: Wet items are being separated by color and treated immediately with anti-microbial.");
+            if (conditions.mold) reminders.push("Mold-affected items require special handling with PPE — do not disturb.");
+            if (conditions.boarded) reminders.push("Access may be limited — please confirm entry arrangements.");
+
+            // Interests / activities
+            if (interests.includes("school")) rushItems.push("School backpacks, uniforms, and kids sports gear");
+
+            // Seasons
             const hasSeason = (name) => seasons.some(s => s.name === name);
             if (hasSeason("Spring")) seasonalWardrobes.push({ season: "Spring", items: ["Light jackets, windbreakers, and rain gear", "Transition layers (long sleeves, light sweaters)", "Sneakers and rain boots"] });
-            if (hasSeason("Summer") || (rushGuideData.interests || []).includes("summer_activities")) {
+            if (hasSeason("Summer") || interests.includes("summer_activities")) {
               const items = ["Shorts, t-shirts, skirts, and lightweight clothing", "Sandals, open-toe shoes, and sunglasses"];
-              if ((rushGuideData.interests || []).includes("summer_activities")) items.push("Swimwear, beach bags, sun hats, and pool gear");
+              if (interests.includes("summer_activities")) items.push("Swimwear, beach bags, sun hats, and pool gear");
               seasonalWardrobes.push({ season: "Summer", items });
             }
             if (hasSeason("Fall")) seasonalWardrobes.push({ season: "Fall", items: ["Sweaters, fleeces, and mid-weight coats", "Jeans, heavier pants, and closed-toe shoes"] });
-            if (hasSeason("Winter") || (rushGuideData.interests || []).includes("winter_sports")) {
+            if (hasSeason("Winter") || interests.includes("winter_sports")) {
               const items = ["Heavy winter coats, parkas, and snow boots", "Gloves, scarves, thermal layers, and thick socks"];
-              if ((rushGuideData.interests || []).includes("winter_sports")) items.push("Skiing/snowboarding equipment, snow pants, and goggles");
+              if (interests.includes("winter_sports")) items.push("Skiing/snowboarding equipment, snow pants, and goggles");
               seasonalWardrobes.push({ season: "Winter", items });
             }
 
-            (rushGuideData.events || []).forEach(evt => {
+            // Events from interview data
+            events.forEach(evt => {
               if (!evt.date) return;
               const eventDate = new Date(evt.date);
               if (estimatedReturn && eventDate > estimatedReturn) { reminders.push(`Your trip "${evt.name}" falls after repairs are expected to finish.`); return; }
@@ -12477,16 +12571,14 @@ export default function App(){
                 <span className="text-sm font-bold text-white">Rush Guide</span>
                 {primaryCustomer.first && <span className="text-teal-200 text-xs">for {[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ")}</span>}
                 <div className="flex-1" />
-                {rushGuideStep < 4 && <div className="flex items-center gap-2">
-                  {[1,2,3].map(i => <div key={i} className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${rushGuideStep === i ? 'bg-white text-teal-700' : rushGuideStep > i ? 'bg-teal-400 text-white' : 'bg-teal-700 text-teal-300'}`}>{i}</div>)}
-                </div>}
+                <span className="text-teal-200 text-xs">Auto-generated from interview</span>
                 <button onClick={() => setRushGuideOpen(false)} className="text-teal-200 hover:text-white text-lg font-bold ml-3">×</button>
               </div>
               <div className="flex-1 overflow-y-auto">
                 <div className="max-w-3xl mx-auto p-6 space-y-6">
 
                   {/* Step 1: Basics */}
-                  {rushGuideStep === 1 && <>
+                  {false && rushGuideStep === 1 && <>
                     <div><h2 className="text-xl font-bold text-slate-900 mb-1">Step 1: The Basics</h2><p className="text-sm text-slate-500">Confirm living situation and repair timeline.</p></div>
                     <div>
                       <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Living Situation</div>
@@ -12564,13 +12656,17 @@ export default function App(){
                   </>}
 
                   {/* Step 4: Results */}
-                  {rushGuideStep === 4 && repairInfo && <>
-                    <div><button onClick={() => setRushGuideStep(3)} className="text-xs text-slate-400 hover:text-slate-600 mb-2">← Modify Inputs</button>
-                      <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Smart Action Plan</h2>
+                  {(repairInfo || orderSituation) ? <>
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-900 mb-2">Rush Guide for {[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ") || "Customer"}</h2>
                       <div className="flex flex-wrap gap-2 mb-4">
-                        <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{RUSH_LIVING_SITUATIONS.find(s => s.id === orderSituation)?.label}</span>
-                        <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{family.adults + family.kids + family.babies} People</span>
-                        <span className="rounded-full bg-teal-100 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">Return: {rushFormatDate(estimatedReturn)}</span>
+                        {orderSituation && <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{RUSH_LIVING_SITUATIONS.find(s => s.id === orderSituation)?.label || orderSituation}</span>}
+                        <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{totalPeople} People{petCount > 0 ? `, ${petCount} Pet${petCount > 1 ? "s" : ""}` : ""}</span>
+                        {kids > 0 && <span className="rounded-full bg-sky-100 border border-sky-200 px-3 py-1 text-xs font-bold text-sky-700">{kids} Child{kids > 1 ? "ren" : ""}</span>}
+                        {babies > 0 && <span className="rounded-full bg-pink-100 border border-pink-200 px-3 py-1 text-xs font-bold text-pink-700">{babies} Baby{babies > 1 ? "/Toddler" : ""}</span>}
+                        {elderly > 0 && <span className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">{elderly} Elderly</span>}
+                        {estimatedReturn && <span className="rounded-full bg-teal-100 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">Return: {rushFormatDate(estimatedReturn)}</span>}
+                        {seasons.length > 0 && <span className="rounded-full bg-violet-100 border border-violet-200 px-3 py-1 text-xs font-bold text-violet-700">Seasons: {seasons.map(s => s.name).join(", ")}</span>}
                       </div>
                     </div>
 
@@ -12650,7 +12746,12 @@ export default function App(){
                         setRushGuideOpen(false);
                       }} className="rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-700">Apply to Order & Close</button>
                     </div>
-                  </>}
+                  </> : <div className="text-center py-12 space-y-3">
+                    <div className="text-4xl">📋</div>
+                    <div className="text-lg font-bold text-slate-700">Complete the interview to generate</div>
+                    <p className="text-sm text-slate-500 max-w-md mx-auto">The Rush Guide needs at least a living situation or repair type from the interview to generate personalized recommendations.</p>
+                    <button onClick={() => { setRushGuideOpen(false); setInterviewPanelOpen(true); }} className="rounded-xl bg-violet-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-violet-600">Open Interview</button>
+                  </div>}
 
                 </div>
               </div>
