@@ -1782,6 +1782,14 @@ const RUSH_INTERESTS = [
   { id: 'school', label: 'School & Kids Sports', desc: 'Backpacks, uniforms, gear' },
   { id: 'summer_activities', label: 'Summer & Swim', desc: 'Swimwear, beach bags, sun hats' },
   { id: 'winter_sports', label: 'Winter & Snow', desc: 'Skiing, heavy outerwear' },
+  { id: 'halloween', label: 'Halloween', desc: 'Costumes, decorations' },
+  { id: 'thanksgiving', label: 'Thanksgiving', desc: 'Holiday linens, servingware' },
+  { id: 'christmas', label: 'Christmas / Hanukkah', desc: 'Holiday clothing, decorations, gifts' },
+  { id: 'easter', label: 'Easter / Passover', desc: 'Spring formal, holiday items' },
+  { id: 'religious', label: 'Religious Services', desc: 'Formal wear, prayer items' },
+  { id: 'graduation', label: 'Graduation', desc: 'Caps, gowns, formal attire' },
+  { id: 'workout', label: 'Gym & Fitness', desc: 'Workout clothes, equipment' },
+  { id: 'work_from_home', label: 'Work from Home', desc: 'Office supplies, desk items' },
 ];
 
 const RUSH_SEASONS = {
@@ -12144,12 +12152,11 @@ export default function App(){
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {RUSH_INTERESTS.map(i => {
                           const active = (data.rushInterests || []).includes(i.id);
-                          return <button key={i.id} type="button" onClick={() => { update("rushInterests", active ? (data.rushInterests||[]).filter(x=>x!==i.id) : [...(data.rushInterests||[]), i.id]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`p-2 rounded-lg border text-center ${active ? 'border-teal-400 bg-teal-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                            <div className={`text-[10px] font-bold ${active ? 'text-teal-800' : 'text-slate-600'}`}>{i.label}</div>
-                            <div className="text-[9px] text-slate-400">{i.desc}</div>
+                          return <button key={i.id} type="button" onClick={() => { update("rushInterests", active ? (data.rushInterests||[]).filter(x=>x!==i.id) : [...(data.rushInterests||[]), i.id]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${active ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`} title={i.desc}>
+                            {i.label}
                           </button>;
                         })}
                       </div>
@@ -12533,6 +12540,9 @@ export default function App(){
 
             // Interests / activities
             if (interests.includes("school")) rushItems.push("School backpacks, uniforms, and kids sports gear");
+            if (interests.includes("workout")) rushItems.push("Workout clothes, sneakers, and gym equipment");
+            if (interests.includes("work_from_home")) shortTermItems.push("Home office supplies, desk accessories, and work materials");
+            if (interests.includes("religious")) shortTermItems.push("Formal religious attire, prayer items, and head coverings");
 
             // Seasons
             const hasSeason = (name) => seasons.some(s => s.name === name);
@@ -12547,6 +12557,27 @@ export default function App(){
               const items = ["Heavy winter coats, parkas, and snow boots", "Gloves, scarves, thermal layers, and thick socks"];
               if (interests.includes("winter_sports")) items.push("Skiing/snowboarding equipment, snow pants, and goggles");
               seasonalWardrobes.push({ season: "Winter", items });
+            }
+
+            // Holiday/interest-driven seasonal deliveries
+            if (interests.includes("halloween") && estimatedReturn) {
+              const halloween = new Date(estimatedReturn.getFullYear(), 9, 31);
+              if (now < halloween && halloween <= estimatedReturn) seasonalWardrobes.push({ season: "Halloween", items: ["Costumes and accessories", "Halloween decorations and party supplies"] });
+            }
+            if (interests.includes("thanksgiving") && estimatedReturn) {
+              const tg = new Date(estimatedReturn.getFullYear(), 10, 27);
+              if (now < tg && tg <= estimatedReturn) seasonalWardrobes.push({ season: "Thanksgiving", items: ["Holiday table linens and servingware", "Fall decorations", "Formal holiday clothing"] });
+            }
+            if (interests.includes("christmas") && estimatedReturn) {
+              const xmas = new Date(estimatedReturn.getFullYear(), 11, 25);
+              if (now < xmas && xmas <= estimatedReturn) seasonalWardrobes.push({ season: "Christmas / Hanukkah", items: ["Holiday clothing and formal wear", "Holiday decorations and ornaments", "Gift wrapping supplies", "Stockings and holiday bedding"] });
+            }
+            if (interests.includes("easter") && estimatedReturn) {
+              const easter = new Date(estimatedReturn.getFullYear(), 3, 5);
+              if (now < easter && easter <= estimatedReturn) seasonalWardrobes.push({ season: "Easter / Passover", items: ["Spring formal attire", "Holiday table settings", "Children's Easter outfits"] });
+            }
+            if (interests.includes("graduation") && estimatedReturn) {
+              seasonalWardrobes.push({ season: "Graduation", items: ["Cap and gown", "Formal celebration attire", "Photography outfits"] });
             }
 
             // Events from interview data
@@ -12902,6 +12933,22 @@ export default function App(){
               documentType="approval"
               orderNarrative={orderNarrative}
               orderNarrativeProse={buildNarrativeProse(orderNarrative, data)}
+              rushGuideTimeline={(() => {
+                const repairMap = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
+                const firstRepair = (data.repairsSummary || "").split(", ").filter(Boolean)[0] || "";
+                const repairId = repairMap[firstRepair];
+                const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === repairId);
+                if (!repairInfo) return null;
+                const now = new Date();
+                const returnDate = rushAddDays(now, repairInfo.days);
+                const timeline = [];
+                timeline.push({ group: "Rush Delivery", timeframe: "24-72 hours", desc: "Essential clothing, footwear, baby items, pet supplies" });
+                if (data.livingStatus === "Staying in home") timeline.push({ group: "Short-Term Home", timeframe: "1-2 weeks", desc: "Household essentials, temporary bedding, window shades" });
+                const seasons = rushGetSeasons(now, returnDate);
+                if (seasons.length > 1) timeline.push({ group: "Seasonal Wardrobes", timeframe: "2-8 weeks", desc: `Transition clothing for ${seasons.map(s => s.name).join(", ")}` });
+                timeline.push({ group: repairInfo.group, timeframe: `${repairInfo.days} days (${rushFormatDate(returnDate)})`, desc: "Final delivery of all remaining items after repairs complete" });
+                return timeline;
+              })()}
               onClose={() => setShowSdsPreview(false)}
             />
           </div>

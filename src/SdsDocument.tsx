@@ -674,7 +674,7 @@ const SdsBrochurePage = ({ brand = BRAND, media = BRAND_CARES_MEDIA }) => (
   </SdsPageBlock>
 );
 
-export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", policyNumber = "", nationalCarrier = "", primaryLossType = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsPhotos = [], sdsCoverPhoto = null, scopeBridge = {}, documentType = "approval", orderNarrative = [], orderNarrativeProse = [] }) {
+export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", policyNumber = "", nationalCarrier = "", primaryLossType = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsPhotos = [], sdsCoverPhoto = null, scopeBridge = {}, documentType = "approval", orderNarrative = [], orderNarrativeProse = [], rushGuideTimeline = null }) {
   const docSeverity = lossSeverity || {};
   const printRootRef = useRef(null);
   const responseCopy = getSdsResponseCopy(documentType);
@@ -1848,6 +1848,25 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                   {(orderNarrativeProse || []).map((line, i) => <p key={i}>{line}</p>)}
                 </div>
               </SdsWidgetSection>
+              {rushGuideTimeline && rushGuideTimeline.length > 0 && (
+                <SdsWidgetSection title="Recommended Delivery Timeline" subtitle="Our suggested delivery schedule based on your repair timeline and family needs.">
+                  <div className="space-y-3">
+                    {rushGuideTimeline.map((item, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="flex flex-col items-center shrink-0">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${i === 0 ? 'bg-teal-600' : i === rushGuideTimeline.length - 1 ? 'bg-slate-700' : 'bg-sky-500'}`}>{i + 1}</div>
+                          {i < rushGuideTimeline.length - 1 && <div className="w-0.5 h-6 bg-slate-200" />}
+                        </div>
+                        <div className="pb-2">
+                          <div className="text-sm font-bold text-slate-800">{item.group}</div>
+                          <div className="text-xs text-slate-500">{item.timeframe}</div>
+                          <div className="text-xs text-slate-600 mt-0.5">{item.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </SdsWidgetSection>
+              )}
             </SdsPageBlock>
           )}
           <SdsRestoreStoryPage brand={BRAND} media={BRAND_CARES_MEDIA} serviceHighlights={SERVICE_HIGHLIGHTS} />
