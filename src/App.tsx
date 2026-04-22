@@ -2430,7 +2430,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
 
 const Toast = ({message,onClose,panelOffset=0})=>{
   useEffect(()=>{ const id=setTimeout(onClose,3500); return ()=>clearTimeout(id);},[onClose]);
-  return(<div className="fade-in fixed bottom-28 z-[90] rounded-2xl bg-slate-800/95 backdrop-blur px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2" style={{ left: `calc((100% - ${panelOffset}px) / 2)`, transform: 'translateX(-50%)' }}><span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>{message}</div>)
+  return(<div className="fade-in fixed bottom-28 z-[90] rounded-2xl bg-slate-800/95 backdrop-blur px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2" style={{ left: '0', right: `${panelOffset}px`, margin: '0 auto', width: 'fit-content' }}><span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>{message}</div>)
 };
 
 const Switch = ({ checked, onChange }) => (
@@ -2449,7 +2449,7 @@ const SmartNotification = ({ message, onReject, onClose, panelOffset = 0 }) => {
     }, [onClose]);
 
     return (
-        <div className="fixed bottom-24 z-[90] flex items-center gap-4 rounded-lg bg-slate-900 px-4 py-3 text-white shadow-2xl slide-up border border-slate-700" style={{ left: `calc((100% - ${panelOffset}px) / 2)`, transform: 'translateX(-50%)' }}>
+        <div className="fixed bottom-24 z-[90] flex items-center gap-4 rounded-lg bg-slate-900 px-4 py-3 text-white shadow-2xl slide-up border border-slate-700" style={{ left: '0', right: `${panelOffset}px`, margin: '0 auto', width: 'fit-content' }}>
             <div className="flex items-center gap-3">
                 <div className="text-orange-500 font-bold text-lg">⚡</div>
                 <span className="text-sm font-medium">{message}</span>
@@ -11845,6 +11845,17 @@ export default function App(){
                       <ToggleMulti key={item.id} label={item.label} checked={item.active} onChange={() => { item.onToggle(); executeInterviewActions(item.label, !item.active); }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(item.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
                     ))}
                   </div>
+                  {showCoaching && [
+                    { label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true },
+                    { label: "Visible Mold", active: !!data.damageMoldMildew },
+                    { label: "Structural Damage", active: data.structuralElectricDamage === "Y" },
+                    { label: "No Electricity", active: !!data.noLights },
+                    { label: "Boarded Up", active: !!data.boardedUp },
+                  ].filter(i => i.active && interviewActions[i.label]?.coaching).map(i => (
+                    <div key={i.label} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                      <span className="font-bold">{i.label}:</span> {interviewActions[i.label].coaching}
+                    </div>
+                  ))}
                   {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
                   </div>}
                 </div>;
@@ -11873,6 +11884,11 @@ export default function App(){
                           }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
+                      {showCoaching && ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].filter(s => (data.repairsSummary || "").includes(s) && interviewActions[s]?.coaching).map(s => (
+                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                          <span className="font-bold">{s}:</span> {interviewActions[s].coaching}
+                        </div>
+                      ))}
                       {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
                     </div>}
                   </div>;
@@ -11941,6 +11957,11 @@ export default function App(){
                           <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => { const isAdding = !(data.packoutSummary || []).includes(s); update("packoutSummary", toggleMulti(data.packoutSummary || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
+                      {showCoaching && (data.packoutSummary || []).filter(s => interviewActions[s]?.coaching).map(s => (
+                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                          <span className="font-bold">{s}:</span> {interviewActions[s].coaching}
+                        </div>
+                      ))}
                       {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
                     </div>}
                   </div>;
@@ -11992,6 +12013,11 @@ export default function App(){
                           <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities" className="!text-xs !py-1.5" />
                         </div>
                       )}
+                      {showCoaching && (data.sdsConsiderations || []).filter(s => interviewActions[s]?.coaching).map(s => (
+                        <div key={`coach-${s}`} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                          <span className="font-bold">{s}:</span> {interviewActions[s].coaching}
+                        </div>
+                      ))}
                       {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
                     </div>}
                   </div>;
