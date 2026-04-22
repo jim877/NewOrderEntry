@@ -1752,6 +1752,54 @@ const DEFAULT_INTERVIEW_ACTIONS = {
   "Pets":                   { coaching: "Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.", actions: [{ type: "sdsObservation", value: "Pets on site" }, { type: "eventInstruction", value: "Keep doors closed - pets on site" }] },
 };
 
+// --- RUSH GUIDE ---
+const RUSH_REPAIR_TIMELINES = [
+  { id: 'cleaning', label: 'Just Cleaning', days: 7, group: 'RFD' },
+  { id: 'paint', label: 'Painting', days: 21, group: 'STD' },
+  { id: 'refinish_floors', label: 'Refinishing Floors', days: 28, group: 'STD' },
+  { id: 'replace_floors', label: 'Replacing Floors', days: 60, group: 'LTD' },
+  { id: 'cosmetic', label: 'Cosmetic Repairs', days: 90, group: 'LTD' },
+  { id: 'structural', label: 'Major Structural Damage', days: 365, group: 'LTD' },
+  { id: 'rebuild', label: 'Complete Rebuild', days: 480, group: 'LTFD' },
+];
+
+const RUSH_LIVING_SITUATIONS = [
+  { id: 'home', label: 'Staying in my home', desc: 'Living on-site during repairs' },
+  { id: 'hotel', label: 'Staying in a hotel', desc: 'Temporary hotel stay' },
+  { id: 'temp', label: 'Temporary rental', desc: 'Furnished apartment or rental home' },
+  { id: 'moving', label: 'Moving to a new home', desc: 'Relocating permanently' },
+];
+
+const RUSH_EVENT_TYPES = [
+  { id: 'vacation_beach', label: 'Warm Weather / Beach Vacation' },
+  { id: 'vacation_ski', label: 'Cold Weather / Ski Trip' },
+  { id: 'wedding', label: 'Wedding / Formal Event' },
+  { id: 'business', label: 'Business Trip / Conference' },
+  { id: 'sports', label: 'Sports Tournament' },
+];
+
+const RUSH_INTERESTS = [
+  { id: 'school', label: 'School & Kids Sports', desc: 'Backpacks, uniforms, gear' },
+  { id: 'summer_activities', label: 'Summer & Swim', desc: 'Swimwear, beach bags, sun hats' },
+  { id: 'winter_sports', label: 'Winter & Snow', desc: 'Skiing, heavy outerwear' },
+];
+
+const RUSH_SEASONS = {
+  SPRING: { name: 'Spring', months: [2, 3, 4] },
+  SUMMER: { name: 'Summer', months: [5, 6, 7] },
+  FALL: { name: 'Fall', months: [8, 9, 10] },
+  WINTER: { name: 'Winter', months: [11, 0, 1] },
+};
+
+const rushAddDays = (date, days) => { const r = new Date(date); r.setDate(r.getDate() + days); return r; };
+const rushFormatDate = (d) => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+const rushGetSeasons = (start, end) => {
+  const found = new Set();
+  let cur = new Date(start);
+  while (cur <= end) { const m = cur.getMonth(); Object.values(RUSH_SEASONS).forEach(s => { if (s.months.includes(m)) found.add(s); }); cur.setMonth(cur.getMonth() + 1); }
+  return Array.from(found);
+};
+
 const DEFAULT_FORM={
   isLead: null,
   isRestorationProject: "",
@@ -5094,6 +5142,9 @@ export default function App(){
   const [interviewPanelOpen, setInterviewPanelOpen] = useState(false);
   const [interviewExpanded, setInterviewExpanded] = useState({});
   const [interviewSearch, setInterviewSearch] = useState("");
+  const [rushGuideOpen, setRushGuideOpen] = useState(false);
+  const [rushGuideStep, setRushGuideStep] = useState(1);
+  const [rushGuideData, setRushGuideData] = useState({ interests: [], events: [] });
   const [actionItemsOpen, setActionItemsOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -12132,6 +12183,7 @@ export default function App(){
                 })()}
               </div>
               <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+                <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100">Rush Guide</button>
                 <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-violet-500 px-5 py-2 text-sm font-bold text-white hover:bg-violet-600">Done</button>
               </div>
           </div>
@@ -12339,6 +12391,272 @@ export default function App(){
             </div>
           </div>
         )}
+
+        {/* Rush Guide */}
+        {rushGuideOpen && (() => {
+          // Pre-fill from order data
+          const livingMap = { "Staying in home": "home", "Hotel": "hotel", "Temp": "temp", "Moving": "moving" };
+          const repairMap = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
+          const orderSituation = livingMap[data.livingStatus] || rushGuideData.situation || "";
+          const firstRepair = (data.repairsSummary || "").split(", ").filter(Boolean)[0] || "";
+          const orderRepairType = repairMap[firstRepair] || rushGuideData.repairType || "";
+          const household = data.household || [];
+          const people = household.filter(m => m.category === "person");
+          const pets = household.filter(m => m.category === "pet");
+          const primaryCustomer = (data.customers || [])[0] || {};
+          const familyDefaults = { adults: Math.max(1, (data.customers || []).length), kids: people.filter(p => /child|infant/i.test(p.type)).length, babies: people.filter(p => /infant|baby/i.test(p.type)).length, pets: pets.length };
+          const family = { ...familyDefaults, ...(rushGuideData.family || {}) };
+
+          const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === orderRepairType);
+          const now = new Date();
+          const estimatedReturn = repairInfo ? rushAddDays(now, repairInfo.days) : null;
+          const seasons = estimatedReturn ? rushGetSeasons(now, estimatedReturn) : [];
+
+          // Generate action plan
+          const rushItems = [];
+          const shortTermItems = [];
+          const seasonalWardrobes = [];
+          const eventDeliveries = [];
+          const reminders = [
+            "Remove Valuables: Please remove any valuables or highly personal items from your textiles.",
+            "No Need to Bag: You do not need to photograph, bag, or list any items — we will do that for you!"
+          ];
+
+          if (repairInfo) {
+            rushItems.push(`Clothing & undergarments to last ${family.adults + family.kids + family.babies} people a couple of weeks`);
+            rushItems.push("Daily footwear, sneakers, and belts");
+            if (orderSituation === "hotel" || orderSituation === "temp") rushItems.push("Suitcases, duffel bags, or overnight bags");
+            if (orderSituation === "home") {
+              rushItems.push("Daily household essentials (towels, shower curtains)");
+              shortTermItems.push("Temporary window shades (for privacy)");
+              shortTermItems.push("Throw rugs and daily bedding");
+              reminders.push("Since you are staying home, we will try to work as quietly as possible.");
+            } else if (orderSituation === "hotel") {
+              reminders.push("Hotels provide bedding and towels, so there is no need to rush those items.");
+              shortTermItems.push("Favorite blankets or pillows for comfort");
+            } else if (orderSituation === "temp") {
+              reminders.push("Most rentals are furnished so you likely will not need full bedding or towels unless preferred.");
+            }
+            if (family.babies > 0) { rushItems.push("Strollers, diaper bags, and car seats"); rushItems.push("Crib bedding, baby blankets, and sleep sacks"); }
+            if (family.kids > 0) rushItems.push("Favorite comfort toys or stuffed animals");
+            if (family.pets > 0) rushItems.push("Pet beds, leashes, and carrying crates");
+            if ((rushGuideData.interests || []).includes("school")) rushItems.push("School backpacks, uniforms, and kids sports gear");
+
+            const hasSeason = (name) => seasons.some(s => s.name === name);
+            if (hasSeason("Spring")) seasonalWardrobes.push({ season: "Spring", items: ["Light jackets, windbreakers, and rain gear", "Transition layers (long sleeves, light sweaters)", "Sneakers and rain boots"] });
+            if (hasSeason("Summer") || (rushGuideData.interests || []).includes("summer_activities")) {
+              const items = ["Shorts, t-shirts, skirts, and lightweight clothing", "Sandals, open-toe shoes, and sunglasses"];
+              if ((rushGuideData.interests || []).includes("summer_activities")) items.push("Swimwear, beach bags, sun hats, and pool gear");
+              seasonalWardrobes.push({ season: "Summer", items });
+            }
+            if (hasSeason("Fall")) seasonalWardrobes.push({ season: "Fall", items: ["Sweaters, fleeces, and mid-weight coats", "Jeans, heavier pants, and closed-toe shoes"] });
+            if (hasSeason("Winter") || (rushGuideData.interests || []).includes("winter_sports")) {
+              const items = ["Heavy winter coats, parkas, and snow boots", "Gloves, scarves, thermal layers, and thick socks"];
+              if ((rushGuideData.interests || []).includes("winter_sports")) items.push("Skiing/snowboarding equipment, snow pants, and goggles");
+              seasonalWardrobes.push({ season: "Winter", items });
+            }
+
+            (rushGuideData.events || []).forEach(evt => {
+              if (!evt.date) return;
+              const eventDate = new Date(evt.date);
+              if (estimatedReturn && eventDate > estimatedReturn) { reminders.push(`Your trip "${evt.name}" falls after repairs are expected to finish.`); return; }
+              const items = [];
+              if (evt.type === "vacation_beach") { items.push("Swimwear, resort wear, and sandals"); items.push("Beach bags, sunglasses, and sun hats"); items.push("Suitcases and travel luggage"); }
+              else if (evt.type === "vacation_ski") { items.push("Ski gear, thermal layers, heavy coats, and boots"); items.push("Suitcases and travel luggage"); }
+              else if (evt.type === "wedding") { items.push("Suits, formal dresses, dress shoes"); items.push("Ties, jewelry, and formal accessories"); }
+              else if (evt.type === "business") { items.push("Business professional attire and dress shoes"); items.push("Briefcase, garment bags, and carry-on luggage"); }
+              else if (evt.type === "sports") { items.push("Uniforms, cleats, and practice gear"); items.push("Sports equipment bags and gear"); }
+              eventDeliveries.push({ name: evt.name, date: rushFormatDate(eventDate), items });
+            });
+          }
+
+          return (
+            <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setRushGuideOpen(false); }} tabIndex={-1}>
+              <div className="flex-shrink-0 flex items-center gap-3 bg-teal-600 px-5 py-3 shadow-sm z-10">
+                <span className="text-lg">📋</span>
+                <span className="text-sm font-bold text-white">Rush Guide</span>
+                {primaryCustomer.first && <span className="text-teal-200 text-xs">for {[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ")}</span>}
+                <div className="flex-1" />
+                {rushGuideStep < 4 && <div className="flex items-center gap-2">
+                  {[1,2,3].map(i => <div key={i} className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${rushGuideStep === i ? 'bg-white text-teal-700' : rushGuideStep > i ? 'bg-teal-400 text-white' : 'bg-teal-700 text-teal-300'}`}>{i}</div>)}
+                </div>}
+                <button onClick={() => setRushGuideOpen(false)} className="text-teal-200 hover:text-white text-lg font-bold ml-3">×</button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <div className="max-w-3xl mx-auto p-6 space-y-6">
+
+                  {/* Step 1: Basics */}
+                  {rushGuideStep === 1 && <>
+                    <div><h2 className="text-xl font-bold text-slate-900 mb-1">Step 1: The Basics</h2><p className="text-sm text-slate-500">Confirm living situation and repair timeline.</p></div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Living Situation</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {RUSH_LIVING_SITUATIONS.map(s => (
+                          <button key={s.id} onClick={() => setRushGuideData(p => ({...p, situation: s.id}))} className={`p-3 rounded-xl border text-left ${orderSituation === s.id ? 'border-teal-500 bg-teal-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                            <div className={`text-sm font-bold ${orderSituation === s.id ? 'text-teal-800' : 'text-slate-700'}`}>{s.label}</div>
+                            <div className="text-[10px] text-slate-500">{s.desc}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Repair Type</div>
+                      <select value={orderRepairType} onChange={e => setRushGuideData(p => ({...p, repairType: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm">
+                        <option value="">Select...</option>
+                        {RUSH_REPAIR_TIMELINES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                      </select>
+                      {repairInfo && <div className="mt-2 rounded-lg bg-sky-50 border border-sky-100 px-3 py-2 text-xs text-sky-800">Expected return: <strong>{rushFormatDate(estimatedReturn)}</strong> · Seasons: {seasons.map(s => s.name).join(", ")}</div>}
+                    </div>
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                      <button disabled={!orderSituation || !orderRepairType} onClick={() => setRushGuideStep(2)} className="rounded-xl bg-teal-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400">Next →</button>
+                    </div>
+                  </>}
+
+                  {/* Step 2: Family */}
+                  {rushGuideStep === 2 && <>
+                    <div><button onClick={() => setRushGuideStep(1)} className="text-xs text-slate-400 hover:text-slate-600 mb-2">← Back</button><h2 className="text-xl font-bold text-slate-900 mb-1">Step 2: Family & Lifestyle</h2></div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[{id:"adults",label:"Adults"},{id:"kids",label:"Children"},{id:"babies",label:"Babies/Toddlers"},{id:"pets",label:"Pets"}].map(t => (
+                        <div key={t.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50">
+                          <span className="text-sm font-bold text-slate-700">{t.label}</span>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setRushGuideData(p => ({...p, family: {...family, [t.id]: Math.max(0, family[t.id]-1)}}))} className="w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-600 font-bold text-sm">-</button>
+                            <span className="w-4 text-center font-bold">{family[t.id]}</span>
+                            <button onClick={() => setRushGuideData(p => ({...p, family: {...family, [t.id]: family[t.id]+1}}))} className="w-7 h-7 rounded-full bg-teal-50 border border-teal-200 text-teal-700 font-bold text-sm">+</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Activities & Interests</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {RUSH_INTERESTS.map(i => {
+                          const active = (rushGuideData.interests || []).includes(i.id);
+                          return <button key={i.id} onClick={() => setRushGuideData(p => ({...p, interests: active ? p.interests.filter(x => x !== i.id) : [...(p.interests||[]), i.id]}))} className={`p-3 rounded-xl border text-center ${active ? 'border-teal-500 bg-teal-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                            <div className={`text-xs font-bold ${active ? 'text-teal-800' : 'text-slate-700'}`}>{i.label}</div>
+                            <div className="text-[9px] text-slate-500">{i.desc}</div>
+                          </button>;
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                      <button onClick={() => setRushGuideStep(3)} className="rounded-xl bg-teal-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-700">Next →</button>
+                    </div>
+                  </>}
+
+                  {/* Step 3: Events */}
+                  {rushGuideStep === 3 && <>
+                    <div><button onClick={() => setRushGuideStep(2)} className="text-xs text-slate-400 hover:text-slate-600 mb-2">← Back</button><h2 className="text-xl font-bold text-slate-900 mb-1">Step 3: Upcoming Trips & Events</h2><p className="text-sm text-slate-500">Any travel or formal events before {rushFormatDate(estimatedReturn)}?</p></div>
+                    <div className="space-y-3">
+                      {(rushGuideData.events || []).map(evt => (
+                        <div key={evt.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 grid grid-cols-3 gap-3 relative">
+                          <button onClick={() => setRushGuideData(p => ({...p, events: p.events.filter(e => e.id !== evt.id)}))} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 text-sm">×</button>
+                          <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Name</div><input value={evt.name} onChange={e => setRushGuideData(p => ({...p, events: p.events.map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev)}))} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" /></div>
+                          <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Type</div><select value={evt.type} onChange={e => setRushGuideData(p => ({...p, events: p.events.map(ev => ev.id === evt.id ? {...ev, type: e.target.value} : ev)}))} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white">{RUSH_EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
+                          <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Date</div><input type="date" value={evt.date} onChange={e => setRushGuideData(p => ({...p, events: p.events.map(ev => ev.id === evt.id ? {...ev, date: e.target.value} : ev)}))} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" /></div>
+                        </div>
+                      ))}
+                      <button onClick={() => setRushGuideData(p => ({...p, events: [...(p.events||[]), {id: safeUid(), type: "vacation_beach", date: "", name: ""}]}))} className="w-full p-3 border-2 border-dashed border-slate-300 rounded-xl text-sm font-bold text-slate-500 hover:border-teal-400 hover:text-teal-600">+ Add Trip or Event</button>
+                    </div>
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                      <button onClick={() => setRushGuideStep(4)} className="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-md">Generate Smart Checklist →</button>
+                    </div>
+                  </>}
+
+                  {/* Step 4: Results */}
+                  {rushGuideStep === 4 && repairInfo && <>
+                    <div><button onClick={() => setRushGuideStep(3)} className="text-xs text-slate-400 hover:text-slate-600 mb-2">← Modify Inputs</button>
+                      <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Smart Action Plan</h2>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{RUSH_LIVING_SITUATIONS.find(s => s.id === orderSituation)?.label}</span>
+                        <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{family.adults + family.kids + family.babies} People</span>
+                        <span className="rounded-full bg-teal-100 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">Return: {rushFormatDate(estimatedReturn)}</span>
+                      </div>
+                    </div>
+
+                    {/* Reminders */}
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+                      <div className="text-xs font-bold text-amber-800 mb-2">Important Reminders</div>
+                      <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">{reminders.map((r,i) => <li key={i}>{r}</li>)}</ul>
+                    </div>
+
+                    {/* Rush Items */}
+                    <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                      <div className="bg-teal-600 px-5 py-4 text-white">
+                        <div className="font-bold text-lg">Rush Action Items</div>
+                        <div className="text-teal-100 text-xs">Delivered in 24 to 72 hours</div>
+                      </div>
+                      <div className="p-5 space-y-2">
+                        {rushItems.map((item, i) => <div key={i} className="flex items-start gap-2"><span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" /><span className="text-sm text-slate-700">{item}</span></div>)}
+                      </div>
+                    </div>
+
+                    {/* Short Term */}
+                    {shortTermItems.length > 0 && <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                      <div className="bg-sky-600 px-5 py-4 text-white">
+                        <div className="font-bold text-lg">Home & Comfort (Short-Term)</div>
+                        <div className="text-sky-100 text-xs">Delivered in 1-4 weeks</div>
+                      </div>
+                      <div className="p-5 space-y-2">
+                        {shortTermItems.map((item, i) => <div key={i} className="flex items-start gap-2"><span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" /><span className="text-sm text-slate-700">{item}</span></div>)}
+                      </div>
+                    </div>}
+
+                    {/* Seasonal */}
+                    {seasonalWardrobes.length > 0 && <div>
+                      <div className="text-lg font-bold text-slate-900 mb-3">Seasonal Wardrobes</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {seasonalWardrobes.map((w, i) => (
+                          <div key={i} className="rounded-xl border border-slate-200 overflow-hidden">
+                            <div className="bg-slate-100 px-3 py-2 border-b border-slate-200"><span className="font-bold text-sm text-slate-700">{w.season}</span></div>
+                            <div className="p-3 space-y-1">{w.items.map((item, j) => <div key={j} className="flex items-start gap-2"><span className="w-3 h-3 rounded-full bg-slate-200 shrink-0 mt-1" /><span className="text-xs text-slate-700">{item}</span></div>)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>}
+
+                    {/* Events */}
+                    {eventDeliveries.length > 0 && <div>
+                      <div className="text-lg font-bold text-slate-900 mb-3">Dedicated Event Deliveries</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {eventDeliveries.map((evt, i) => (
+                          <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
+                            <div className="bg-indigo-600 px-4 py-3 text-white"><div className="font-bold">{evt.name}</div><div className="text-indigo-200 text-xs">{evt.date}</div></div>
+                            <div className="p-3 space-y-1">{evt.items.map((item, j) => <div key={j} className="text-xs text-slate-700">• {item}</div>)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>}
+
+                    {/* Long Term */}
+                    <div className="rounded-2xl bg-slate-800 p-5 text-white">
+                      <div className="font-bold text-lg mb-1">Long-Term Storage & Final Delivery</div>
+                      <p className="text-slate-300 text-sm">Everything not marked for Rush or Short-Term will be securely packed, barcode-tracked, professionally cleaned, and stored in our climate-controlled facility until your repairs are finished.</p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-3 pt-4 border-t border-slate-100">
+                      <button onClick={() => {
+                        const text = `RUSH GUIDE - ${data.orderName || "Order"}\n\n` +
+                          `RUSH ITEMS (24-72 hrs):\n${rushItems.map(i => `• ${i}`).join("\n")}\n\n` +
+                          (shortTermItems.length ? `SHORT TERM (1-4 wks):\n${shortTermItems.map(i => `• ${i}`).join("\n")}\n\n` : "") +
+                          (seasonalWardrobes.length ? seasonalWardrobes.map(w => `${w.season.toUpperCase()}:\n${w.items.map(i => `• ${i}`).join("\n")}`).join("\n\n") + "\n\n" : "") +
+                          `REMINDERS:\n${reminders.map(r => `• ${r}`).join("\n")}`;
+                        navigator.clipboard?.writeText(text).then(() => setToast("Rush Guide copied to clipboard"));
+                      }} className="rounded-xl border border-sky-300 bg-sky-50 px-5 py-2.5 text-sm font-bold text-sky-700 hover:bg-sky-100">Copy to Clipboard</button>
+                      <button onClick={() => {
+                        if (repairInfo) update("suggestedGroups", Array.from(new Set([...(data.suggestedGroups || []), repairInfo.group])));
+                        setToast("Rush Guide applied to order");
+                        setRushGuideOpen(false);
+                      }} className="rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-700">Apply to Order & Close</button>
+                    </div>
+                  </>}
+
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Old audit sidebar removed — now in Action Items panel */}
       
