@@ -1329,14 +1329,14 @@ const SDS_ICON_MAP = {
   "Photo Inventory": "/Photo_Inventory.png",
   "Unpacking": "/Gemini_Unpacking.png",
   "Anti-Microbial": "/Gemini_Anti_Microbial.png",
-  "Drying Needed": "/Drying.jpg",
-  "Drying": "/Drying.jpg",
+  "Drying Needed": "/Drying.png",
+  "Drying": "/Drying.png",
   "Disposal": "/Gemini_Generated_Image_tydpketydpketydp.png",
   "Fiber Protection": "/Gemini_Fiber_Protection.png",
   "Moving": "/Moving.png",
   "Rolling Racks": "/Rolling_Racks.png",
   "Total Loss Inventory": "/Total_Loss_Inventory.png",
-  "Content Manipulation": "/Content_Manipulation.jpg",
+  "Content Manipulation": "/Content_Manipulation.png",
   "High Density": "/High_Density_Parking.png",
   "Expert Stain Removal": "/Expert_Stain_Removal.png",
 };
@@ -1967,7 +1967,7 @@ const buildNarrativeProse = (narrative = [], data = {}) => {
   // Referral + Insurance
   const refParts = [];
   if (g["Referral"]) refParts.push(`This order was referred by ${g["Referral"][0]}`);
-  if (g["Sales Rep"]) refParts.push(`assigned to ${g["Sales Rep"][0]}`);
+  if (g["Sales Rep"]) refParts.push(`assigned to account manager ${g["Sales Rep"][0]}`);
   if (refParts.length) p.push(refParts.join(", ") + ".");
 
   if (g["Insurance"]) {
@@ -2014,8 +2014,8 @@ const buildNarrativeProse = (narrative = [], data = {}) => {
   // Schedule
   if (g["Scheduled"]) p.push(`The next appointment is ${g["Scheduled"][0]}.`);
 
-  // Notes
-  if (g["Notes"]) p.push(g["Notes"][0]);
+  // Event Instructions
+  if (g["Event Instructions"]) p.push(`Event Instructions for next appointment: ${g["Event Instructions"][0]}`);
 
   return p;
 };
@@ -3886,6 +3886,7 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Current User</label>
                                 <Input value={currentUser || ""} onChange={e=>setCurrentUser(e.target.value)} placeholder="Name" className="mt-1 !py-1.5 !text-xs" />
                             </div>
+                            <button onClick={() => setShowSettings(false)} className="w-full mt-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 transition-all">Close</button>
                         </div>
                     )}
                 </div>
@@ -5810,11 +5811,14 @@ export default function App(){
       setToast("Enter a preset name.");
       return;
     }
+    let scopePhotos = null;
+    try { scopePhotos = JSON.parse(localStorage.getItem("noe-scope-photos") || "null"); } catch {}
     const payload = {
       id: safeUid(),
       name,
       createdAt: new Date().toISOString(),
-      data
+      data,
+      scopePhotos
     };
     setTestPresets(prev => {
       const existingIndex = prev.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
@@ -5849,6 +5853,10 @@ export default function App(){
         selectedGroups: mergedSelectedGroups,
       }),
     });
+    if (preset.scopePhotos) {
+      localStorage.setItem("noe-scope-photos", JSON.stringify(preset.scopePhotos));
+      setPhotoScopeData(preset.scopePhotos);
+    }
     setToast("Test preset loaded.");
   }, []);
 
@@ -8179,7 +8187,7 @@ export default function App(){
     if (data.eventAssignee) lines.push({ section: "Assignee", text: data.eventAssignee });
     // Custom notes
     const customNotes = stripEventSystemLines(data.eventInstructions || "").trim();
-    if (customNotes) lines.push({ section: "Notes", text: customNotes });
+    if (customNotes) lines.push({ section: "Event Instructions", text: customNotes });
     return lines;
   }, [data]);
 
@@ -9907,6 +9915,28 @@ export default function App(){
 
   if (entryMode === 'start') return <div data-noe-mode="start" data-noe-app="new-order-entry"><StartScreen onSelect={handleEntryModeSelect} /></div>;
   if (entryMode === 'photo-scope') {
+    // Push order context to Photo Scope via localStorage
+    try {
+      const primaryCustomer = (data.customers || [])[0] || {};
+      const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {};
+      const rooms = (data.sdsRooms || []).map(r => r.name).filter(Boolean);
+      localStorage.setItem("noe-photo-scope-context", JSON.stringify({
+        orderName: data.orderName || "",
+        customerName: [primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" "),
+        address: [primaryAddr.street, primaryAddr.city, primaryAddr.state].filter(Boolean).join(", "),
+        lossType: data.primaryLossType || "",
+        orderTypes: data.orderTypes || [],
+        claimNumber: data.claimNumber || "",
+        insuranceCompany: data.insuranceCompany || "",
+        rooms: rooms.length ? rooms : ["Kitchen", "Living Room", "Bedroom", "Bathroom", "Basement", "Hallway", "Dining Room"],
+        suggestedGroups: data.suggestedGroups || [],
+        severityCodes: data.severityCodes || [],
+        considerations: data.sdsConsiderations || [],
+        observations: data.sdsObservations || [],
+        handlingCodes: data.handlingCodes || [],
+        services: data.serviceOfferings || [],
+      }));
+    } catch {}
     return (
       <div data-noe-mode="photo-scope" data-noe-app="new-order-entry" className="fixed inset-0 flex flex-col bg-white">
         <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 shadow-sm z-10">
@@ -10436,7 +10466,7 @@ export default function App(){
                                               <div className="flex flex-wrap gap-2">{QUALITY_CODES.map(q => (<ToggleMulti key={q} label={q} checked={data.qualityCode === q} onChange={() => update("qualityCode", q)} />))}</div>
                                             </div>
                                             <div className="border-t border-slate-100 my-1"></div>
-                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div>{showCoaching && <div className="text-xs text-slate-500 mb-3">Special processing instructions. Hover each code for its meaning.</div>}<div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className="!px-3 !py-2 !text-sm" checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
+                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div>{showCoaching && <div className="text-xs text-slate-500 mb-3">Special processing instructions. Hover each code for its meaning.</div>}<div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className={`${compactMode ? '!px-2 !py-1 !text-xs' : '!px-2.5 !py-1.5 !text-xs'}`} checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -11883,7 +11913,7 @@ export default function App(){
                   </div>
                   </> );
               })()}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {showCoaching && !interviewSearch && <div className="text-xs text-slate-400 mb-2">Ask the customer these questions during or before the initial visit.</div>}
 
                 {isFieldVisible("damageWasWet") && matchesInterviewSearch("Is anything still wet or damaged", "Still Wet Visible Mold Structural Damage No Electricity No Heat Boarded Up") && (() => {
@@ -11896,7 +11926,7 @@ export default function App(){
                     <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Is anything still wet or damaged?")}</div>
                     {answered && !expanded && <div className="flex items-center gap-2"><span className="text-xs text-emerald-600">{summary}</span>{log && <span className="text-[9px] text-slate-300">{log.user} · {log.at}</span>}</div>}
                   </button>
-                  {expanded && <div className="px-4 pb-4 space-y-3">
+                  {expanded && <div className="px-3 pb-3 space-y-2">
                   <div className="flex flex-wrap gap-2">
                     {[
                       { id: "wet", label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true, onToggle: () => updateSmart("damageWasWet", (data.damageWasWet === "Y" || data.damageWasWet === true) ? "N" : "Y") },
@@ -11906,7 +11936,7 @@ export default function App(){
                       { id: "heat", label: "No Heat", active: !!data.noHeat, onToggle: () => updateSmart("noHeat", !data.noHeat) },
                       { id: "boarded", label: "Boarded Up", active: !!data.boardedUp, onToggle: () => updateSmart("boardedUp", !data.boardedUp) },
                     ].map(item => (
-                      <ToggleMulti key={item.id} label={item.label} checked={item.active} onChange={() => { item.onToggle(); executeInterviewActions(item.label, !item.active); }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(item.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                      <ToggleMulti key={item.id} label={item.label} checked={item.active} onChange={() => { item.onToggle(); executeInterviewActions(item.label, !item.active); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(item.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
                     ))}
                   </div>
                   {showCoaching && [
@@ -11936,7 +11966,7 @@ export default function App(){
                       {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-4 pb-4 space-y-3">
+                    {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
                           <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
@@ -11945,7 +11975,7 @@ export default function App(){
                             const next = isAdding ? [...current, s] : current.filter(x => x !== s);
                             update("repairsSummary", next.join(", "));
                             executeInterviewActions(s, isAdding);
-                          }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                          }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
                       {showCoaching && ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].filter(s => (data.repairsSummary || "").includes(s) && interviewActions[s]?.coaching).map(s => (
@@ -11967,7 +11997,7 @@ export default function App(){
                       {answered && !expanded && <span className="text-[10px] text-emerald-600 ml-2">{data.livingStatus}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-4 pb-4 space-y-3">
+                    {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {[{ label: "Staying in home" }, { label: "Hotel" }, { label: "Temp" }, { label: "Moving" }].map(s => (
                           <ToggleMulti key={s.label} label={s.label} checked={data.livingStatus === s.label} onChange={() => { updateLivingStatus(data.livingStatus === s.label ? "" : s.label); if (s.label !== data.livingStatus) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
@@ -11996,7 +12026,7 @@ export default function App(){
                       {answered && !expanded && <span className="text-[10px] text-emerald-600 ml-2">{data.processType}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-4 pb-4 space-y-3">
+                    {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {[{ label: "Return to Home ASAP", value: "Deliver ASAP" }, { label: "To Temp Address", value: "Deliver to Temp" }, { label: "To New Home", value: "Deliver to New Home" }, { label: "Store Until Home Repaired", value: "Long-Term Storage" }].map(s => (
                           <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => { update("processType", data.processType === s.value ? "" : s.value); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
@@ -12015,10 +12045,10 @@ export default function App(){
                       {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-4 pb-4 space-y-3">
+                    {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => { const isAdding = !(data.packoutSummary || []).includes(s); update("packoutSummary", toggleMulti(data.packoutSummary || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => { const isAdding = !(data.packoutSummary || []).includes(s); update("packoutSummary", toggleMulti(data.packoutSummary || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
                       {showCoaching && (data.packoutSummary || []).filter(s => interviewActions[s]?.coaching).map(s => (
@@ -12040,10 +12070,10 @@ export default function App(){
                       {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-4 pb-4 space-y-3">
+                    {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                          <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
                       {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
@@ -12060,10 +12090,10 @@ export default function App(){
                       {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-4 pb-4 space-y-3">
+                    {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => { const isAdding = !(data.sdsConsiderations || []).includes(s); update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-3 !py-2 !text-sm ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                          <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => { const isAdding = !(data.sdsConsiderations || []).includes(s); update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
                       {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
@@ -12202,7 +12232,7 @@ export default function App(){
                       {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-4 pb-4 space-y-3">
+                    {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="grid grid-cols-1 gap-3">
                         <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
                           <span className="text-xs text-slate-700">Medical issues?</span>
@@ -13349,6 +13379,117 @@ export default function App(){
                 </div>
                 <button onClick={saveTestPreset} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
                   Save Preset
+                </button>
+              </div>
+              <div className="mb-3">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Built-in Samples</div>
+                <button onClick={() => {
+                  setData(prev => ({
+                    ...prev,
+                    orderName: "Olivo-BrooklynNY",
+                    isLead: false,
+                    orderStatus: "New",
+                    primaryLossType: "Water",
+                    orderTypes: ["Water", "Mold"],
+                    secondaryContaminants: ["Mold"],
+                    leadSourceCategory: "Referral",
+                    referringCompany: "State Farm",
+                    referrer: "Jamie Lee",
+                    salesRep: "Jim F",
+                    contactMethod: "Call",
+                    insuranceClaim: "Yes",
+                    insuranceCompany: "State Farm",
+                    insuranceAdjuster: "Jamie Lee",
+                    nationalCarrier: "State Farm",
+                    claimNumber: "CLM-2026-04821",
+                    policyNumber: "POL-SF-99281",
+                    dateOfLoss: "2026-04-15",
+                    billingPayer: "Insurance",
+                    directionOfPayment: "Direct from Insurance",
+                    damageWasWet: "Y",
+                    damageMoldMildew: true,
+                    structuralElectricDamage: "N",
+                    noLights: false,
+                    noHeat: false,
+                    boardedUp: false,
+                    livingStatus: "Hotel",
+                    processType: "Long-Term Storage",
+                    repairsSummary: "Replace Floors, Paint",
+                    packoutSummary: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Electronics"],
+                    loadList: ["Floor Protection", "Blankets", "TV Boxes", "Dollies", "Extra Manpower"],
+                    storageNeeded: "Y",
+                    storageMonths: "8",
+                    sdsConsiderations: ["Elderly", "Pets", "Skin Sensitivity"],
+                    sdsObservations: ["Pets", "Smoking"],
+                    sdsServices: ["Anti-Microbial", "Drying", "Content Manipulation", "Expert Stain Removal", "Fiber Protection"],
+                    serviceOfferings: ["Contents", "Furniture", "Rugs", "Textiles", "Pack-out", "Storage Only"],
+                    householdAnimals: "Dog Rex, Cat Whiskers",
+                    familyMedicalIssues: "N",
+                    soapFragAllergies: "Y",
+                    soapFragNote: "Fragrance-free only — skin sensitivity",
+                    selfCleaning: "Y",
+                    selfCleaningNote: "Drawers, Undergarments",
+                    howDryLaundry: "Air-Dry",
+                    useDryCleaner: "Yes",
+                    handlingCodes: ["Det", "NoDry", "Wet", "PPE"],
+                    severityCodes: ["Water-2", "Mold-1"],
+                    qualityCode: "Q1",
+                    lossSeverity: {
+                      touched: true,
+                      fire: { enabled: false, values: { "Heat": 0, "Soot": 0, "Odor": 0, "Extinguisher Powder": 0, "Remediation Debris": 0 } },
+                      water: { enabled: true, values: { "Water": 3, "Humidity": 2, "Musty Smell": 2, "Visible Mildew": 1, "Visible Mold": 2, "Sprinkler Chemical": 0, "Flood Cut Debris": 1 } },
+                      puffback: { enabled: false, values: { "Oil": 0, "Soot": 0, "Odor": 0, "Oily Film": 0 } },
+                    },
+                    sdsRooms: [
+                      { id: safeUid(), name: "Kitchen", affected: true, severitySelections: ["Water-3", "Mold-1"], tasks: ["Pack out all contents", "Remove wet rugs"], notes: "Burst pipe under sink. Standing water 2 inches. Mold starting behind cabinets." },
+                      { id: safeUid(), name: "Basement", affected: true, severitySelections: ["Water-2", "Mold-2"], tasks: ["Full pack out", "Dehumidification needed"], notes: "Water migrated from kitchen. Visible mold on walls and ceiling tiles. Strong musty odor." },
+                      { id: safeUid(), name: "Living Room", affected: true, severitySelections: ["Water-1"], tasks: ["Remove area rugs", "Pack out electronics"], notes: "Minor water damage to hardwood floors near kitchen entrance." },
+                      { id: safeUid(), name: "Master Bedroom", affected: false, severitySelections: [], tasks: ["Pack bedding for rush delivery"], notes: "Not directly affected but customer needs bedding rushed to hotel." },
+                      { id: safeUid(), name: "Kids Room", affected: false, severitySelections: [], tasks: ["Pack school supplies and toys"], notes: "Sofia's room — rush school backpack and comfort toys." },
+                    ],
+                    sdsPhotos: [
+                      { id: safeUid(), src: "/Gemini_Pets.png", room: "Kitchen", note: "Water damage under sink — burst pipe" },
+                      { id: safeUid(), src: "/Drying.png", room: "Kitchen", note: "Standing water on kitchen floor" },
+                      { id: safeUid(), src: "/Content_Manipulation.png", room: "Basement", note: "Mold visible on basement walls" },
+                      { id: safeUid(), src: "/Expert_Stain_Removal.png", room: "Basement", note: "Water staining on carpet" },
+                      { id: safeUid(), src: "/Gemini_Pets.png", room: "Living Room", note: "Hardwood floor water marks near kitchen" },
+                    ],
+                    suggestedGroups: ["RD", "LTD", "Storage Only"],
+                    moldCoverageConfirm: "$15,000",
+                    moldLimit: "15000",
+                    contentsCoverageLimit: "250000",
+                    customers: [
+                      { ...initCustomer({ first: "Maria", last: "Olivo", phone: "(718) 555-0142", email: "maria.olivo@email.com", type: "Policyholder", isPrimary: true, policyHolder: true, preferredContact: "Phone" }) },
+                      { ...initCustomer({ first: "Tony", last: "Olivo", phone: "(718) 555-0143", email: "tony.olivo@email.com", type: "Spouse" }) },
+                    ],
+                    addresses: [
+                      { ...initAddress({ street: "482 Atlantic Ave", apt: "3B", city: "Brooklyn", state: "NY", zip: "11217", type: "Apartment", isPrimary: true, isLossSite: true, lat: "40.6844", lng: "-73.9785" }) },
+                      { ...initAddress({ street: "Holiday Inn Downtown", city: "Brooklyn", state: "NY", zip: "11201", type: "Hotel" }) },
+                    ],
+                    household: [
+                      { id: safeUid(), category: "person", type: "Elderly", name: "Rosa Olivo", age: "78" },
+                      { id: safeUid(), category: "person", type: "Child", name: "Sofia", age: "7" },
+                      { id: safeUid(), category: "pet", type: "Dog", name: "Rex" },
+                      { id: safeUid(), category: "pet", type: "Cat", name: "Whiskers" },
+                    ],
+                    rushInterests: ["school", "christmas"],
+                    upcomingEvents: [
+                      { id: safeUid(), name: "Florida Vacation", type: "vacation_beach", date: "2026-07-15" },
+                      { id: safeUid(), name: "Sofia's Birthday", type: "wedding", date: "2026-05-20" },
+                    ],
+                    scheduleType: "Pickup",
+                    pickupDate: "2026-04-24",
+                    pickupTime: "9:00 AM",
+                    eventAssignee: "Jim F",
+                    eventVehicle: "Truck 4",
+                    contactAssignment: "office",
+                    eventInstructions: "Water damage from burst pipe in kitchen. Mold visible in basement. Elderly grandmother (78) staying — be patient and careful. Dog Rex and cat Whiskers on premises — keep doors closed. Customer prefers fragrance-free products. Air-dries all clothing.",
+                  }));
+                  setToast("Full SDS Sample loaded");
+                  setShowPresetModal(false);
+                }} className="w-full rounded-lg border border-teal-300 bg-teal-50 px-4 py-3 text-left hover:bg-teal-100 transition-colors">
+                  <div className="text-sm font-bold text-teal-800">Load Full SDS Sample</div>
+                  <div className="text-[10px] text-teal-600">Water + Mold loss, hotel stay, elderly + kids + pets, full interview, events, all SDS fields</div>
                 </button>
               </div>
               <div className="max-h-64 overflow-auto rounded-xl border border-slate-200">

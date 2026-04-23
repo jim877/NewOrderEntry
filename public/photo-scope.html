@@ -5004,5 +5004,32 @@ if('serviceWorker' in navigator && !/localhost|127\.0\.0\.1/i.test(location.host
   });
 }
 </script>
+<script>
+// NOE Order Context Bridge — reads order data from parent NOE app
+(function(){
+  try {
+    const raw = localStorage.getItem('noe-photo-scope-context');
+    if (!raw) return;
+    const ctx = JSON.parse(raw);
+    if (!ctx || !ctx.orderName) return;
+
+    // Add order banner at top of the app
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;padding:6px 16px;font-family:var(--font);display:flex;align-items:center;gap:12px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.15)';
+    banner.innerHTML = `
+      <span style="font-weight:800;font-size:13px">${ctx.orderName}</span>
+      <span style="opacity:0.7">|</span>
+      <span>${ctx.customerName || ''}</span>
+      ${ctx.address ? `<span style="opacity:0.7">|</span><span style="opacity:0.8">${ctx.address}</span>` : ''}
+      ${ctx.lossType ? `<span style="opacity:0.7">|</span><span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:99px;font-weight:700">${ctx.lossType}</span>` : ''}
+      ${ctx.claimNumber ? `<span style="opacity:0.5;margin-left:auto;font-size:10px">${ctx.claimNumber}</span>` : ''}
+    `;
+    document.body.prepend(banner);
+
+    // Offset the rest of the UI to account for the banner
+    document.body.style.paddingTop = '32px';
+  } catch(e) {}
+})();
+</script>
 </body>
 </html>
