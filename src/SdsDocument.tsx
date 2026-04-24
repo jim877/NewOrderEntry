@@ -1857,10 +1857,17 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${i === 0 ? 'bg-teal-600' : i === rushGuideTimeline.length - 1 ? 'bg-slate-700' : 'bg-sky-500'}`}>{i + 1}</div>
                           {i < rushGuideTimeline.length - 1 && <div className="w-0.5 h-6 bg-slate-200" />}
                         </div>
-                        <div className="pb-2">
+                        <div className="pb-2 flex-1">
                           <div className="text-sm font-bold text-slate-800">{item.group}</div>
                           <div className="text-xs text-slate-500">{item.timeframe}</div>
-                          <div className="text-xs text-slate-600 mt-0.5">{item.desc}</div>
+                          {item.address && <div className="text-[10px] text-slate-400 mt-0.5">→ {item.address}</div>}
+                          {item.items && item.items.length > 0 ? (
+                            <ul className="mt-1 space-y-0.5">
+                              {item.items.map((line, j) => <li key={j} className="text-xs text-slate-600">• {line}</li>)}
+                            </ul>
+                          ) : (
+                            <div className="text-xs text-slate-600 mt-0.5">{item.desc}</div>
+                          )}
                         </div>
                       </div>
                     ))}

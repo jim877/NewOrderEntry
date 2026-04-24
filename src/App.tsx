@@ -2865,6 +2865,23 @@ const CompanyRecord = ({ company, contact, contacts, roles = [], className, edit
   );
 };
 
+class ScopeBoundary extends React.Component<{onBack: () => void; children: React.ReactNode}, {error: Error | null}> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-8">
+        <div className="max-w-lg rounded-2xl border border-rose-200 bg-white p-6 shadow-lg space-y-4">
+          <div className="text-xl font-bold text-rose-700">Scope failed to load</div>
+          <pre className="text-xs text-rose-600 bg-rose-50 rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap">{this.state.error.message}{"\n"}{this.state.error.stack}</pre>
+          <button onClick={() => { this.setState({ error: null }); this.props.onBack(); }} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-white hover:bg-sky-600">← Back to Order</button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 const ToggleMulti = ({ label, checked, onChange, className, colorClass, title, showDot = true, noeField }) => {
     const activeClass = colorClass || pillActive;
     return (
@@ -8154,8 +8171,9 @@ export default function App(){
     if (considerations.length) {
       lines.push({ section: "Considerations", text: considerations.join(", ") });
     }
-    if ((data.sdsConsiderations || []).includes("Pets") && data.householdAnimals) {
-      lines.push({ section: "Pets", text: data.householdAnimals });
+    const petStr = data.householdAnimals || (data.household || []).filter((m: any) => m.category === "pet").map((p: any) => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+    if (petStr) {
+      lines.push({ section: "Pets", text: petStr });
     }
     // Interview details
     if (data.familyMedicalIssues === "Y") {
@@ -9920,6 +9938,29 @@ export default function App(){
       const primaryCustomer = (data.customers || [])[0] || {};
       const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {};
       const rooms = (data.sdsRooms || []).map(r => r.name).filter(Boolean);
+      // Build conditions from individual flags
+      const conditions = [];
+      if (data.damageWasWet === "Y" || data.damageWasWet === true) conditions.push("Still Wet");
+      if (data.damageMoldMildew) conditions.push("Visible Mold");
+      if (data.structuralElectricDamage === "Y") conditions.push("Structural Damage");
+      if (data.noLights) conditions.push("No Electricity");
+      if (data.noHeat) conditions.push("No Heat");
+      if (data.boardedUp) conditions.push("Boarded Up");
+
+      // Build repairs from comma-separated string
+      const repairs = (data.repairsSummary || "").split(", ").filter(Boolean);
+
+      // Build packout from array
+      const packout = data.packoutSummary || [];
+
+      // Map rush interests IDs to labels
+      const RUSH_INT_LABELS: Record<string, string> = { school: "School & Kids Sports", summer_activities: "Summer & Swim", winter_sports: "Winter & Snow", halloween: "Halloween", thanksgiving: "Thanksgiving", christmas: "Christmas / Hanukkah", easter: "Easter / Passover", religious: "Religious Services", graduation: "Graduation", workout: "Gym & Fitness", work_from_home: "Work from Home" };
+      const interests = (data.rushInterests || []).map((id: string) => RUSH_INT_LABELS[id] || id);
+
+      // Map event type IDs to labels
+      const EVENT_LABELS: Record<string, string> = { vacation_beach: "Warm Weather / Beach Vacation", vacation_ski: "Cold Weather / Ski Trip", wedding: "Wedding / Formal Event", business: "Business Trip / Conference", sports: "Sports Tournament" };
+      const upcomingEvents = (data.upcomingEvents || []).map((e: any) => EVENT_LABELS[e.type] || e.name || "").filter(Boolean);
+
       localStorage.setItem("noe-photo-scope-context", JSON.stringify({
         orderName: data.orderName || "",
         customerName: [primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" "),
@@ -9935,6 +9976,25 @@ export default function App(){
         observations: data.sdsObservations || [],
         handlingCodes: data.handlingCodes || [],
         services: data.serviceOfferings || [],
+        interview: {
+          conditions,
+          repairs,
+          living: data.livingStatus || null,
+          delivery: data.processType || null,
+          packout,
+          loadList: data.loadList || [],
+          considerations: data.sdsConsiderations || [],
+          suggestedGroups: data.suggestedGroups || [],
+          medicalIssues: data.familyMedicalIssues === "Y" ? true : data.familyMedicalIssues === "N" ? false : null,
+          soapAllergies: data.soapFragAllergies === "Y" ? true : data.soapFragAllergies === "N" ? false : null,
+          selfCleaning: data.selfCleaning === "Y" ? true : data.selfCleaning === "N" ? false : null,
+          useDryCleaner: data.useDryCleaner || null,
+          dryLaundry: data.howDryLaundry || null,
+          needStorage: data.storageNeeded === "Y" ? true : data.storageNeeded === "N" ? false : null,
+          petsInHome: (data.household || []).filter((m: any) => m.category === "pet").map((p: any) => p.type).filter(Boolean),
+          interests,
+          upcomingEvents,
+        },
       }));
     } catch {}
     return (
@@ -9967,6 +10027,7 @@ export default function App(){
     const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {};
     const addressLabel = [primaryAddr.street, primaryAddr.city, primaryAddr.state].filter(Boolean).join(", ");
     return (
+      <ScopeBoundary onBack={() => setEntryMode('detailed')}>
       <SameDayScope
         onExit={() => setEntryMode('start')}
         onNavigateToNoe={() => setEntryMode('detailed')}
@@ -10012,6 +10073,7 @@ export default function App(){
         sdsDisagreementNote={data.sdsDisagreementNote}
         onSdsDisagreementNoteChange={(value) => update("sdsDisagreementNote", value)}
       />
+      </ScopeBoundary>
     );
   }
 
@@ -11880,6 +11942,9 @@ export default function App(){
                   { key: "considerations", title: "Special considerations", configKey: "sdsConsiderations",
                     isAnswered: () => (data.sdsConsiderations || []).length > 0,
                     summary: () => (data.sdsConsiderations || []).join(", ") },
+                  { key: "pets", title: "Pets in home?", configKey: "householdAnimals",
+                    isAnswered: () => (data.household || []).some(m => m.category === "pet"),
+                    summary: () => (data.household || []).filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ") },
                   { key: "medical", title: "Medical issues?", configKey: "familyMedicalIssues", isAnswered: () => !!data.familyMedicalIssues, summary: () => data.familyMedicalIssues === "Y" ? "Yes" : "No" },
                   { key: "allergies", title: "Soap/fragrance allergies?", configKey: "soapFragAllergies", isAnswered: () => !!data.soapFragAllergies, summary: () => data.soapFragAllergies === "Y" ? "Yes" : "No" },
                   { key: "selfClean", title: "Self-clean anything?", configKey: "selfCleaning", isAnswered: () => !!data.selfCleaning, summary: () => data.selfCleaning === "Y" ? "Yes" : "No" },
@@ -12082,7 +12147,7 @@ export default function App(){
                 })()}
 
                 {/* Considerations */}
-                {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity Pets") && (() => {
+                {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity") && (() => {
                   const answered = (data.sdsConsiderations || []).length > 0; const summary = (data.sdsConsiderations || []).join(", "); const log = (data.interviewLog || {}).considerations; const expanded = interviewExpanded.considerations !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
@@ -12092,7 +12157,7 @@ export default function App(){
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
-                        {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"].map(s => (
+                        {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"].map(s => (
                           <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => { const isAdding = !(data.sdsConsiderations || []).includes(s); update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
@@ -12113,6 +12178,73 @@ export default function App(){
                         </div>
                       ))}
                       {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Pets in Home */}
+                {matchesInterviewSearch("pets animals dog cat", "dog cat bird fish rabbit hamster pet") && (() => {
+                  const pets = (data.household || []).filter(m => m.category === "pet");
+                  const answered = pets.length > 0;
+                  const summary = pets.map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ");
+                  const log = (data.interviewLog || {}).pets;
+                  const expanded = interviewExpanded.pets !== false;
+                  const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"];
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: !p.pets}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Pets in home?")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {petTypes.map(type => {
+                          const hasPet = pets.some(p => p.type === type);
+                          return <button key={type} type="button" onClick={() => {
+                            const members = data.household || [];
+                            let next;
+                            if (hasPet) {
+                              next = members.filter(m => !(m.category === "pet" && m.type === type));
+                            } else {
+                              next = [...members, { id: safeUid(), category: "pet", type, name: "" }];
+                            }
+                            update("household", next);
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                            const sdsC = data.sdsConsiderations || [];
+                            if (petStr && !sdsC.includes("Pets")) update("sdsConsiderations", [...sdsC, "Pets"]);
+                            if (!petStr && sdsC.includes("Pets")) update("sdsConsiderations", sdsC.filter(s => s !== "Pets"));
+                            if (!(data.sdsObservations || []).includes("Pets") && petStr) update("sdsObservations", [...(data.sdsObservations || []), "Pets"]);
+                            if (!petStr && (data.sdsObservations || []).includes("Pets")) update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
+                            setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                          }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${hasPet ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{type}</button>;
+                        })}
+                      </div>
+                      {pets.map(pet => (
+                        <div key={pet.id} className="flex items-center gap-2 bg-teal-50/50 rounded-lg border border-teal-100 px-3 py-1.5">
+                          <span className="text-[10px] font-bold text-teal-700">{pet.type}</span>
+                          <input value={pet.name || ""} onChange={e => {
+                            const next = (data.household || []).map(m => m.id === pet.id ? {...m, name: e.target.value} : m);
+                            update("household", next);
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                          }} placeholder="Pet name" className="flex-1 rounded border border-teal-200 px-2 py-0.5 text-[10px] text-slate-700 bg-white outline-none focus:border-teal-400" />
+                          <button type="button" onClick={() => {
+                            const next = (data.household || []).filter(m => m.id !== pet.id);
+                            update("household", next);
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                            if (!petStr) {
+                              update("sdsConsiderations", (data.sdsConsiderations || []).filter(s => s !== "Pets"));
+                              update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
+                            }
+                          }} className="text-slate-400 hover:text-rose-500 text-xs">×</button>
+                        </div>
+                      ))}
+                      {showCoaching && answered && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                        <span className="font-bold">Pets:</span> Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.
+                      </div>}
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
                     </div>}
                   </div>;
                 })()}
@@ -12500,6 +12632,12 @@ export default function App(){
           const people = household.filter(m => m.category === "person");
           const pets = household.filter(m => m.category === "pet");
           const primaryCustomer = (data.customers || [])[0] || {};
+          // Addresses
+          const allAddresses = data.addresses || [];
+          const primaryAddress = allAddresses.find(a => a.isPrimary) || allAddresses[0] || {};
+          const primaryAddrStr = [primaryAddress.street, primaryAddress.city, primaryAddress.state, primaryAddress.zip].filter(Boolean).join(", ");
+          const tempAddress = allAddresses.find(a => /temp|hotel|rental/i.test(a.type || "")) || {};
+          const tempAddrStr = [tempAddress.street, tempAddress.city, tempAddress.state, tempAddress.zip].filter(Boolean).join(", ");
           // Age-aware family composition
           const babies = people.filter(p => { const age = parseInt(p.age); return /infant|baby/i.test(p.type) || (age >= 0 && age <= 2); }).length;
           const kids = people.filter(p => { const age = parseInt(p.age); return /child/i.test(p.type) || (age > 2 && age <= 17); }).length;
@@ -12610,18 +12748,24 @@ export default function App(){
               seasonalWardrobes.push({ season: "Graduation", items: ["Cap and gown", "Formal celebration attire", "Photography outfits"] });
             }
 
-            // Events from interview data
+            // Events from interview data + rush guide overrides
             events.forEach(evt => {
               if (!evt.date) return;
               const eventDate = new Date(evt.date);
               if (estimatedReturn && eventDate > estimatedReturn) { reminders.push(`Your trip "${evt.name}" falls after repairs are expected to finish.`); return; }
-              const items = [];
+              const items: string[] = [];
               if (evt.type === "vacation_beach") { items.push("Swimwear, resort wear, and sandals"); items.push("Beach bags, sunglasses, and sun hats"); items.push("Suitcases and travel luggage"); }
               else if (evt.type === "vacation_ski") { items.push("Ski gear, thermal layers, heavy coats, and boots"); items.push("Suitcases and travel luggage"); }
               else if (evt.type === "wedding") { items.push("Suits, formal dresses, dress shoes"); items.push("Ties, jewelry, and formal accessories"); }
               else if (evt.type === "business") { items.push("Business professional attire and dress shoes"); items.push("Briefcase, garment bags, and carry-on luggage"); }
               else if (evt.type === "sports") { items.push("Uniforms, cleats, and practice gear"); items.push("Sports equipment bags and gear"); }
-              eventDeliveries.push({ name: evt.name, date: rushFormatDate(eventDate), items });
+              // Check rush guide overrides for group assignment
+              const override = (rushGuideData as any).eventOverrides?.[evt.id];
+              const assignedGroup = override?.group || "event";
+              const eventAddress = override?.address || "";
+              if (assignedGroup === "rush") { rushItems.push(...items.map(i => `[${evt.name}] ${i}`)); }
+              else if (assignedGroup === "short") { shortTermItems.push(...items.map(i => `[${evt.name}] ${i}`)); }
+              else { eventDeliveries.push({ id: evt.id, name: evt.name, date: rushFormatDate(eventDate), items, address: eventAddress }); }
             });
           }
 
@@ -12719,7 +12863,8 @@ export default function App(){
                   {/* Step 4: Results */}
                   {(repairInfo || orderSituation) ? <>
                     <div>
-                      <h2 className="text-2xl font-bold text-slate-900 mb-2">Rush Guide for {[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ") || "Customer"}</h2>
+                      <h2 className="text-2xl font-bold text-slate-900 mb-1">Rush Guide for {[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ") || "Customer"}</h2>
+                      {primaryAddrStr && <div className="text-sm text-slate-500 mb-3">{primaryAddrStr}</div>}
                       <div className="flex flex-wrap gap-2 mb-4">
                         {orderSituation && <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{RUSH_LIVING_SITUATIONS.find(s => s.id === orderSituation)?.label || orderSituation}</span>}
                         <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{totalPeople} People{petCount > 0 ? `, ${petCount} Pet${petCount > 1 ? "s" : ""}` : ""}</span>
@@ -12740,8 +12885,17 @@ export default function App(){
                     {/* Rush Items */}
                     <div className="rounded-2xl border border-slate-200 overflow-hidden">
                       <div className="bg-teal-600 px-5 py-4 text-white">
-                        <div className="font-bold text-lg">Rush Action Items</div>
-                        <div className="text-teal-100 text-xs">Delivered in 24 to 72 hours</div>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="font-bold text-lg">Rush Delivery</div>
+                            <div className="text-teal-100 text-xs">Delivered in 24 to 72 hours</div>
+                          </div>
+                        </div>
+                        {(orderSituation === "hotel" || orderSituation === "temp") && tempAddrStr ? (
+                          <div className="mt-2 text-teal-100 text-xs flex items-center gap-1"><span className="font-bold text-teal-200">Deliver to:</span> {tempAddrStr}</div>
+                        ) : primaryAddrStr ? (
+                          <div className="mt-2 text-teal-100 text-xs flex items-center gap-1"><span className="font-bold text-teal-200">Deliver to:</span> {primaryAddrStr}</div>
+                        ) : null}
                       </div>
                       <div className="p-5 space-y-2">
                         {rushItems.map((item, i) => <div key={i} className="flex items-start gap-2"><span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" /><span className="text-sm text-slate-700">{item}</span></div>)}
@@ -12753,6 +12907,7 @@ export default function App(){
                       <div className="bg-sky-600 px-5 py-4 text-white">
                         <div className="font-bold text-lg">Home & Comfort (Short-Term)</div>
                         <div className="text-sky-100 text-xs">Delivered in 1-4 weeks</div>
+                        {primaryAddrStr && <div className="mt-2 text-sky-100 text-xs"><span className="font-bold text-sky-200">Deliver to:</span> {primaryAddrStr}</div>}
                       </div>
                       <div className="p-5 space-y-2">
                         {shortTermItems.map((item, i) => <div key={i} className="flex items-start gap-2"><span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" /><span className="text-sm text-slate-700">{item}</span></div>)}
@@ -12774,14 +12929,37 @@ export default function App(){
 
                     {/* Events */}
                     {eventDeliveries.length > 0 && <div>
-                      <div className="text-lg font-bold text-slate-900 mb-3">Dedicated Event Deliveries</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        {eventDeliveries.map((evt, i) => (
+                      <div className="text-lg font-bold text-slate-900 mb-3">Event Deliveries</div>
+                      <div className="grid grid-cols-1 gap-3">
+                        {eventDeliveries.map((evt: any, i) => {
+                          const override = (rushGuideData as any).eventOverrides?.[evt.id] || {};
+                          return (
                           <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
-                            <div className="bg-indigo-600 px-4 py-3 text-white"><div className="font-bold">{evt.name}</div><div className="text-indigo-200 text-xs">{evt.date}</div></div>
-                            <div className="p-3 space-y-1">{evt.items.map((item, j) => <div key={j} className="text-xs text-slate-700">• {item}</div>)}</div>
+                            <div className="bg-indigo-600 px-4 py-3 text-white">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-bold">{evt.name}</div>
+                                  <div className="text-indigo-200 text-xs">{evt.date}</div>
+                                </div>
+                                <select value={override.group || "event"} onChange={e => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), group: e.target.value}}}))} className="rounded-lg bg-indigo-500 border border-indigo-400 text-white text-[10px] font-bold px-2 py-1">
+                                  <option value="event">Separate Delivery</option>
+                                  <option value="rush">Include in Rush</option>
+                                  <option value="short">Include in Short-Term</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="p-3 space-y-2">
+                              {evt.items.map((item: string, j: number) => <div key={j} className="text-xs text-slate-700">• {item}</div>)}
+                              <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                                <div className="text-[10px] font-bold text-slate-500 uppercase">Deliver to</div>
+                                <input value={override.address || ""} onChange={e => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), address: e.target.value}}}))} placeholder={primaryAddrStr || "Enter delivery address"} className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-300" />
+                                <div className="text-[10px] font-bold text-slate-500 uppercase">Deliver by</div>
+                                <input type="date" value={override.deliverBy || ""} onChange={e => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), deliverBy: e.target.value}}}))} className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-300" />
+                              </div>
+                            </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>}
 
@@ -12789,15 +12967,21 @@ export default function App(){
                     <div className="rounded-2xl bg-slate-800 p-5 text-white">
                       <div className="font-bold text-lg mb-1">Long-Term Storage & Final Delivery</div>
                       <p className="text-slate-300 text-sm">Everything not marked for Rush or Short-Term will be securely packed, barcode-tracked, professionally cleaned, and stored in our climate-controlled facility until your repairs are finished.</p>
+                      {primaryAddrStr && <div className="mt-2 text-slate-400 text-xs"><span className="font-bold text-slate-300">Final delivery to:</span> {primaryAddrStr}</div>}
+                      {estimatedReturn && <div className="text-slate-400 text-xs mt-1"><span className="font-bold text-slate-300">Estimated:</span> {rushFormatDate(estimatedReturn)}</div>}
                     </div>
 
                     {/* Actions */}
                     <div className="flex gap-3 pt-4 border-t border-slate-100">
                       <button onClick={() => {
-                        const text = `RUSH GUIDE - ${data.orderName || "Order"}\n\n` +
-                          `RUSH ITEMS (24-72 hrs):\n${rushItems.map(i => `• ${i}`).join("\n")}\n\n` +
-                          (shortTermItems.length ? `SHORT TERM (1-4 wks):\n${shortTermItems.map(i => `• ${i}`).join("\n")}\n\n` : "") +
+                        const rushAddr = (orderSituation === "hotel" || orderSituation === "temp") && tempAddrStr ? tempAddrStr : primaryAddrStr;
+                        const text = `RUSH GUIDE - ${data.orderName || "Order"}\n` +
+                          (primaryAddrStr ? `Address: ${primaryAddrStr}\n` : "") + "\n" +
+                          `RUSH DELIVERY (24-72 hrs)${rushAddr ? ` → ${rushAddr}` : ""}:\n${rushItems.map(i => `• ${i}`).join("\n")}\n\n` +
+                          (shortTermItems.length ? `SHORT TERM (1-4 wks)${primaryAddrStr ? ` → ${primaryAddrStr}` : ""}:\n${shortTermItems.map(i => `• ${i}`).join("\n")}\n\n` : "") +
                           (seasonalWardrobes.length ? seasonalWardrobes.map(w => `${w.season.toUpperCase()}:\n${w.items.map(i => `• ${i}`).join("\n")}`).join("\n\n") + "\n\n" : "") +
+                          (eventDeliveries.length ? eventDeliveries.map((e: any) => `EVENT: ${e.name} (${e.date})${e.address ? ` → ${e.address}` : ""}:\n${e.items.map((i: string) => `• ${i}`).join("\n")}`).join("\n\n") + "\n\n" : "") +
+                          `LONG-TERM STORAGE → Final delivery to ${primaryAddrStr || "TBD"}${estimatedReturn ? ` (est. ${rushFormatDate(estimatedReturn)})` : ""}\n\n` +
                           `REMINDERS:\n${reminders.map(r => `• ${r}`).join("\n")}`;
                         navigator.clipboard?.writeText(text).then(() => setToast("Rush Guide copied to clipboard"));
                       }} className="rounded-xl border border-sky-300 bg-sky-50 px-5 py-2.5 text-sm font-bold text-sky-700 hover:bg-sky-100">Copy to Clipboard</button>
@@ -12949,6 +13133,10 @@ export default function App(){
               orderTypes={data.orderTypes || []}
               primaryLossType={data.primaryLossType || ""}
               address={(() => { const a = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {}; return [a.street, a.city, a.state].filter(Boolean).join(", "); })()}
+              lossSeverity={data.lossSeverity}
+              rooms={data.sdsRooms || []}
+              lossDetails={data.lossDetails || {}}
+              severityCodes={data.severityCodes || []}
               selectedServices={data.sdsServices || []}
               noeServiceOfferings={data.serviceOfferings || []}
               customers={data.customers || []}
@@ -12964,19 +13152,61 @@ export default function App(){
               orderNarrative={orderNarrative}
               orderNarrativeProse={buildNarrativeProse(orderNarrative, data)}
               rushGuideTimeline={(() => {
-                const repairMap = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
+                const repairMap: Record<string,string> = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
+                const livingMap: Record<string,string> = { "Staying in home": "home", "Hotel": "hotel", "Temp": "temp", "Moving": "moving" };
                 const firstRepair = (data.repairsSummary || "").split(", ").filter(Boolean)[0] || "";
                 const repairId = repairMap[firstRepair];
                 const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === repairId);
-                if (!repairInfo) return null;
+                const orderSit = livingMap[data.livingStatus] || "";
+                if (!repairInfo && !orderSit) return null;
                 const now = new Date();
-                const returnDate = rushAddDays(now, repairInfo.days);
-                const timeline = [];
-                timeline.push({ group: "Rush Delivery", timeframe: "24-72 hours", desc: "Essential clothing, footwear, baby items, pet supplies" });
-                if (data.livingStatus === "Staying in home") timeline.push({ group: "Short-Term Home", timeframe: "1-2 weeks", desc: "Household essentials, temporary bedding, window shades" });
-                const seasons = rushGetSeasons(now, returnDate);
-                if (seasons.length > 1) timeline.push({ group: "Seasonal Wardrobes", timeframe: "2-8 weeks", desc: `Transition clothing for ${seasons.map(s => s.name).join(", ")}` });
-                timeline.push({ group: repairInfo.group, timeframe: `${repairInfo.days} days (${rushFormatDate(returnDate)})`, desc: "Final delivery of all remaining items after repairs complete" });
+                const returnDate = repairInfo ? rushAddDays(now, repairInfo.days) : null;
+                const allAddr = data.addresses || [];
+                const primAddr = allAddr.find((a: any) => a.isPrimary) || allAddr[0] || {};
+                const primAddrStr = [primAddr.street, primAddr.city, primAddr.state, primAddr.zip].filter(Boolean).join(", ");
+                const tmpAddr = allAddr.find((a: any) => /temp|hotel|rental/i.test(a.type || "")) || {};
+                const tmpAddrStr = [tmpAddr.street, tmpAddr.city, tmpAddr.state, tmpAddr.zip].filter(Boolean).join(", ");
+                const rushAddr = (orderSit === "hotel" || orderSit === "temp") && tmpAddrStr ? tmpAddrStr : primAddrStr;
+
+                // Build Rush items
+                const household = data.household || [];
+                const pets = household.filter((m: any) => m.category === "pet");
+                const babies = household.filter((m: any) => /infant|baby/i.test(m.type)).length;
+                const kids = household.filter((m: any) => /child/i.test(m.type)).length;
+                const elderly = household.filter((m: any) => /elderly/i.test(m.type)).length;
+                const totalPeople = Math.max(1, (data.customers || []).length) + kids + babies;
+                const rItems: string[] = [];
+                rItems.push(`Clothing & undergarments for ${totalPeople} people`);
+                rItems.push("Daily footwear, sneakers, and belts");
+                if (orderSit === "hotel" || orderSit === "temp") rItems.push("Suitcases and overnight bags");
+                if (babies > 0) rItems.push("Strollers, diaper bags, crib bedding");
+                if (kids > 0) rItems.push("Favorite comfort toys");
+                if (elderly > 0) rItems.push("Medications and mobility aids");
+                if (pets.length > 0) rItems.push("Pet beds, leashes, and crates");
+                const stItems: string[] = [];
+                if (orderSit === "home") { stItems.push("Temporary window shades, throw rugs, daily bedding"); }
+
+                const timeline: any[] = [];
+                timeline.push({ group: "Rush Delivery", timeframe: "24-72 hours", desc: rItems.slice(0, 3).join("; "), items: rItems, address: rushAddr });
+                if (stItems.length > 0) timeline.push({ group: "Short-Term Home", timeframe: "1-4 weeks", desc: stItems.join("; "), items: stItems, address: primAddrStr });
+                if (returnDate) {
+                  const seasons = rushGetSeasons(now, returnDate);
+                  if (seasons.length > 1) timeline.push({ group: "Seasonal Wardrobes", timeframe: "2-8 weeks", desc: `Transition clothing for ${seasons.map(s => s.name).join(", ")}`, address: primAddrStr });
+                }
+                // Event deliveries
+                (data.upcomingEvents || []).forEach((evt: any) => {
+                  if (!evt.date) return;
+                  const ed = new Date(evt.date);
+                  if (returnDate && ed > returnDate) return;
+                  const eItems: string[] = [];
+                  if (evt.type === "vacation_beach") { eItems.push("Swimwear, resort wear, sandals, luggage"); }
+                  else if (evt.type === "vacation_ski") { eItems.push("Ski gear, thermal layers, boots, luggage"); }
+                  else if (evt.type === "wedding") { eItems.push("Formal attire, dress shoes, accessories"); }
+                  else if (evt.type === "business") { eItems.push("Business attire, briefcase, garment bags"); }
+                  else if (evt.type === "sports") { eItems.push("Uniforms, cleats, gear"); }
+                  if (eItems.length > 0) timeline.push({ group: evt.name || "Event", timeframe: rushFormatDate(ed), desc: eItems.join("; "), items: eItems, address: "" });
+                });
+                if (repairInfo) timeline.push({ group: "Final Delivery", timeframe: `${repairInfo.days} days (${rushFormatDate(returnDate!)})`, desc: "All remaining items after repairs complete", address: primAddrStr });
                 return timeline;
               })()}
               onClose={() => setShowSdsPreview(false)}

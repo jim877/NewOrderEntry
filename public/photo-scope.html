@@ -1329,27 +1329,32 @@ function mergeSev(base,ov){if(!ov)return base;Object.keys(ov).forEach(k=>{if(!ba
 function effectiveSev(room,fi){const b=JSON.parse(JSON.stringify(curOrder.severity||emptySev()));const fl=curOrder.floors[fi!==undefined?fi:curFloorIdx];if(fl&&fl.severity)mergeSev(b,fl.severity);if(room&&room.severity)mergeSev(b,room.severity);return b;}
 function sevSummary(sevObj){const parts=LOSS_TYPES.filter(lt=>sevObj[lt.code]&&sevObj[lt.code].sev>0).map(lt=>lt.icon+sevObj[lt.code].sev);return parts.length?parts.join(' '):null;}
 const PROPERTY_TYPES=['House','Apartment','Business','Row House','Garden Apt','Trailer'];
-const OFFERINGS=['Textiles','Art','Appliance','Furniture','Consulting','TLI','Inhome'];
+const OFFERINGS=['Appliance','Art','Consulting','Contents','Furniture','Hand Clean','Pack-out','Rugs','Storage Only','Textiles','TLI','Expert Stain Removal','Inhome'];
 const OFFERING_SUBSERVICES={
-  Textiles:['Rugs','Window Treatments','Hand Cleaning','Pressing'],
+  Textiles:['Window Treatments','Hand Cleaning','Pressing'],
   Furniture:['Inhome Cleaning','Packout','Mover Delivered','Clean at Mover'],
   Appliance:['Inhome Cleaning','Packout','Mover Delivered','Clean at Mover'],
+  Contents:['General','Electronics','Documents','Specialty Items'],
 };
 const ROOM_PRESETS=['Kitchen','Bath','Bedroom','Living','Dining','Master','Office','Garage','Laundry','Hallway','Closet','Attic','Basement','Pantry','Foyer','Den','Studio','Gym'];
 const INTERVIEW_SECTIONS=[
-  {id:'conditions',title:'Conditions ⚡',type:'multi',critical:true,options:['Still Wet','Visible Mold','Structural Damage','No Electricity','No Heat','Boarded Up']},
-  {id:'repairs',title:'Repairs Summary',type:'multi',critical:true,options:['Just Cleaning','Clean and Paint','Cosmetic Damage','Major Structural Damage','Refinish Floors','Replace Floors','Complete Rebuild']},
-  {id:'living',title:'Living Situation',type:'single',critical:true,options:['Staying in home','Moving','Hotel','Neighbor','Relative','Rental','Other Home']},
-  {id:'timeline',title:'Delivery + Storage Timeline',type:'multi',critical:true,options:['Deliver to Temp','Deliver to Move','Deliver to home ASAP','Long-Term Storage']},
-  {id:'packout',title:'Packout Summary',type:'multi',critical:true,options:['Remove Rugs','Remove Window Treatments','Remove Hardware','Remove Furniture','Remove Electronics']},
+  {id:'conditions',title:'Is anything still wet or damaged? ⚡',type:'multi',critical:true,options:['Still Wet','Visible Mold','Structural Damage','No Electricity','No Heat','Boarded Up']},
+  {id:'repairs',title:'What repairs are being done?',type:'multi',critical:true,options:['Just Cleaning','Paint','Refinish Floors','Replace Floors','Cosmetic Damage','Major Structural Damage','Complete Rebuild']},
+  {id:'living',title:'Where will the customer live during repairs?',type:'single',critical:true,options:['Staying in home','Hotel','Temp','Moving','Neighbor','Relative','Rental','Other Home']},
+  {id:'delivery',title:'Where should we make final delivery?',type:'single',critical:true,options:['Deliver ASAP','Deliver to Temp','Deliver to New Home','Long-Term Storage']},
+  {id:'packout',title:'What are we picking up?',type:'multi',critical:true,options:['Rugs','Window Treatments','Clothing','Bedding','Furniture','Art','Electronics','Hardware','Appliances']},
+  {id:'loadList',title:'What do we need to bring?',type:'multi',critical:false,options:['Tall Ladder','Extra Manpower','Floor Protection','Dollies','Wardrobe Boxes','TV Boxes','Blankets','Plastic Bags']},
+  {id:'considerations',title:'Special Considerations',type:'multi',critical:false,options:['Elderly','Pregnancy','Baby','Hearing Impaired','Spanish Only','Respiratory Concerns','Premium Brands','Skin Sensitivity']},
+  {id:'petsInHome',title:'Pets in Home?',type:'multi',critical:false,options:['Dog','Cat','Bird','Fish','Rabbit','Hamster','Other']},
   {id:'suggestedGroups',title:'Suggested Groups',type:'multi',critical:false,options:['RD','RFD','STD','STFD','LTD','LTFD','Inhome','TLI','Test','Dispose','Storage Only']},
   {id:'medicalIssues',title:'Medical Issues?',type:'boolean',critical:true},
-  {id:'soapAllergies',title:'Soap Allergies? ⚡',type:'boolean',critical:true},
-  {id:'selfCleaning',title:'Self Cleaning?',type:'boolean',critical:false},
-  {id:'donateItems',title:'Donate Items?',type:'boolean',critical:false},
-  {id:'useDryCleaner',title:'Use Dry Cleaner?',type:'single',critical:false,options:['Yes','No','Rarely']},
-  {id:'dryLaundry',title:'How do you dry laundry? ⚡',type:'single',critical:true,options:['Air-Dry','Low Heat','Dryer']},
+  {id:'soapAllergies',title:'Soap/Fragrance Allergies? ⚡',type:'boolean',critical:true},
+  {id:'selfCleaning',title:'Self-clean anything?',type:'boolean',critical:false},
+  {id:'useDryCleaner',title:'Use a dry cleaner?',type:'single',critical:false,options:['Yes','No','Rarely']},
+  {id:'dryLaundry',title:'How do they dry laundry? ⚡',type:'single',critical:true,options:['Air-Dry','Low Heat','Dryer']},
   {id:'needStorage',title:'Need Storage?',type:'boolean',critical:true},
+  {id:'interests',title:'Activities & Interests',type:'multi',critical:false,options:['School & Kids Sports','Summer & Swim','Winter & Snow','Halloween','Thanksgiving','Christmas / Hanukkah','Easter / Passover','Religious Services','Graduation','Gym & Fitness','Work from Home']},
+  {id:'upcomingEvents',title:'Upcoming Trips & Events',type:'multi',critical:false,options:['Warm Weather / Beach Vacation','Cold Weather / Ski Trip','Wedding / Formal Event','Business Trip / Conference','Sports Tournament']},
 ];
 const INTERVIEW_CRITICAL_IDS=INTERVIEW_SECTIONS.filter(s=>s.critical).map(s=>s.id);
 
@@ -5015,15 +5020,83 @@ if('serviceWorker' in navigator && !/localhost|127\.0\.0\.1/i.test(location.host
 
     // Add order banner at top of the app
     const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;padding:6px 16px;font-family:var(--font);display:flex;align-items:center;gap:12px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.15)';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;padding:6px 16px;font-family:var(--font);display:flex;align-items:center;gap:12px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer';
+    banner.title = 'Click to load this order into Photo Scope';
     banner.innerHTML = `
       <span style="font-weight:800;font-size:13px">${ctx.orderName}</span>
       <span style="opacity:0.7">|</span>
       <span>${ctx.customerName || ''}</span>
       ${ctx.address ? `<span style="opacity:0.7">|</span><span style="opacity:0.8">${ctx.address}</span>` : ''}
       ${ctx.lossType ? `<span style="opacity:0.7">|</span><span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:99px;font-weight:700">${ctx.lossType}</span>` : ''}
-      ${ctx.claimNumber ? `<span style="opacity:0.5;margin-left:auto;font-size:10px">${ctx.claimNumber}</span>` : ''}
+      <span style="margin-left:auto;background:rgba(255,255,255,0.25);padding:3px 12px;border-radius:99px;font-weight:700;font-size:11px">Load Order →</span>
     `;
+
+    banner.addEventListener('click', function() {
+      // Pre-fill the wizard address field
+      var addrInput = document.getElementById('inp-address');
+      if (addrInput) addrInput.value = ctx.address || ctx.orderName || '';
+
+      // Navigate to wizard step 1 (this resets wizard state)
+      var newOrderBtn = document.getElementById('btn-new-order');
+      if (newOrderBtn) newOrderBtn.click();
+
+      // After the wizard resets, pre-fill from NOE context
+      setTimeout(function() {
+        // Address
+        var addrField = document.getElementById('inp-address');
+        if (addrField) addrField.value = ctx.address || ctx.orderName || '';
+
+        // Service offerings — lists now match between NOE and Photo Scope
+        if (ctx.services && ctx.services.length) window._wizOfferings = ctx.services.slice();
+
+        // Severity codes — convert NOE "Fire-3" format to Photo Scope {fire:{sev:3,details:{}}}
+        var sevCodes = ctx.severityCodes || [];
+        if (sevCodes.length) {
+          var sevMap = { 'Fire': 'fire', 'Water': 'water', 'Mold': 'mold', 'Puffback': 'pb', 'Debris': 'debris' };
+          var sev = window._wizSev || (typeof emptySev === 'function' ? emptySev() : {});
+          sevCodes.forEach(function(code) {
+            var parts = String(code || '').split('-');
+            var group = sevMap[parts[0]];
+            var level = parseInt(parts[1]) || 0;
+            if (group && level > 0) {
+              if (!sev[group]) sev[group] = { sev: 0, details: {} };
+              sev[group].sev = Math.max(sev[group].sev, level);
+            }
+          });
+          window._wizSev = sev;
+        }
+
+        // Rooms — store for later use when creating floors
+        if (ctx.rooms && ctx.rooms.length) {
+          window._noeRooms = ctx.rooms;
+        }
+
+        // Interview answers — pre-fill from NOE context
+        var iv = ctx.interview;
+        if (iv && typeof iv === 'object') {
+          if (!window._wizInterview) window._wizInterview = typeof normalizeInterviewState === 'function' ? normalizeInterviewState(null) : { answers: {} };
+          var ans = window._wizInterview.answers;
+          if (Array.isArray(iv.conditions) && iv.conditions.length) ans.conditions = iv.conditions;
+          if (Array.isArray(iv.repairs) && iv.repairs.length) ans.repairs = iv.repairs;
+          if (iv.living) ans.living = iv.living;
+          if (iv.delivery) ans.delivery = iv.delivery;
+          if (Array.isArray(iv.packout) && iv.packout.length) ans.packout = iv.packout;
+          if (Array.isArray(iv.loadList) && iv.loadList.length) ans.loadList = iv.loadList;
+          if (Array.isArray(iv.considerations) && iv.considerations.length) ans.considerations = iv.considerations;
+          if (Array.isArray(iv.suggestedGroups) && iv.suggestedGroups.length) ans.suggestedGroups = iv.suggestedGroups;
+          if (iv.medicalIssues === true || iv.medicalIssues === false) ans.medicalIssues = iv.medicalIssues;
+          if (iv.soapAllergies === true || iv.soapAllergies === false) ans.soapAllergies = iv.soapAllergies;
+          if (iv.selfCleaning === true || iv.selfCleaning === false) ans.selfCleaning = iv.selfCleaning;
+          if (iv.useDryCleaner) ans.useDryCleaner = iv.useDryCleaner;
+          if (iv.dryLaundry) ans.dryLaundry = iv.dryLaundry;
+          if (iv.needStorage === true || iv.needStorage === false) ans.needStorage = iv.needStorage;
+          if (Array.isArray(iv.petsInHome) && iv.petsInHome.length) ans.petsInHome = iv.petsInHome;
+          if (Array.isArray(iv.interests) && iv.interests.length) ans.interests = iv.interests;
+          if (Array.isArray(iv.upcomingEvents) && iv.upcomingEvents.length) ans.upcomingEvents = iv.upcomingEvents;
+        }
+      }, 50);
+    });
+
     document.body.prepend(banner);
 
     // Offset the rest of the UI to account for the banner
