@@ -2535,7 +2535,7 @@ const SmartNotification = ({ message, onReject, onClose, panelOffset = 0 }) => {
     );
 };
 
-const pillBase = "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-all duration-200 cursor-pointer select-none";
+const pillBase = "inline-flex items-center justify-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-all duration-200 cursor-pointer select-none min-w-[44px]";
 const pillInactive = "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50";
 const pillActive = "bg-sky-50 border-sky-300 text-sky-700 font-bold shadow-sm"; 
 
@@ -3936,8 +3936,7 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, setShowSearch, onInt
             <div className="pointer-events-auto bg-white border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.15)] shadow-slate-700/30 rounded-full flex items-center p-1.5 gap-1 sm:gap-2 px-2 sm:px-3">
 
                 <button data-noe-action="search" onClick={() => setShowSearch(true)} className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 bg-slate-50">
-                    <span className="text-base">🔍</span>
-                    <span className="text-xs sm:text-sm font-bold hidden sm:inline">Search</span>
+                    <span className="text-xs sm:text-sm font-bold">Search</span>
                 </button>
 
                 <button
@@ -3945,7 +3944,6 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, setShowSearch, onInt
                     onClick={onInterview}
                     className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all ${interviewPanelOpen ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'hover:bg-violet-50 text-slate-600 hover:text-violet-600 bg-slate-50'}`}
                 >
-                    <span className="text-base">🎤</span>
                     <span className="text-xs sm:text-sm font-bold">Interview</span>
                 </button>
 
@@ -3954,7 +3952,6 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, setShowSearch, onInt
                     onClick={onActionItems}
                     className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-amber-50 text-slate-600 hover:text-amber-600 bg-slate-50 relative"
                 >
-                    <span className="text-base">⚡</span>
                     <span className="text-xs sm:text-sm font-bold">Action Items</span>
                     {actionItemCount > 0 && (
                       <span className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1">{actionItemCount}</span>
@@ -10427,11 +10424,11 @@ export default function App(){
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-base">🎤</span>
                                   <span className="text-sm font-bold text-violet-700">Interview</span>
-                                  {(data.damageWasWet || data.damageMoldMildew || data.livingStatus || data.repairsSummary || (data.packoutSummary||[]).length) && (
-                                    <span className="text-[10px] text-violet-500">In progress</span>
-                                  )}
+                                  {(() => {
+                                    const answered = [data.damageWasWet, data.damageMoldMildew, data.livingStatus, data.repairsSummary, (data.packoutSummary||[]).length > 0, data.familyMedicalIssues, data.soapFragAllergies, data.selfCleaning, data.useDryCleaner, data.howDryLaundry, data.storageNeeded, (data.rushInterests||[]).length > 0, (data.upcomingEvents||[]).length > 0, (data.sdsConsiderations||[]).length > 0, (data.household||[]).some((m:any) => m.category === "pet"), (data.loadList||[]).length > 0].filter(Boolean).length;
+                                    return <span className="text-[10px] text-violet-500">{answered} of 16</span>;
+                                  })()}
                                 </div>
                                 <span className="text-xs font-bold text-violet-600">Open →</span>
                               </div>
@@ -11981,7 +11978,6 @@ export default function App(){
                   <>
                   <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-violet-50 shrink-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">🎤</span>
                       <span className="text-sm font-bold text-violet-800">Interview</span>
                       <span className="text-xs text-violet-500">{answeredCount} of {visibleQuestions.length}</span>
                     </div>
@@ -12078,12 +12074,12 @@ export default function App(){
                   const log = (data.interviewLog || {}).living;
                   const expanded = !answered || interviewExpanded.living;
                   const STAY_TYPES = [
-                    { id: "Neighbor", icon: "🏘️", desc: "Staying next door" },
-                    { id: "Relative", icon: "👨‍👩‍👧", desc: "Family member's home" },
-                    { id: "Hotel", icon: "🏨", desc: "Hotel or motel" },
-                    { id: "Rental", icon: "🏠", desc: "Temporary rental" },
-                    { id: "Staying in home", icon: "🔧", desc: "Living on-site" },
-                    { id: "Moving", icon: "📦", desc: "Relocating permanently" },
+                    { id: "Neighbor", desc: "Staying next door" },
+                    { id: "Relative", desc: "Family member's home" },
+                    { id: "Hotel", desc: "Hotel or motel" },
+                    { id: "Rental", desc: "Temporary rental" },
+                    { id: "Staying in home", desc: "Living on-site" },
+                    { id: "Moving", desc: "Relocating permanently" },
                   ];
                   const addStay = (type: string) => {
                     const next = [...timeline, { id: safeUid(), type, duration: "", address: "" }];
@@ -12124,7 +12120,7 @@ export default function App(){
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <span className="w-5 h-5 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center">{idx + 1}</span>
-                                <span className="text-xs font-bold text-slate-700">{STAY_TYPES.find(t => t.id === stay.type)?.icon} {stay.type}</span>
+                                <span className="text-xs font-bold text-slate-700">{stay.type}</span>
                               </div>
                               <button type="button" onClick={() => removeStay(stay.id)} className="text-slate-400 hover:text-rose-500 text-xs">×</button>
                             </div>
@@ -12155,7 +12151,7 @@ export default function App(){
                         <div className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">{timeline.length > 0 ? "Add next stay" : "Where first?"}</div>
                         <div className="flex flex-wrap gap-1.5">
                           {STAY_TYPES.map(t => (
-                            <button key={t.id} type="button" onClick={() => addStay(t.id)} className="rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all" title={t.desc}>{t.icon} {t.id}</button>
+                            <button key={t.id} type="button" onClick={() => addStay(t.id)} className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all" title={t.desc}>{t.id}</button>
                           ))}
                         </div>
                       </div>
@@ -12494,7 +12490,7 @@ export default function App(){
                   </div>;
                 })()}
               </div>
-              <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+              <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-4">
                 <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100">Rush Guide</button>
                 <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-violet-500 px-5 py-2 text-sm font-bold text-white hover:bg-violet-600">Done</button>
               </div>
@@ -12521,7 +12517,7 @@ export default function App(){
                   <div className="flex items-center gap-2">
                     <span className="text-base">⚡</span>
                     <span className="text-sm font-bold text-amber-800">Action Items</span>
-                    <span className="text-xs text-amber-600">{missing.length + placeholders.length + blockers.length} items</span>
+                    <span className="text-xs text-amber-600">{missing.length + placeholders.length + blockers.length + (!(data.damageWasWet || data.damageMoldMildew || data.repairsSummary || data.livingStatus || (data.livingTimeline || []).length > 0 || (data.packoutSummary || []).length > 0 || data.familyMedicalIssues || data.soapFragAllergies || data.howDryLaundry || data.storageNeeded) ? 1 : 0) + (!((data.repairsSummary || data.estimatedReturnDate || data.storageMonths) && (data.livingStatus || (data.livingTimeline || []).length > 0)) ? 1 : 0)} items</span>
                   </div>
                   <button onClick={() => setActionItemsOpen(false)} className="text-amber-400 hover:text-amber-600 text-lg font-bold">×</button>
                 </div>
@@ -12538,6 +12534,28 @@ export default function App(){
                       </div>
                     </div>
                   )}
+                  {/* Workflow status: Interview + Rush Guide */}
+                  {(() => {
+                    const interviewAnswered = !!(data.damageWasWet || data.damageMoldMildew || data.repairsSummary || data.livingStatus || (data.livingTimeline || []).length > 0 || (data.packoutSummary || []).length > 0 || data.familyMedicalIssues || data.soapFragAllergies || data.howDryLaundry || data.storageNeeded);
+                    const rushGuideReady = !!(data.repairsSummary || data.estimatedReturnDate || data.storageMonths) && !!(data.livingStatus || (data.livingTimeline || []).length > 0);
+                    const items: {label: string; sub: string; done: boolean; action: () => void}[] = [];
+                    if (!interviewAnswered) items.push({ label: "Interview not started", sub: "Answer interview questions to populate the order", done: false, action: () => { setActionItemsOpen(false); setInterviewPanelOpen(true); } });
+                    if (!rushGuideReady) items.push({ label: "Rush Guide not ready", sub: "Needs living status + return date or repair type", done: false, action: () => { setActionItemsOpen(false); setRushGuideOpen(true); setRushGuideStep(1); } });
+                    return items.length > 0 ? (
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Workflow</div>
+                        <div className="space-y-1">
+                          {items.map((item, i) => (
+                            <button key={`wf-${i}`} onClick={item.action} className="w-full text-left rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2 text-xs hover:bg-violet-50">
+                              <span className="font-bold text-violet-800">{item.label}</span>
+                              <span className="text-violet-500 ml-1">— {item.sub}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+
                   {placeholders.length > 0 && (
                     <div>
                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Placeholders</div>
@@ -12820,7 +12838,11 @@ export default function App(){
 
           const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === orderRepairType);
           const now = new Date();
-          const estimatedReturn = repairInfo ? rushAddDays(now, repairInfo.days) : null;
+          // Estimated return: explicit date > repair timeline > storage months > null
+          const explicitReturn = data.estimatedReturnDate ? new Date(data.estimatedReturnDate) : null;
+          const repairReturn = repairInfo ? rushAddDays(now, repairInfo.days) : null;
+          const storageReturn = data.storageMonths ? rushAddDays(now, parseInt(data.storageMonths) * 30) : null;
+          const estimatedReturn = explicitReturn || repairReturn || storageReturn;
           const seasons = estimatedReturn ? rushGetSeasons(now, estimatedReturn) : [];
 
           // Smart address resolution from living timeline
@@ -12905,7 +12927,7 @@ export default function App(){
             "No Need to Bag: You do not need to photograph, bag, or list any items — we will do that for you!"
           ];
 
-          if (repairInfo || orderSituation) {
+          if (repairInfo || orderSituation || estimatedReturn) {
             // Core essentials
             rushItems.push(`Clothing & undergarments to last ${totalPeople} people a couple of weeks`);
             rushItems.push("Daily footwear, sneakers, and belts");
@@ -13092,7 +13114,7 @@ export default function App(){
                   </>}
 
                   {/* Results */}
-                  {(repairInfo || orderSituation) ? (() => {
+                  {(repairInfo || orderSituation || estimatedReturn) ? (() => {
                     // Collect seasonal items assigned to rental
                     const rentalSeasonalItems = seasonalWardrobes.filter(sw => sw.assignedGroup === "rental");
                     const separateSeasonals = seasonalWardrobes.filter(sw => sw.assignedGroup === "separate");
@@ -13208,6 +13230,12 @@ export default function App(){
                         {isLongTerm && <span className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">Long-Term Order</span>}
                         {estimatedReturn && <span className="rounded-full bg-teal-100 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">Return: {rushFormatDate(estimatedReturn)}</span>}
                         {seasonChanges.length > 0 && <span className="rounded-full bg-violet-100 border border-violet-200 px-3 py-1 text-xs font-bold text-violet-700">{seasonChanges.length} Season Change{seasonChanges.length > 1 ? "s" : ""}</span>}
+                      </div>
+                      {/* Editable return date */}
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] font-bold text-slate-500">Return date:</span>
+                        <input type="date" value={data.estimatedReturnDate || (estimatedReturn ? estimatedReturn.toISOString().split("T")[0] : "")} onChange={e => update("estimatedReturnDate", e.target.value)} className="rounded border border-slate-200 px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-teal-400" />
+                        {data.estimatedReturnDate && <button type="button" onClick={() => update("estimatedReturnDate", "")} className="text-[9px] text-slate-400 hover:text-slate-600">Reset to auto</button>}
                       </div>
                     </div>
 
@@ -13627,31 +13655,73 @@ export default function App(){
                       </div>
                     </div>
                   </>;
-                  })() : <div className="text-center py-12 space-y-4 max-w-md mx-auto">
-                    <div className="text-4xl">📋</div>
-                    <div className="text-lg font-bold text-slate-700">Answer these interview questions first</div>
-                    <p className="text-sm text-slate-500">The Rush Guide needs at least one of these to generate your delivery timeline and recommendations.</p>
-                    <div className="space-y-2 text-left">
-                      <div className={`rounded-xl border-2 p-3 ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-lg ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "text-emerald-500" : "text-amber-500"}`}>{data.livingStatus || (data.livingTimeline || []).length > 0 ? "✓" : "!"}</span>
-                          <div>
-                            <div className="text-sm font-bold text-slate-700">Where will the customer live during repairs?</div>
-                            <div className="text-xs text-slate-500">{data.livingStatus || (data.livingTimeline || []).length > 0 ? `Answered: ${(data.livingTimeline || []).length > 0 ? (data.livingTimeline || []).map((s: any) => s.type).join(" → ") : data.livingStatus}` : "Hotel, Rental, Staying in home, etc. — determines delivery addresses"}</div>
-                          </div>
+                  })() : <div className="py-8 space-y-4 max-w-lg mx-auto">
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">📋</div>
+                      <div className="text-lg font-bold text-slate-700">Set up the Rush Guide</div>
+                      <p className="text-sm text-slate-500 mt-1">Answer these questions to generate the delivery timeline.</p>
+                    </div>
+
+                    {/* Required: Living Status — click to open interview */}
+                    <button type="button" onClick={() => { setRushGuideOpen(false); setInterviewPanelOpen(true); setInterviewExpanded((p: any) => ({...p, living: true})); }} className={`w-full rounded-xl border-2 p-4 text-left hover:shadow-md transition-shadow cursor-pointer ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+                      <div className="flex items-start gap-2">
+                        <span className={`text-lg mt-0.5 ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "text-emerald-500" : "text-amber-500"}`}>{data.livingStatus || (data.livingTimeline || []).length > 0 ? "✓" : "1"}</span>
+                        <div className="flex-1">
+                          <div className="text-sm font-bold text-slate-700">Where will the customer live during repairs?</div>
+                          {data.livingStatus || (data.livingTimeline || []).length > 0
+                            ? <div className="text-xs text-emerald-600 mt-1">{(data.livingTimeline || []).length > 0 ? (data.livingTimeline || []).map((s: any) => s.type).join(" → ") : data.livingStatus}</div>
+                            : <div className="text-xs text-slate-500 mt-1">Click to answer — determines where we deliver</div>
+                          }
                         </div>
+                        <span className="text-slate-400 text-xs mt-1">→</span>
                       </div>
-                      <div className={`rounded-xl border-2 p-3 ${data.repairsSummary ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-lg ${data.repairsSummary ? "text-emerald-500" : "text-amber-500"}`}>{data.repairsSummary ? "✓" : "!"}</span>
-                          <div>
-                            <div className="text-sm font-bold text-slate-700">What repairs are being done?</div>
-                            <div className="text-xs text-slate-500">{data.repairsSummary ? `Answered: ${data.repairsSummary}` : "Just Cleaning, Paint, Replace Floors, etc. — determines repair timeline"}</div>
+                    </button>
+
+                    {/* Required: Repairs or Return Date */}
+                    <div className={`rounded-xl border-2 p-4 ${data.repairsSummary || data.estimatedReturnDate || data.storageMonths ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+                      <div className="flex items-start gap-2">
+                        <span className={`text-lg mt-0.5 ${data.repairsSummary || data.estimatedReturnDate || data.storageMonths ? "text-emerald-500" : "text-amber-500"}`}>{data.repairsSummary || data.estimatedReturnDate || data.storageMonths ? "✓" : "2"}</span>
+                        <div className="flex-1">
+                          <div className="text-sm font-bold text-slate-700">When will they return home?</div>
+                          <div className="text-xs text-slate-500 mt-1">Set a repair type, expected return date, or storage duration.</div>
+
+                          {/* Quick-set repair type */}
+                          <div className="mt-3">
+                            <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Repair type (sets estimated timeline)</div>
+                            <div className="flex flex-wrap gap-1">
+                              {RUSH_REPAIR_TIMELINES.map(r => (
+                                <button key={r.id} type="button" onClick={() => update("repairsSummary", r.label)} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-all ${(data.repairsSummary || "").includes(r.label) ? "border-teal-400 bg-teal-50 text-teal-700" : "border-slate-300 text-slate-500 hover:border-slate-400 bg-white"}`}>{r.label} ({r.days}d)</button>
+                              ))}
+                            </div>
                           </div>
+
+                          {/* Or set explicit date */}
+                          <div className="mt-3 flex items-center gap-3">
+                            <div className="flex-1">
+                              <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Or set expected return date</div>
+                              <input type="date" value={data.estimatedReturnDate || ""} onChange={e => update("estimatedReturnDate", e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs outline-none focus:border-teal-400" />
+                            </div>
+                            <div className="text-[10px] text-slate-400 pt-4">or</div>
+                            <div>
+                              <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Storage months</div>
+                              <input type="number" min="1" max="36" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" className="w-16 rounded-lg border border-slate-300 px-3 py-1.5 text-xs outline-none focus:border-teal-400 text-center" />
+                            </div>
+                          </div>
+
+                          {(data.repairsSummary || data.estimatedReturnDate || data.storageMonths) && (() => {
+                            const ri = RUSH_REPAIR_TIMELINES.find(r => (data.repairsSummary || "").includes(r.label));
+                            const explicit = data.estimatedReturnDate ? new Date(data.estimatedReturnDate) : null;
+                            const fromRepairs = ri ? rushAddDays(new Date(), ri.days) : null;
+                            const fromStorage = data.storageMonths ? rushAddDays(new Date(), parseInt(data.storageMonths) * 30) : null;
+                            const est = explicit || fromRepairs || fromStorage;
+                            return est ? <div className="mt-2 rounded-lg bg-teal-100 border border-teal-200 px-3 py-1.5 text-xs text-teal-800 font-bold">Estimated return: {rushFormatDate(est)}</div> : null;
+                          })()}
                         </div>
                       </div>
                     </div>
-                    <div className="text-xs text-slate-400 pt-2">These questions also enhance the Rush Guide when answered:</div>
+
+                    {/* Enhancing questions */}
+                    <div className="text-xs text-slate-400 text-center pt-1">These questions also enhance the Rush Guide:</div>
                     <div className="flex flex-wrap justify-center gap-1.5">
                       {[
                         { label: "Packout items", done: (data.packoutSummary || []).length > 0 },
@@ -13662,7 +13732,9 @@ export default function App(){
                         { label: "Pets", done: (data.household || []).some((m: any) => m.category === "pet") },
                       ].map(q => <span key={q.label} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${q.done ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 text-slate-400"}`}>{q.done ? "✓" : "○"} {q.label}</span>)}
                     </div>
-                    <button onClick={() => { setRushGuideOpen(false); setInterviewPanelOpen(true); }} className="rounded-xl bg-violet-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-600 mt-2">Open Interview</button>
+                    <div className="text-center">
+                      <button onClick={() => { setRushGuideOpen(false); setInterviewPanelOpen(true); }} className="rounded-xl bg-violet-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-600">Open Full Interview</button>
+                    </div>
                   </div>}
 
                 </div>
