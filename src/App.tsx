@@ -112,8 +112,8 @@ const STYLES = `
   .placeholder-shell {
       border-width: 2px !important;
       border-style: dotted !important;
-      border-color: #f59e0b !important;
-      background: linear-gradient(135deg, #fff7ed 0%, #ffffff 68%);
+      border-color: #fbbf24 !important;
+      background: #fffbeb !important;
   }
   .placeholder-chip {
       border: 1px dotted #f59e0b;
@@ -168,6 +168,7 @@ const STYLES = `
   .compact-mode .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.4rem !important; }
 
   html { scroll-behavior: smooth; }
+  .google-address-search input:focus { outline: none !important; box-shadow: none !important; ring: none !important; }
 `;
 
 // --- UTILS ---
@@ -327,7 +328,7 @@ const addHours = (timeStr = "", hours = 1) => {
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const EVENT_SYSTEM_PREFIXES = ["Conditions:", "Bring:", "Service Offerings:", "Quick Notes:", "Estimate Required:"];
+const EVENT_SYSTEM_PREFIXES = ["Conditions:", "Bring:", "Service Offerings:", "Quick Notes:", "Scope Notes:", "Estimate Required:"];
 const stripEventSystemLines = (text = "") =>
   text
     .split("\n")
@@ -340,6 +341,7 @@ const buildEventSystemEntries = (data, conditionSummary) => {
   if ((data.loadList || []).length) entries.push({ label: "Bring", value: (data.loadList || []).join(", ") });
   if ((data.serviceOfferings || []).length) entries.push({ label: "Service Offerings", value: (data.serviceOfferings || []).join(", ") });
   if ((data.quickInstructionNotes || []).length) entries.push({ label: "Quick Notes", value: (data.quickInstructionNotes || []).join(", ") });
+  if ((data.quickScopeNotes || []).length) entries.push({ label: "Scope Notes", value: (data.quickScopeNotes || []).join(", ") });
   if (data.estimateRequested) {
     let value = data.estimateType || "Yes";
     if (data.estimateRequestedBy) value += ` (Requested By: ${data.estimateRequestedBy})`;
@@ -357,7 +359,7 @@ const buildEventSystemLines = (data, conditionSummary) => {
 };
 
 const composeEventInstructions = (base, data, conditionSummary) => {
-  const cleaned = (base || "").trimEnd();
+  const cleaned = base || "";
   const system = buildEventSystemLines(data, conditionSummary);
   if (!system) return cleaned;
   return cleaned ? `${cleaned}\n${system}` : system;
@@ -433,7 +435,7 @@ const VENDOR_TYPES=["Art","Contents","Moving","Mitigation","Contractor","Consult
 const SALES_REPS=["Dave Fenyo, Sales Rep","Jim Fenyo","Josh Cintron, Sales Rep"];
 const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Textiles","TLI","Expert Stain Removal"];
 const SUGGESTED_GROUPS = ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"];
-const LIVING_STATUS_ADDRESS_TYPES = ["Moving", "Hotel", "Neighbor", "Relative", "Rental", "Other Home"];
+const LIVING_STATUS_ADDRESS_TYPES = ["Moving", "Hotel", "Temp", "Neighbor", "Relative", "Rental", "Other Home"];
 const SUGGESTED_GROUP_HELP = {
   RD: "Rush Delivery (within 1 week)",
   RFD: "Rush Final Delivery (all within 1 week)",
@@ -932,34 +934,30 @@ const EntityPreferencePanel = ({
     if (!entries.length) return null;
     const collapsed = collapsedState[groupKey];
     return (
-      <div key={`instruction-group-${groupKey}`} className="rounded-lg border border-slate-200 bg-white">
+      <div key={`instruction-group-${groupKey}`} className="rounded-lg border border-slate-100 bg-slate-50/50">
         <button
           type="button"
           onClick={() => toggleGroup(groupKey, seenKey ? [seenKey] : [])}
-          className="flex w-full items-center justify-between gap-3 rounded-t-lg border-b border-amber-100 bg-amber-50/60 px-3 py-2 text-left"
+          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50 transition-colors rounded-lg"
         >
-          <span className="text-[13px] font-medium text-slate-700">{title}</span>
-          <span className="text-base font-semibold leading-none text-amber-700">{collapsed ? "+" : "-"}</span>
+          <span className="text-[11px] font-bold text-slate-500">{title}</span>
+          <Chevron open={!collapsed} />
         </button>
         {!collapsed ? (
-          <div className="px-3 py-2">
-            <div className="space-y-1.5">
+          <div className="px-3 py-2 border-t border-slate-100">
+            <div className="space-y-1">
               {entries.map((item) => (
                 item.isPaperwork ? (
                   <div
                     key={`${groupKey}-${item.type}-${item.text}`}
-                    className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-[13px] leading-6 text-amber-900"
+                    className="flex items-start gap-2 text-xs text-slate-700"
                   >
-                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-                    <div>
-                      <span className="font-semibold text-amber-900">Special paperwork required:</span>
-                      <span>{` ${item.text}`}</span>
-                    </div>
+                    <span className="text-amber-600 shrink-0">📄</span>
+                    <span><span className="font-bold text-slate-800">Paperwork:</span> {item.text}</span>
                   </div>
                 ) : (
-                  <div key={`${groupKey}-${item.type}-${item.text}`} className="text-[13px] leading-6 text-slate-700">
-                    <span className="font-semibold text-slate-900">{`${item.type}:`}</span>
-                    <span>{` ${item.text}`}</span>
+                  <div key={`${groupKey}-${item.type}-${item.text}`} className="text-xs text-slate-600">
+                    <span className="font-bold text-slate-700">{item.type}:</span> {item.text}
                   </div>
                 )
               ))}
@@ -1000,7 +998,24 @@ const EntityPreferencePanel = ({
 };
 
 // --- CONSTANTS FOR SELECTIONS ---
-const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil"];
+const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil", "Other"];
+const LOSS_TYPE_COACHING = {
+  "Fire": "Includes smoke, soot, protein fires. If water was used to extinguish, add Water as secondary.",
+  "Water": "Verify coverage for groundwater, flood, and sump pump failure — these are often excluded or capped.",
+  "Mold": "Usually has coverage limits. Mold from covered water damage is typically covered in full under water coverage.",
+  "Dust/Debris": "From construction or remediation (flood cuts, charred material). Common secondary contaminant.",
+  "Puffback": "Furnace/fireplace malfunction pushes soot or oily residue into the home. No flames.",
+  "Oil": "Heating oil spill/mist. Requires dry cleaning only — washing won't work. May need to replace non-dry-cleanable items.",
+  "Other": "Windstorms, fallen trees, etc. — perils that don't fit other categories.",
+  "Non-Restoration": "Not an insurance claim — regular residential or commercial cleaning unrelated to a loss event.",
+};
+const ROLE_COACHING = {
+  "Policyholder": "The person(s) named on the policy who is required to sign our authorization paperwork.",
+  "Primary": "The primary contact handling our portion of the project. May or may not be the policyholder or owner — can be a PA, employee, or family member.",
+  "Referral": "The first person that called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead.",
+  "Expert Stain Removal": "A per-hour charge for removing complicated loss-related stains from items worth saving. Example: removing rust or dye stains from a rug or carpet.",
+  "Find Address": "Use Google to insert a valid, verified address.",
+};
 const NON_RESTORATION_PRIMARY = "Non-Restoration";
 const NON_RESTORATION_SUBTYPES = ["Commercial Cleaning", "Residential Cleaning", "Other"];
 const getNonRestorationSubtype = (orderTypes = []) =>
@@ -1048,10 +1063,10 @@ const selectNonRestorationSubtypeSelection = (orderTypes = [], subtype = "") => 
 
 const CAUSES = {
   "Fire": ["Battery", "Candle", "Cooking", "Electrical", "Explosion", "Fireplace", "Flammables", "Heating", "Neighbor", "Protein", "Smoking", "Wildfire"],
-  "Water": ["Roof Leak", "Window/Door Leak", "Frozen Pipes", "Pipe Burst", "Overflow", "Storm", "Sprinkler", "Firefighting"],
+  "Water": ["Roof Leak", "Window/Door Leak", "Frozen Pipes", "Pipe Burst", "Overflow", "Storm", "Sprinkler", "Firefighting", "Groundwater⚠", "Flood⚠", "Sump Pump Failure⚠"],
   "Mold": ["Spores Only", "Visible Mold", "Moldy Odor"],
   "Dust/Debris": ["Mitigation", "Construction", "Fiberglass"],
-  "Puffback": ["Oily Odor"],
+  "Puffback": ["Oily Film", "Oily Odor", "Oily Soot"],
   "Non-Restoration Cleaning": ["Inhome Cleaning", "Pickup", "Stain Removal", "Furniture Cleaning", "Drapery Take-down"],
   "Oil": ["Spill", "Furnace"]
 };
@@ -1314,14 +1329,14 @@ const SDS_ICON_MAP = {
   "Photo Inventory": "/Photo_Inventory.png",
   "Unpacking": "/Gemini_Unpacking.png",
   "Anti-Microbial": "/Gemini_Anti_Microbial.png",
-  "Drying Needed": "/Drying.jpg",
-  "Drying": "/Drying.jpg",
+  "Drying Needed": "/Drying.png",
+  "Drying": "/Drying.png",
   "Disposal": "/Gemini_Generated_Image_tydpketydpketydp.png",
   "Fiber Protection": "/Gemini_Fiber_Protection.png",
   "Moving": "/Moving.png",
   "Rolling Racks": "/Rolling_Racks.png",
   "Total Loss Inventory": "/Total_Loss_Inventory.png",
-  "Content Manipulation": "/Content_Manipulation.jpg",
+  "Content Manipulation": "/Content_Manipulation.png",
   "High Density": "/High_Density_Parking.png",
   "Expert Stain Removal": "/Expert_Stain_Removal.png",
 };
@@ -1370,11 +1385,11 @@ const summarizeAddress = (addr = {}) => {
 };
 
 const TIME_SLOTS = [];
-for(let i=8; i<=18; i++) {
-    const hour = i > 12 ? i - 12 : i;
+for(let i=6; i<=20; i++) {
+    const hour = i > 12 ? i - 12 : (i === 0 ? 12 : i);
     const ampm = i >= 12 ? 'PM' : 'AM';
     TIME_SLOTS.push(`${hour}:00 ${ampm}`);
-    TIME_SLOTS.push(`${hour}:30 ${ampm}`);
+    if (i < 20) TIME_SLOTS.push(`${hour}:30 ${ampm}`);
 }
 
 const QUALITY_CODES = ["Q1", "Q2", "Q3", "Q5"];
@@ -1473,9 +1488,10 @@ function initAddress(overrides={}){
 
 const isAddressPlaceholder = (addr = {}) => {
   if (isPlaceholderFlagActive(addr?.placeholder)) return true;
-  const street = (addr?.street || "").trim().toUpperCase();
+  const street = (addr?.street || "").trim();
   const type = (addr?.type || "").trim().toLowerCase();
-  return street === "TBD" || type.includes("placeholder");
+  if (!street) return true;
+  return street.toUpperCase() === "TBD" || type.includes("placeholder");
 };
 
 const entryContactList = (entry = {}) => {
@@ -1583,6 +1599,15 @@ function initLossSeverity(overrides = {}) {
         "Flood Cut Debris": 0
       }
     },
+    puffback: {
+      enabled: false,
+      values: {
+        "Oil": 0,
+        "Soot": 0,
+        "Odor": 0,
+        "Oily Film": 0
+      }
+    },
     ...overrides
   };
 }
@@ -1592,6 +1617,195 @@ const stringListMatches = (a = [], b = []) => {
   if (a.length !== b.length) return false;
   const right = new Set(b.map((item) => `${item}`));
   return a.every((item) => right.has(`${item}`));
+};
+
+// --- FIELD CONFIGURATION ---
+const FIELD_CONFIG_SECTIONS = [
+  { id: "order", label: "Order" },
+  { id: "source", label: "Source" },
+  { id: "interview", label: "Interview" },
+  { id: "customer", label: "Customer" },
+  { id: "address", label: "Address" },
+  { id: "billing", label: "Billing & Insurance" },
+  { id: "schedule", label: "Schedule" },
+  { id: "codes", label: "Codes & Processing" },
+];
+
+const DEFAULT_FIELD_CONFIG = {
+  // --- Order ---
+  orderName:              { label: "Order Name",           section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, coaching: "Auto-generated from LastName-TownST. Lock to prevent changes." },
+  orderTypes:             { label: "Order Type",           section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, checkFn: "hasPrimaryOrderTypeDecision", coaching: "Pick the primary peril — what happened first." },
+  nonRestorationSubtype:  { label: "Non-Restoration Type", section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "primaryLossType", equals: "Non-Restoration" }, checkFn: "hasRequiredNonRestorationSubtype" },
+  leadSourceCategory:     { label: "Lead Source",          section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true },
+  referringCompany:       { label: "Referring Company",    section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "leadSourceCategory", equals: "Referral" } },
+  referrer:               { label: "Referrer",             section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "leadSourceCategory", equals: "Referral" } },
+  leadSourceDetail:       { label: "Lead Source Detail",   section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "leadSourceCategory", oneOf: ["Marketing", "Internal"] } },
+  moldCoverageConfirm:    { label: "Mold Coverage",        section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "orderTypes", includes: "Mold" } },
+
+  // --- Customer ---
+  custFirst:  { label: "Customer First Name", section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].first" },
+  custLast:   { label: "Customer Last Name",  section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].last" },
+  custPhone:  { label: "Customer Phone",      section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].phone" },
+  custEmail:  { label: "Customer Email",      section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].email" },
+
+  // --- Address ---
+  addrStreet: { label: "Street Address", section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].street" },
+  addrCity:   { label: "City",           section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].city" },
+  addrState:  { label: "State",          section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].state" },
+  addrZip:    { label: "Zip",            section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].zip" },
+  addrLat:    { label: "Latitude",       section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].lat" },
+  addrLng:    { label: "Longitude",      section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].lng" },
+  rentCoverageLimit: { label: "Rent Coverage", section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "rentOrOwn", equals: "Rent" } },
+
+  // --- Billing & Insurance ---
+  billingPayer:      { label: "Bill To (Payer)",   section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "always", visible: true },
+  pricePlatform:     { label: "Pricing Platform",  section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
+  priceList:         { label: "Price List",         section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
+  multiplier:        { label: "Price Multiplier",   section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
+  estimateRequested: { label: "Estimate Requested", section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
+
+  // --- Interview Questions ---
+  damageWasWet:              { label: "Still Wet?",                section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Urgent — untreated wet items develop mold." },
+  damageMoldMildew:          { label: "Visible Mold?",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Ask about respiratory issues. Our team needs PPE." },
+  structuralElectricDamage:  { label: "Structural Damage?",       section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
+  noLights:                  { label: "No Electricity?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Bring portable lighting." },
+  noHeat:                    { label: "No Heat?",                 section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
+  boardedUp:                 { label: "Boarded Up?",              section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Confirm access — who has the key or code?" },
+  repairsSummary:            { label: "Repairs",                  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
+  livingStatus:              { label: "Living Situation",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "single" },
+  processType:               { label: "Delivery Destination",     section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "single" },
+  packoutSummary:            { label: "What Are We Picking Up?",  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
+  loadList:                  { label: "What To Bring",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  sdsConsiderations:         { label: "Special Considerations",   section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  familyMedicalIssues:       { label: "Medical Issues?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  soapFragAllergies:         { label: "Soap/Fragrance Allergies?",section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  selfCleaning:              { label: "Self-Cleaning?",           section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+  useDryCleaner:             { label: "Use Dry Cleaner?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
+  howDryLaundry:             { label: "How Dry Laundry?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
+  storageNeeded:             { label: "Storage Needed?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
+  suggestedGroups:           { label: "Suggested Groups",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
+
+  // --- Codes (post-inspection) ---
+  interview:     { label: "Interview Section",  section: "sec1", category: "codes", requiredInAudit: true, requiredAtStatus: "Pickup Complete", visible: true, checkFn: "interviewCompleted" },
+  codes:         { label: "Codes Section",       section: "sec1", category: "codes", requiredInAudit: true, requiredAtStatus: "Pickup Complete", visible: true, checkFn: "codesCompleted" },
+};
+
+const DEFAULT_BLOCKER_RULES = [
+  { id: "auth",         enabled: true, trigger: "No authorization on file",              blockerText: "Won't Sign Authorization" },
+  { id: "custEstimate", enabled: true, trigger: "Customer requests estimate before work", blockerText: "Customer Wants Estimate" },
+  { id: "adjEstimate",  enabled: true, trigger: "Adjuster requests estimate before work", blockerText: "Adjuster Wants Estimate" },
+  { id: "specialDocs",  enabled: true, trigger: "Special paperwork required by carrier",  blockerText: "Special paperwork required" },
+  { id: "unknownIns",   enabled: true, trigger: "Insurance company set to Not Yet Known", blockerText: "Insurance Company Not Yet Known" },
+];
+
+// --- INTERVIEW ANSWER ACTIONS ---
+const DEFAULT_INTERVIEW_ACTIONS = {
+  // Q1: Conditions
+  "Still Wet":          { coaching: "We will need to get out right away, separate the wet items by color and process them immediately using an anti-microbial to prevent mold growth.", actions: [{ type: "loadList", value: "Plastic Bags" }, { type: "handlingCode", value: "Wet" }] },
+  "Visible Mold":       { coaching: "Please don't disturb the mold and consider wearing safety gear. If your Insurance is considering this a 'Mold Claim' it may count against your mold limit.", actions: [{ type: "loadList", value: "Tyvek" }, { type: "handlingCode", value: "PPE" }, { type: "suggestOrderType", value: "Mold" }, { type: "openMoldLimit" }] },
+  "Structural Damage":  { coaching: "Please stay out of any unstable areas. Has there been a safety assessment?", actions: [{ type: "loadList", value: "Hard Hats" }, { type: "sdsObservation", value: "Structural Damage" }, { type: "blocker", value: "Safety Assessment needed" }, { type: "suggestGroup", value: "LTD" }] },
+  "No Electricity":     { coaching: "No problem, our crew will bring portable lights. Will you be able to pull your Rush items?", actions: [{ type: "loadList", value: "Lights" }] },
+  "No Heat":            { coaching: "", actions: [{ type: "loadList", value: "Heater" }] },
+  "Boarded Up":         { coaching: "Please confirm safe entry and available access.", actions: [{ type: "loadList", value: "Lights" }] },
+
+  // Q2: Repairs
+  "Just Cleaning":              { coaching: "Since it's just a cleaning, we should plan the essentials for a quick turnaround.", actions: [{ type: "eventInstruction", value: "Standard pack-out/pack-back" }, { type: "suggestGroup", value: "RFD" }] },
+  "Paint":                      { coaching: "We usually require waiting 48 hours after painting is finished before delivering to avoid odors or items sticking to the walls.", actions: [{ type: "eventInstruction", value: "Hold delivery until paint cures" }, { type: "suggestGroup", value: "STD" }] },
+  "Refinish Floors":            { coaching: "We will strictly follow your contractor's advice on floor curing times before we bring heavy furniture back in.", actions: [{ type: "loadList", value: "Floor Protection" }, { type: "suggestGroup", value: "STD" }] },
+  "Replace Floors":             { coaching: "We'll make sure to bring extra floor protection during delivery to keep your brand new floors pristine.", actions: [{ type: "eventInstruction", value: "Floor replacement" }, { type: "loadList", value: "Floor Protection" }, { type: "suggestGroup", value: "LTD" }] },
+  "Cosmetic Damage":            { coaching: "Once the minor repairs are wrapped up, just give us a call and we'll arrange your delivery.", actions: [{ type: "eventInstruction", value: "Minor repairs" }, { type: "suggestGroup", value: "LTD" }] },
+  "Major Structural Damage":    { coaching: "We can prep your belongings for safe, long-term storage in our facility.", actions: [{ type: "suggestGroup", value: "LTD" }, { type: "blocker", value: "Timeline TBD" }] },
+  "Complete Rebuild":           { coaching: "We can prep your belongings for safe, long-term storage in our facility.", actions: [{ type: "suggestGroup", value: "LTFD" }] },
+
+  // Q3: Living Status
+  "Staying in home":    { coaching: "We'll try to work as quietly as possible and expedite your household essentials like bedding, shower curtains and throw rugs. We also have temporary shades if you need privacy on the windows.", actions: [{ type: "eventInstruction", value: "Customer on-site" }] },
+  "Hotel":              { coaching: "We can deliver your rush items straight to the hotel.", actions: [{ type: "addressPlaceholder", value: "Hotel" }] },
+  "Temp":               { coaching: "We can deliver future seasonal items to this address.", actions: [{ type: "addressPlaceholder", value: "Temp" }] },
+  "Moving":             { coaching: "We'll update your file so your final delivery goes smoothly to your new permanent address. Will you be moving locally or will we need to coordinate a national move?", actions: [{ type: "addressPlaceholder", value: "Moving" }, { type: "blocker", value: "Final Delivery Date needed" }] },
+
+  // Q4: Delivery
+  "Deliver ASAP":           { coaching: "We will prioritize your most important items to get your house feeling like home again as fast as possible.", actions: [{ type: "eventInstruction", value: "Rush processing for essentials" }] },
+  "Deliver to Temp":        { coaching: "We'll coordinate with you to deliver exactly what you need to your temporary residence.", actions: [{ type: "eventInstruction", value: "Deliver to temporary address" }] },
+  "Deliver to New Home":    { coaching: "We will hold onto everything safely and deliver it straight to your new place when you are ready to move in.", actions: [{ type: "eventInstruction", value: "Deliver to new address" }] },
+  "Long-Term Storage":      { coaching: "We can provide safe, secure, long term storage until your home is ready.", actions: [{ type: "eventInstruction", value: "Hold for home completion" }] },
+
+  // Q5: Packout
+  "Rugs":               { coaching: "Ask about size, weight and heavy furniture that may need to be moved. We may need extra manpower.", actions: [] },
+  "Window Treatments":  { coaching: "Our team will carefully take down your drapes and blinds for specialized cleaning. Will we need any special ladders or equipment?", actions: [] },
+  "Clothing":           { coaching: "We'll kindly ask that you prioritize your rush items.", actions: [] },
+  "Bedding":            { coaching: "", actions: [] },
+  "Furniture":          { coaching: "We'll bring plenty of moving blankets and padding to protect the corners and surfaces of your furniture.", actions: [{ type: "loadList", value: "Blankets" }, { type: "loadList", value: "Dollies" }, { type: "loadList", value: "Extra Manpower" }] },
+  "Art":                { coaching: "We'll use specialized picture boxes and packing paper to keep your artwork completely safe.", actions: [{ type: "loadList", value: "Art Boxes" }] },
+  "Electronics":        { coaching: "Consider any rush electronics we may need.", actions: [{ type: "loadList", value: "TV Boxes" }, { type: "loadList", value: "Blankets" }] },
+  "Hardware":           { coaching: "", actions: [] },
+  "Appliances":         { coaching: "We will send heavy-duty dollies and extra hands to safely move your large appliances.", actions: [{ type: "loadList", value: "Dollies" }, { type: "loadList", value: "Extra Manpower" }] },
+
+  // Q7: Considerations
+  "Elderly":                { coaching: "", actions: [{ type: "sdsObservation", value: "Elderly resident" }, { type: "contactNote", value: "Elderly" }] },
+  "Pregnancy":              { coaching: "We will use baby-safe, hypoallergenic cleaning methods.", actions: [{ type: "handlingCode", value: "Det" }, { type: "contactNote", value: "Pregnancy" }] },
+  "Baby":                   { coaching: "We will use baby-safe, hypoallergenic cleaning methods and can rush essential baby items like cribs, strollers, and clothing.", actions: [{ type: "handlingCode", value: "Det" }, { type: "contactNote", value: "Baby in household" }] },
+  "Hearing Impaired":       { coaching: "", actions: [{ type: "contactNote", value: "Hearing Impaired" }] },
+  "Spanish Only":           { coaching: "", actions: [{ type: "eventInstruction", value: "Spanish speaking crew required" }, { type: "contactNote", value: "Spanish Only" }] },
+  "Respiratory Concerns":   { coaching: "We will strictly use mild, fragrance-free cleaning agents to protect your respiratory health.", actions: [{ type: "handlingCode", value: "Det" }, { type: "contactNote", value: "Respiratory Concerns" }] },
+  "Premium Brands":         { coaching: "We will route your high-end designer pieces for delicate hand-cleaning.", actions: [{ type: "sdsObservation", value: "Premium Brands" }] },
+  "Skin Sensitivity":       { coaching: "We will process your garments using 100% dye-free and fragrance-free detergents.", actions: [{ type: "handlingCode", value: "Det" }] },
+  "Pets":                   { coaching: "Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.", actions: [{ type: "sdsObservation", value: "Pets on site" }, { type: "eventInstruction", value: "Keep doors closed - pets on site" }] },
+};
+
+// --- RUSH GUIDE ---
+const RUSH_REPAIR_TIMELINES = [
+  { id: 'cleaning', label: 'Just Cleaning', days: 7, group: 'RFD' },
+  { id: 'paint', label: 'Painting', days: 21, group: 'STD' },
+  { id: 'refinish_floors', label: 'Refinishing Floors', days: 28, group: 'STD' },
+  { id: 'replace_floors', label: 'Replacing Floors', days: 60, group: 'LTD' },
+  { id: 'cosmetic', label: 'Cosmetic Repairs', days: 90, group: 'LTD' },
+  { id: 'structural', label: 'Major Structural Damage', days: 365, group: 'LTD' },
+  { id: 'rebuild', label: 'Complete Rebuild', days: 480, group: 'LTFD' },
+];
+
+const RUSH_LIVING_SITUATIONS = [
+  { id: 'home', label: 'Staying in my home', desc: 'Living on-site during repairs' },
+  { id: 'hotel', label: 'Staying in a hotel', desc: 'Temporary hotel stay' },
+  { id: 'temp', label: 'Temporary rental', desc: 'Furnished apartment or rental home' },
+  { id: 'moving', label: 'Moving to a new home', desc: 'Relocating permanently' },
+];
+
+const RUSH_EVENT_TYPES = [
+  { id: 'vacation_beach', label: 'Warm Weather / Beach Vacation' },
+  { id: 'vacation_ski', label: 'Cold Weather / Ski Trip' },
+  { id: 'wedding', label: 'Wedding / Formal Event' },
+  { id: 'business', label: 'Business Trip / Conference' },
+  { id: 'sports', label: 'Sports Tournament' },
+];
+
+const RUSH_INTERESTS = [
+  { id: 'school', label: 'School & Kids Sports', desc: 'Backpacks, uniforms, gear' },
+  { id: 'summer_activities', label: 'Summer & Swim', desc: 'Swimwear, beach bags, sun hats' },
+  { id: 'winter_sports', label: 'Winter & Snow', desc: 'Skiing, heavy outerwear' },
+  { id: 'halloween', label: 'Halloween', desc: 'Costumes, decorations' },
+  { id: 'thanksgiving', label: 'Thanksgiving', desc: 'Holiday linens, servingware' },
+  { id: 'christmas', label: 'Christmas / Hanukkah', desc: 'Holiday clothing, decorations, gifts' },
+  { id: 'easter', label: 'Easter / Passover', desc: 'Spring formal, holiday items' },
+  { id: 'religious', label: 'Religious Services', desc: 'Formal wear, prayer items' },
+  { id: 'graduation', label: 'Graduation', desc: 'Caps, gowns, formal attire' },
+  { id: 'workout', label: 'Gym & Fitness', desc: 'Workout clothes, equipment' },
+  { id: 'work_from_home', label: 'Work from Home', desc: 'Office supplies, desk items' },
+];
+
+const RUSH_SEASONS = {
+  SPRING: { name: 'Spring', months: [2, 3, 4] },
+  SUMMER: { name: 'Summer', months: [5, 6, 7] },
+  FALL: { name: 'Fall', months: [8, 9, 10] },
+  WINTER: { name: 'Winter', months: [11, 0, 1] },
+};
+
+const rushAddDays = (date, days) => { const r = new Date(date); r.setDate(r.getDate() + days); return r; };
+const rushFormatDate = (d) => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+const rushGetSeasons = (start, end) => {
+  const found = new Set();
+  let cur = new Date(start);
+  while (cur <= end) { const m = cur.getMonth(); Object.values(RUSH_SEASONS).forEach(s => { if (s.months.includes(m)) found.add(s); }); cur.setMonth(cur.getMonth() + 1); }
+  return Array.from(found);
 };
 
 const DEFAULT_FORM={
@@ -1610,6 +1824,8 @@ const DEFAULT_FORM={
   referringCompany:"", referrer:"",
   
   orderTypes: [],
+  primaryLossType: "",
+  secondaryContaminants: [],
   lossDetails: {}, 
   
   livingStatus: "", 
@@ -1638,6 +1854,9 @@ const DEFAULT_FORM={
   serviceOfferings: [],
   groupAddressLinks: {},
   lossSeverity: initLossSeverity(),
+  interviewLog: {},
+  upcomingEvents: [],
+  rushInterests: [],
   vendors:[],
   vendorDetails:{},
   showReferralVendor: true,
@@ -1667,7 +1886,7 @@ const DEFAULT_FORM={
   eventFirm: false,
   eventUrgent: false,
   eventHandledBySalesRep: false,
-  eventCustomerContacted: false,
+  eventCustomerContacted: "office",
   eventBillToContacted: false,
   scheduleStatus: "",
   reminderEnabled: false,
@@ -1683,6 +1902,8 @@ const DEFAULT_FORM={
   sdsProjectFloors: [],
   sdsApartmentType: "",
   sdsPrebagged: "",
+  sdsPhotos: [],
+  sdsCoverPhoto: null,
   sdsInitialInstructions: [],
   sdsInstructionAgreement: null,
   sdsDisagreementNote: "",
@@ -1709,8 +1930,108 @@ const DEFAULT_FORM={
 // --- UI PRIMITIVES ---
 const Chevron = ({open}) => <span className={`text-slate-400 transition-transform duration-200 ${open?"rotate-90":""}`}>›</span>;
 
-const Field = ({label,children,subtle,missing, className, action, smart, id}) => (
-  <div id={id} className={`flex flex-col gap-1.5 ${className||""}`}>
+const buildNarrativeProse = (narrative = [], data = {}) => {
+  const g = {};
+  narrative.forEach(l => { if (!g[l.section]) g[l.section] = []; g[l.section].push(l.text); });
+  const p = [];
+
+  // Opening — loss description
+  if (g["Loss"]) {
+    p.push(`This is a ${g["Loss"][0]}`);
+  }
+
+  // Customer + Address
+  const primary = (data.customers || []).find(c => c.isPrimary) || (data.customers || [])[0];
+  const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0];
+  if (primary && (primary.first || primary.last)) {
+    const name = [primary.first, primary.last].filter(Boolean).join(" ");
+    const role = primary.policyHolder ? "The policyholder" : "The customer";
+    let custLine = `${role} is ${name}`;
+    if (primaryAddr && primaryAddr.street) custLine += ` at ${summarizeAddress(primaryAddr)}`;
+    if (primary.phone) custLine += `. They can be reached at ${primary.phone}`;
+    if (primary.email) custLine += ` (${primary.email})`;
+    custLine += ".";
+    p.push(custLine);
+  }
+  // Additional contacts
+  const others = (data.customers || []).filter((c, i) => i > 0 && (c.first || c.last));
+  others.forEach(c => {
+    const name = [c.first, c.last].filter(Boolean).join(" ");
+    const role = c.type || "additional contact";
+    let line = `${name} is ${role === "Husband" || role === "Wife" ? `the ${role.toLowerCase()}` : `an ${role.toLowerCase()}`}`;
+    if (c.email) line += ` (${c.email})`;
+    if (c.phone) line += `, reachable at ${c.phone}`;
+    p.push(line + ".");
+  });
+
+  // Referral + Insurance
+  const refParts = [];
+  if (g["Referral"]) refParts.push(`This order was referred by ${g["Referral"][0]}`);
+  if (g["Sales Rep"]) refParts.push(`assigned to account manager ${g["Sales Rep"][0]}`);
+  if (refParts.length) p.push(refParts.join(", ") + ".");
+
+  if (g["Insurance"]) {
+    let ins = `The insurance carrier is ${g["Insurance"][0]}`;
+    if (g["Claim #"]) ins += `, claim #${g["Claim #"][0]}`;
+    p.push(ins + ".");
+  }
+
+  // Other companies
+  (data.vendors || []).forEach(v => {
+    if (v.company && v.type && !["Insurance"].includes(v.type)) {
+      let line = `${v.company} is the ${v.type.toLowerCase()}`;
+      if (v.contact) line += ` (contact: ${v.contact})`;
+      p.push(line + ".");
+    }
+  });
+
+  // Our services
+  if (g["Services"]) p.push(`Our scope of work includes ${g["Services"][0].toLowerCase()}.`);
+
+  // Conditions
+  if (g["Conditions"]) p.push(`At the home, the site currently has ${g["Conditions"][0]}`);
+
+  // Customer care
+  const careParts = [];
+  if (g["Considerations"]) careParts.push(g["Considerations"][0].toLowerCase());
+  if (g["Pets"]) careParts.push(`has a pet (${g["Pets"][0]})`);
+  if (g["Laundry"]) careParts.push(g["Laundry"][0].toLowerCase());
+  if (careParts.length) p.push(`The customer is ${careParts.join(", ")}.`);
+
+  // Living + Storage
+  if (g["Living"]) {
+    let living = `The customer is currently ${g["Living"][0] === "Staying in home" ? "staying in the home" : g["Living"][0] === "Hotel" ? "staying in a hotel" : g["Living"][0] === "Temp" ? "in a temporary home" : g["Living"][0] === "Moving" ? "permanently relocating" : "in temporary housing"}`;
+    if (g["Storage"]) living += ` and will need ${g["Storage"][0].toLowerCase()}`;
+    p.push(living + ".");
+  }
+
+  // Structural repairs (not our work)
+  if (g["Repairs"]) p.push(`Structural repairs to the home include ${g["Repairs"][0].toLowerCase()} (performed by the contractor, not our team).`);
+
+  // Our packout
+  if (g["Pack-out"]) p.push(`We will be picking up ${g["Pack-out"][0].toLowerCase()}.`);
+
+  // Schedule
+  if (g["Scheduled"]) p.push(`The next appointment is ${g["Scheduled"][0]}.`);
+
+  // Event Instructions
+  if (g["Event Instructions"]) p.push(`Event Instructions for next appointment: ${g["Event Instructions"][0]}`);
+
+  return p;
+};
+
+const CoachingTip = ({ tipKey, dismissed, onDismiss, children, className }) => {
+  if (dismissed.has(tipKey)) return null;
+  return (
+    <div className={`rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 ${className || ""}`}>
+      <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDismiss(tipKey); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
+      {children}
+    </div>
+  );
+};
+
+const Field = ({label,children,subtle,missing, className, action, smart, id, noeField}) => (
+  <div id={id} className={`flex flex-col gap-1.5 ${className||""}`} data-noe-field={noeField || undefined} data-noe-label={label || undefined}>
     <div className="flex items-center justify-between">
         <label className={`flex items-center text-sm font-semibold tracking-wide ${subtle?"text-slate-500":"text-slate-700"}`}>
         {label}
@@ -1853,9 +2174,12 @@ const DatePicker = ({ value, onChange, closeSignal }) => {
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
 
+  const todayIso = getNowDateIso();
+
   const pick = (d) => {
     if (!d) return;
     const iso = new Date(year, month, d).toISOString().slice(0, 10);
+    if (iso < todayIso) return;
     onChange(iso);
     setOpen(false);
   };
@@ -1868,6 +2192,8 @@ const DatePicker = ({ value, onChange, closeSignal }) => {
         onFocus={() => setOpen(true)}
         onBlur={() => {
           const normalized = normalizeDateInput(value);
+          const today = getNowDateIso();
+          if (!normalized || normalized < today) { onChange(today); return; }
           if (normalized !== value) onChange(normalized);
         }}
         onKeyDown={(e) => {
@@ -1918,13 +2244,26 @@ const DatePicker = ({ value, onChange, closeSignal }) => {
           </div>
           <div className="grid grid-cols-7 gap-2">
             {days.map((d, idx) => {
-              const isSelected = normalizeDateInput(value) === new Date(year, month, d || 1).toISOString().slice(0, 10);
+              const dateIso = d ? new Date(year, month, d).toISOString().slice(0, 10) : "";
+              const isSelected = d ? normalizeDateInput(value) === dateIso : false;
+              const isToday = d ? dateIso === todayIso : false;
+              const isPast = d ? dateIso < todayIso : false;
+              const dayOfWeek = d ? new Date(year, month, d).getDay() : -1;
+              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
               return (
                 <button
                   key={`${d}-${idx}`}
                   onClick={() => pick(d)}
-                  className={`h-10 w-10 rounded-full text-sm ${!d ? "text-transparent" : isSelected ? "bg-sky-500 text-white" : "text-slate-700 hover:bg-sky-50"}`}
-                  disabled={!d}
+                  className={`h-10 w-10 rounded-full text-sm relative ${
+                    !d ? "text-transparent" :
+                    isPast ? "text-slate-300 cursor-not-allowed" :
+                    isSelected ? "bg-sky-500 text-white font-bold" :
+                    isToday ? "bg-sky-50 text-sky-700 font-bold ring-2 ring-sky-300" :
+                    isWeekend ? "text-slate-500 bg-slate-50 hover:bg-sky-50" :
+                    "text-slate-700 hover:bg-sky-50"
+                  }`}
+                  disabled={!d || isPast}
+                  title={d ? new Date(year, month, d).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : ""}
                 >
                   {d || "."}
                 </button>
@@ -2016,7 +2355,7 @@ const normalizeOption = (opt) => {
   return { label, value, type: opt?.type || "generic" };
 };
 
-const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, className, onKeyDown, onBlur, clearOnCommit, inputRef, onEmptyEnter, maxResults = 8, uppercase = false, menuClassName = "", ...props }) => {
+const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, className, onKeyDown, onBlur, clearOnCommit, inputRef, onEmptyEnter, onAddNew, maxResults = 8, uppercase = false, menuClassName = "", ...props }) => {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [query, setQuery] = useState(value || "");
@@ -2109,7 +2448,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
         {...props}
       />
       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-300">▾</span>
-      {open && filtered.length > 0 && (
+      {open && (filtered.length > 0 || (query.trim() && onAddNew)) && (
         <div ref={listRef} className={`absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg overflow-auto ${menuClassName || "max-h-60"}`}>
           {filtered.map((opt, idx) => (
             <button
@@ -2121,11 +2460,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
               className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between ${
                 idx === highlight
                   ? "bg-sky-50 text-sky-700"
-                  : opt.type === "company"
-                    ? "text-emerald-700 hover:bg-slate-50"
-                    : opt.type === "contact"
-                      ? "text-sky-700 hover:bg-slate-50"
-                      : "text-slate-700 hover:bg-slate-50"
+                  : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               <span>{opt.label}</span>
@@ -2134,15 +2469,26 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
               )}
             </button>
           ))}
+          {query.trim() && onAddNew && filtered.length === 0 && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onAddNew(query.trim()); setQuery(""); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-50 border-t border-slate-100 flex items-center gap-2"
+            >
+              <span className="text-base">+</span>
+              <span>Add "{query.trim()}" as new</span>
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 };
 
-const Toast = ({message,onClose})=>{ 
-  useEffect(()=>{ const id=setTimeout(onClose,2600); return ()=>clearTimeout(id);},[onClose]); 
-  return(<div className="fade-in fixed bottom-28 left-1/2 z-[90] -translate-x-1/2 rounded-full bg-slate-800/90 backdrop-blur px-6 py-2.5 text-sm font-medium text-white shadow-xl shadow-slate-500/20">{message}</div>) 
+const Toast = ({message,onClose,panelOffset=0})=>{
+  useEffect(()=>{ const id=setTimeout(onClose,3500); return ()=>clearTimeout(id);},[onClose]);
+  return(<div className="fade-in fixed bottom-28 z-[90] rounded-2xl bg-slate-800/95 backdrop-blur px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2" style={{ left: '0', right: `${panelOffset}px`, margin: '0 auto', width: 'fit-content' }}><span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>{message}</div>)
 };
 
 const Switch = ({ checked, onChange }) => (
@@ -2154,14 +2500,14 @@ const Switch = ({ checked, onChange }) => (
     </button>
 );
 
-const SmartNotification = ({ message, onReject, onClose }) => {
+const SmartNotification = ({ message, onReject, onClose, panelOffset = 0 }) => {
     useEffect(() => {
         const timer = setTimeout(onClose, 4000);
         return () => clearTimeout(timer);
     }, [onClose]);
 
     return (
-        <div className="fixed bottom-24 left-1/2 z-[90] -translate-x-1/2 flex items-center gap-4 rounded-lg bg-slate-900 px-4 py-3 text-white shadow-2xl slide-up border border-slate-700">
+        <div className="fixed bottom-24 z-[90] flex items-center gap-4 rounded-lg bg-slate-900 px-4 py-3 text-white shadow-2xl slide-up border border-slate-700" style={{ left: '0', right: `${panelOffset}px`, margin: '0 auto', width: 'fit-content' }}>
             <div className="flex items-center gap-3">
                 <div className="text-orange-500 font-bold text-lg">⚡</div>
                 <span className="text-sm font-medium">{message}</span>
@@ -2174,15 +2520,15 @@ const SmartNotification = ({ message, onReject, onClose }) => {
 
 const pillBase = "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-all duration-200 cursor-pointer select-none";
 const pillInactive = "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50";
-const pillActive = "bg-sky-50 border-sky-500 text-sky-700 font-bold shadow-sm animate-outline-fade-purple"; 
+const pillActive = "bg-sky-50 border-sky-300 text-sky-700 font-bold shadow-sm"; 
 
-const ToggleGroup = ({ options, value, onChange }) => (
-  <div className="flex flex-wrap gap-2">
+const ToggleGroup = ({ options, value, onChange, noeField }) => (
+  <div className="flex flex-wrap gap-2" data-noe-field={noeField || undefined} data-noe-value={value || undefined}>
     {options.map(opt => {
        const label = typeof opt === "string" ? opt : opt.label;
        const title = typeof opt === "string" ? undefined : opt.title;
        const isActive = value === label;
-       return (<button key={label} type="button" title={title} aria-pressed={isActive} onClick={() => onChange(isActive ? "" : label)} className={isActive ? `${pillBase} ${pillActive}` : `${pillBase} ${pillInactive}`}>
+       return (<button key={label} type="button" title={title} aria-pressed={isActive} data-noe-option={label} data-noe-selected={isActive} onClick={() => onChange(isActive ? "" : label)} className={isActive ? `${pillBase} ${pillActive}` : `${pillBase} ${pillInactive}`}>
          {isActive && <span className="block h-1.5 w-1.5 rounded-full bg-sky-500 mr-2"></span>}
          {label}
        </button>)
@@ -2519,10 +2865,27 @@ const CompanyRecord = ({ company, contact, contacts, roles = [], className, edit
   );
 };
 
-const ToggleMulti = ({ label, checked, onChange, className, colorClass, title, showDot = true }) => {
+class ScopeBoundary extends React.Component<{onBack: () => void; children: React.ReactNode}, {error: Error | null}> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-8">
+        <div className="max-w-lg rounded-2xl border border-rose-200 bg-white p-6 shadow-lg space-y-4">
+          <div className="text-xl font-bold text-rose-700">Scope failed to load</div>
+          <pre className="text-xs text-rose-600 bg-rose-50 rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap">{this.state.error.message}{"\n"}{this.state.error.stack}</pre>
+          <button onClick={() => { this.setState({ error: null }); this.props.onBack(); }} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-white hover:bg-sky-600">← Back to Order</button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
+const ToggleMulti = ({ label, checked, onChange, className, colorClass, title, showDot = true, noeField }) => {
     const activeClass = colorClass || pillActive;
     return (
-        <button type="button" onClick={onChange} title={title} aria-pressed={checked} className={(checked ? `${pillBase} ${activeClass}` : `${pillBase} ${pillInactive}`) + " " + (className||"")}> 
+        <button type="button" onClick={onChange} title={title} aria-pressed={checked} data-noe-option={label} data-noe-selected={checked} data-noe-field={noeField || undefined} className={(checked ? `${pillBase} ${activeClass}` : `${pillBase} ${pillInactive}`) + " " + (className||"")}>
             {checked && showDot && <span className="block h-1.5 w-1.5 rounded-full bg-sky-500 mr-2"></span>}
             {label}
         </button>
@@ -2532,7 +2895,7 @@ const ToggleMulti = ({ label, checked, onChange, className, colorClass, title, s
 const SubSection = ({ id, title, open, onToggle, children, compact, className, action }) => {
   const handleToggle = () => onToggle?.(!open);
   return (
-    <div id={id} className={`rounded-xl border border-slate-200 bg-white ${compact ? "p-3" : "p-5"} shadow-sm scroll-mt-28 ${className || ""}`}>
+    <div id={id} data-noe-subsection={id || undefined} data-noe-open={open} className={`rounded-xl border border-slate-200 bg-white ${compact ? "p-3" : "p-5"} shadow-sm scroll-mt-28 ${className || ""}`}>
       <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={handleToggle}>
         <button
           type="button"
@@ -2555,11 +2918,13 @@ const SubSection = ({ id, title, open, onToggle, children, compact, className, a
 
 // --- SHARED FIELD COMPONENTS ---
 
-const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, toggleMulti, showInlineHelp, auditOn, salesRep, setSalesRep, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, setToast, getSalesRepForContact, onOpenCrmLog, onPromptRoleAssignment }) => {
+const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, toggleMulti, showInlineHelp, auditOn, salesRep, setSalesRep, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, setToast, getSalesRepForContact, onOpenCrmLog, onPromptRoleAssignment, onAddNewToSystem }) => {
   const referrerDisplayValue = data.referrer && data.referringCompany
     ? `${data.referrer} — ${data.referringCompany}`
     : (data.referrer || data.referringCompany || "");
   const [referrerQuery, setReferrerQuery] = useState(referrerDisplayValue);
+  const [addNewContact, setAddNewContact] = useState(null);
+  useEffect(() => { if (!data.referrer && !data.referringCompany) setAddNewContact(null); }, [data.referrer, data.referringCompany]);
   const [repMenuOpen, setRepMenuOpen] = useState(false);
   const [showSuggestedRoles, setShowSuggestedRoles] = useState(false);
   const [suggestedSelection, setSuggestedSelection] = useState(suggestedReferrerRoles || []);
@@ -2616,13 +2981,14 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
     updateMany(patch);
     if (nextCompany) triggerAutoFlash?.("referringCompany");
     if (nextContact) triggerAutoFlash?.("referrer");
-    onPromptRoleAssignment?.({
-      company: nextCompany,
-      contact: nextContact,
-      source: "referrer",
-      preferredRoles: ["referrer"],
-      forceRoles: ["referrer"]
-    });
+    // Role badges are now inline on the referrer card — no blocking popup needed
+    // onPromptRoleAssignment?.({
+    //   company: nextCompany,
+    //   contact: nextContact,
+    //   source: "referrer",
+    //   preferredRoles: ["referrer"],
+    //   forceRoles: ["referrer"]
+    // });
   };
   const toggleReferrerRole = (roleId) => {
     const company = data.referringCompany || "";
@@ -2717,17 +3083,15 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
     };
   }, [showSuggestedRoles]);
   return (
-  <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-6">
-      <Field label="Source">
+  <div className="space-y-4">
+      <Field label="How did we get this order?">
           <div className="flex flex-wrap justify-start gap-2" data-audit-key="leadSourceCategory">
                {LEAD_SOURCES.map(s => <ToggleMulti key={s} label={s} title={LEAD_SOURCE_HELP[s]} checked={data.leadSourceCategory === s} onChange={() => update("leadSourceCategory", s)} />)}
           </div>
       </Field>
-      {showInlineHelp && data.leadSourceCategory && (
-        <div className="text-[11px] text-slate-400">
-          {data.leadSourceCategory === "Referral" && "Opportunity came from a Company or Contact."}
-          {data.leadSourceCategory === "Marketing" && "Opportunity came from Marketing efforts."}
-          {data.leadSourceCategory === "Internal" && "Opportunity came from other internal sources."}
+      {showInlineHelp && data.leadSourceCategory === "Referral" && (
+        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Referrer:</span> The referrer reached out with this order. If assigned, we can begin. If only a lead, we cannot contact the customer yet.
         </div>
       )}
 
@@ -2736,27 +3100,47 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                <div ref={referrerFieldAnchorRef}>
                  <Field
                    label="Referrer (Contact or Company)"
-                   action={
-                     referrerRep ? (
-                       <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-bold text-sky-700">
-                         <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold">{getRepInitials(referrerRep)}</span>
-                         <span>Rep</span>
-                       </div>
-                     ) : null
-                   }
+                   action={referrerDisplayValue ? (
+                     <button
+                       type="button"
+                       onClick={() => {
+                         if (window.confirm(`Remove ${referrerDisplayValue} as referrer? This will also clear any linked roles (Bill To, Insurance, Sales Rep).`)) {
+                           updateMany({ referrer: "", referringCompany: "", salesRep: "" });
+                           setToast?.("Referrer removed");
+                         }
+                       }}
+                       className="text-[10px] font-bold text-slate-400 hover:text-rose-500"
+                     >
+                       Remove
+                     </button>
+                   ) : null}
                  >
+                 {referrerDisplayValue ? (
+                   <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                     <span className="text-sm font-semibold text-slate-700">{referrerDisplayValue}</span>
+                   </div>
+                 ) : (
                  <div className="max-w-sm">
                      <SearchSelect
                        data-audit-key="referrer"
                        className={auditOn && data.highlightMissing?.referrer ? "audit-missing" : ""}
-                       value={referrerDisplayValue}
+                       value=""
                        onChange={(v)=>applyReferrerValue(v)}
                        onQueryChange={(v)=>setReferrerQuery(v)}
                      options={combinedContactOptions}
                      placeholder="Type contact or company..."
                      onBlur={() => ensureReferrerFromQuery()}
+                     onAddNew={(name) => {
+                       if (onAddNewToSystem) {
+                         const nameParts = (name || "").trim().split(/\s+/);
+                         onAddNewToSystem({
+                           firstName: nameParts[0] || "",
+                           lastName: nameParts.slice(1).join(" ") || "",
+                           source: "referrer",
+                         });
+                       }
+                     }}
                    />
-                 </div>
                  {referrerBestMatch && referrerBestMatch !== referrerDisplayValue && (
                    <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-2">
                      <span>Top match:</span>
@@ -2769,18 +3153,53 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                        <span>(press Enter or Tab)</span>
                      </div>
                    )}
+                 </div>
+                 )}
                  </Field>
                </div>
-               <div className="flex items-center justify-between text-xs text-slate-500">
-                 <span>CRM Log</span>
-                 <button
-                   onClick={onOpenCrmLog}
-                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                 >
-                   + Add CRM Log
-                 </button>
-               </div>
-               {/* Referrer record now appears in Companies list */}
+               {(data.referrer || data.referringCompany) && !addNewContact && (
+                 <div>
+                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Assign roles for this contact</div>
+                   <div className="flex flex-wrap gap-2">
+                     <ToggleMulti
+                       label="Referrer"
+                       checked={true}
+                       onChange={() => {}}
+                       className="!text-[10px] !px-2.5 !py-1 !cursor-default opacity-70"
+                     />
+                     <ToggleMulti
+                       label="Bill To"
+                       checked={!!data.referringCompany && data.billingCompany === data.referringCompany}
+                       onChange={() => {
+                         if (data.billingCompany === data.referringCompany) {
+                           updateMany({ billingCompany: "", billingContact: "", billingPayer: "" });
+                         } else {
+                           updateMany({ billingCompany: data.referringCompany, billingContact: data.referrer, billingPayer: "Referrer" });
+                         }
+                       }}
+                       className="!text-[10px] !px-2.5 !py-1"
+                     />
+                     <ToggleMulti
+                       label="Insurance"
+                       checked={!!data.referringCompany && data.insuranceCompany === data.referringCompany}
+                       onChange={() => {
+                         if (data.insuranceCompany === data.referringCompany) {
+                           updateMany({ insuranceCompany: "", insuranceAdjuster: "", insuranceClaim: "" });
+                         } else {
+                           updateMany({ insuranceCompany: data.referringCompany, insuranceAdjuster: data.referrer, insuranceClaim: "Yes", involvesInsurance: "Yes" });
+                         }
+                       }}
+                       className="!text-[10px] !px-2.5 !py-1"
+                     />
+                   </div>
+                 </div>
+               )}
+               <button
+                 onClick={onOpenCrmLog}
+                 className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 hover:text-sky-700"
+               >
+                 + Add CRM Log{data.referrer ? ` for ${data.referrer}` : ""}
+               </button>
            </div>
        )}
       {data.leadSourceCategory === "Marketing" && (
@@ -2790,13 +3209,19 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
            <div className="animate-indigo-fade p-4 rounded-lg bg-sky-50/30 border border-sky-100"><Field label="Type"><div className="flex flex-wrap gap-2" data-audit-key="leadSourceDetail">{INTERNAL_TYPES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} />)}</div></Field></div>
        )}
 
-      <Field label="Method">
-          <div className="flex flex-wrap justify-start gap-2">
-               {CONTACT_METHODS.map(m => <ToggleMulti key={m} label={m} title={CONTACT_METHOD_HELP[m]} checked={data.contactMethod === m} onChange={() => update("contactMethod", m)} />)}
+      {data.leadSourceCategory && salesRep && (
+        <Field label="Sales Rep">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold shadow-sm">{getRepInitials(salesRep)}</span>
+            <span className="text-sm font-semibold text-slate-700">{salesRep.split(",")[0]}</span>
           </div>
-      </Field>
+          {showInlineHelp && <div className="text-[10px] text-slate-400 mt-1">Auto-assigned from referrer.</div>}
+        </Field>
+      )}
 
-      <Field label="Sales Rep" className="max-w-[90px]">
+      {data.leadSourceCategory && !salesRep && (
+      <React.Fragment>
+      <Field label="Sales Rep" className="max-w-[200px]">
         <div className="relative inline-flex items-center gap-2">
           <button
             type="button"
@@ -2804,9 +3229,9 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
             className="h-10 w-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-bold border border-sky-200 hover:bg-sky-50"
             title={salesRep || "Select sales rep"}
           >
-            {getRepInitials(salesRep || "Rep")}
+            {getRepInitials(salesRep || "?")}
           </button>
-          <span className="text-xs text-slate-400">Rep</span>
+          {!salesRep && <span className="text-xs text-slate-400">Select rep</span>}
           {repMenuOpen && (
             <div className="absolute top-12 left-0 z-50 w-48 rounded-lg border border-slate-200 bg-white shadow-lg">
               {SALES_REPS.map(r => (
@@ -2831,8 +3256,10 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
         </div>
       </Field>
       {showInlineHelp && <div className="text-[11px] text-slate-400">Employee managing customer relationships/accounts.</div>}
+      </React.Fragment>
+      )}
       {showSuggestedRoles && (
-        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[120] flex items-start justify-center bg-slate-900/35 p-4">
+        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[120] flex items-start justify-center bg-slate-900/35 p-4" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); ensureReferrerFromQuery(); onApplyReferrerRoles?.(suggestedSelection); setShowSuggestedRoles(false); } if (e.key === "Escape") setShowSuggestedRoles(false); }}>
           <div ref={suggestedRolesCardRef} className="w-full max-w-2xl max-h-[calc(100vh-2rem)] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-auto fade-in" style={{ marginTop: `${suggestedRolesOffsetTop}px` }}>
             <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
               <div>
@@ -2916,18 +3343,18 @@ const AI_USAGE_GUIDELINES = [
   "Recommended AI workflow: In Detailed Entry, tab through the entire form and use Enter as needed to move forward field by field. If a correction is needed, use Shift + Enter to move backward.",
   "Always specify a referrer: The referrer is the person or company that provided the job or assignment. Use the quick entry search—type in the name and select the correct contact/company from the suggestions.",
   "Ensure a Bill‑To is entered: Identify who will pay for the services. If an insurance company is the referrer, that company typically serves as both the Bill‑To and the insurance provider.",
-  "Provide an order name: An order name helps identify the job. It will auto‑populate when you enter the customer’s name and address, but verify it before saving.",
+  "Provide an order name: An order name helps identify the job. It will auto‑populate when you enter the customer's name and address, but verify it before saving.",
   "Capture contact information: Make sure at least one phone number or email is recorded for the primary customer. Include additional contacts (spouse, adjuster, mover) if relevant.",
   "Fill in the Interview section: Open the Interview section and answer as many questions as you can (e.g., project type, severity, origin, cause). Smart fields marked with a lightning‑bolt icon will automatically fill related fields and display a confirmation toast.",
   "Scheduling appointments: In the Schedule section you can either type directly over the date and time or use the calendar and clock icons to pick them. Indicate whether the event is firm or tentative, select the correct service offerings, and provide clear event instructions.",
-  "Refinements for insurance claims: When entering insurance details, indicate whether it’s an insurance claim, select the insurance company, and add the adjuster’s contact via the quick‑add menu. Use the same menu to add other companies (e.g., movers, contractors).",
+  "Refinements for insurance claims: When entering insurance details, indicate whether it's an insurance claim, select the insurance company, and add the adjuster's contact via the quick‑add menu. Use the same menu to add other companies (e.g., movers, contractors).",
   "Review before saving: Check that all required fields (Referrer, Bill‑To, order name, schedule date/time) are completed. Missing required fields may trigger a warning before submission. Once complete, click Save, review the summary, and then choose Continue Save to submit the order."
 ];
 
 const AI_TIME_SAVING_TIPS = [
   "Use “quick add” wherever possible: The quick‑add menu is the fastest way to assign roles like adjuster, mover or contractors. Begin typing a name or company and select the correct match from the drop‑down instead of creating contacts from scratch.",
   "Type times directly into the schedule: If the time picker is hard to use, double‑click in the time field, press Ctrl + A to highlight the existing entry and type the desired time (e.g., 12:00 PM). Press Enter to confirm.",
-  "Look for auto‑fill hints: When you enter a customer’s name and address, the order name and other fields may auto‑populate. Accept these suggestions to save time and ensure consistency.",
+  "Look for auto‑fill hints: When you enter a customer's name and address, the order name and other fields may auto‑populate. Accept these suggestions to save time and ensure consistency.",
   "Document thoroughly in notes: Use the Interview and Event Instructions fields to capture details about the job (e.g., site conditions, special handling instructions, pets on site). Detailed notes reduce follow‑up questions later.",
   "Use keyboard shortcuts: Press Tab or Enter to move forward, and Shift + Tab or Shift + Enter to move backward through fields. Keyboard navigation can speed up data entry and reduce reliance on the mouse."
 ];
@@ -2938,27 +3365,74 @@ const StartScreen = ({ onSelect }) => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 fade-in scale-in">
-      <div className="text-center mb-8">
+      <div className="text-center mb-10">
         <h1 className="text-5xl font-extrabold text-slate-900 mb-2 tracking-tight">New Order Entry</h1>
-        <p className="text-lg text-slate-500">Choose your entry mode</p>
-        <button
-          type="button"
-          onClick={() => setShowGuidelines(v => !v)}
-          className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-sky-600 hover:text-sky-700"
-        >
-          Start here {showGuidelines ? "▾" : "▸"}
-        </button>
+        <p className="text-lg text-slate-500">How much detail do you have right now?</p>
+        <p className="mt-2 text-sm text-slate-400">You can switch between modes at any time — nothing is lost.</p>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
+      <button
+        onClick={() => onSelect('quick')}
+        className="group relative flex flex-col items-center p-10 rounded-3xl bg-white border border-slate-200 shadow-xl hover:shadow-2xl hover:border-sky-300 hover:-translate-y-1 transition-all duration-300"
+      >
+        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">⚡</div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-3">Quick Entry</h2>
+        <p className="text-center text-slate-500 text-sm">Get it on the calendar fast. Name, address, date — just the essentials.</p>
+        <div className="mt-4 text-xs text-slate-400 text-center">Best for: sales reps, leads, partial info, mobile</div>
+        <div className="mt-5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Start Fast →</div>
+      </button>
+      <button
+        onClick={() => onSelect('detailed')}
+        className="group relative flex flex-col items-center p-10 rounded-3xl bg-white border-2 border-sky-200 shadow-xl hover:shadow-2xl hover:border-sky-400 hover:-translate-y-1 transition-all duration-300"
+      >
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-sky-500 px-3 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">Most Common</div>
+        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">📝</div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-3">Detailed Entry</h2>
+        <p className="text-center text-slate-500 text-sm">Guided workflow for the full order. Insurance, billing, conditions, contacts, scope — a complete interview.</p>
+        <div className="mt-4 text-xs text-slate-400 text-center">Best for: office team, live conversations, computer</div>
+        <div className="mt-5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Start Detailed →</div>
+      </button>
+      <div className="flex flex-col items-center p-10 rounded-3xl bg-white border border-slate-200 shadow-xl">
+        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl">📦</div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-3">Same Day Scope</h2>
+        <p className="text-center text-slate-500 text-sm mb-2">Room-by-room scope for pack-out instructions or photo documentation.</p>
+        <div className="mt-2 text-xs text-slate-400 text-center mb-5">Best for: on-site at the home, field work</div>
+        <div className="flex flex-col gap-3 w-full">
+          <button
+            onClick={() => onSelect('same-day-scope')}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 transition-all"
+          >
+            📝 Text-Based Scope
+            <div className="text-[10px] font-normal text-slate-400 mt-0.5">Task lists, notes, and SDS document</div>
+          </button>
+          <button
+            onClick={() => onSelect('photo-scope')}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 transition-all"
+          >
+            📷 Photo-Based Scope
+            <div className="text-[10px] font-normal text-slate-400 mt-0.5">Camera-first walkthrough with photo tagging</div>
+          </button>
+        </div>
+      </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowGuidelines(v => !v)}
+        className="mt-10 inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-600"
+      >
+        Usage guidelines {showGuidelines ? "▾" : "▸"}
+      </button>
       {showGuidelines && (
-        <div className="mb-10 w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mt-4 w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="text-sm font-bold uppercase tracking-widest text-sky-600">AI App Usage Guidelines</div>
           <ul className="mt-4 list-disc space-y-2 pl-6 text-sm text-slate-700">
             {AI_USAGE_GUIDELINES.map(line => (
               <li key={line}>{line}</li>
             ))}
           </ul>
-          <div className="mt-6 text-sm font-bold uppercase tracking-widest text-slate-500">Additional Time‑Saving Tips</div>
+          <div className="mt-6 text-sm font-bold uppercase tracking-widest text-slate-500">Additional Time-Saving Tips</div>
           <ul className="mt-3 list-disc space-y-2 pl-6 text-sm text-slate-700">
             {AI_TIME_SAVING_TIPS.map(line => (
               <li key={line}>{line}</li>
@@ -2966,36 +3440,6 @@ const StartScreen = ({ onSelect }) => {
           </ul>
         </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
-      <button 
-        onClick={() => onSelect('quick')}
-        className="group relative flex flex-col items-center p-10 rounded-3xl bg-white border border-slate-200 shadow-xl hover:shadow-2xl hover:border-sky-300 hover:-translate-y-1 transition-all duration-300"
-      >
-        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">⚡</div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Quick Entry</h2>
-        <p className="text-center text-slate-500">Rapid data capture. Basic details, location, and scheduling.</p>
-        <div className="mt-6 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Start Fast →</div>
-      </button>
-      <button 
-        onClick={() => onSelect('detailed')}
-        className="group relative flex flex-col items-center p-10 rounded-3xl bg-white border border-slate-200 shadow-xl hover:shadow-2xl hover:border-sky-400 hover:-translate-y-1 transition-all duration-300"
-      >
-        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">📝</div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Detailed Entry</h2>
-        <p className="text-center text-slate-500">Full interview process. Smart triggers, detailed conditions, and billing.</p>
-        <div className="mt-6 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Start Detailed →</div>
-      </button>
-      <button 
-        onClick={() => onSelect('same-day-scope')}
-        className="group relative flex flex-col items-center p-10 rounded-3xl bg-white border border-slate-200 shadow-xl hover:shadow-2xl hover:border-sky-400 hover:-translate-y-1 transition-all duration-300"
-      >
-        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">📦</div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Same Day Scope</h2>
-        <p className="text-center text-slate-500">Room-by-room pack-out scope with guided lists and notes.</p>
-        <div className="mt-6 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Open Scope →</div>
-      </button>
-      </div>
     </div>
   );
 };
@@ -3031,14 +3475,21 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec1', sub: 'order', label: 'Cause', keywords: 'cause origin' },
     { id: 'sec1', sub: 'order', label: 'Origin', keywords: 'origin location' },
     { id: 'sec1', sub: 'order', label: 'Severity', keywords: 'severity rejects' },
-    { id: 'sec1', sub: 'interview', label: 'Interview', keywords: 'interview living staying temp moving repairs packout conditions' },
-    { id: 'sec1', sub: 'codes', label: 'Order Codes', keywords: 'handling severity quality box damp' },
+    { id: 'sec1', label: 'Interview', keywords: 'interview living staying temp moving repairs packout conditions', navAction: 'openInterview' },
+    { id: 'sec1', sub: 'codes', label: 'Order Codes', keywords: 'handling severity quality box damp det detergent allergy wet ppe' },
     { id: 'sec1', sub: 'codes', label: 'Order Instructions', keywords: 'instructions tagging cleaning packing delivery communication scheduling pickup billing collections' },
     { id: 'sec1', sub: 'source', label: 'Source', keywords: 'source referral marketing internal method sales rep' },
     { id: 'sec1', sub: 'source', label: 'Referrer (Contact or Company)', keywords: 'referrer referring company contact' },
     { id: 'sec1', sub: 'source', label: 'Method', keywords: 'method call email form meeting text tpa' },
     { id: 'sec1', sub: 'source', label: 'Sales Rep', keywords: 'sales rep representative rep' },
 
+    { id: 'sec1', label: 'Event Instructions', keywords: 'notes instructions event notes' },
+    { id: 'sec2', label: 'Household', keywords: 'pets animals dog cat bird fish household children child baby infant elderly housekeeper caretaker tenant roommate', navAction: 'openPets' },
+    { id: 'sec1', label: 'Special Considerations', keywords: 'elderly pregnancy baby hearing impaired respiratory premium brands skin sensitivity considerations allergy allergies soap detergent fragrance' },
+    { id: 'sec1', label: 'Soap & Fragrance Allergies', keywords: 'soap fragrance allergy allergies detergent sensitive skin hypoallergenic det special' },
+    { id: 'sec1', label: 'Conditions', keywords: 'still wet mold structural damage no electricity no heat boarded up conditions' },
+    { id: 'sec1', label: 'Living Situation', keywords: 'living staying moving temp housing hotel displaced' },
+    { id: 'sec1', label: 'Storage', keywords: 'storage long term months' },
     { id: 'sec2', label: 'Customer Section', keywords: 'customer section' },
     { id: 'sec2', label: 'Customer Type', keywords: 'customer type relationship' },
     { id: 'sec2', label: 'First Name', keywords: 'first name' },
@@ -3072,7 +3523,6 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec4', sub: 'insurance', label: 'Adjuster', keywords: 'adjuster' },
     { id: 'sec4', sub: 'insurance', label: 'Claim #', keywords: 'claim # claim number' },
     { id: 'sec4', sub: 'insurance', label: 'Date of Loss', keywords: 'date of loss' },
-    { id: 'sec4', sub: 'insurance', label: 'Work Order #', keywords: 'work order number' },
     { id: 'sec4', sub: 'insurance', label: 'Policy #', keywords: 'policy number' },
     { id: 'sec4', sub: 'insurance', label: 'Order Specific Email', keywords: 'order specific email insurance email' },
     { id: 'sec4', sub: 'insurance', label: 'Contents Limit', keywords: 'contents limit coverage' },
@@ -3218,9 +3668,9 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 };
 
 // --- UNIFIED FLOATING HEADER (PROGRESS HEADER) ---
-const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, compactMode, setCompactMode, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount }) => {
+const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, onShowSds, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount, onOpenFieldConfig, interviewPanelOpen, actionItemsOpen }) => {
     const steps = [
-        { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }, { id: "interview", label: "Interview" }, { id: "codes", label: "Codes" }] },
+        { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }] },
         { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
         { id: 'sec3', label: 'Address', subsections: [{ id: "address", label: "Addresses" }] },
         { id: 'sec4', label: 'Billing', subsections: [{ id: "companies", label: "Companies and Contacts" }, { id: "billing", label: "Billing" }, { id: "finance", label: "Finance" }, { id: "insurance", label: "Insurance" }] },
@@ -3300,14 +3750,21 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-white/60 backdrop-blur-xl border-b border-slate-200 shadow-md shadow-slate-900/5">
+        <header className="fixed top-0 left-0 z-50 bg-white/60 backdrop-blur-xl border-b border-slate-200 shadow-md shadow-slate-900/5" style={{ right: (interviewPanelOpen || actionItemsOpen) ? '480px' : '0', transition: 'right 0.2s ease' }}>
             <div className="max-w-6xl mx-auto px-4 pt-4 pb-6 flex items-center justify-between gap-6">
                 <div className="flex items-center gap-4 min-w-[120px]">
                      <button onClick={() => setEntryMode('start')} className="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-full hover:bg-slate-100">
                         <span className="text-lg">←</span>
                      </button>
                      <div className="flex flex-col">
-                         <h1 className="text-base font-bold text-slate-900 leading-none">{title}</h1>
+                         <div className="flex items-center gap-2">
+                           <h1 className="text-base font-bold text-slate-900 leading-none">{title}</h1>
+                           <div className="flex items-center bg-slate-100 rounded-full p-0.5 gap-0.5">
+                             <button className="rounded-full px-2.5 py-1 text-[10px] font-bold bg-white text-sky-700 shadow-sm">Order</button>
+                             <button onClick={() => setEntryMode('same-day-scope')} className="rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Scope</button>
+                             <button onClick={onShowSds} className="rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">SDS</button>
+                           </div>
+                         </div>
                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">{version}</span>
                      </div>
                 </div>
@@ -3385,20 +3842,27 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                 {entryMode !== 'detailed' && <div className="flex-1"></div>}
 
                 <div className="min-w-[120px] flex justify-end gap-2 relative">
-                    <button 
-                        onClick={() => setShowSettings(v => !v)} 
+                    <button
+                        onClick={() => setShowCoaching(v => !v)}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${showCoaching ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-400 hover:border-violet-300'}`}
+                        title={showCoaching ? "Hide coaching prompts" : "Show coaching prompts"}
+                    >
+                        {showCoaching ? "🎓 Coaching" : "🎓"}
+                    </button>
+                    <button
+                        onClick={() => setShowSettings(v => !v)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border bg-white text-slate-400 border-slate-200 hover:border-slate-300"
                     >
                         <span>Settings ⚙︎</span>
                     </button>
                     {showSettings && (
                         <div className="absolute right-0 top-10 w-56 rounded-xl border border-slate-200 bg-white shadow-xl p-2">
-                            <button 
-                                onClick={() => setShowInlineHelp(!showInlineHelp)} 
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all ${showInlineHelp ? 'bg-sky-50 text-sky-600' : 'hover:bg-slate-50 text-slate-600'}`}
+                            <button
+                                onClick={() => setShowCoaching(!showCoaching)}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all ${showCoaching ? 'bg-violet-50 text-violet-600' : 'hover:bg-slate-50 text-slate-600'}`}
                             >
-                                <span>Inline Help</span>
-                                <span>{showInlineHelp ? 'On' : 'Off'}</span>
+                                <span>🎓 Coaching</span>
+                                <span>{showCoaching ? 'On' : 'Off'}</span>
                             </button>
                             <button
                                 onClick={() => setCompactMode(!compactMode)}
@@ -3428,10 +3892,18 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                                 <span>Test Data Presets</span>
                                 <span>{presetCount ? `(${presetCount})` : "▤"}</span>
                             </button>
+                            <button
+                                onClick={onOpenFieldConfig}
+                                className="w-full mt-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all hover:bg-slate-50 text-slate-600"
+                            >
+                                <span>Field Configuration</span>
+                                <span>⚙</span>
+                            </button>
                             <div className="mt-2 px-3 py-2">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Current User</label>
                                 <Input value={currentUser || ""} onChange={e=>setCurrentUser(e.target.value)} placeholder="Name" className="mt-1 !py-1.5 !text-xs" />
                             </div>
+                            <button onClick={() => setShowSettings(false)} className="w-full mt-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 transition-all">Close</button>
                         </div>
                     )}
                 </div>
@@ -3441,49 +3913,50 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
 };
 
 // --- FLOATING CAPSULE BAR (Bottom) ---
-const FloatingCapsule = ({ entryMode, setEntryMode, onSave, onAudit, auditOn, setShowSearch, onPlan }) => {
-    const [expanded, setExpanded] = useState(true);
-
+const FloatingCapsule = ({ entryMode, setEntryMode, onSave, setShowSearch, onInterview, interviewPanelOpen, onActionItems, actionItemsOpen, actionItemCount, modeButtonFlash }) => {
     return (
-        <div className="fixed bottom-4 sm:bottom-8 left-0 right-0 z-50 flex justify-center pointer-events-none fade-in" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-            <div className={`pointer-events-auto bg-white border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.15)] shadow-slate-700/30 rounded-full flex items-center p-1.5 gap-2 transition-all duration-500 ease-out ${expanded ? 'px-3' : 'px-2'}`}>
-                
-                <button 
-                    onClick={() => setExpanded(!expanded)} 
-                    className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
-                    title={expanded ? "Collapse" : "Expand"}
+        <div className="fixed bottom-4 sm:bottom-8 left-0 z-50 flex justify-center pointer-events-none fade-in" style={{ right: (interviewPanelOpen || actionItemsOpen) ? '480px' : '0', paddingBottom: "env(safe-area-inset-bottom)", transition: 'right 0.2s ease' }}>
+            <div className="pointer-events-auto bg-white border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.15)] shadow-slate-700/30 rounded-full flex items-center p-1.5 gap-1 sm:gap-2 px-2 sm:px-3">
+
+                <button data-noe-action="search" onClick={() => setShowSearch(true)} className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 bg-slate-50">
+                    <span className="text-base">🔍</span>
+                    <span className="text-xs sm:text-sm font-bold hidden sm:inline">Search</span>
+                </button>
+
+                <button
+                    data-noe-action="interview"
+                    onClick={onInterview}
+                    className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all ${interviewPanelOpen ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'hover:bg-violet-50 text-slate-600 hover:text-violet-600 bg-slate-50'}`}
                 >
-                    <span className={`transform transition-transform duration-300 ${expanded ? 'rotate-180' : 'rotate-0'}`}>›</span>
+                    <span className="text-base">🎤</span>
+                    <span className="text-xs sm:text-sm font-bold">Interview</span>
                 </button>
 
-                <div className="h-6 w-px bg-slate-200 mx-1"></div>
-
-                <button onClick={() => setShowSearch(true)} className={`flex items-center justify-center h-10 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 ${expanded ? 'px-4 gap-2 bg-slate-50' : 'w-10'}`}>
-                    <span className="text-lg">🔍</span>
-                    {expanded && <span className="text-sm font-bold">Search</span>}
-                </button>
-
-                <button 
-                    onClick={() => setEntryMode(entryMode === 'quick' ? 'detailed' : 'quick')} 
-                    className={`flex items-center justify-center h-10 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 ${expanded ? 'px-4 gap-2 bg-slate-50' : 'w-10'}`}
+                <button
+                    data-noe-action="action-items"
+                    onClick={onActionItems}
+                    className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-amber-50 text-slate-600 hover:text-amber-600 bg-slate-50 relative"
                 >
-                    <span className="text-lg">{entryMode === 'quick' ? '⚡' : '📝'}</span>
-                    {expanded && <span className="text-sm font-bold">{entryMode === 'quick' ? 'Detailed' : 'Quick'}</span>}
+                    <span className="text-base">⚡</span>
+                    <span className="text-xs sm:text-sm font-bold">Action Items</span>
+                    {actionItemCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1">{actionItemCount}</span>
+                    )}
                 </button>
 
-                <button onClick={onAudit} className={`flex items-center justify-center h-10 rounded-full transition-all ${auditOn ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'hover:bg-sky-50 text-slate-600 hover:text-sky-600'} ${expanded ? 'px-4 gap-2' : 'w-10'}`}>
-                    <span className="text-lg">📋</span>
-                    {expanded && <span className="text-sm font-bold">{auditOn ? 'Audit: On' : 'Audit'}</span>}
+                <button
+                    data-noe-action="toggle-mode"
+                    data-noe-current-mode={entryMode}
+                    onClick={() => setEntryMode(entryMode === 'quick' ? 'detailed' : 'quick')}
+                    className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 bg-slate-50 ${modeButtonFlash ? 'animate-nav-focus ring-2 ring-sky-400' : ''}`}
+                >
+                    <span className="text-base">{entryMode === 'quick' ? '📝' : '⚡'}</span>
+                    <span className="text-xs sm:text-sm font-bold">{entryMode === 'quick' ? 'Detailed' : 'Quick'}</span>
                 </button>
 
-                <button onClick={onPlan} className={`flex items-center justify-center h-10 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 ${expanded ? 'px-4 gap-2 bg-slate-50' : 'w-10'}`}>
-                    <span className="text-lg">🧭</span>
-                    {expanded && <span className="text-sm font-bold">Plan</span>}
-                </button>
-
-                <button onClick={onSave} className={`flex items-center justify-center h-10 rounded-full bg-sky-500 text-white shadow-lg shadow-sky-200 hover:bg-sky-500 transition-all ${expanded ? 'px-6 gap-2' : 'w-10'}`}>
-                    <span className="text-lg">💾</span>
-                    {expanded && <span className="text-sm font-bold">Save</span>}
+                <button data-noe-action="save" onClick={onSave} className="flex items-center justify-center h-10 px-4 sm:px-6 gap-1.5 rounded-full bg-sky-500 text-white shadow-lg shadow-sky-200 hover:bg-sky-600 transition-all">
+                    <span className="text-base">💾</span>
+                    <span className="text-xs sm:text-sm font-bold">Save</span>
                 </button>
 
             </div>
@@ -3492,7 +3965,7 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, onAudit, auditOn, se
 };
 
 
-const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaretClick, children, badges, className, compact }) => {
+const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaretClick, children, badges, className, compact, noeSection }) => {
   const handleHeaderClick = () => {
     if (onHeaderClick) {
       onHeaderClick();
@@ -3508,7 +3981,7 @@ const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaret
     onToggle?.();
   };
   return (
-    <div id={id} className={`mb-0 overflow-hidden rounded-none border-y border-slate-200 bg-white shadow-sm transition-shadow duration-300 scroll-mt-28 sm:mb-4 sm:rounded-xl sm:border ${isOpen ? 'ring-1 ring-sky-500/20 shadow-md' : ''} ${className||""}`}>
+    <div id={id} data-noe-section={noeSection || id || undefined} data-noe-open={isOpen} className={`mb-0 overflow-hidden rounded-none border-y border-slate-200 bg-white shadow-sm transition-shadow duration-300 scroll-mt-28 sm:mb-4 sm:rounded-xl sm:border ${isOpen ? 'ring-1 ring-sky-500/20 shadow-md' : ''} ${className||""}`}>
       <div
         className={`flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5 text-left font-semibold text-slate-800 transition-colors cursor-pointer ${compact ? "section-header-tight" : ""} ${isOpen ? "bg-white" : "bg-slate-50/50 hover:bg-slate-50"}`}
         onClick={handleHeaderClick}
@@ -3548,11 +4021,26 @@ const Section = ({ id, title, helpText, isOpen, onToggle, onHeaderClick, onCaret
 };
 
 // --- SUB-COMPONENTS ---
-const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts }) => {
+const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onAddHousehold, onSendWelcome, contacts, sdsConsiderations = [], householdAnimals = "", onUpdatePets, household = [] }) => {
   const toggleList = (list, value) => list.includes(value) ? list.filter(v=>v!==value) : [...list, value];
-  const [householdName, setHouseholdName] = useState("");
-  const [open, setOpen] = useState(false);
   const customerDisplayName = [c.first, c.last].filter(hasMeaningfulValue).join(" ").trim();
+  const [open, setOpen] = useState(!customerDisplayName);
+  useEffect(() => {
+    if (c._forceOpen) {
+      setOpen(true);
+      updateCust(c.id, { _forceOpen: false });
+      setTimeout(() => {
+        const card = document.querySelector(`[data-customer-id="${c.id}"]`);
+        if (!card) return;
+        if (!hasMeaningfulValue(c.type)) {
+          const typeInput = card.querySelector('input[placeholder="Type..."], [class*="SearchSelect"] input');
+          if (typeInput) { typeInput.focus(); return; }
+        }
+        const firstInput = card.querySelector('input[data-audit-key="custFirst"], input:not([type="hidden"])');
+        if (firstInput) firstInput.focus();
+      }, 150);
+    }
+  }, [c._forceOpen]);
   const customerPlaceholder = isPlaceholderFlagActive(c.placeholder);
   const customerRoleLabel = hasMeaningfulValue(c.type) ? c.type : (c.isPrimary ? "Primary" : "Relationship");
   const hasMobile = (c.phone || "").replace(/[^\d]/g, "").length >= 10;
@@ -3566,16 +4054,46 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
     const nextNoteText = [base, line].filter(Boolean).join("\n");
     updateCust(c.id, { quickNotes: nextNotes, note: nextNoteText });
   };
+  const hasContact = hasMeaningfulValue(c.phone) || hasMeaningfulValue(c.email);
+  const isIncomplete = customerPlaceholder || !hasMeaningfulValue(c.last) || (hasMeaningfulValue(c.first) && !hasContact);
+  const getPetIcon = (text) => {
+    const t = (text || "").toLowerCase();
+    if (/\bdog\b|puppy|pup\b|golden|lab\b|shepherd|poodle|terrier|bulldog|beagle|husky|shih\s*tzu|chihuahua|dachshund|corgi|pitbull|rottweiler/.test(t)) return "🐕";
+    if (/\bcat\b|kitten|kitty|feline|tabby|persian|siamese|maine coon/.test(t)) return "🐈";
+    if (/\bbird\b|parrot|parakeet|cockatiel|canary|finch/.test(t)) return "🐦";
+    if (/\bfish\b|aquarium|tank/.test(t)) return "🐟";
+    if (/\brabbit\b|bunny/.test(t)) return "🐇";
+    if (/\bhamster|guinea|gerbil/.test(t)) return "🐹";
+    if (/\bsnake|lizard|reptile|gecko|iguana|turtle|tortoise/.test(t)) return "🐍";
+    if (/\bhorse|pony/.test(t)) return "🐴";
+    return "🐕";
+  };
   return (
     <div
       data-audit-key={customerPlaceholder ? `placeholder-customer-${c.id}` : undefined}
-      className={`group relative rounded-lg sm:rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-sky-300 hover:shadow-md ${customerPlaceholder ? "placeholder-shell" : (c.isPrimary ? "border-sky-400 ring-1 ring-sky-50" : "border-slate-200")}`}
+      data-customer-id={c.id}
+      className={`group relative rounded-lg sm:rounded-xl border ${open ? 'p-3 sm:p-5' : 'px-3 py-2 sm:px-4 sm:py-2.5'} shadow-sm transition-all hover:shadow-md ${isIncomplete ? "placeholder-shell" : customerPlaceholder ? "placeholder-shell" : c.isPrimary ? "border-sky-300 bg-white" : "border-slate-200 bg-white hover:border-sky-300"}`}
     >
       {c.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
-      {total > 1 && ( <button onClick={() => onRemove(c.id, index)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
+      {total > 1 && !c._showMenu && ( <button onClick={() => { if (!hasMeaningfulValue(c.first) && !hasMeaningfulValue(c.last) && !hasMeaningfulValue(c.phone) && !hasMeaningfulValue(c.email)) { onRemove(c.id, index); } else { updateCust(c.id, { _showMenu: true }); } }} className={`absolute ${open ? 'right-3 top-3 h-7 w-7' : 'right-2 top-2 h-5 w-5 text-xs'} grid place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors`}>×</button> )}
+      {c._showMenu && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => updateCust(c.id, { _showMenu: false })}>
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-slate-100">
+              <div className="text-sm font-bold text-slate-800">{customerDisplayName || "Customer"}</div>
+              <div className="text-xs text-slate-500">{c.type || "No type set"}</div>
+            </div>
+            <div className="p-3 space-y-1">
+              <button onClick={() => updateCust(c.id, { _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={() => updateCust(c.id, { inactive: true, _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50">Make Inactive</button>
+              <button onClick={() => { onRemove(c.id, index); }} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div
-        className="mb-4 flex cursor-pointer flex-col gap-3 pl-1 sm:pl-2 sm:flex-row sm:items-center sm:justify-between"
+        className={`${open ? 'mb-4' : 'mb-0'} flex cursor-pointer flex-col gap-2 pl-1 sm:pl-2 sm:flex-row sm:items-center sm:justify-between`}
         onClick={(e) => {
           if (isHeaderToggleIgnoredTarget(e.target)) return;
           setOpen(v => !v);
@@ -3590,7 +4108,7 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
 	            >
               <Chevron open={open} />
             </button>
-	            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-600">{index + 1}</div>
+	            <div className={`flex items-center justify-center rounded-full bg-sky-100 font-bold text-sky-600 ${open ? 'h-8 w-8 text-xs' : 'h-6 w-6 text-[10px]'}`}>{index + 1}</div>
 	            <div className="flex flex-col">
 	              <span className={`text-sm font-semibold ${customerDisplayName ? "text-slate-800" : (customerPlaceholder ? "placeholder-text" : "text-slate-800")}`}>{customerDisplayName || "Customer"}</span>
 	              <span className={`text-[10px] ${customerPlaceholder ? "placeholder-text" : "text-slate-500"}`}>{customerRoleLabel}</span>
@@ -3598,172 +4116,106 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
               {customerPlaceholder && (
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>
               )}
+              {c.doNotContact && <span className="rounded-full bg-rose-100 border border-rose-300 px-2 py-0.5 text-[10px] font-bold text-rose-700">Do Not Contact</span>}
+              {c.contactViaRep && <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700">Via Rep</span>}
 	         </div>
-	         <div className="flex flex-wrap gap-2">
-	            <ToggleMulti className="!py-1 !px-3 sm:!px-3 !text-xs" label="Primary" checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: true })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
-            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Policy Holder" checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder, type: !c.policyHolder ? "Policyholder" : c.type })} />
-            <ToggleMulti className="!py-1 !px-2 sm:!px-3 !text-xs" label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay, type: !c.selfPay ? "Owner" : c.type })} />
+	         <div className="flex flex-wrap gap-1.5">
+	            <ToggleMulti className={`${open ? '!py-1 !px-3' : '!py-0.5 !px-2'} !text-[10px]`} label="Primary" title={ROLE_COACHING["Primary"]} checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
+            <ToggleMulti className={`${open ? '!py-1 !px-2 sm:!px-3' : '!py-0.5 !px-2'} !text-[10px]`} label="Policy Holder" title={ROLE_COACHING["Policyholder"]} checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder })} />
+            <ToggleMulti className={`${open ? '!py-1 !px-2 sm:!px-3' : '!py-0.5 !px-2'} !text-[10px]`} label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay })} />
          </div>
       </div>
 
       {open && (
       <div className="grid gap-4 pl-1 sm:pl-2">
-         <div className="w-full sm:w-1/2">
-            <div className="mb-1 flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-500">Type</label>
-              {c.type && (
-                <button
-                  type="button"
-                  onClick={() => updateCust(c.id, { type: "" })}
-                  className="text-[10px] font-semibold text-slate-400 hover:text-rose-600"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <SearchSelect value={c.type || ""} onChange={(v)=>updateCust(c.id,{type:v})} options={CUSTOMER_TYPES} listId={`customer-type-${c.id}`} placeholder="Search relationship..." maxResults={CUSTOMER_TYPES.length} />
+         {/* PRIMARY FIELDS — always visible */}
+         <div className="grid grid-cols-5 gap-3">
+           <div className="col-span-1">
+             <Field label="Type">
+               <SearchSelect value={c.type || ""} onChange={(v)=>updateCust(c.id,{type:v})} options={CUSTOMER_TYPES} placeholder="Type..." maxResults={CUSTOMER_TYPES.length} />
+             </Field>
+           </div>
+           <div className="col-span-2 sm:col-span-1">
+             <Field label="First Name"><Input data-audit-key="custFirst" className={index===0 && auditOn && highlightMissing?.custFirst ? "audit-missing" : ""} value={c.first} onChange={e=>updateCust(c.id,{first:e.target.value})} /></Field>
+           </div>
+           <div className="col-span-2 sm:col-span-1">
+             <Field label="Last Name"><Input data-audit-key="custLast" className={hasMeaningfulValue(c.first) && !hasMeaningfulValue(c.last) ? "attention-outline" : ""} value={c.last} onChange={e=>updateCust(c.id,{last:e.target.value})} /></Field>
+           </div>
+           <div className="col-span-2 sm:col-span-1">
+             <Field label="Phone"><Input data-audit-key="custPhone" type="tel" value={c.phone} onChange={e=>updateCust(c.id,{phone: formatPhoneNumber(e.target.value)})} maxLength={14} placeholder="(555) 123-4567" /></Field>
+           </div>
+           <div className="col-span-3 sm:col-span-1">
+             <Field label="Email"><Input data-audit-key="custEmail" type="email" value={c.email} onChange={e=>updateCust(c.id,{email:e.target.value})} placeholder="email@example.com" /></Field>
+           </div>
          </div>
 
-         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="First Name"><Input data-audit-key="custFirst" className={index===0 && auditOn && highlightMissing?.custFirst ? "audit-missing" : ""} value={c.first} onChange={e=>updateCust(c.id,{first:e.target.value})} /></Field>
-            <Field label="Last Name"><Input data-audit-key="custLast" className={index===0 && auditOn && highlightMissing?.custLast ? "audit-missing" : ""} value={c.last} onChange={e=>updateCust(c.id,{last:e.target.value})} /></Field>
+         {/* Preferred contact — compact inline */}
+         <div className="flex items-center gap-2 flex-wrap">
+           <span className="text-[10px] font-bold text-slate-400 uppercase">Preferred method:</span>
+           {["Phone", "Email", "Text"].map(m => (
+             <ToggleMulti key={m} label={m} checked={c.preferredContact === m} onChange={() => {
+               updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false, contactViaRep: false });
+             }} className="!text-[10px] !px-2 !py-1" />
+           ))}
+           <span className="w-px h-4 bg-slate-200 mx-0.5" />
+           <ToggleMulti label="Contact via Rep" checked={!!c.contactViaRep} onChange={() => updateCust(c.id, { contactViaRep: !c.contactViaRep, doNotContact: false, preferredContact: "" })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-amber-50 !border-amber-300 !text-amber-700" />
+           <ToggleMulti label="Do Not Contact" checked={!!c.doNotContact} onChange={() => updateCust(c.id, { doNotContact: !c.doNotContact, contactViaRep: false, preferredContact: "" })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-rose-50 !border-rose-300 !text-rose-700" />
+         </div>
+         {c.contactViaRep && (
+           <div className="text-[10px] text-amber-600 pl-1">All communication for this contact should go through their representative.</div>
+         )}
+         {c.doNotContact && (
+           <div className="text-[10px] text-rose-600 pl-1">This person is flagged as Do Not Contact — the system will block outreach.</div>
+         )}
+
+         {/* SECONDARY — compact action buttons */}
+         <div className="flex items-center gap-2 flex-wrap">
+           <button
+             type="button"
+             onClick={() => updateCust(c.id, { showWelcomePanel: !c.showWelcomePanel })}
+             className={`rounded-full border px-3 py-1 text-[10px] font-bold ${c.showWelcomePanel ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}
+           >
+             📱 Send Welcome Text
+           </button>
+           <button
+             type="button"
+             onClick={() => updateCust(c.id, { showQuickNotes: !c.showQuickNotes })}
+             className={`rounded-full border px-3 py-1 text-[10px] font-bold ${c.showQuickNotes ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}
+           >
+             📝 Add Note
+           </button>
          </div>
 
-         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-             <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between items-center"><label className="text-sm font-semibold text-slate-700">Phone</label><button className="text-xs text-sky-600 font-bold hover:text-sky-700">+ Add</button></div>
-                <div className="flex gap-2">
-                    <div className="w-1/3"><Select value={c.phoneType} onChange={(e) => updateCust(c.id, { phoneType: e.target.value })}><option>Mobile</option><option>Home</option><option>Work</option></Select></div>
-                    <Input data-audit-key="custPhone" className={`flex-1 ${index===0 && auditOn && highlightMissing?.custPhone ? "audit-missing" : ""}`} type="tel" value={c.phone} onChange={e=>updateCust(c.id,{phone: formatPhoneNumber(e.target.value)})} maxLength={14} placeholder="(555) 123-4567" />
-                </div>
+         {/* Welcome text — expanded only when clicked */}
+         {c.showWelcomePanel && (
+           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-semibold text-slate-600">
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendBrochure} onChange={e=>updateCust(c.id,{sendBrochure:e.target.checked})} /> Brochure</label>
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendRushGuide} onChange={e=>updateCust(c.id,{sendRushGuide:e.target.checked})} /> Rush Guide</label>
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendAuthLink} onChange={e=>updateCust(c.id,{sendAuthLink:e.target.checked})} /> Auth Form</label>
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendCosLink} onChange={e=>updateCust(c.id,{sendCosLink:e.target.checked})} /> COS Link</label>
+               <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" checked={!!c.sendGoogleReviewLink} onChange={e=>updateCust(c.id,{sendGoogleReviewLink:e.target.checked})} /> Google Review</label>
              </div>
-             <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between items-center"><label className="text-sm font-semibold text-slate-700">Email</label><button className="text-xs text-sky-600 font-bold hover:text-sky-700">+ Add</button></div>
-                <Input data-audit-key="custEmail" className={index===0 && auditOn && highlightMissing?.custEmail ? "audit-missing" : ""} type="email" value={c.email} onChange={e=>updateCust(c.id,{email:e.target.value})} placeholder="user@example.com" />
+             <div className="flex items-center justify-between">
+               {!hasMobile && <span className="text-[10px] text-amber-600">Add mobile # to send</span>}
+               {c.doNotContact && <span className="text-[10px] text-rose-600">Do Not Contact enabled</span>}
+               <button onClick={() => onSendWelcome?.(c.id)} disabled={!canSendWelcome} className={`rounded-full px-3 py-1 text-[10px] font-bold ${canSendWelcome ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>Send</button>
              </div>
-         </div>
-
-         <Field label="Preferred Contact Method">
-             <div className="flex flex-wrap gap-2">
-                 {["Phone", "Email", "Text"].map(m => (
-                     <ToggleMulti key={m} label={m} checked={c.preferredMethod === m} onChange={() => updateCust(c.id, { preferredMethod: m })} colorClass="!bg-sky-500 !border-sky-500 !text-white" />
-                 ))}
-             </div>
-         </Field>
-
-         <div className="flex items-center gap-3">
-           <span className="text-sm font-bold text-rose-700">Do Not Contact</span>
-           <Switch checked={!!c.doNotContact} onChange={(val)=>updateCust(c.id,{doNotContact: val})} />
-           {c.doNotContact && (
-             <span className="text-xs text-rose-700">Enabled</span>
-           )}
-         </div>
-
-         <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-             <button onClick={() => updateCust(c.id, { showWelcomePanel: !c.showWelcomePanel })} className="flex w-full items-center justify-between">
-               <span className="text-sm font-bold text-slate-700">Send Welcome Text</span>
-               <span className="text-slate-400 text-lg">{c.showWelcomePanel ? "▾" : "›"}</span>
-             </button>
-             {c.showWelcomePanel && (
-               <div className="space-y-3">
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendBrochure} onChange={e=>updateCust(c.id,{sendBrochure:e.target.checked})} /> Send Brochure</label>
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendRushGuide} onChange={e=>updateCust(c.id,{sendRushGuide:e.target.checked})} /> Send Rush Guide</label>
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendAuthLink} onChange={e=>updateCust(c.id,{sendAuthLink:e.target.checked})} /> Authorization Form Link</label>
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendCosLink} onChange={e=>updateCust(c.id,{sendCosLink:e.target.checked})} /> COS Link</label>
-                     <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-slate-200" checked={!!c.sendGoogleReviewLink} onChange={e=>updateCust(c.id,{sendGoogleReviewLink:e.target.checked})} /> Google Review Link</label>
-                 </div>
-                 <div className="flex items-center justify-end">
-                   <button onClick={() => onSendWelcome?.(c.id)} disabled={!canSendWelcome} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${canSendWelcome ? 'bg-sky-500 text-white hover:bg-sky-500' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>Send</button>
-                 </div>
-                 {!hasMobile && (
-                   <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                     Add a mobile phone number to send texts.
-                   </div>
-                 )}
-                 {c.doNotContact && (
-                   <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-                     Do Not Contact is enabled. Sending is disabled.
-                   </div>
-                 )}
-               </div>
-             )}
-         </div>
-
-         <Field label="Notes">
-             <div className="mb-2">
-               <button
-                 onClick={() => updateCust(c.id, { showQuickNotes: !c.showQuickNotes })}
-                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${c.showQuickNotes ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
-               >
-                 📝 Add Quick Note
-               </button>
-             </div>
-             {c.showQuickNotes && (
-                 <div className="mb-2 flex flex-wrap gap-2">
-                     {CUSTOMER_QUICK_NOTES.map(n => (
-                         <ToggleMulti key={n} label={n} checked={(c.quickNotes || []).includes(n)} onChange={() => toggleQuickNote(n)} />
-                     ))}
-                 </div>
-             )}
-             <Textarea value={c.note} onChange={e => updateCust(c.id, { note: e.target.value })} placeholder="Add notes about this customer..." />
-         </Field>
-
-         {c.isPrimary && (
-           <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 space-y-3">
-               <div className="flex items-center justify-between">
-                   <span className="text-sm font-bold text-emerald-800">Household</span>
-               </div>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                 <Field label="Number of Members">
-                   <Input type="number" value={c.householdCount || ""} onChange={e=>updateCust(c.id,{householdCount:e.target.value})} placeholder="#" />
-                 </Field>
-                <Field label="Pets">
-                  <Input value={c.householdAnimals || ""} onChange={e=>updateCust(c.id,{householdAnimals:e.target.value})} placeholder="Enter type and names" />
-                </Field>
-               </div>
-               <Field label="Quick Add Names">
-                 <div className="flex gap-2">
-                   <Input
-                     value={householdName}
-                     onChange={e=>setHouseholdName(e.target.value)}
-                     placeholder="Name"
-                     onKeyDown={(e) => {
-                       if (e.key === "Enter") {
-                         e.preventDefault();
-                         const name = householdName.trim();
-                         if (!name) return;
-                         const next = [...(c.householdMembers || []), name];
-                         updateCust(c.id, { householdMembers: next });
-                         setHouseholdName("");
-                       }
-                     }}
-                   />
-                   <button
-                     onClick={() => {
-                       const name = householdName.trim();
-                       if (!name) return;
-                       const next = [...(c.householdMembers || []), name];
-                       updateCust(c.id, { householdMembers: next });
-                       setHouseholdName("");
-                     }}
-                     className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-                   >
-                     Add
-                   </button>
-                 </div>
-                 {(c.householdMembers || []).length > 0 && (
-                   <div className="mt-2 flex flex-wrap gap-2">
-                     {(c.householdMembers || []).map((n, idx) => (
-                       <span key={`${n}-${idx}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                         {n}
-                       </span>
-                     ))}
-                   </div>
-                 )}
-               </Field>
            </div>
          )}
+
+         {/* Notes — expanded only when clicked */}
+         {c.showQuickNotes && (
+           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+             <div className="flex flex-wrap gap-1.5">
+               {CUSTOMER_QUICK_NOTES.map(n => (
+                 <ToggleMulti key={n} label={n} checked={(c.quickNotes || []).includes(n)} onChange={() => toggleQuickNote(n)} className="!text-[10px] !px-2 !py-1" />
+               ))}
+             </div>
+             <Input value={c.note} onChange={e => updateCust(c.id, { note: e.target.value })} placeholder="Additional notes..." />
+           </div>
+         )}
+
 
          <div className="flex justify-end">
            <button
@@ -3784,6 +4236,31 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
 const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing, index, onVerify, auditOn, rentOrOwn, rentCoverageLimit, onRentOrOwnChange, onRentCoverageChange, forceShowCoords, autoOpenForTypePrompt, autoFocusTypePrompt, onTypePromptFocused }) => {
   const [coordsOpen, setCoordsOpen] = useState(false);
   const [open, setOpen] = useState(false);
+  const prevOpenRef = useRef(false);
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      setTimeout(() => {
+        const card = document.querySelector(`[data-address-item-id="${addr.id}"]`);
+        if (!card) return;
+        const wrapper = card.querySelector('.google-address-search');
+        const searchInput = wrapper?.querySelector('input');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.style.borderColor = "#0ea5e9";
+          searchInput.style.outline = "none";
+          searchInput.style.boxShadow = "none";
+          setTimeout(() => { searchInput.style.borderColor = ""; }, 2500);
+        }
+      }, 150);
+    }
+    prevOpenRef.current = open;
+  }, [open]);
+  useEffect(() => {
+    if (addr._forceOpen) {
+      setOpen(true);
+      updateAddr(addr.id, { _forceOpen: false });
+    }
+  }, [addr._forceOpen]);
   const typeSelectRef = useRef(null);
   const placeholder = isAddressPlaceholder(addr);
   useEffect(() => {
@@ -3813,12 +4290,42 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
     <div
       data-address-item-id={addr.id}
       data-audit-key={placeholder ? `placeholder-address-${addr.id}` : undefined}
-      className={`group relative overflow-hidden rounded-lg sm:rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all hover:shadow-md ${placeholder ? "placeholder-shell" : (addr.isPrimary ? "border-sky-400 ring-1 ring-sky-50" : "border-slate-200")}`}
+      className={`group relative overflow-hidden rounded-lg sm:rounded-xl border ${open ? 'p-3 sm:p-5' : 'px-3 py-2 sm:px-4 sm:py-2.5'} shadow-sm transition-all hover:shadow-md ${addr.inactive ? "bg-slate-50 opacity-60 border-slate-200" : placeholder ? "placeholder-shell bg-white" : addr.isPrimary ? "bg-white border-sky-400 ring-1 ring-sky-50" : "bg-white border-slate-200"}`}
     >
       {addr.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
-      {total > 1 && ( <button onClick={()=>onRemove(addr.id)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">×</button> )}
+      {total > 1 && !addr.inactive && (
+        <button
+          onClick={() => updateAddr(addr.id, { _showMenu: true })}
+          className={`absolute ${open ? 'right-3 top-3 h-7 w-7' : 'right-2 top-2 h-5 w-5 text-xs'} grid place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors`}
+          title="Remove or deactivate address"
+        >×</button>
+      )}
+      {addr._showMenu && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => updateAddr(addr.id, { _showMenu: false })}>
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-slate-100">
+              <div className="text-sm font-bold text-slate-800">{addr.type || "Address"}</div>
+              <div className="text-xs text-slate-500">{summarizeAddress(addr)}</div>
+            </div>
+            <div className="p-3 space-y-1">
+              <button onClick={() => updateAddr(addr.id, { _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+              {hasMeaningfulValue(addr.street) && (
+                <button onClick={() => updateAddr(addr.id, { inactive: true, isPrimary: false, isLossSite: false, _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50">Make Inactive</button>
+              )}
+              <button onClick={() => { if (hasMeaningfulValue(addr.street) ? window.confirm("Permanently delete this address?") : true) onRemove(addr.id); else updateAddr(addr.id, { _showMenu: false }); }} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {addr.inactive && (
+        <button
+          onClick={() => updateAddr(addr.id, { inactive: false })}
+          className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-sky-600 hover:bg-sky-50"
+          title="Reactivate this address"
+        >Reactivate</button>
+      )}
       <div
-        className="mb-4 pl-1 sm:pl-2 flex items-center gap-2 cursor-pointer"
+        className="pl-1 sm:pl-2 flex items-center gap-2 cursor-pointer"
         onClick={(e) => {
           if (isHeaderToggleIgnoredTarget(e.target)) return;
           setOpen(v => !v);
@@ -3835,118 +4342,112 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
          >
            <Chevron open={open} />
          </button>
-         <div className="flex flex-col">
-           <span className={`text-sm font-bold ${placeholder ? "placeholder-text" : "text-slate-800"}`}>{addr.type || "Address"}</span>
-           <span className="text-[10px] text-slate-500">{summarizeAddress(addr)}</span>
+         <div className="flex flex-col min-w-0">
+           <div className="flex items-center gap-2">
+             <span className={`${open ? 'text-base' : 'text-sm'} font-bold truncate ${placeholder ? "placeholder-text" : "text-slate-800"}`}>{addr.type || "Address"}</span>
+             {verified
+               ? <span title="This address was found and confirmed via Google Maps." className="rounded-full bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700 cursor-help shrink-0">✓</span>
+               : null
+             }
+           </div>
+           <span className="text-xs text-slate-500 truncate">{summarizeAddress(addr)}</span>
          </div>
-         {placeholder && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>}
-         {addr.isPrimary && <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-700">Primary</span>}
-         {addr.isLossSite && <span className="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Loss Site</span>}
+         <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+           {addr.inactive && <span className="rounded-full bg-slate-200 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-500">Inactive</span>}
+           {placeholder && !addr.inactive && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>}
+           <button type="button" onClick={() => updateAddr(addr.id, { isPrimary: !addr.isPrimary })} className={`rounded-full ${open ? 'px-2 py-0.5' : 'px-1.5 py-0.5'} text-[10px] font-bold border ${addr.isPrimary ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-sky-300'}`}>Primary</button>
+           {(addr.isPrimary || addr.isLossSite || open) && (
+             <button type="button" onClick={() => updateAddr(addr.id, { isLossSite: !addr.isLossSite })} className={`rounded-full ${open ? 'px-2 py-0.5' : 'px-1.5 py-0.5'} text-[10px] font-bold border ${addr.isLossSite ? 'bg-rose-100 border-rose-300 text-rose-700' : 'bg-white border-slate-200 text-slate-400 hover:border-rose-300'}`}>Loss Site</button>
+           )}
+         </div>
       </div>
       {open && (
-      <div className="grid gap-4 pl-1 sm:pl-2">
-        <div className="rounded-lg border border-sky-100 bg-sky-50/50 p-2">
-          <Field label="Find on Google (recommended)" subtle className="text-sky-700">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Start typing address..."
-                value={addr.googleQuery || ""}
-                onChange={e=>updateAddr(addr.id,{googleQuery:e.target.value})}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    updateAddr(addr.id,{street:"1 Main St",city:"Bloomingdale",state:"NJ",zip:"07403"});
-                  }
+      <div className="space-y-4 pl-1 sm:pl-2 mt-3">
+        {/* Core Address — always visible */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          {/* Google search inside the address card */}
+          {(() => {
+            const DEMO_RESULTS = [
+              { street: "148 Amsterdam Ave", city: "Hawthorne", state: "NY", zip: "10532", display: "148 Amsterdam Ave, Hawthorne, NY 10532" },
+              { street: "25 Main St", city: "Bloomingdale", state: "NJ", zip: "07403", display: "25 Main St, Bloomingdale, NJ 07403" },
+              { street: "1616 Springfield Ave", city: "Pennsauken", state: "NJ", zip: "08110", display: "1616 Springfield Ave, Pennsauken, NJ 08110" },
+              { street: "17 Wausau St", city: "Ogdensburg", state: "NJ", zip: "07439", display: "17 Wausau St, Ogdensburg, NJ 07439" },
+              { street: "42 Park Ave", apt: "4B", city: "New York", state: "NY", zip: "10016", display: "42 Park Ave #4B, New York, NY 10016" },
+            ];
+            return (
+              <SearchSelect
+                value=""
+                onChange={v => {
+                  const match = DEMO_RESULTS.find(r => r.display === v);
+                  if (match) updateAddr(addr.id, { street: match.street, apt: match.apt || "", city: match.city, state: match.state, zip: match.zip, lat: "40.0", lng: "-74.0" });
                 }}
+                options={DEMO_RESULTS.map(r => ({ label: r.display, value: r.display, type: "address" }))}
+                placeholder="🔍  Find address on Google..."
+                clearOnCommit
+                maxResults={5}
+                autoComplete="off"
+                className="google-address-search !border-sky-300 !rounded-lg !py-3 !shadow-none !ring-0"
               />
-              <button className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600 transition-all" onClick={()=>updateAddr(addr.id,{street:"1 Main St",city:"Bloomingdale",state:"NJ",zip:"07403"})}>Search</button>
-            </div>
-          </Field>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[140px]">
-            <Field label="Type">
-              <Select
-                ref={typeSelectRef}
-                value={addr.type}
-                onChange={e=>updateAddr(addr.id,{type:e.target.value})}
-                className={placeholder && !addr.type ? "attention-fill" : ""}
-              >
-                <option value="" disabled>Select Type...</option>
+            );
+          })()}
+          <div className="grid grid-cols-4 gap-3">
+            <div className="col-span-3"><Field label="Street"><Input data-audit-key="addrStreet" className={index===0 && auditOn && highlightMissing?.addrStreet ? "audit-missing" : ""} value={addr.street} onChange={e=>updateAddr(addr.id,{street:e.target.value})} /></Field></div>
+            <div className="col-span-1"><Field label="Apt / Unit"><Input value={addr.apt} onChange={e=>updateAddr(addr.id,{apt:e.target.value})} placeholder="Apt #" /></Field></div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="City"><Input data-audit-key="addrCity" className={index===0 && auditOn && highlightMissing?.addrCity ? "audit-missing" : ""} value={addr.city} onChange={e=>updateAddr(addr.id,{city:e.target.value})} /></Field>
+            <Field label="State">
+              <SearchSelect value={addr.state} onChange={(v)=>updateAddr(addr.id,{state:v})} options={STATES} placeholder="State" className={index===0 && auditOn && highlightMissing?.addrState ? "audit-missing" : ""} maxResults={STATES.length} uppercase />
+            </Field>
+            <Field label="Zip"><Input data-audit-key="addrZip" className={index===0 && auditOn && highlightMissing?.addrZip ? "audit-missing" : ""} value={addr.zip} onChange={e=>updateAddr(addr.id,{zip:e.target.value})} inputMode="numeric" /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Address Type">
+              <Select ref={typeSelectRef} value={addr.type || ""} onChange={e=>updateAddr(addr.id,{type:e.target.value})}>
+                <option value="">Select type...</option>
                 {["House","Apartment","Garden Apartment","Row House","Neighbor","Hotel","Moving","Relative","Rental","Other Home","Temp","Work","Other"].map(t=><option key={t} value={t}>{t}</option>)}
               </Select>
-              {placeholder && !addr.type && (
-                <div className="mt-1 text-[10px] font-semibold text-orange-700">
-                  Select address type now, or leave as placeholder for later.
+            </Field>
+            <Field label="Address Note">
+              <Input value={addr.note || ""} onChange={e=>updateAddr(addr.id,{note:e.target.value})} placeholder="e.g. Long driveway on left, gate code 1234" />
+            </Field>
+          </div>
+        </div>
+
+        {/* Property Details — collapsible */}
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <button type="button" onClick={() => setCoordsOpen(v => !v)} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 rounded-xl">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Property Details</span>
+            <span className={`text-slate-400 text-xs transition-transform ${coordsOpen ? "rotate-90" : ""}`}>›</span>
+          </button>
+          {coordsOpen && (
+            <div className="px-4 pb-4 space-y-4 border-t border-slate-100">
+              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block h-2 w-2 rounded-full ${verified ? "bg-emerald-500" : "bg-slate-300"}`} />
+                  <span className="text-sm text-slate-700">{verified ? "Address verified" : "Verify address"}</span>
+                </div>
+                <button onClick={() => onVerify?.(addr.id)} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Verify</button>
+              </div>
+              {index === 0 && (<><span data-audit-key="addrLat" className="block h-[1px] w-[1px] opacity-0" /><span data-audit-key="addrLng" className="block h-[1px] w-[1px] opacity-0" /></>)}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Latitude"><Input className={index===0 && auditOn && highlightMissing?.addrLat ? "audit-missing" : ""} value={addr.lat} onChange={e=>updateAddr(addr.id,{lat:e.target.value})} placeholder="e.g. 40.8874" /></Field>
+                <Field label="Longitude"><Input className={index===0 && auditOn && highlightMissing?.addrLng ? "audit-missing" : ""} value={addr.lng} onChange={e=>updateAddr(addr.id,{lng:e.target.value})} placeholder="e.g. -74.0291" /></Field>
+              </div>
+              {index === 0 && (
+                <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                  <span className="text-sm text-slate-700">Rent or own?</span>
+                  <ToggleGroup options={["Rent","Own"]} value={rentOrOwn} onChange={onRentOrOwnChange} />
                 </div>
               )}
-            </Field>
-          </div>
-          <div className="flex-1"><Field label="Location Status"><div className="flex gap-2"><ToggleMulti label="Primary" checked={!!addr.isPrimary} onChange={()=>updateAddr(addr.id,{isPrimary:!addr.isPrimary})} colorClass="!bg-sky-100 !border-sky-400 !text-sky-700" showDot={false} /><ToggleMulti label="Loss Site" checked={!!addr.isLossSite} onChange={()=>updateAddr(addr.id,{isLossSite:!addr.isLossSite})} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} /></div></Field></div>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><Field label="Street Address"><Input data-audit-key="addrStreet" className={index===0 && auditOn && highlightMissing?.addrStreet ? "audit-missing" : ""} value={addr.street} onChange={e=>updateAddr(addr.id,{street:e.target.value})} /></Field><Field label="Apt / Unit #"><Input value={addr.apt} onChange={e=>updateAddr(addr.id,{apt:e.target.value})} /></Field></div>
-        <div className="grid grid-cols-3 gap-4">
-           <div className="col-span-1"><Field label="City"><Input data-audit-key="addrCity" className={index===0 && auditOn && highlightMissing?.addrCity ? "audit-missing" : ""} value={addr.city} onChange={e=>updateAddr(addr.id,{city:e.target.value})} /></Field></div>
-           <div className="col-span-1">
-             <Field label="State">
-               <SearchSelect
-                 value={addr.state}
-                 onChange={(v)=>updateAddr(addr.id,{state:v})}
-                 options={STATES}
-                 placeholder="State"
-                 className={index===0 && auditOn && highlightMissing?.addrState ? "audit-missing" : ""}
-                 maxResults={STATES.length}
-                 uppercase
-               />
-               <div className="mt-1 text-[10px] text-slate-400">Press Tab to accept.</div>
-             </Field>
-           </div>
-           <div className="col-span-1"><Field label="Zip"><Input data-audit-key="addrZip" className={index===0 && auditOn && highlightMissing?.addrZip ? "audit-missing" : ""} value={addr.zip} onChange={e=>updateAddr(addr.id,{zip:e.target.value})} inputMode="numeric" pattern="\d{5}" /></Field></div>
-        </div>
-        <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${verified ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"} ${index===0 && auditOn && (!addr.lat || !addr.lng) ? "audit-missing" : ""}`}>
-          <div className="flex items-center gap-2 text-xs font-semibold">
-            <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${verified ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-              {verified ? "✓" : "!"}
-            </span>
-            <span className={verified ? "text-emerald-700" : "text-amber-700"}>
-              {verified ? "Verified by Google" : "Address not verified"}
-            </span>
-          </div>
-          <button
-            onClick={() => setCoordsOpen(v => !v)}
-            className="text-[10px] font-bold text-slate-500 hover:text-sky-700"
-          >
-            {coordsOpen ? "Hide coords" : "Edit coords"}
-          </button>
-          {index === 0 && (
-            <>
-              <span data-audit-key="addrLat" className="block h-[1px] w-[1px] opacity-0" />
-              <span data-audit-key="addrLng" className="block h-[1px] w-[1px] opacity-0" />
-            </>
+              {index === 0 && rentOrOwn === "Rent" && (
+                <div className="rounded-lg border border-orange-300 bg-orange-50 p-3">
+                  <div className="text-sm font-bold text-orange-800 mb-2">Confirm Coverage</div>
+                  <Input data-audit-key="rentCoverageLimit" className={auditOn && highlightMissing?.rentCoverageLimit ? "audit-missing" : ""} value={rentCoverageLimit || ""} onChange={e=>onRentCoverageChange(e.target.value)} placeholder="Coverage amount ($)" />
+                </div>
+              )}
+            </div>
           )}
-        </div>
-        {coordsOpen && (
-          <div className="grid grid-cols-2 gap-4">
-             <div className="col-span-1"><Field label="Latitude"><Input className={index===0 && auditOn && highlightMissing?.addrLat ? "audit-missing" : ""} value={addr.lat} onChange={e=>updateAddr(addr.id,{lat:e.target.value})} placeholder="e.g. 40.8874" /></Field></div>
-             <div className="col-span-1"><Field label="Longitude"><Input className={index===0 && auditOn && highlightMissing?.addrLng ? "audit-missing" : ""} value={addr.lng} onChange={e=>updateAddr(addr.id,{lng:e.target.value})} placeholder="e.g. -74.0291" /></Field></div>
-          </div>
-        )}
-        {index === 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <Field label="Rent or Own?">
-              <ToggleGroup options={["Rent","Own"]} value={rentOrOwn} onChange={onRentOrOwnChange} />
-            </Field>
-            {rentOrOwn === "Rent" && (
-              <div className="mt-3 rounded-lg border border-orange-300 bg-orange-50 p-3">
-                <div className="text-sm font-bold text-orange-800 mb-2">Confirm Coverage</div>
-                <Input data-audit-key="rentCoverageLimit" className={auditOn && highlightMissing?.rentCoverageLimit ? "audit-missing" : ""} value={rentCoverageLimit || ""} onChange={e=>onRentCoverageChange(e.target.value)} placeholder="Coverage amount ($)" />
-              </div>
-            )}
-          </div>
-        )}
-        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-           <div className="text-xs text-slate-500">Verify address and auto-fill lat/long (demo)</div>
-           <button onClick={() => onVerify?.(addr.id)} className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Verify</button>
         </div>
         <div className="flex justify-end">
           <button
@@ -3964,12 +4465,35 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
 });
 
 // --- QUICK ENTRY COMPONENT ---
-const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment, toggleNonRestorationPrimary, toggleRestorationType, selectNonRestorationSubtype }) => {
+const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment, toggleNonRestorationPrimary, toggleRestorationType, selectNonRestorationSubtype, onSwitchToDetailed }) => {
+    const recordWord = data.isLead === true ? "Lead" : "Order";
     const [eventNoteDraft, setEventNoteDraft] = useState("");
     const [showQuickInstructions, setShowQuickInstructions] = useState(false);
     const [showLoadListPanel, setShowLoadListPanel] = useState(false);
     const [showAllEventNotes, setShowAllEventNotes] = useState(false);
     const [editSystemInstructions, setEditSystemInstructions] = useState(false);
+    const [scheduleMoreOpen, setScheduleMoreOpen] = useState(false);
+    const [quickCompanyOpen, setQuickCompanyOpen] = useState(false);
+    const [quickCompanySelectedRole, setQuickCompanySelectedRole] = useState("");
+    const [quickCompanyDraftCompany, setQuickCompanyDraftCompany] = useState("");
+    const [quickCompanyDraftContact, setQuickCompanyDraftContact] = useState("");
+    const [addNewModal, setAddNewModal] = useState(null);
+    const [dismissedTips, setDismissedTips] = useState(new Set());
+    const dismissTip = (key) => setDismissedTips(prev => new Set([...prev, key]));
+
+    // Reset add-company state when data is cleared
+    const vendorCount = (data.vendors || []).length;
+    useEffect(() => {
+      if (vendorCount === 0) {
+        setQuickCompanySelectedRole("");
+        setQuickCompanyDraftCompany("");
+        setQuickCompanyDraftContact("");
+      }
+    }, [vendorCount]);
+
+    const QUICK_COMPANY_TYPES = ["Insurance", "TPA", "Restoration Company", "Moving", "Public Adjusting", "Independent Adjusting", "Contractor", "Hygienist", "Art", "Other"];
+
+    const quickAddedCompanies = data.vendors || [];
     const dateRef = useRef(null);
     const timeRef = useRef(null);
     const noteInputRef = useRef(null);
@@ -4011,47 +4535,96 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
     return (
         <div className="space-y-6 fade-in pt-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-extrabold uppercase tracking-widest text-sky-700">Quick Questions</div>
-                {quickQuestionsCollapsed && (
-                  <button className="text-[10px] font-bold text-sky-600 hover:text-sky-700" onClick={() => setQuickQuestionsCollapsed(false)}>Edit</button>
+            {showInlineHelp && (
+              <div className="rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3 flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  <strong className="text-slate-700">Quick Entry</strong> — capture the basics fast. Need more fields? <button type="button" onClick={onSwitchToDetailed} className="font-bold text-sky-600 hover:text-sky-700 underline underline-offset-2">Switch to Detailed</button> anytime, or add extra details in Event Instructions below.
+                </p>
+                {onSwitchToDetailed && (
+                  <button type="button" onClick={onSwitchToDetailed} className="shrink-0 rounded-full border border-sky-300 bg-white px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-50 transition-all">
+                    Detailed Entry
+                  </button>
                 )}
               </div>
-              {quickQuestionsCollapsed ? (
-                <div className="mt-3 text-xs text-slate-600 flex flex-wrap gap-2">
-                  <span className={`rounded-full px-2 py-0.5 font-semibold ${recordTypeLabel === "Select Type" ? "bg-amber-50 text-amber-700" : "bg-sky-50 text-sky-700"}`}>{recordTypeLabel}</span>
-                  {derivedProjectType && <span className="rounded-full bg-slate-100 px-2 py-0.5">{derivedProjectType}</span>}
-                  {nonRestorationSelected && nonRestorationSubtype && <span className="rounded-full bg-slate-100 px-2 py-0.5">{nonRestorationSubtype}</span>}
-                  {data.involvesInsurance && <span className="rounded-full bg-slate-100 px-2 py-0.5">Insurance: {data.involvesInsurance}</span>}
-                  {data.payorQuick && <span className="rounded-full bg-slate-100 px-2 py-0.5">Payor: {data.payorQuick}</span>}
-                </div>
-              ) : (
-                <div className={`mt-4 ${compactMode ? "space-y-3" : "space-y-4"}`}>
+            )}
+            <div id="quick-questions" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28">
+              <div className="mb-4">
+                <input
+                  value={data.orderName || ""}
+                  onChange={e => updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })}
+                  placeholder={`${recordWord} Name (e.g. Baker-PennsaukenNJ)`}
+                  className="w-full text-lg font-bold text-sky-700 border-none outline-none bg-transparent placeholder:text-slate-300 placeholder:font-normal"
+                  data-noe-field="orderName"
+                />
+                <div className="h-px bg-slate-100 mt-1"></div>
+              </div>
+              <div className={`${compactMode ? "space-y-3" : "space-y-4"}`}>
                   <Field label="Is this an Order or only a Lead?">
                     <ToggleGroup options={[
                       { label: "Order", title: "Active project with confirmed billing." },
                       { label: "Lead", title: "Potential project; incomplete information or no billing yet." }
                     ]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
+                    {showInlineHelp && (
+                    <div className="text-[11px] text-slate-400 mt-1">
+                      {data.isLead === true
+                        ? "A Lead requires selling the customer and getting approvals from the adjuster before we proceed. No billable charges yet — just an opportunity we will pursue."
+                        : data.isLead === false
+                          ? "An Order is a confirmed project ready to be scheduled and worked."
+                          : "Select one to continue."}
+                    </div>
+                    )}
                   </Field>
-                  <Field label="Order Type">
+                  <div className="border-t border-slate-100 pt-4">
+                    <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={onApplyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={onOpenCrmLog} onPromptRoleAssignment={onPromptRoleAssignment} onAddNewToSystem={(info) => {
+                      setAddNewModal({
+                        firstName: info.firstName || "",
+                        lastName: info.lastName || "",
+                        title: "",
+                        phone: "",
+                        email: "",
+                        companyName: "",
+                        companyType: "",
+                        companyPhone: "",
+                        companyWebsite: "",
+                        companyAddress: "",
+                        isNewCompany: false,
+                        source: info.source || "referrer",
+                      });
+                    }} />
+                  </div>
+                  <div className="border-t border-slate-100 pt-4 space-y-4">
+                  <Field label="What caused the loss?">
+                    {showInlineHelp && !data.primaryLossType && !dismissedTips.has("Loss Type") && (
+                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-2">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Loss Type"); e.target.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
+                        🎓 <span className="font-bold">Loss Type:</span> Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map((ot) => (
                         <ToggleMulti
                           key={ot}
                           label={ot}
-                          title="Type of peril/damage involved."
-                          checked={(data.orderTypes || []).includes(ot)}
+                          title={LOSS_TYPE_COACHING[ot] || "Type of peril/damage involved."}
+                          checked={data.primaryLossType === ot || (ot === NON_RESTORATION_PRIMARY && nonRestorationSelected)}
                           onChange={() => {
                             if (ot === NON_RESTORATION_PRIMARY) {
                               toggleNonRestorationPrimary();
+                              updateMany({ primaryLossType: NON_RESTORATION_PRIMARY });
                               return;
                             }
-                            toggleRestorationType(ot);
+                            const newPrimary = data.primaryLossType === ot ? "" : ot;
+                            const newOrderTypes = newPrimary ? [newPrimary, ...(data.secondaryContaminants || []).filter(s => s !== newPrimary)] : [...(data.secondaryContaminants || [])];
+                            updateMany({ primaryLossType: newPrimary, orderTypes: newOrderTypes });
                           }}
                         />
                       ))}
                     </div>
+                    {showInlineHelp && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
+                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">{data.primaryLossType}:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                      </div>
+                    )}
                   </Field>
                   {nonRestorationSelected && (
                     <Field label="Non-Restoration Type" missing={data.highlightMissing?.nonRestorationSubtype}>
@@ -4068,90 +4641,248 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       </div>
                     </Field>
                   )}
-                  {isRestorationProject && (
-                    <Field label="Does it involve insurance?">
-                      <ToggleGroup options={[
-                        { label: "Yes", title: "Whether customer is filing an insurance claim." },
-                        { label: "No", title: "Whether customer is filing an insurance claim." }
-                      ]} value={data.involvesInsurance} onChange={v => update("involvesInsurance", v)} />
+                  {data.primaryLossType && !nonRestorationSelected && (
+                    <Field label="Additional contaminants?">
+                      <div className="flex flex-wrap gap-2">
+                        {LOSS_TYPES.filter(t => t !== data.primaryLossType).map(t => (
+                          <ToggleMulti
+                            key={t}
+                            label={t}
+                            checked={(data.secondaryContaminants || []).includes(t)}
+                            onChange={() => {
+                              const next = (data.secondaryContaminants || []).includes(t)
+                                ? (data.secondaryContaminants || []).filter(s => s !== t)
+                                : [...(data.secondaryContaminants || []), t];
+                              updateMany({ secondaryContaminants: next, orderTypes: [data.primaryLossType, ...next] });
+                            }}
+                          />
+                        ))}
+                      </div>
+                      {showInlineHelp && <div className="text-[11px] text-slate-400 mt-1">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
                     </Field>
                   )}
-                  {data.involvesInsurance === "Yes" && (
+                  {isRestorationProject && (
                     <Field label="Who will be paying?">
                       <ToggleGroup options={[
-                        { label: "Insurance", title: "Whether customer is filing an insurance claim." },
+                        { label: "Insurance", title: "Customer is filing an insurance claim." },
                         { label: "Self-pay", title: "Customer pays directly without insurance." },
                         { label: "Referrer", title: "Referring party covers payment." },
                         { label: "Public Adjuster", title: "Public adjuster covers payment." },
                         { label: "Other", title: "Other payment arrangement." }
-                      ]} value={data.payorQuick} onChange={v => { update("payorQuick", v); update("billingPayer", v === "Self-pay" ? "Customer" : (v === "Insurance" ? "Insurance" : v)); }} />
+                      ]} value={data.payorQuick} onChange={v => {
+                        const patch = { payorQuick: v, billingPayer: v === "Self-pay" ? "Customer" : (v === "Insurance" ? "Insurance" : v) };
+                        if (v === "Insurance") { patch.involvesInsurance = "Yes"; patch.insuranceClaim = "Yes"; }
+                        else { patch.involvesInsurance = "No"; }
+                        updateMany(patch);
+                      }} />
                     </Field>
                   )}
-                </div>
-              )}
+                  {data.payorQuick === "Insurance" && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="Claim #" noeField="claimNumber">
+                        <Input value={data.claimNumber || ""} onChange={e => update("claimNumber", e.target.value)} placeholder="e.g. 70100933341" />
+                      </Field>
+                      <Field label="Policy #" noeField="policyNumber">
+                        <Input value={data.policyNumber || ""} onChange={e => update("policyNumber", e.target.value)} placeholder="e.g. 2361416060" />
+                      </Field>
+                    </div>
+                  )}
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-4 space-y-3">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Companies & Contacts on this Order</div>
+                    <SearchSelect
+                      value=""
+                      onChange={v => {
+                        const parsed = parseCombinedContact?.(v) || { contact: "", company: "" };
+                        const companyName = parsed.company || v;
+                        const contactName = parsed.contact || "";
+                        const existing = (data.vendors || []).some(x =>
+                          normalizeCompany(x.company || "") === normalizeCompany(companyName) &&
+                          normalizeContact(x.contact || "") === normalizeContact(contactName)
+                        );
+                        if (existing) { setToast?.(`${contactName ? contactName + " at " : ""}${companyName} is already on this order`); return; }
+                        const isKnown = combinedContactOptions.some(opt =>
+                          normalizeCompany(opt.value || "") === normalizeCompany(v) ||
+                          normalizeContact(opt.value || "") === normalizeContact(v)
+                        );
+                        const inferredType = inferCompanyTypeFromName(companyName);
+                        const entry = {
+                          company: companyName,
+                          contact: contactName,
+                          type: isKnown && inferredType !== "Other" ? inferredType : "",
+                          id: safeUid(),
+                          incomplete: !isKnown,
+                        };
+                        update("vendors", [...(data.vendors || []), entry]);
+                        setToast?.(isKnown
+                          ? `Added ${contactName ? contactName + " at " : ""}${companyName}`
+                          : `Added "${v}" as placeholder — tap Complete to add full details`
+                        );
+                      }}
+                      onQueryChange={() => {}}
+                      options={combinedContactOptions}
+                      placeholder="🔍  Search contacts and companies to add..."
+                      clearOnCommit
+                      onAddNew={v => {
+                        const entry = { company: "", contact: v, type: "", id: safeUid(), incomplete: true };
+                        update("vendors", [...(data.vendors || []), entry]);
+                        setToast?.(`Added "${v}" as placeholder — tap to complete details`);
+                      }}
+                      className="!border-sky-300 !rounded-lg"
+                    />
+                    {quickAddedCompanies.length > 0 && (
+                      <div className="space-y-2">
+                        {quickAddedCompanies.map((v, idx) => {
+                          const isReferrer = data.referringCompany && normalizeCompany(v.company || "") === normalizeCompany(data.referringCompany);
+                          const isInsurance = data.insuranceCompany && normalizeCompany(v.company || "") === normalizeCompany(data.insuranceCompany);
+                          const isBillTo = data.billingCompany && normalizeCompany(v.company || "") === normalizeCompany(data.billingCompany);
+                          return (
+                            <div key={v.id || `qc-${idx}`} className={`flex items-center gap-3 rounded-lg border px-4 py-3 flex-wrap ${v.incomplete ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 bg-white'}`}>
+                              {v.incomplete ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nameParts = (v.contact || "").trim().split(/\s+/);
+                                    setAddNewModal({
+                                      firstName: nameParts[0] || "",
+                                      lastName: nameParts.slice(1).join(" ") || "",
+                                      title: "",
+                                      phone: "",
+                                      email: "",
+                                      companyName: v.company || "",
+                                      companyType: v.type || "",
+                                      companyPhone: "",
+                                      companyWebsite: "",
+                                      companyAddress: "",
+                                      isNewCompany: !v.company,
+                                      source: "vendors",
+                                      replaceIdx: idx,
+                                    });
+                                  }}
+                                  className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-200 cursor-pointer"
+                                >
+                                  Needs Attention
+                                </button>
+                              ) : (
+                                <span className="rounded-full bg-sky-100 border border-sky-200 px-2.5 py-1 text-[10px] font-bold text-sky-700">{v.type || "Company"}</span>
+                              )}
+                              <span className="text-base font-bold text-slate-800">{v.company || v.contact || v.name}</span>
+                              {v.contact && v.company && <span className="text-base text-slate-600">— {v.contact}</span>}
+                              {[
+                                { active: isInsurance, label: "Insurance", toggle: () => {
+                                  if (isInsurance) updateMany({ insuranceCompany: "", insuranceAdjuster: "" });
+                                  else {
+                                    if (data.insuranceCompany && normalizeCompany(data.insuranceCompany) !== normalizeCompany(v.company)) {
+                                      if (!window.confirm(`This order already has "${data.insuranceCompany}" as insurance. Change to "${v.company}"?`)) return;
+                                    }
+                                    updateMany({ insuranceCompany: v.company, insuranceAdjuster: v.contact || "", insuranceClaim: "Yes", involvesInsurance: "Yes" });
+                                  }
+                                }},
+                                { active: isBillTo, label: "Bill To", toggle: () => {
+                                  if (isBillTo) updateMany({ billingCompany: "", billingContact: "" });
+                                  else updateMany({ billingCompany: v.company, billingContact: v.contact || "" });
+                                }},
+                              ].map(role => (
+                                <button key={role.label} type="button" onClick={role.toggle}
+                                  className={`rounded-full px-2 py-0.5 text-[9px] font-bold border transition-all ${role.active ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-sky-200 hover:text-sky-600'}`}
+                                >{role.label}</button>
+                              ))}
+                              {v.incomplete && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nameParts = (v.contact || "").trim().split(/\s+/);
+                                    setAddNewModal({
+                                      firstName: nameParts[0] || "",
+                                      lastName: nameParts.slice(1).join(" ") || "",
+                                      title: "",
+                                      phone: "",
+                                      email: "",
+                                      companyName: v.company || "",
+                                      companyType: v.type || "",
+                                      companyPhone: "",
+                                      companyWebsite: "",
+                                      companyAddress: "",
+                                      isNewCompany: !v.company,
+                                      source: "vendors",
+                                      replaceIdx: idx,
+                                    });
+                                  }}
+                                  className="text-[10px] font-bold text-amber-700 hover:text-amber-800"
+                                >
+                                  Complete
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => update("vendors", quickAddedCompanies.filter((_, i) => i !== idx))}
+                                className="ml-auto text-[10px] font-bold text-slate-400 hover:text-rose-500"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+              </div>
             </div>
 
-            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={onApplyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={onOpenCrmLog} onPromptRoleAssignment={onPromptRoleAssignment} />
-
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Quick Flags</h3>
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Project Type">
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                          {derivedProjectType || "Select an Order Type above"}
-                        </div>
-                    </Field>
-                    <Field label="Going Through Insurance?">
-                        <ToggleGroup options={["Yes", "No", "TBD"]} value={data.insuranceStatus} onChange={v => update("insuranceStatus", v)} />
-                    </Field>
+            <div id="quick-customer" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="customer">
+                <div className="flex items-baseline justify-between mb-4">
+                  <h3 className="text-sm font-bold uppercase text-sky-600">Customer</h3>
+                  <span className="text-[10px] text-slate-400">Notes? Add to Event Instructions below</span>
                 </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Customer</h3>
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="First Name">
+                    <Field label="First Name" noeField="customerFirstName">
                         <Input value={data.customers?.[0]?.first || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { first: e.target.value })} />
                     </Field>
-                    <Field label="Last Name">
+                    <Field label="Last Name" noeField="customerLastName">
                         <Input value={data.customers?.[0]?.last || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { last: e.target.value })} />
                     </Field>
-                    <Field label="Phone">
+                    <Field label="Phone" noeField="customerPhone">
                         <Input value={data.customers?.[0]?.phone || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { phone: formatPhoneNumber(e.target.value) })} placeholder="(555) 123-4567" />
                     </Field>
-                    <Field label="Email">
+                    <Field label="Email" noeField="customerEmail">
                         <Input type="email" value={data.customers?.[0]?.email || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { email: e.target.value })} placeholder="user@example.com" />
                     </Field>
                 </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                 <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Address</h3>
+            <div id="quick-address" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="address">
+                 <div className="flex items-baseline justify-between mb-4">
+                   <h3 className="text-sm font-bold uppercase text-sky-600">Address</h3>
+                   <span className="text-[10px] text-slate-400">Gate codes, access notes? Add below</span>
+                 </div>
                  <div className="grid gap-4">
                     <div className="rounded-lg border border-sky-50 bg-sky-50/50 p-2">
-                        <Field label="Find on Google" subtle className="text-sky-700">
+                        <Field label="Find on Google" subtle className="text-sky-700" noeField="addressSearch">
                              <div className="flex gap-2">
                                 <Input placeholder="Start typing address..." value={primaryAddr.googleQuery || ""} onChange={e=>updateAddr(primaryAddr.id,{googleQuery:e.target.value})} />
-                                <button className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600 transition-all" onClick={()=>updateAddr(primaryAddr.id,{street:"1 Main St",city:"Bloomingdale",state:"NJ",zip:"07403"})}>Search</button>
+                                <button data-noe-action="address-search" className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600 transition-all" onClick={()=>updateAddr(primaryAddr.id,{street:"1 Main St",city:"Bloomingdale",state:"NJ",zip:"07403"})}>Search</button>
                              </div>
                         </Field>
                     </div>
-                    <Field label="Street"><Input value={primaryAddr.street || ""} onChange={e=>updateAddr(primaryAddr.id,{street:e.target.value})} /></Field>
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="col-span-3"><Field label="Street" noeField="addressStreet"><Input value={primaryAddr.street || ""} onChange={e=>updateAddr(primaryAddr.id,{street:e.target.value})} /></Field></div>
+                      <div className="col-span-1"><Field label="Apt/Unit" noeField="addressApt"><Input value={primaryAddr.apt || ""} onChange={e=>updateAddr(primaryAddr.id,{apt:e.target.value})} placeholder="Apt #" /></Field></div>
+                    </div>
                     <div className="grid grid-cols-3 gap-2">
-                       <div className="col-span-1"><Input placeholder="City" value={primaryAddr.city || ""} onChange={e=>updateAddr(primaryAddr.id,{city:e.target.value})} /></div>
-                       <div className="col-span-1"><Select value={primaryAddr.state || ""} onChange={e=>updateAddr(primaryAddr.id,{state:e.target.value})}><option value="">State</option>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</Select></div>
-                       <div className="col-span-1"><Input placeholder="Zip" value={primaryAddr.zip || ""} onChange={e=>updateAddr(primaryAddr.id,{zip:e.target.value})} /></div>
+                       <div className="col-span-1" data-noe-field="addressCity"><Input placeholder="City" value={primaryAddr.city || ""} onChange={e=>updateAddr(primaryAddr.id,{city:e.target.value})} /></div>
+                       <div className="col-span-1" data-noe-field="addressState"><Select value={primaryAddr.state || ""} onChange={e=>updateAddr(primaryAddr.id,{state:e.target.value})}><option value="">State</option>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</Select></div>
+                       <div className="col-span-1" data-noe-field="addressZip"><Input placeholder="Zip" value={primaryAddr.zip || ""} onChange={e=>updateAddr(primaryAddr.id,{zip:e.target.value})} /></div>
                     </div>
                  </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Scheduling</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                     <button onClick={() => update('scheduleType', 'Scope')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Scope' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">📋</span><span className="font-bold text-xs">Scope</span></button>
-                     <button onClick={() => update('scheduleType', 'Pickup')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Pickup' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🚚</span><span className="font-bold text-xs">Pickup</span></button>
-                     <button onClick={() => update('scheduleType', 'In-Home')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'In-Home' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🏡</span><span className="font-bold text-xs">In-Home</span></button>
-                     <button onClick={() => update('scheduleType', 'Meeting')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Meeting' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🗓️</span><span className="font-bold text-xs">Meeting</span></button>
+            <div id="quick-scheduling" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28" data-noe-section="scheduling">
+                <h3 className="mb-4 text-sm font-bold uppercase text-sky-600">Schedule & Event Instructions</h3>
+                <div className="mb-4">
+                  <Field label="Event Type">
+                    <ToggleGroup options={["Scope","Pickup","In-Home","Meeting"]} value={data.scheduleType} onChange={v => update("scheduleType", v)} />
+                  </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 mb-4">
                     <Field
@@ -4159,214 +4890,168 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       action={
                         <button
                           type="button"
-                          onClick={() => onSetNowDate?.()}
-                          className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                          title="Set to today"
+                          onClick={() => { onSetNowDate?.(); onSetNowTime?.(); updateMany({ eventFirm: true, pickupTimeTentative: false, scheduleStatus: "" }); }}
+                          className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold text-sky-700 hover:bg-sky-100"
+                          title="Set date to today, time to next half hour, and mark as firm"
                         >
-                          📅 Now
+                          Now
                         </button>
                       }
                     >
                       <DatePicker value={data.pickupDate} onChange={(v)=>update("pickupDate", v)} closeSignal={dateCloseSignal} />
                     </Field>
-                    <Field
-                      label="Time"
-                      action={
-                        <button
-                          type="button"
-                          onClick={() => onSetNowTime?.()}
-                          className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                          title="Set to now"
-                        >
-                          🕒 Now
-                        </button>
-                      }
-                    >
+                    <Field label="Time" action={
+                      <button
+                        type="button"
+                        onClick={() => updateMany({ pickupTime: '12:00 AM', pickupTimeTentative: true, eventFirm: false })}
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-colors ${data.pickupTime === '12:00 AM' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'border border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-700'}`}
+                        title="Set time to TBD (12:00 AM placeholder)"
+                      >
+                        TBD
+                      </button>
+                    }>
                       <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseSignal} />
                     </Field>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                  <Field label="Event Assignee">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Assignee">
                     <Input value={data.eventAssignee} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" />
                   </Field>
                   <Field label="Vehicle">
-                    <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle" />
+                    <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle (optional)" />
                   </Field>
                 </div>
-                <Field label="Firm / Tentative">
-                  <div className="flex flex-wrap gap-2">
-                    <ToggleMulti
-                      label="Firm"
-                      checked={!!data.eventFirm}
-                      onChange={() => updateMany({ eventFirm: !data.eventFirm, pickupTimeTentative: false, scheduleStatus: !data.eventFirm ? "" : data.scheduleStatus })}
-                    />
-                    <ToggleMulti
-                      label="Tentative"
-                      checked={!!data.pickupTimeTentative}
-                      onChange={() => updateMany({ pickupTimeTentative: !data.pickupTimeTentative, eventFirm: false })}
-                      colorClass="!bg-orange-50 !border-orange-400 !text-orange-700"
-                    />
+                {data.pickupTime === '12:00 AM' && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 font-semibold">
+                    TBD — on the calendar but time not yet confirmed.
                   </div>
-                </Field>
-                <Field label="Scheduling Status">
-                  <div className="space-y-2">
-                    <div className={data.eventFirm ? "opacity-50 pointer-events-none" : ""}>
-                      <ToggleGroup
-                        options={["Schedule ASAP","Rep will Schedule"]}
-                        value={data.scheduleStatus}
-                        onChange={(v)=>updateMany({ scheduleStatus: v, eventFirm: false, pickupTimeTentative: false })}
+                )}
+                <div className="border-t border-slate-100 pt-4 mt-4">
+                  <div className="text-sm font-bold text-slate-700 mb-1">Event Instructions</div>
+                  {showInlineHelp && <p className="text-xs text-slate-400 mb-2">What the field team needs to know — conditions, access, customer preferences, what to bring.</p>}
+                  <AutoGrowTextarea
+                    value={stripEventSystemLines(data.eventInstructions || "")}
+                    onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
+                    placeholder="e.g. Fire started in basement. Water in basement too. Boarded up, no electricity — bring lights. Customer is elderly, does not text. Dog on premises."
+                    className="!min-h-[100px]"
+                  />
+                </div>
+                <div className="border-t border-slate-100 pt-3 mt-3 space-y-3">
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Who is contacting the customer?</div>
+                    <div className="flex flex-wrap gap-2">
+                      <ToggleMulti label="Already contacted" checked={data.contactAssignment === "done"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "done" ? "" : "done" })} className="!text-[10px] !px-2.5 !py-1" />
+                      <ToggleMulti label="Rep will contact" checked={data.contactAssignment === "rep"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "rep" ? "" : "rep" })} className="!text-[10px] !px-2.5 !py-1" />
+                      <ToggleMulti label="Office please contact" checked={data.contactAssignment === "office"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "office" ? "" : "office" })} className="!text-[10px] !px-2.5 !py-1" />
+                      <ToggleMulti label="Enter only — do not contact" checked={data.contactAssignment === "enter-only"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "enter-only" ? "" : "enter-only" })} className="!text-[10px] !px-2.5 !py-1" />
+                    </div>
+                  </div>
+                </div>
+            </div>
+
+
+            {addNewModal && (
+              <div className="fixed inset-0 z-[140] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-8 sm:pt-16 overflow-auto"
+                onKeyDown={e => { if (e.key === "Escape") setAddNewModal(null); }}
+              >
+                <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden" tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
+                  <div className="bg-sky-500 px-6 py-4">
+                    <h3 className="text-lg font-bold text-white">Add New Contact / Company</h3>
+                    <p className="text-sm text-sky-100">This will add them to the system for future orders.</p>
+                  </div>
+                  <div className="p-6 space-y-5">
+                    {/* Company section */}
+                    <div className="space-y-3">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Company</div>
+                      <SearchSelect
+                        value={addNewModal.companyName}
+                        onChange={v => setAddNewModal(p => ({ ...p, companyName: v, isNewCompany: !companies.some(c => normalizeCompany(c) === normalizeCompany(v)) }))}
+                        onQueryChange={() => {}}
+                        options={companies.map(c => ({ label: c, value: c, type: "company" }))}
+                        placeholder="Search existing or type new company..."
+                        onAddNew={v => setAddNewModal(p => ({ ...p, companyName: v, isNewCompany: true }))}
                       />
-                    </div>
-                    <div className="text-[11px] text-slate-400">Use when the event is not firm and the customer has not been contacted.</div>
-                  </div>
-                </Field>
-                <Field label="Who are we meeting?">
-                  <div className="flex flex-wrap gap-2">
-                    {(knownPeople && knownPeople.length > 0) ? knownPeople.map(p => (
-                      <ToggleMulti key={p} label={p} checked={(data.meetingWith || []).includes(p)} onChange={() => update("meetingWith", toggleMulti(data.meetingWith || [], p))}/>
-                    )) : <span className="text-sm text-slate-400 italic">Add customers or contacts first</span>}
-                  </div>
-                </Field>
-                <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                    <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">✅ Send Confirmation</button>
-                    <button onClick={onOpenReminder} className={`rounded-lg border px-4 py-3 text-sm font-semibold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600"}`}>⏰ {data.reminderEnabled ? "Edit Reminder" : "Schedule Reminder"}</button>
-                </div>
-                <div className="flex items-center justify-start border-t border-slate-100 pt-3">
-                  <button
-                    onClick={() => { update("addCRMlog", true); onOpenCrmLog?.(); }}
-                    className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  >
-                    + Add CRM Log
-                  </button>
-                </div>
-                <Field label="Event Instructions">
-                  <div className="relative rounded-lg border border-slate-200 bg-white p-3 space-y-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => { setShowQuickInstructions(v=>!v); setShowLoadListPanel(false); }}
-                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${showQuickInstructions ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
-                          title="Quick instructions"
-                        >
-                          📝 Notes
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setShowLoadListPanel(v=>!v); setShowQuickInstructions(false); }}
-                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${showLoadListPanel ? 'border-sky-400 text-sky-700 bg-sky-50' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
-                          title="To Load"
-                        >
-                          📦 Load
-                        </button>
-                      </div>
-                    </div>
-                    {eventSystemLines && (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="text-[10px] font-bold text-slate-500">Auto-filled</div>
-                          <button
-                            type="button"
-                            onClick={() => setEditSystemInstructions(v => !v)}
-                            className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
-                            title={editSystemInstructions ? "Lock auto-filled" : "Unlock to edit"}
-                          >
-                            {editSystemInstructions ? "🔓 Edit" : "🔒 Locked"}
-                          </button>
+                      {addNewModal.companyName && (
+                        <div className={`text-[11px] font-semibold ${addNewModal.isNewCompany ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          {addNewModal.isNewCompany
+                            ? `"${addNewModal.companyName}" is new — will be created`
+                            : `"${addNewModal.companyName}" found`}
                         </div>
-                        {editSystemInstructions ? (
-                          <textarea
-                            className="w-full min-h-[72px] rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
-                            value={data.eventSystemOverride || eventSystemLines}
-                            onChange={(e) => update("eventSystemOverride", e.target.value)}
-                          />
-                        ) : (
-                          <div className="space-y-1">
-                            {data.eventSystemOverride ? (
-                              <div className="whitespace-pre-line">{eventSystemLines}</div>
-                            ) : (
-                              eventSystemEntries.map(entry => (
-                                <div key={entry.label}>
-                                  <span className="font-semibold text-slate-700">{entry.label}:</span>{" "}
-                                  <span>{entry.value}</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <AutoGrowTextarea
-                      value={stripEventSystemLines(data.eventInstructions || "")}
-                      onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
-                      placeholder="please enter instrucitons for this event"
-                      className={hasEventInstructions ? "" : "border-orange-300 focus:border-orange-400 focus:ring-orange-200/40"}
-                    />
-                    {showQuickInstructions && (
-                      <div className="absolute right-3 top-12 z-20 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
-                        <div className="text-xs font-bold text-slate-500 mb-2">📝 Notes</div>
-                        <div className="flex flex-wrap gap-2">
-                          {quickNotes.map(n => (
-                            <ToggleMulti key={n} label={n} checked={(data.quickInstructionNotes||[]).includes(n)} onChange={()=>appendQuickNote(n)} />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {showLoadListPanel && (
-                      <div className="absolute right-3 top-12 z-20 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
-                        <div className="text-xs font-bold text-slate-500 mb-2">📦 Items to load</div>
-                        <div className="flex flex-wrap gap-2">
-                          {LOAD_ITEMS.map(item => (
-                            <ToggleMulti key={item} label={item} checked={(data.loadList||[]).includes(item)} onChange={() => update("loadList", toggleMulti(data.loadList||[], item))} />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div className="mt-3 border-t border-slate-100 pt-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ToggleMulti label="Customer Contacted" checked={!!data.eventCustomerContacted} onChange={() => update("eventCustomerContacted", !data.eventCustomerContacted)} className="!text-[10px] !px-2 !py-1" />
-                        <ToggleMulti label="Bill To Contacted" checked={!!data.eventBillToContacted} onChange={() => update("eventBillToContacted", !data.eventBillToContacted)} className="!text-[10px] !px-2 !py-1" />
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <Input
-                          ref={noteInputRef}
-                          value={eventNoteDraft}
-                          onChange={e=>setEventNoteDraft(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEventNote(); } }}
-                          placeholder="enter scheduling notes and attempts here"
-                        />
-                        <button onClick={addEventNote} className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Add</button>
-                      </div>
-                      {(data.eventNotes || []).length === 0 ? (
-                        <div className="text-xs text-slate-400 mt-2">No scheduling notes yet.</div>
-                      ) : (
-                        <div className="space-y-2 mt-2">
-                          {visibleEventNotes.map(n => (
-                            <div key={n.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                              <div className="font-semibold">{n.text}</div>
-                              <div className="text-[10px] text-slate-500">{n.at} · {n.user || "Unknown"}</div>
-                            </div>
-                          ))}
-                          {(data.eventNotes || []).length > 4 && (
+                      )}
+                      {addNewModal.isNewCompany && addNewModal.companyName && (
+                        <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">New Company Details</div>
                             <button
                               type="button"
-                              onClick={() => setShowAllEventNotes(v => !v)}
-                              className="text-xs font-bold text-sky-600 hover:text-sky-700"
+                              onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(addNewModal.companyName)}`, '_blank')}
+                              className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100"
                             >
-                              {showAllEventNotes ? "Show less" : `Show all (${data.eventNotes.length})`}
+                              Search Google
                             </button>
-                          )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {QUICK_COMPANY_TYPES.map(type => (
+                              <button key={type} type="button" onClick={() => setAddNewModal(p => ({ ...p, companyType: type }))}
+                                className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition-all ${addNewModal.companyType === type ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
+                              >{type}</button>
+                            ))}
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <Input value={addNewModal.companyPhone || ""} onChange={e => setAddNewModal(p => ({ ...p, companyPhone: formatPhoneNumber(e.target.value) }))} placeholder="Company phone" />
+                            <Input value={addNewModal.companyWebsite || ""} onChange={e => setAddNewModal(p => ({ ...p, companyWebsite: e.target.value }))} placeholder="Website" />
+                          </div>
+                          <Input value={addNewModal.companyAddress || ""} onChange={e => setAddNewModal(p => ({ ...p, companyAddress: e.target.value }))} placeholder="Company address" />
                         </div>
                       )}
                     </div>
+                    {/* Contact section */}
+                    <div className="space-y-3">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact{addNewModal.companyName ? ` at ${addNewModal.companyName}` : ""}</div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input value={addNewModal.firstName || ""} onChange={e => setAddNewModal(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" />
+                        <Input value={addNewModal.lastName || ""} onChange={e => setAddNewModal(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" />
+                      </div>
+                      <Input value={addNewModal.title || ""} onChange={e => setAddNewModal(p => ({ ...p, title: e.target.value }))} placeholder="Title (e.g. Adjuster, Project Manager, Owner)" />
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input value={addNewModal.phone || ""} onChange={e => setAddNewModal(p => ({ ...p, phone: formatPhoneNumber(e.target.value) }))} placeholder="Phone" />
+                        <Input value={addNewModal.email || ""} onChange={e => setAddNewModal(p => ({ ...p, email: e.target.value }))} placeholder="Email" />
+                      </div>
+                    </div>
                   </div>
-                </Field>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <QuickScopeFields data={data} update={update} toggleMulti={toggleMulti} />
-                <LoadListFields data={data} update={update} toggleMulti={toggleMulti} />
-            </div>
+                  <div className="bg-slate-50 px-6 py-4 flex justify-between border-t border-slate-200">
+                    <button onClick={() => setAddNewModal(null)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700">Cancel</button>
+                    <button
+                      onClick={() => {
+                        const fullName = [addNewModal.firstName, addNewModal.lastName].filter(Boolean).join(" ");
+                        const companyName = addNewModal.companyName || "";
+                        if (!fullName && !companyName) return;
+                        const inferredType = addNewModal.isNewCompany ? (addNewModal.companyType || "Other") : inferCompanyTypeFromName(companyName);
+                        const entry = { company: companyName, contact: fullName, type: inferredType, title: addNewModal.title || "", id: safeUid(), incomplete: false };
+                        if (addNewModal.replaceIdx !== undefined && addNewModal.replaceIdx !== null) {
+                          const next = [...(data.vendors || [])];
+                          next[addNewModal.replaceIdx] = entry;
+                          update("vendors", next);
+                        } else {
+                          update("vendors", [...(data.vendors || []), entry]);
+                        }
+                        if (addNewModal.source === "referrer") {
+                          const display = fullName && companyName ? `${fullName} — ${companyName}` : fullName || companyName;
+                          update("referrer", fullName);
+                          update("referringCompany", companyName);
+                        }
+                        setToast?.(`Added ${fullName ? fullName + (companyName ? " at " + companyName : "") : companyName} to the system`);
+                        setAddNewModal(null);
+                      }}
+                      disabled={!addNewModal.firstName && !addNewModal.companyName}
+                      className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white hover:bg-sky-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Add to System & Order
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
         </div>
     );
@@ -4450,7 +5135,13 @@ export default function App(){
   };
   const [entryMode, setEntryMode] = useState("start"); 
   const [showInlineHelp, setShowInlineHelp] = useState(true);
+  const [showCoaching, setShowCoaching] = useState(true);
+  const [dismissedTips, setDismissedTips] = useState(new Set());
+  const dismissTip = (key) => setDismissedTips(prev => new Set([...prev, key]));
+  const tipVisible = (key) => showCoaching && !dismissedTips.has(key);
   const [compactMode, setCompactMode] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewView, setPreviewView] = useState("narrative");
   const [data, setData] = useState(() => {
     try {
       const s = localStorage.getItem("same-day-scope-v52");
@@ -4475,6 +5166,14 @@ export default function App(){
       };
     } catch(e) { return DEFAULT_FORM; }
   });
+  const recordWord = data.isLead === true ? "Lead" : "Order";
+  const [interviewPanelOpen, setInterviewPanelOpen] = useState(false);
+  const [interviewExpanded, setInterviewExpanded] = useState({});
+  const [interviewSearch, setInterviewSearch] = useState("");
+  const [rushGuideOpen, setRushGuideOpen] = useState(false);
+  const [rushGuideStep, setRushGuideStep] = useState(1);
+  const [rushGuideData, setRushGuideData] = useState({ interests: [], events: [] });
+  const [actionItemsOpen, setActionItemsOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const TEST_PRESETS_KEY = "noe-test-presets";
@@ -4514,6 +5213,98 @@ export default function App(){
       ];
     }
   });
+  const [fieldConfig, setFieldConfig] = useState(() => {
+    try { const s = localStorage.getItem("noe-field-config-v1"); if (!s) return { ...DEFAULT_FIELD_CONFIG }; const saved = JSON.parse(s); const merged = { ...DEFAULT_FIELD_CONFIG }; Object.keys(merged).forEach(k => { if (saved[k]) merged[k] = { ...merged[k], ...saved[k] }; }); return merged; }
+    catch { return { ...DEFAULT_FIELD_CONFIG }; }
+  });
+  const [blockerRules, setBlockerRules] = useState(() => {
+    try { const s = localStorage.getItem("noe-blocker-rules-v1"); return s ? JSON.parse(s) : [...DEFAULT_BLOCKER_RULES]; }
+    catch { return [...DEFAULT_BLOCKER_RULES]; }
+  });
+  const [interviewActions, setInterviewActions] = useState(() => {
+    try { const s = localStorage.getItem("noe-interview-actions-v1"); if (!s) return { ...DEFAULT_INTERVIEW_ACTIONS }; const saved = JSON.parse(s); const merged = { ...DEFAULT_INTERVIEW_ACTIONS }; Object.keys(merged).forEach(k => { if (saved[k]) merged[k] = { ...merged[k], ...saved[k] }; }); return merged; }
+    catch { return { ...DEFAULT_INTERVIEW_ACTIONS }; }
+  });
+  const [showFieldConfig, setShowFieldConfig] = useState(false);
+  const [configSelectedKeys, setConfigSelectedKeys] = useState(new Set());
+  const [configSearch, setConfigSearch] = useState("");
+  const isFieldVisible = (key) => fieldConfig[key]?.visible !== false;
+  const executeInterviewActions = (answerKey, isOn) => {
+    const config = interviewActions[answerKey];
+    if (!config || !config.actions) return;
+    if (!isOn) return; // only execute on selection, not deselection
+    const executed = [];
+    config.actions.forEach(action => {
+      switch (action.type) {
+        case "loadList":
+          setData(p => ({ ...p, loadList: Array.from(new Set([...(p.loadList || []), action.value])) }));
+          executed.push(`+ ${action.value} to load`);
+          break;
+        case "handlingCode":
+          setData(p => ({ ...p, handlingCodes: Array.from(new Set([...(p.handlingCodes || []), action.value])) }));
+          executed.push(`+ ${action.value} handling code`);
+          break;
+        case "eventInstruction": {
+          const note = action.value;
+          setData(p => {
+            const current = stripEventSystemLines(p.eventInstructions || "").trim();
+            if (current.includes(note)) return p;
+            const combined = current ? `${current}\n${note}` : note;
+            return { ...p, eventInstructions: composeEventInstructions(combined, p, conditionSummary) };
+          });
+          executed.push(`+ "${note}" to instructions`);
+          break;
+        }
+        case "sdsObservation":
+          setData(p => ({ ...p, sdsObservations: Array.from(new Set([...(p.sdsObservations || []), action.value])) }));
+          executed.push(`+ ${action.value} to SDS`);
+          break;
+        case "suggestGroup":
+          setData(p => ({ ...p, suggestedGroups: Array.from(new Set([...(p.suggestedGroups || []), action.value])) }));
+          executed.push(`Suggested ${action.value} group`);
+          break;
+        case "blocker":
+          setData(p => {
+            const current = p.scopeBridge?.pendingIssues || [];
+            if (current.includes(action.value)) return p;
+            return { ...p, scopeBridge: { ...(p.scopeBridge || {}), pendingIssues: [...current, action.value] } };
+          });
+          executed.push(`Blocker: ${action.value}`);
+          break;
+        case "contactNote":
+          // Add to primary customer note
+          setData(p => {
+            const custs = [...(p.customers || [])];
+            if (custs[0]) {
+              const existing = custs[0].note || "";
+              if (!existing.includes(action.value)) {
+                custs[0] = { ...custs[0], note: existing ? `${existing}, ${action.value}` : action.value };
+              }
+            }
+            return { ...p, customers: custs };
+          });
+          break;
+      }
+    });
+    if (executed.length) setToast(executed.join(" · "));
+  };
+  const matchesInterviewSearch = (title, ...extras) => {
+    const q = interviewSearch.trim().toLowerCase();
+    if (!q) return true;
+    if (title.toLowerCase().includes(q)) return true;
+    return extras.some(e => (e || "").toLowerCase().includes(q));
+  };
+  const isSearchMatch = (text) => {
+    const q = interviewSearch.trim().toLowerCase();
+    return q && text.toLowerCase().includes(q);
+  };
+  const highlightSearch = (text) => {
+    const q = interviewSearch.trim();
+    if (!q) return text;
+    const idx = text.toLowerCase().indexOf(q.toLowerCase());
+    if (idx < 0) return text;
+    return <>{text.slice(0, idx)}<mark className="bg-yellow-200 rounded px-0.5">{text.slice(idx, idx + q.length)}</mark>{text.slice(idx + q.length)}</>;
+  };
   const [openSections, setOpenSections] = useState({sec1:true, sec2:false, sec3:false, sec4:false, sec5:false}); 
   const [modal, setModal] = useState({type:"",value:"",onSave:null});
   const [openCodes, setOpenCodes] = useState(false);
@@ -4531,7 +5322,9 @@ export default function App(){
   const [visitedSections, setVisitedSections] = useState(new Set(['sec1']));
 
   const [alertModal, setAlertModal] = useState(createAlertModalState);
+  const [inlineAlert, setInlineAlert] = useState(null);
   const [smartNotification, setSmartNotification] = useState(null);
+  const [conditionAutoFillHints, setConditionAutoFillHints] = useState({});
   const [smartConfirm, setSmartConfirm] = useState(createSmartConfirmState);
   const [orderInstructionModal, setOrderInstructionModal] = useState({
     isOpen: false,
@@ -4582,6 +5375,7 @@ export default function App(){
   const [auditTargets, setAuditTargets] = useState({ sections: new Set(), subsections: new Set() });
   const [showPrimaryCoords, setShowPrimaryCoords] = useState(false);
   const [addCompanyModalOpen, setAddCompanyModalOpen] = useState(false);
+  const [addNewSystemModal, setAddNewSystemModal] = useState(null);
   const [addCompanyType, setAddCompanyType] = useState("");
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [companyModalCloseArmed, setCompanyModalCloseArmed] = useState(false);
@@ -4725,11 +5519,13 @@ export default function App(){
   const [auditOn, setAuditOn] = useState(false);
   const [auditMissing, setAuditMissing] = useState([]);
   const [auditPercent, setAuditPercent] = useState(0);
-  const [saveSummaryOpen, setSaveSummaryOpen] = useState(false);
   const [saveSummaryLines, setSaveSummaryLines] = useState([]);
   const [saveSummaryMissing, setSaveSummaryMissing] = useState([]);
   const [saveExportLines, setSaveExportLines] = useState([]);
   const appContentRef = useRef(null);
+  const quickNudgeShownRef = useRef(false);
+  const [modeButtonFlash, setModeButtonFlash] = useState(false);
+  const [showSdsPreview, setShowSdsPreview] = useState(false);
   const orderNameInputRef = useRef(null);
   const scheduleDateRef = useRef(null);
   const scheduleTimeRef = useRef(null);
@@ -4737,6 +5533,7 @@ export default function App(){
   const [autoScrollDone, setAutoScrollDone] = useState(false);
   const [lastLossDetailTouched, setLastLossDetailTouched] = useState(null);
   const [pendingAddressTypePromptId, setPendingAddressTypePromptId] = useState("");
+  const [pendingAddressFromGoogle, setPendingAddressFromGoogle] = useState(null);
   const [orderSubOpen, setOrderSubOpen] = useState(true);
   const [sourceSubOpen, setSourceSubOpen] = useState(false);
   const [interviewSubOpen, setInterviewSubOpen] = useState(false);
@@ -4789,7 +5586,11 @@ export default function App(){
   useEffect(()=>{ localStorage.setItem("companies-registry",JSON.stringify(companies)); },[companies]);
   useEffect(()=>{ localStorage.setItem("contacts-registry",JSON.stringify(contacts)); },[contacts]);
   useEffect(()=>{ localStorage.setItem("same-day-scope-v52", JSON.stringify(data)); },[data]);
+  useEffect(()=>{ localStorage.setItem("noe-field-config-v1", JSON.stringify(fieldConfig)); },[fieldConfig]);
+  useEffect(()=>{ localStorage.setItem("noe-blocker-rules-v1", JSON.stringify(blockerRules)); },[blockerRules]);
+  useEffect(()=>{ localStorage.setItem("noe-interview-actions-v1", JSON.stringify(interviewActions)); },[interviewActions]);
   useEffect(()=>{ localStorage.setItem("sample-contacts", JSON.stringify(sampleContacts)); },[sampleContacts]);
+  const [householdEditOpen, setHouseholdEditOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -4819,6 +5620,98 @@ export default function App(){
 
   const update = useCallback((k,v) => setData(p=>({...p,[k]:v})), []);
   const updateMany = useCallback((patch) => setData(p => ({ ...p, ...patch })), []);
+
+  // --- AI / AUTOMATION API ---
+  useEffect(() => {
+    const schema = {
+      // Core order fields
+      isLead: { type: "boolean", description: "True if this is a lead, false if a confirmed order" },
+      orderName: { type: "string", description: "Order name (auto-generated or manual)" },
+      orderStatus: { type: "enum", options: ORDER_STATUSES, description: "Current order status" },
+      orderTypes: { type: "string[]", options: [...LOSS_TYPES, NON_RESTORATION_PRIMARY], description: "Loss/order types" },
+      // Customer
+      "customers[0].first": { type: "string", description: "Primary customer first name" },
+      "customers[0].last": { type: "string", description: "Primary customer last name" },
+      "customers[0].phone": { type: "string", description: "Primary customer phone" },
+      "customers[0].email": { type: "string", description: "Primary customer email" },
+      "customers[0].type": { type: "enum", options: CUSTOMER_TYPES, description: "Customer relationship type" },
+      // Address
+      "addresses[0].street": { type: "string", description: "Primary address street" },
+      "addresses[0].city": { type: "string", description: "Primary address city" },
+      "addresses[0].state": { type: "enum", options: STATES, description: "Primary address state" },
+      "addresses[0].zip": { type: "string", description: "Primary address zip code" },
+      // Source
+      leadSourceCategory: { type: "enum", options: LEAD_SOURCES, description: "How the lead was sourced" },
+      contactMethod: { type: "enum", options: CONTACT_METHODS, description: "How we were contacted" },
+      referringCompany: { type: "string", description: "Company that referred this order" },
+      referrer: { type: "string", description: "Person who referred this order" },
+      salesRep: { type: "enum", options: SALES_REPS, description: "Assigned sales rep" },
+      // Insurance
+      insuranceClaim: { type: "enum", options: ["Yes", "No"], description: "Whether this involves an insurance claim" },
+      insuranceCompany: { type: "string", description: "Insurance carrier name" },
+      insuranceAdjuster: { type: "string", description: "Insurance adjuster name" },
+      claimNumber: { type: "string", description: "Insurance claim number" },
+      dateOfLoss: { type: "date", description: "Date of loss (YYYY-MM-DD)" },
+      policyNumber: { type: "string", description: "Insurance policy number" },
+      // Billing
+      billingPayer: { type: "string", description: "Who is paying (Insurance, Customer, etc.)" },
+      billingCompany: { type: "string", description: "Billing company name" },
+      billingContact: { type: "string", description: "Billing contact name" },
+      // Scheduling
+      scheduleType: { type: "enum", options: MEETING_TYPES, description: "Type of scheduled event" },
+      pickupDate: { type: "date", description: "Scheduled date (YYYY-MM-DD)" },
+      pickupTime: { type: "string", description: "Scheduled time (e.g. '9:00 AM')" },
+      eventAssignee: { type: "string", description: "Person assigned to this event" },
+      eventInstructions: { type: "string", description: "Instructions for the field team" },
+      eventFirm: { type: "boolean", description: "Whether the schedule is firm" },
+      // Services
+      serviceOfferings: { type: "string[]", options: SERVICE_OFFERINGS, description: "Selected service offerings" },
+      suggestedGroups: { type: "string[]", options: SUGGESTED_GROUPS, description: "Suggested processing groups" },
+      // Conditions
+      damageWasWet: { type: "string", options: ["Y", "N"], description: "Whether damage is still wet" },
+      damageMoldMildew: { type: "boolean", description: "Whether visible mold/mildew is present" },
+      noHeat: { type: "boolean", description: "Whether there is no heat at the site" },
+      noLights: { type: "boolean", description: "Whether there is no electricity" },
+      boardedUp: { type: "boolean", description: "Whether the building is boarded up" },
+      // SDS
+      sdsConsiderations: { type: "string[]", options: SDS_CONSIDERATIONS, description: "SDS customer considerations" },
+      sdsObservations: { type: "string[]", options: SDS_OBSERVATIONS, description: "SDS site observations" },
+      sdsServices: { type: "string[]", options: SDS_SERVICES, description: "SDS services requested" },
+    };
+
+    window.NOE = {
+      getData: () => JSON.parse(JSON.stringify(data)),
+      update: (field, value) => {
+        if (field.startsWith("customers[0].")) {
+          const prop = field.split(".")[1];
+          const custId = data.customers?.[0]?.id;
+          if (custId) setData(p => ({ ...p, customers: p.customers.map((c, i) => i === 0 ? { ...c, [prop]: value } : c) }));
+          return;
+        }
+        if (field.startsWith("addresses[0].")) {
+          const prop = field.split(".")[1];
+          const addrId = data.addresses?.[0]?.id;
+          if (addrId) setData(p => ({ ...p, addresses: p.addresses.map((a, i) => i === 0 ? { ...a, [prop]: value } : a) }));
+          return;
+        }
+        setData(p => ({ ...p, [field]: value }));
+      },
+      updateMany: (patch) => setData(p => ({ ...p, ...patch })),
+      getMode: () => entryMode,
+      setMode: (mode) => { if (["start", "quick", "detailed", "same-day-scope"].includes(mode)) setEntryMode(mode); },
+      getSchema: () => JSON.parse(JSON.stringify(schema)),
+      getFieldValue: (field) => {
+        if (field.startsWith("customers[0].")) return data.customers?.[0]?.[field.split(".")[1]] || "";
+        if (field.startsWith("addresses[0].")) return data.addresses?.[0]?.[field.split(".")[1]] || "";
+        return data[field];
+      },
+      listFields: () => Object.keys(schema),
+      version: "1.0",
+    };
+
+    return () => { delete window.NOE; };
+  }, [data, entryMode]);
+
   const setSuggestedGroupsAndSync = useCallback((list) => {
     const safeList = Array.isArray(list) ? list : [];
     setData((prev) => {
@@ -4893,7 +5786,11 @@ export default function App(){
   const updateAddr = useCallback((id, patch) => setData(p => ({
     ...p,
     addresses: p.addresses.map(a => {
-      if (a.id !== id) return a;
+      if (a.id !== id) {
+        // If setting another address as Primary, clear Primary from this one
+        if (patch.isPrimary === true) return { ...a, isPrimary: false };
+        return a;
+      }
       const next = { ...a, ...patch };
       const hasResolvedAddressData = [next.street, next.city, next.state, next.zip, next.googleQuery]
         .some(v => hasMeaningfulValue(v) && (v || "").toString().trim().toUpperCase() !== "TBD");
@@ -4931,11 +5828,14 @@ export default function App(){
       setToast("Enter a preset name.");
       return;
     }
+    let scopePhotos = null;
+    try { scopePhotos = JSON.parse(localStorage.getItem("noe-scope-photos") || "null"); } catch {}
     const payload = {
       id: safeUid(),
       name,
       createdAt: new Date().toISOString(),
-      data
+      data,
+      scopePhotos
     };
     setTestPresets(prev => {
       const existingIndex = prev.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
@@ -4970,6 +5870,10 @@ export default function App(){
         selectedGroups: mergedSelectedGroups,
       }),
     });
+    if (preset.scopePhotos) {
+      localStorage.setItem("noe-scope-photos", JSON.stringify(preset.scopePhotos));
+      setPhotoScopeData(preset.scopePhotos);
+    }
     setToast("Test preset loaded.");
   }, []);
 
@@ -5478,6 +6382,8 @@ export default function App(){
           };
           const reason = reasonMap[k] || "condition selected";
           setSmartNotification({ message: `Bring: ${loadListAdded.join(', ')} added because ${reason}`, loadListToRemove: loadListAdded });
+          setConditionAutoFillHints(prev => ({ ...prev, [k]: loadListAdded.join(', ') }));
+          setTimeout(() => setConditionAutoFillHints(prev => { const next = { ...prev }; delete next[k]; return next; }), 4000);
       }
       
       setData(prev => {
@@ -5582,24 +6488,35 @@ export default function App(){
   const addLivingAddressFromPrompt = useCallback((mode) => {
     const type = livingAddressPrompt.type;
     if (!type) return;
-    const added = ensureAddressType(type, { placeholder: mode === "placeholder" });
+    const added = ensureAddressType(type, { placeholder: true });
     setLivingAddressPrompt({ open: false, type: "" });
     if (!added) {
       setToast(`${type} address already exists.`);
       return;
     }
+    if (mode === "placeholder") {
+      // Stay where we are — just add quietly
+      setToast(`${type} placeholder added — you can enter the address later.`);
+      return;
+    }
+    // "full" mode — navigate to sec3, open the card, focus search
     setOpenSections(prev => ({ ...prev, sec3: true }));
     setVisitedSections(prevV => new Set([...prevV, "sec3"]));
     setActiveSection("sec3");
     setTimeout(() => {
-      const section = document.getElementById("sec3");
-      section?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
-    setToast(
-      mode === "placeholder"
-        ? `${type} placeholder address added.`
-        : `${type} address row added.`
-    );
+      const newAddr = (data.addresses || []).find(a => a.type === type && !a.street);
+      if (newAddr) updateAddr(newAddr.id, { _forceOpen: true });
+      setTimeout(() => {
+        const el = document.querySelector(`[data-address-item-id="${newAddr?.id}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.remove("audit-pulse");
+          void el.offsetWidth;
+          el.classList.add("audit-pulse");
+        }
+      }, 200);
+    }, 150);
+    setToast(`${type} address added — enter the address or use Google search above.`);
   }, [livingAddressPrompt.type]);
 
   const closeLivingAddressPrompt = useCallback(() => {
@@ -5817,6 +6734,17 @@ export default function App(){
       }
   };
 
+  // Auto-suggest DET handling code when allergy-related considerations are selected
+  useEffect(() => {
+    const considerations = data.sdsConsiderations || [];
+    const needsDet = considerations.some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c));
+    const hasDet = (data.handlingCodes || []).includes("Det");
+    if (needsDet && !hasDet) {
+      setData(prev => ({ ...prev, handlingCodes: [...(prev.handlingCodes || []), "Det"] }));
+      setSmartNotification({ message: "Smart Update: Added Det (special detergent) handling code based on customer sensitivity." });
+    }
+  }, [data.sdsConsiderations]);
+
   const rejectSmartAction = () => {
       if (smartNotification) {
           setData(prev => ({
@@ -5926,7 +6854,10 @@ export default function App(){
     if (resolvedSection === "sec4") {
       if (resolvedKey === "billing") setBillingSubOpen(true);
       else if (resolvedKey === "finance") setFinanceSubOpen(true);
-      else if (resolvedKey === "insurance") setInsuranceSubOpen(true);
+      else if (resolvedKey === "insurance") {
+        setInsuranceSubOpen(true);
+        if (data.insuranceClaim !== "Yes") update("insuranceClaim", "Yes");
+      }
       else setCompaniesSubOpen(true);
       return;
     }
@@ -5968,37 +6899,102 @@ export default function App(){
     });
   }, [jumpToSection, openSearchSubsection, scrollToSubsection]);
 
-  const focusSearchLabel = (label) => {
+  const focusSearchLabel = (label, retries = 5) => {
     if (!label) return;
     const normalize = (s) => (s || "").toString().toLowerCase().replace(/\s+/g, " ").trim();
     const target = normalize(label);
-    const labels = Array.from(document.querySelectorAll("label"));
-    let match = labels.find(l => normalize(l.textContent).includes(target));
-    if (!match) {
-      const el = document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
-      match = el ? el.closest("label") || el : null;
-    }
-    const el = match || document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("audit-pulse");
-      setTimeout(() => el.classList.remove("audit-pulse"), 2400);
-      if (el.focus) el.focus();
-    }
+    const tryFind = (remaining) => {
+      const labels = Array.from(document.querySelectorAll("label"));
+      let match = labels.find(l => normalize(l.textContent).includes(target));
+      if (!match) {
+        const el = document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
+        match = el ? el.closest("label") || el : null;
+      }
+      const el = match || document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("audit-pulse");
+        setTimeout(() => el.classList.remove("audit-pulse"), 2400);
+        if (el.focus) el.focus();
+        return;
+      }
+      if (remaining > 0) {
+        setTimeout(() => tryFind(remaining - 1), 150);
+      }
+    };
+    tryFind(retries);
   };
 
   const handleSearchNavigate = (item) => {
     if (!item) return;
-    if (item.id) jumpToSection(item.id, { scroll: !item.sub });
+    // In Quick Entry, scroll to the matching quick section
+    if (entryMode === "quick") {
+      const quickMap = {
+        sec1: "quick-questions",
+        sec2: "quick-customer",
+        sec3: "quick-address",
+        sec5: "quick-scheduling",
+      };
+      // Also check if the search label matches Quick Entry sections
+      const labelLower = (item.label || "").toLowerCase();
+      if (labelLower.includes("note") || labelLower.includes("instruction") || labelLower.includes("event")) {
+        document.getElementById("quick-scheduling")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      const quickId = item.navAction ? null : quickMap[item.id];
+      if (quickId) {
+        document.getElementById(quickId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        // Field not in Quick Entry — switch to detailed
+        setEntryMode("detailed");
+        setTimeout(() => {
+          if (item.id) jumpToSection(item.id, { scroll: !item.sub });
+          if (item.navAction === 'openPets') {
+            setTimeout(() => {
+              const el = document.getElementById("household-pets");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                el.classList.remove("audit-pulse");
+                void el.offsetWidth;
+                el.classList.add("audit-pulse");
+              }
+            }, 200);
+          } else {
+            setTimeout(() => {
+              if (item.sub) {
+                openSearchSubsection(item.sub, item.id);
+                requestAnimationFrame(() => scrollToSubsection(item.sub, item.id));
+              }
+            }, 80);
+          }
+        }, 100);
+      }
+      return;
+    }
+    if (item.id) jumpToSection(item.id, { scroll: false });
     setTimeout(() => {
       if (item.sub) {
         openSearchSubsection(item.sub, item.id);
-        requestAnimationFrame(() => scrollToSubsection(item.sub, item.id));
       }
     }, 80);
-    setTimeout(() => {
-      if (item.label) focusSearchLabel(item.label);
-    }, 220);
+    if (item.navAction === 'openInterview') {
+      setInterviewPanelOpen(true);
+      return;
+    } else if (item.navAction === 'openPets') {
+      setTimeout(() => {
+        const el = document.getElementById("household-pets");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.remove("audit-pulse");
+          void el.offsetWidth;
+          el.classList.add("audit-pulse");
+        }
+      }, 400);
+    } else {
+      setTimeout(() => {
+        if (item.label) focusSearchLabel(item.label, 10);
+      }, 400);
+    }
   };
 
   const handleConfirmClick = () => {
@@ -6063,11 +7059,13 @@ export default function App(){
   const addNewAddress = useCallback(() => {
     const addressId = safeUid();
     setData(p => {
-        const hasPrimary = p.addresses.some(a => a.isPrimary);
+        // Remove any existing empty addresses (except primary)
+        const cleaned = p.addresses.filter((a, i) => i === 0 || hasMeaningfulValue(a.street) || hasMeaningfulValue(a.city));
+        const hasPrimary = cleaned.some(a => a.isPrimary);
         return {
           ...p,
           addresses: [
-            ...p.addresses,
+            ...cleaned,
             initAddress({
               id: addressId,
               isPrimary: !hasPrimary,
@@ -6083,18 +7081,22 @@ export default function App(){
   }, [setToast]);
   
   const addNewCustomer = useCallback(() => {
-    setData(p => ({
-      ...p,
-      customers: [
-        ...p.customers,
-        initCustomer({
-          type: "",
-          policyHolder: false,
-          isPrimary: false,
-          placeholder: createPlaceholderFlag("customer", "Customer details needed")
-        })
-      ]
-    }));
+    // Remove any existing empty customers first
+    setData(p => {
+      const cleaned = p.customers.filter((c, i) => i === 0 || hasMeaningfulValue(c.first) || hasMeaningfulValue(c.last) || hasMeaningfulValue(c.phone) || hasMeaningfulValue(c.email));
+      return {
+        ...p,
+        customers: [
+          ...cleaned,
+          initCustomer({
+            type: "",
+            policyHolder: false,
+            isPrimary: false,
+            placeholder: createPlaceholderFlag("customer", "Customer details needed")
+          })
+        ]
+      };
+    });
   }, []);
 
   const handleAddressTypePromptFocused = useCallback((addressId) => {
@@ -6182,6 +7184,7 @@ export default function App(){
       } else {
         setBillingSubOpen(true);
         setInsuranceSubOpen(true);
+        if (data.insuranceClaim !== "Yes") update("insuranceClaim", "Yes");
       }
     }
     if (item.key === "addrLat" || item.key === "addrLng") {
@@ -6212,7 +7215,10 @@ export default function App(){
 
   const handleReset = useCallback(() => {
     localStorage.removeItem("same-day-scope-v52");
-    setData({ ...DEFAULT_FORM, isLead: entryMode === "quick" ? true : null });
+    localStorage.removeItem("noe-scope-photos");
+    const user = data.currentUser || "";
+    setData({ ...DEFAULT_FORM, isLead: null, currentUser: user, eventAssignee: user, vendors: [], referrer: "", referringCompany: "", salesRep: "", leadSourceCategory: "", leadSourceDetail: "", contactMethod: "", insuranceCompany: "", insuranceAdjuster: "", billingCompany: "", billingContact: "" });
+    setPhotoScopeData(null);
     setOpenSections({sec1:true, sec2:false, sec3:false, sec4:false, sec5:false});
     setVisitedSections(new Set(['sec1']));
     setQuickQuestionsCollapsed(false);
@@ -6241,14 +7247,12 @@ export default function App(){
     setToast("Address verified (demo).");
   }, [updateAddr]);
   
-  const removeCust = useCallback((id, index) => { 
-    if(index===0) setAlertModal({ isOpen: true, message: "Cannot delete primary customer.", onConfirm: null });
-    else setAlertModal({ isOpen: true, message: "Remove this customer?", onConfirm: () => setData(p=>({...p,customers:p.customers.filter(x=>x.id!==id)})) });
+  const removeCust = useCallback((id, index) => {
+    if(index===0) { setToast("Cannot delete primary customer."); return; }
+    setData(p=>({...p,customers:p.customers.filter(x=>x.id!==id)}));
   }, []);
   const removeAddr = useCallback((id) => {
-    if (window.confirm("Remove this address?")) {
-      setData(p=>({...p,addresses:p.addresses.filter(a=>a.id!==id)}));
-    }
+    setData(p=>({...p,addresses:p.addresses.filter(a=>a.id!==id)}));
   }, []);
 
   const buildSaveSummary = () => {
@@ -6387,58 +7391,71 @@ export default function App(){
   const handleSaveClick = () => {
     const missing = computeAuditMissing();
     setSaveSummaryMissing(missing);
-    setSaveSummaryLines(buildSaveSummary());
+    setSaveSummaryLines(orderNarrative.map(l => `${l.section}: ${l.text}`));
     setSaveExportLines(buildFullExportLines());
-    setSaveSummaryOpen(true);
+    setPreviewOpen(true);
   };
 
   const computeAuditMissing = () => {
     const missing = [];
     const primaryCustomer = (data.customers || [])[0] || {};
     const primaryAddress = (data.addresses || [])[0] || {};
+    const statusIndex = ORDER_STATUSES.indexOf(data.orderStatus);
 
-    if(!data.orderName) missing.push({ id: "sec1", label: "Order Name", section: "sec1", key: "orderName" });
-    if(!hasPrimaryOrderTypeDecision(data.orderTypes || [])) missing.push({ id: "sec1", label: "Order Type", section: "sec1", key: "orderTypes" });
-    if(!hasRequiredNonRestorationSubtype(data.orderTypes || [])) missing.push({ id: "sec1", label: "Non-Restoration Type", section: "sec1", key: "nonRestorationSubtype" });
-    if(!data.leadSourceCategory) missing.push({ id: "sec1", label: "Lead Source", section: "sec1", key: "leadSourceCategory" });
-    if(data.leadSourceCategory === "Referral") {
-      if(!data.referringCompany) missing.push({ id: "sec1", label: "Referring Company", section: "sec1", key: "referringCompany" });
-      if(!data.referrer) missing.push({ id: "sec1", label: "Referrer", section: "sec1", key: "referrer" });
-    }
-    if((data.leadSourceCategory === "Marketing" || data.leadSourceCategory === "Internal") && !data.leadSourceDetail) {
-      missing.push({ id: "sec1", label: "Lead Source Detail", section: "sec1", key: "leadSourceDetail" });
-    }
-    if(!data.billingPayer) missing.push({ id: "sec4", label: "Bill To (Payer)", section: "sec4", key: "billingPayer" });
+    // Named check functions for complex validations
+    const checkFns = {
+      hasPrimaryOrderTypeDecision: () => hasPrimaryOrderTypeDecision(data.orderTypes || []),
+      hasRequiredNonRestorationSubtype: () => hasRequiredNonRestorationSubtype(data.orderTypes || []),
+      interviewCompleted: () => !!(data.livingStatus || data.processType || data.repairsSummary || (data.packoutSummary||[]).length || data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp),
+      codesCompleted: () => !!((data.severityCodes||[]).length || data.qualityCode || (data.handlingCodes||[]).length),
+    };
 
-    if(!primaryCustomer.first) missing.push({ id: "sec2", label: "Customer First Name", section: "sec2", key: "custFirst" });
-    if(!primaryCustomer.last) missing.push({ id: "sec2", label: "Customer Last Name", section: "sec2", key: "custLast" });
-    if(!primaryCustomer.phone) missing.push({ id: "sec2", label: "Customer Phone", section: "sec2", key: "custPhone" });
-    if(!primaryCustomer.email) missing.push({ id: "sec2", label: "Customer Email", section: "sec2", key: "custEmail" });
+    // Resolve value from key or dataPath
+    const resolveValue = (key, cfg) => {
+      if (cfg.dataPath) {
+        if (cfg.dataPath.startsWith("customers[0].")) return primaryCustomer[cfg.dataPath.split(".")[1]];
+        if (cfg.dataPath.startsWith("addresses[0].")) return primaryAddress[cfg.dataPath.split(".")[1]];
+      }
+      return data[key];
+    };
 
-    (data.customers || []).forEach((customer, idx) => {
-      if (!isPlaceholderFlagActive(customer?.placeholder)) return;
-      const customerLabel = [customer?.first, customer?.last].filter(hasMeaningfulValue).join(" ").trim() || `Customer ${idx + 1}`;
-      missing.push({
-        id: "sec2",
-        label: `Resolve Placeholder: ${customerLabel}`,
-        section: "sec2",
-        key: `placeholder-customer-${customer?.id || idx}`,
-        category: "placeholders"
-      });
+    // Evaluate condition guard
+    const conditionMet = (cond) => {
+      if (!cond) return true;
+      if (cond.equals) return data[cond.field] === cond.equals;
+      if (cond.oneOf) return (cond.oneOf || []).includes(data[cond.field]);
+      if (cond.includes) return (data[cond.field] || []).includes(cond.includes);
+      return true;
+    };
+
+    // Check status gate
+    const statusGateMet = (requiredAtStatus) => {
+      if (!requiredAtStatus || requiredAtStatus === "always") return true;
+      if (requiredAtStatus === "never") return false;
+      const gateIndex = ORDER_STATUSES.indexOf(requiredAtStatus);
+      return gateIndex >= 0 && statusIndex >= gateIndex;
+    };
+
+    // Config-driven field checks
+    Object.entries(fieldConfig).forEach(([key, cfg]) => {
+      if (!cfg.requiredInAudit) return;
+      if (!statusGateMet(cfg.requiredAtStatus)) return;
+      if (!conditionMet(cfg.condition)) return;
+
+      let isEmpty;
+      if (cfg.checkFn && checkFns[cfg.checkFn]) {
+        isEmpty = !checkFns[cfg.checkFn]();
+      } else {
+        isEmpty = !resolveValue(key, cfg);
+      }
+
+      if (isEmpty) {
+        missing.push({ id: cfg.section, label: cfg.label, section: cfg.section, key });
+      }
     });
 
-    if(!primaryAddress.street) missing.push({ id: "sec3", label: "Street Address", section: "sec3", key: "addrStreet" });
-    if(!primaryAddress.city) missing.push({ id: "sec3", label: "City", section: "sec3", key: "addrCity" });
-    if(!primaryAddress.state) missing.push({ id: "sec3", label: "State", section: "sec3", key: "addrState" });
-    if(!primaryAddress.zip) missing.push({ id: "sec3", label: "Zip", section: "sec3", key: "addrZip" });
-    if(!primaryAddress.lng) missing.push({ id: "sec3", label: "Longitude", section: "sec3", key: "addrLng" });
-    if(!primaryAddress.lat) missing.push({ id: "sec3", label: "Latitude", section: "sec3", key: "addrLat" });
-    if((data.orderTypes || []).includes("Mold") && !data.moldCoverageConfirm) missing.push({ id: "sec1", label: "Mold Coverage", section: "sec1", key: "moldCoverageConfirm" });
-    if(data.rentOrOwn === "Rent" && !data.rentCoverageLimit) missing.push({ id: "sec3", label: "Rent Coverage", section: "sec3", key: "rentCoverageLimit" });
-
-    const needsPickupAudit = ["Pickup Complete","Ready to Bill"].includes(data.orderStatus);
-    const needsFinanceAudit = ["Intake Complete","Ready to Bill"].includes(data.orderStatus);
-    if (needsPickupAudit) {
+    // Dynamic severity checks (special case — keys depend on order types)
+    if (["Pickup Complete","Ready to Bill"].includes(data.orderStatus)) {
       const severityGroupsNeeded = (data.orderTypes || []).reduce((acc, t) => {
         const group = t === "Dust/Debris" ? "Dust" : t;
         if (SEVERITY_GROUPS.includes(group)) acc.add(group);
@@ -6448,50 +7465,29 @@ export default function App(){
         const hasCode = (data.severityCodes || []).some(c => c.startsWith(group + "-"));
         if (!hasCode) missing.push({ id: "sec1", label: `${group} Severity`, section: "sec1", key: `severity-${group.toLowerCase()}` });
       });
-      const interviewCompleted = !!(data.livingStatus || data.processType || data.repairsSummary || (data.packoutSummary||[]).length || data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp);
-      if (!interviewCompleted) missing.push({ id: "sec1", label: "Interview Section", section: "sec1", key: "interview" });
-      const codesCompleted = !!((data.severityCodes||[]).length || data.qualityCode || (data.handlingCodes||[]).length);
-      if (!codesCompleted) missing.push({ id: "sec1", label: "Codes Section", section: "sec1", key: "codes" });
-    }
-    if (needsFinanceAudit) {
-      if (!data.pricePlatform) missing.push({ id: "sec4", label: "Pricing Platform", section: "sec4", key: "pricePlatform" });
-      if (!data.priceList) missing.push({ id: "sec4", label: "Price List", section: "sec4", key: "priceList" });
-      if (!data.multiplier) missing.push({ id: "sec4", label: "Price Multiplier", section: "sec4", key: "multiplier" });
-      if (!data.estimateRequested) missing.push({ id: "sec4", label: "Estimate Requested", section: "sec4", key: "estimateRequested" });
     }
 
+    // Structural placeholder checks (not field-config driven)
+    (data.customers || []).forEach((customer, idx) => {
+      if (!isPlaceholderFlagActive(customer?.placeholder)) return;
+      const customerLabel = [customer?.first, customer?.last].filter(hasMeaningfulValue).join(" ").trim() || `Customer ${idx + 1}`;
+      missing.push({ id: "sec2", label: `Resolve Placeholder: ${customerLabel}`, section: "sec2", key: `placeholder-customer-${customer?.id || idx}`, category: "placeholders" });
+    });
+    (data.vendors || []).forEach((v, idx) => {
+      if (v.incomplete) {
+        missing.push({ id: "sec4", label: `Incomplete: ${v.contact || v.company || `Company ${idx + 1}`}`, section: "sec4", key: `placeholder-vendor-${v.id || idx}`, category: "placeholders", vendorIdx: idx });
+      }
+    });
     (data.addresses || []).forEach((addr, idx) => {
       if (!isAddressPlaceholder(addr)) return;
-      const addressLabel = addr?.type || (idx === 0 ? "Primary Address" : `Address ${idx + 1}`);
-      missing.push({
-        id: "sec3",
-        label: `Resolve Placeholder: ${addressLabel}`,
-        section: "sec3",
-        key: `placeholder-address-${addr.id}`,
-        category: "placeholders"
-      });
+      missing.push({ id: "sec3", label: `Resolve Placeholder: ${addr?.type || (idx === 0 ? "Primary Address" : `Address ${idx + 1}`)}`, section: "sec3", key: `placeholder-address-${addr.id}`, category: "placeholders" });
     });
-
     Object.entries(data.additionalCompanies || {}).forEach(([type, rawEntry]) => {
       const entry = syncCompanyEntryPlaceholders(rawEntry || {});
-      const companyPending = isCompanyPlaceholder(entry);
-      if (companyPending) {
-        missing.push({
-          id: "sec4",
-          label: `Resolve Placeholder: ${type} company`,
-          section: "sec4",
-          key: `placeholder-company-${normalizePlaceholderKeyPart(type)}`,
-          category: "placeholders"
-        });
-      }
-      if (!companyPending && companyTypeRequiresContact(type) && isContactPlaceholder(entry)) {
-        missing.push({
-          id: "sec4",
-          label: `Resolve Placeholder: ${type} contact`,
-          section: "sec4",
-          key: `placeholder-contact-${normalizePlaceholderKeyPart(type)}`,
-          category: "placeholders"
-        });
+      if (isCompanyPlaceholder(entry)) {
+        missing.push({ id: "sec4", label: `Resolve Placeholder: ${type} company`, section: "sec4", key: `placeholder-company-${normalizePlaceholderKeyPart(type)}`, category: "placeholders" });
+      } else if (companyTypeRequiresContact(type) && isContactPlaceholder(entry)) {
+        missing.push({ id: "sec4", label: `Resolve Placeholder: ${type} contact`, section: "sec4", key: `placeholder-contact-${normalizePlaceholderKeyPart(type)}`, category: "placeholders" });
       }
     });
 
@@ -6906,14 +7902,10 @@ export default function App(){
     if (!unseen) return;
     seenAttentionAlertKeysRef.current.add(unseen.key);
     markInstructionKeysSeen(unseen.entityKey ? [unseen.entityKey] : []);
-    setAlertModal({
-      isOpen: true,
+    setInlineAlert({
       title: unseen.title,
       message: unseen.message,
       details: unseen.details,
-      confirmLabel: "OK",
-      dismissLabel: "Close",
-      onConfirm: null,
     });
   }, [orderAttentionAlerts, markInstructionKeysSeen]);
 
@@ -7097,6 +8089,157 @@ export default function App(){
     };
   }, [data.scopeBridge, data.suggestedGroups]);
   const scopeBridgeSnippet = useMemo(() => buildScopeBridgeSnippet(scopeBridgeState), [scopeBridgeState]);
+
+  // --- Live Order Narrative ---
+  const orderNarrative = useMemo(() => {
+    const lines = [];
+    // Loss type
+    if (data.primaryLossType) {
+      let lossLine = `${data.primaryLossType} loss`;
+      const causes = (data.lossDetails?.[data.primaryLossType]?.causes || []);
+      const origins = (data.lossDetails?.[data.primaryLossType]?.origins || []);
+      if (causes.length) lossLine += ` (${causes.join(", ").toLowerCase()})`;
+      if (origins.length) lossLine += ` originating in ${origins.join(", ").toLowerCase()}`;
+      if ((data.secondaryContaminants || []).length) {
+        lossLine += `, with secondary ${(data.secondaryContaminants || []).join(", ").toLowerCase()}`;
+      }
+      lossLine += ".";
+      lines.push({ section: "Loss", text: lossLine });
+    }
+    // Customer
+    const customers = (data.customers || []).filter(c => hasMeaningfulValue(c.first) || hasMeaningfulValue(c.last));
+    customers.forEach((c, i) => {
+      const name = [c.first, c.last].filter(Boolean).join(" ");
+      const details = [c.phone, c.email].filter(Boolean).join(", ");
+      const role = c.isPrimary ? "Customer" : (c.type || "Contact");
+      lines.push({ section: role, text: `${name}${details ? " — " + details : ""}` });
+    });
+    // Address
+    const addrs = (data.addresses || []).filter(a => !a.inactive && hasMeaningfulValue(a.street));
+    addrs.forEach(a => {
+      const label = a.isPrimary ? "Address" : (a.type || "Address");
+      lines.push({ section: label, text: summarizeAddress(a) });
+    });
+    // Source
+    if (data.referrer || data.referringCompany) {
+      lines.push({ section: "Referral", text: [data.referrer, data.referringCompany].filter(Boolean).join(" at ") });
+    }
+    if (data.salesRep) {
+      lines.push({ section: "Sales Rep", text: data.salesRep.split(",")[0] });
+    }
+    // Insurance
+    if (data.insuranceCompany) {
+      let ins = data.insuranceCompany;
+      if (data.insuranceAdjuster) ins += ` — Adjuster: ${data.insuranceAdjuster}`;
+      lines.push({ section: "Insurance", text: ins });
+    }
+    if (data.claimNumber) lines.push({ section: "Claim #", text: data.claimNumber });
+    // Vendors
+    (data.vendors || []).forEach(v => {
+      if (v.company || v.contact) {
+        lines.push({ section: v.type || "Company", text: [v.company, v.contact].filter(Boolean).join(" — ") });
+      }
+    });
+    // Services
+    if ((data.serviceOfferings || []).length) {
+      lines.push({ section: "Services", text: (data.serviceOfferings || []).join(", ") });
+    }
+    // Conditions
+    const conditions = [];
+    if (data.damageWasWet === "Y" || data.damageWasWet === true) conditions.push("still wet");
+    if (data.damageMoldMildew) conditions.push("visible mold");
+    if (data.structuralElectricDamage === "Y") conditions.push("structural damage");
+    if (data.noLights) conditions.push("no electricity");
+    if (data.noHeat) conditions.push("no heat");
+    if (data.boardedUp) conditions.push("boarded up");
+    if (conditions.length) {
+      lines.push({ section: "Conditions", text: conditions.join(", ") + "." });
+    }
+    // Living / Storage
+    if (data.livingStatus) lines.push({ section: "Living", text: data.livingStatus });
+    if (data.storageNeeded === "Y") {
+      lines.push({ section: "Storage", text: `Long-term storage${data.storageMonths ? `, approximately ${data.storageMonths} months` : ""}` });
+    }
+    // Repairs
+    if (data.repairsSummary) lines.push({ section: "Repairs", text: data.repairsSummary });
+    // Packout
+    if ((data.packoutSummary || []).length) {
+      lines.push({ section: "Pack-out", text: (data.packoutSummary || []).join(", ") });
+    }
+    // Considerations
+    const considerations = (data.sdsConsiderations || []).filter(c => c !== "Pets");
+    if (considerations.length) {
+      lines.push({ section: "Considerations", text: considerations.join(", ") });
+    }
+    const petStr = data.householdAnimals || (data.household || []).filter((m: any) => m.category === "pet").map((p: any) => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+    if (petStr) {
+      lines.push({ section: "Pets", text: petStr });
+    }
+    // Interview details
+    if (data.familyMedicalIssues === "Y") {
+      lines.push({ section: "Medical", text: data.familyMedicalNote || "Medical issues reported" });
+    }
+    if (data.soapFragAllergies === "Y") {
+      lines.push({ section: "Allergies", text: data.soapFragNote || "Soap/fragrance allergies reported" });
+    }
+    if (data.selfCleaning === "Y") {
+      lines.push({ section: "Self-Clean", text: data.selfCleaningNote || "Customer will clean some items themselves" });
+    }
+    if (data.useDryCleaner && data.useDryCleaner !== "No") {
+      lines.push({ section: "Dry Cleaner", text: data.useDryCleaner === "Yes" ? "Uses a dry cleaner" : "Rarely uses dry cleaner" });
+    }
+    if (data.howDryLaundry && data.howDryLaundry !== "Dryer") {
+      lines.push({ section: "Laundry", text: data.howDryLaundry === "Air-Dry" ? "Customer air-dries clothing — do not machine dry" : "Customer prefers low heat drying" });
+    }
+    if (data.processType) {
+      lines.push({ section: "Delivery", text: data.processType });
+    }
+    if ((data.handlingCodes || []).length) {
+      lines.push({ section: "Handling", text: (data.handlingCodes || []).join(", ") });
+    }
+    // Schedule
+    if (data.scheduleType || data.pickupDate) {
+      const parts = [data.scheduleType, data.pickupDate ? formatDateLabel(data.pickupDate) : "", data.pickupTime].filter(Boolean);
+      lines.push({ section: "Scheduled", text: parts.join(" — ") });
+    }
+    if (data.eventAssignee) lines.push({ section: "Assignee", text: data.eventAssignee });
+    // Custom notes
+    const customNotes = stripEventSystemLines(data.eventInstructions || "").trim();
+    if (customNotes) lines.push({ section: "Event Instructions", text: customNotes });
+    return lines;
+  }, [data]);
+
+  // --- Photo Scope Bridge: read photos from Photo Scope localStorage ---
+  const [photoScopeData, setPhotoScopeData] = useState(() => {
+    try { const raw = localStorage.getItem("noe-scope-photos"); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+  useEffect(() => {
+    const poll = setInterval(() => {
+      try {
+        const raw = localStorage.getItem("noe-scope-photos");
+        const parsed = raw ? JSON.parse(raw) : null;
+        setPhotoScopeData(prev => {
+          if (!parsed && !prev) return prev;
+          if (parsed?.updatedAt !== prev?.updatedAt) return parsed;
+          return prev;
+        });
+      } catch {}
+    }, 2000);
+    return () => clearInterval(poll);
+  }, []);
+
+  const mergedSdsPhotos = useMemo(() => {
+    const manual = data.sdsPhotos || [];
+    const fromScope = photoScopeData?.photos || [];
+    const seen = new Set(manual.map(p => p.id));
+    const merged = [...manual];
+    fromScope.forEach(p => { if (!seen.has(p.id)) merged.push(p); });
+    return merged;
+  }, [data.sdsPhotos, photoScopeData]);
+
+  const mergedSdsCoverPhoto = useMemo(() => {
+    return data.sdsCoverPhoto || photoScopeData?.coverPhotoId || null;
+  }, [data.sdsCoverPhoto, photoScopeData]);
   const bridgeStatusClass = useMemo(() => {
     if (scopeBridgeState.projectStatus === "green") return "border-emerald-300 bg-emerald-50 text-slate-700";
     if (scopeBridgeState.projectStatus === "yellow") return "border-amber-300 bg-amber-50 text-slate-700";
@@ -7834,6 +8977,25 @@ export default function App(){
       return next;
     });
   };
+
+  // Auto-fill insurance from referrer when referring company is an insurance carrier
+  useEffect(() => {
+    const company = data.referringCompany || "";
+    const contact = data.referrer || "";
+    if (!company) return;
+    const companyType = inferCompanyTypeFromName(company);
+    if (companyType !== "Insurance") return;
+    // Only auto-fill if insurance fields are empty
+    if (data.insuranceCompany && data.insuranceCompany !== company) return;
+    const updates = {};
+    if (!data.insuranceCompany) updates.insuranceCompany = company;
+    if (!data.insuranceAdjuster && contact) updates.insuranceAdjuster = contact;
+    if (!data.insuranceClaim) updates.insuranceClaim = "Yes";
+    if (Object.keys(updates).length) {
+      setData(prev => ({ ...prev, ...updates }));
+      setToast("Insurance auto-filled from referrer.");
+    }
+  }, [data.referringCompany, data.referrer]);
 
   const suggestedReferrerRoles = useMemo(() => {
     const roles = [];
@@ -8730,6 +9892,11 @@ export default function App(){
         if (company && data.insuranceCompany === company) patch.insuranceCompany = "";
         if (contact && data.insuranceAdjuster === contact) patch.insuranceAdjuster = "";
       } else {
+        if (data.insuranceCompany && company && normalizeCompany(data.insuranceCompany) !== normalizeCompany(company)) {
+          if (!window.confirm(`This order already has "${data.insuranceCompany}" as the insurance company. Are you sure you want to change it to "${company}"? Multiple insurance companies on one order is rare but possible.`)) {
+            return;
+          }
+        }
         if (company) patch.insuranceCompany = company;
         if (contact) patch.insuranceAdjuster = contact;
         patch.insuranceClaim = "Yes";
@@ -8749,20 +9916,122 @@ export default function App(){
   const handleEntryModeSelect = (mode) => {
     setEntryMode(mode);
     if (mode === "quick") {
-      setData(prev => ({ ...prev, isLead: true }));
+      setData(prev => ({ ...prev, isLead: true, eventAssignee: prev.eventAssignee || prev.currentUser || "" }));
+      if (!quickNudgeShownRef.current) {
+        quickNudgeShownRef.current = true;
+        setTimeout(() => {
+          setToast("Tip: Capture all the details in Event Instructions. Switch to Detailed anytime for the full workflow.");
+          setModeButtonFlash(true);
+          setTimeout(() => setModeButtonFlash(false), 3000);
+        }, 3000);
+      }
     }
     if (mode === "detailed") {
-      setData(prev => ({ ...prev, isLead: null }));
+      setData(prev => ({ ...prev, isLead: null, eventAssignee: prev.eventAssignee || prev.currentUser || "" }));
     }
   };
 
-  if (entryMode === 'start') return <StartScreen onSelect={handleEntryModeSelect} />;
+  if (entryMode === 'start') return <div data-noe-mode="start" data-noe-app="new-order-entry"><StartScreen onSelect={handleEntryModeSelect} /></div>;
+  if (entryMode === 'photo-scope') {
+    // Push order context to Photo Scope via localStorage
+    try {
+      const primaryCustomer = (data.customers || [])[0] || {};
+      const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {};
+      const rooms = (data.sdsRooms || []).map(r => r.name).filter(Boolean);
+      // Build conditions from individual flags
+      const conditions = [];
+      if (data.damageWasWet === "Y" || data.damageWasWet === true) conditions.push("Still Wet");
+      if (data.damageMoldMildew) conditions.push("Visible Mold");
+      if (data.structuralElectricDamage === "Y") conditions.push("Structural Damage");
+      if (data.noLights) conditions.push("No Electricity");
+      if (data.noHeat) conditions.push("No Heat");
+      if (data.boardedUp) conditions.push("Boarded Up");
+
+      // Build repairs from comma-separated string
+      const repairs = (data.repairsSummary || "").split(", ").filter(Boolean);
+
+      // Build packout from array
+      const packout = data.packoutSummary || [];
+
+      // Map rush interests IDs to labels
+      const RUSH_INT_LABELS: Record<string, string> = { school: "School & Kids Sports", summer_activities: "Summer & Swim", winter_sports: "Winter & Snow", halloween: "Halloween", thanksgiving: "Thanksgiving", christmas: "Christmas / Hanukkah", easter: "Easter / Passover", religious: "Religious Services", graduation: "Graduation", workout: "Gym & Fitness", work_from_home: "Work from Home" };
+      const interests = (data.rushInterests || []).map((id: string) => RUSH_INT_LABELS[id] || id);
+
+      // Map event type IDs to labels
+      const EVENT_LABELS: Record<string, string> = { vacation_beach: "Warm Weather / Beach Vacation", vacation_ski: "Cold Weather / Ski Trip", wedding: "Wedding / Formal Event", business: "Business Trip / Conference", sports: "Sports Tournament" };
+      const upcomingEvents = (data.upcomingEvents || []).map((e: any) => EVENT_LABELS[e.type] || e.name || "").filter(Boolean);
+
+      localStorage.setItem("noe-photo-scope-context", JSON.stringify({
+        orderName: data.orderName || "",
+        customerName: [primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" "),
+        address: [primaryAddr.street, primaryAddr.city, primaryAddr.state].filter(Boolean).join(", "),
+        lossType: data.primaryLossType || "",
+        orderTypes: data.orderTypes || [],
+        claimNumber: data.claimNumber || "",
+        insuranceCompany: data.insuranceCompany || "",
+        rooms: rooms.length ? rooms : ["Kitchen", "Living Room", "Bedroom", "Bathroom", "Basement", "Hallway", "Dining Room"],
+        suggestedGroups: data.suggestedGroups || [],
+        severityCodes: data.severityCodes || [],
+        considerations: data.sdsConsiderations || [],
+        observations: data.sdsObservations || [],
+        handlingCodes: data.handlingCodes || [],
+        services: data.serviceOfferings || [],
+        interview: {
+          conditions,
+          repairs,
+          living: data.livingStatus || null,
+          delivery: data.processType || null,
+          packout,
+          loadList: data.loadList || [],
+          considerations: data.sdsConsiderations || [],
+          suggestedGroups: data.suggestedGroups || [],
+          medicalIssues: data.familyMedicalIssues === "Y" ? true : data.familyMedicalIssues === "N" ? false : null,
+          soapAllergies: data.soapFragAllergies === "Y" ? true : data.soapFragAllergies === "N" ? false : null,
+          selfCleaning: data.selfCleaning === "Y" ? true : data.selfCleaning === "N" ? false : null,
+          useDryCleaner: data.useDryCleaner || null,
+          dryLaundry: data.howDryLaundry || null,
+          needStorage: data.storageNeeded === "Y" ? true : data.storageNeeded === "N" ? false : null,
+          petsInHome: (data.household || []).filter((m: any) => m.category === "pet").map((p: any) => p.type).filter(Boolean),
+          interests,
+          upcomingEvents,
+        },
+      }));
+    } catch {}
+    return (
+      <div data-noe-mode="photo-scope" data-noe-app="new-order-entry" className="fixed inset-0 flex flex-col bg-white">
+        <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 shadow-sm z-10">
+          <button
+            type="button"
+            onClick={() => setEntryMode('start')}
+            className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100"
+            title="Back to start"
+          >
+            <span className="text-sm">←</span>
+          </button>
+          <div className="flex items-center bg-slate-100 rounded-full p-0.5 gap-0.5">
+            <button onClick={() => setEntryMode('detailed')} className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Order</button>
+            <button className="rounded-full px-3 py-1.5 text-xs font-bold bg-white text-sky-700 shadow-sm">Photo Scope</button>
+            <button onClick={() => { setEntryMode('detailed'); setTimeout(() => setShowSdsPreview(true), 100); }} className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">SDS</button>
+          </div>
+          <div className="ml-auto text-xs text-slate-400">Photos sync to SDS automatically</div>
+        </div>
+        <iframe
+          src="/photo-scope.html"
+          className="flex-1 w-full border-none"
+          title="Photo Scope"
+        />
+      </div>
+    );
+  }
   if (entryMode === 'same-day-scope') {
     const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {};
     const addressLabel = [primaryAddr.street, primaryAddr.city, primaryAddr.state].filter(Boolean).join(", ");
     return (
+      <ScopeBoundary onBack={() => setEntryMode('detailed')}>
       <SameDayScope
         onExit={() => setEntryMode('start')}
+        onNavigateToNoe={() => setEntryMode('detailed')}
+        onNavigateToSds={() => { setEntryMode('detailed'); setTimeout(() => setShowSdsPreview(true), 100); }}
         eventInstructions={data.eventInstructions || ""}
         onEventInstructionsChange={(val) => update("eventInstructions", val)}
         serviceOfferings={data.serviceOfferings || []}
@@ -8788,6 +10057,7 @@ export default function App(){
         sdsConsiderations={data.sdsConsiderations || []}
         sdsObservations={data.sdsObservations || []}
         sdsServices={data.sdsServices || []}
+        onSdsServicesChange={(list) => update("sdsServices", list)}
         sdsRooms={data.sdsRooms || []}
         onSdsRoomsChange={(list) => update("sdsRooms", list)}
         sdsProjectFloors={data.sdsProjectFloors || []}
@@ -8803,6 +10073,7 @@ export default function App(){
         sdsDisagreementNote={data.sdsDisagreementNote}
         onSdsDisagreementNoteChange={(value) => update("sdsDisagreementNote", value)}
       />
+      </ScopeBoundary>
     );
   }
 
@@ -8818,23 +10089,29 @@ export default function App(){
             completedSections={completedSections}
             onJump={jumpToSection} 
             onJumpSub={jumpToSectionAndSubsection}
-            title={entryMode === 'quick' ? 'Quick Entry' : 'New Order'} 
+            title={entryMode === 'quick' ? (data.orderName || 'Quick Entry') : (data.orderName || 'New Order')} 
             version="v55"
             entryMode={entryMode}
             setEntryMode={setEntryMode}
-            showInlineHelp={showInlineHelp}
+            showInlineHelp={showCoaching}
             setShowInlineHelp={setShowInlineHelp}
+            showCoaching={showCoaching}
+            setShowCoaching={setShowCoaching}
             compactMode={compactMode}
+            onShowSds={() => setShowSdsPreview(true)}
             setCompactMode={setCompactMode}
             onReset={handleReset}
             currentUser={data.currentUser}
             setCurrentUser={(v)=>update("currentUser", v)}
             setShowSampleDataModal={setShowSampleDataModal}
             onOpenPresets={() => setShowPresetModal(true)}
+            onOpenFieldConfig={() => setShowFieldConfig(true)}
+            interviewPanelOpen={interviewPanelOpen}
+            actionItemsOpen={actionItemsOpen}
             presetCount={testPresets.length}
         />
 
-        <div ref={appContentRef} className={`min-h-screen bg-slate-50 pb-32 font-sans fade-in scale-in ${compactMode ? 'compact-mode' : ''} ${entryMode === 'detailed' ? 'pt-28' : 'pt-24'}`}>
+        <div ref={appContentRef} data-noe-mode={entryMode} data-noe-app="new-order-entry" className={`min-h-screen bg-slate-50 pb-32 font-sans fade-in scale-in ${compactMode ? 'compact-mode' : ''} ${entryMode === 'detailed' ? 'pt-28' : 'pt-24'}`} style={(interviewPanelOpen || actionItemsOpen) ? { marginRight: '480px', transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}>
             
             <div className="absolute inset-x-0 top-0 h-[320px] bg-gradient-to-b from-sky-50/50 to-transparent pointer-events-none" />
 
@@ -8842,27 +10119,78 @@ export default function App(){
               
               {entryMode === 'detailed' ? (
                 <>
+                  {(scopeBridgeState.projectStatus || scopeBridgeState.pendingIssues.length > 0) && (
+                    <button
+                      type="button"
+                      onClick={() => { jumpToSection("sec5"); setTimeout(() => setScheduleBridgeOpen(true), 150); }}
+                      className={`mb-3 w-full rounded-xl border px-4 py-2.5 text-left transition-all hover:shadow-sm ${bridgeStatusClass}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-block h-2.5 w-2.5 rounded-full ${
+                            scopeBridgeState.projectStatus === "green" ? "bg-emerald-500" :
+                            scopeBridgeState.projectStatus === "yellow" ? "bg-amber-500" :
+                            scopeBridgeState.projectStatus === "red" ? "bg-rose-500" : "bg-slate-300"
+                          }`} />
+                          <span className="text-xs font-bold uppercase tracking-wider">
+                            Scope Bridge{scopeBridgeState.projectStatus ? `: ${scopeBridgeState.projectStatus.toUpperCase()}` : ""}
+                          </span>
+                          {scopeBridgeState.pendingIssues.length > 0 && (
+                            <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                              {scopeBridgeState.pendingIssues.length} blocker{scopeBridgeState.pendingIssues.length !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                          {scopeBridgeState.milestones?.authorizationOnFile && (
+                            <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-800">Auth on file</span>
+                          )}
+                          {scopeBridgeState.milestones?.scopeApproved && (
+                            <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-800">Scope approved</span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400">Open</span>
+                      </div>
+                    </button>
+                  )}
+                  {/* Placeholder strip removed — now in Action Items panel */}
+                  {inlineAlert && (
+                    <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3 fade-in">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-bold text-amber-800">{inlineAlert.title}</div>
+                          <div className="text-xs text-amber-700 mt-0.5">{inlineAlert.message}</div>
+                          {inlineAlert.details?.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5">
+                              {inlineAlert.details.map((d, i) => <li key={i} className="text-[11px] text-amber-700">• {d}</li>)}
+                            </ul>
+                          )}
+                        </div>
+                        <button type="button" onClick={() => setInlineAlert(null)} className="text-amber-400 hover:text-amber-600 font-bold text-sm shrink-0">×</button>
+                      </div>
+                    </div>
+                  )}
                   <div className={compactMode ? "space-y-3" : "space-y-4"}>
-                    
+
                     <Section
                       id="sec1"
-                      title="1. Order & Interview"
+                      noeSection="order"
+                      title={`1. ${recordWord}`}
                       helpText="Enter job basics + call details (source, scope/needs, internal codes if known)."
                       isOpen={openSections.sec1}
                       onHeaderClick={()=>handleToggleSection('sec1')}
                       onCaretClick={()=>handleToggleSection('sec1')}
                       badges={
                         <div className="flex items-center gap-2">
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${recordTypeLabel === "Select Type" ? "bg-amber-50 text-amber-700" : "bg-sky-50 text-sky-700"}`}>{recordTypeLabel}</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{codeSummary}</span>
+                          {recordTypeLabel !== "Select Type" && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">{recordTypeLabel}</span>}
+                          {data.primaryLossType && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{data.primaryLossType}</span>}
+                          {codeSummary && codeSummary !== "None" && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{codeSummary}</span>}
                         </div>
                       }
                       compact={compactMode}
                       className={auditOn && auditTargets.sections.has("sec1") ? "audit-outline" : ""}
                     >
                         <div className={`grid ${compactMode ? 'gap-3' : 'gap-5'}`}>
-                            <SubSection id="sec1-order" title="Order" open={orderSubOpen} onToggle={(nextOpen) => setOrderSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("order") ? "audit-outline" : ""}>
-                                <Field label={<span>Order Name <span className="font-normal text-slate-400 text-xs ml-1">(Auto-generated)</span></span>} missing={data.highlightMissing?.orderName}>
+                            <SubSection id="sec1-order" title={recordWord} open={orderSubOpen} onToggle={(nextOpen) => setOrderSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("order") ? "audit-outline" : ""}>
+                                <Field label={<span>{recordWord} Name <span className="font-normal text-slate-400 text-xs ml-1">(Auto-generated)</span></span>} missing={data.highlightMissing?.orderName}>
                                   <div className="flex gap-2">
                                       <Input
                                         ref={orderNameInputRef}
@@ -8872,11 +10200,12 @@ export default function App(){
                                         onChange={e=>updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })}
                                         readOnly={!!data.orderNameLocked}
                                         aria-readonly={!!data.orderNameLocked}
-                                        placeholder="e.g. Name-TownST"
+                                        placeholder="e.g. Smith-BloomingdaleNJ"
                                       />
                                       <button className={`rounded-lg border px-3 text-xs font-bold transition-all ${data.orderNameLocked?"bg-slate-800 text-white":"bg-white hover:bg-slate-50"}`} onClick={()=>updateMany({ orderNameLocked: !data.orderNameLocked, orderNameAuto: data.orderNameLocked ? data.orderNameAuto : false })}>{data.orderNameLocked?"LOCKED":"LOCK"}</button>
                                   </div>
                                 </Field>
+                                {showCoaching && <div className="text-[11px] text-slate-400">Auto-generated from LastName-TownST. Lock to prevent changes.</div>}
                                 <div className="grid gap-4 sm:grid-cols-2">
                                   <Field label="Record Type">
                                     <ToggleGroup options={[
@@ -8884,31 +10213,49 @@ export default function App(){
                                       { label: "Lead", title: "Potential project; incomplete information or no billing yet." }
                                     ]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
                                   </Field>
-                                  <Field label="Order Status">
+                                  <Field label={`${recordWord} Status`}>
                                     <ToggleGroup options={ORDER_STATUSES} value={data.orderStatus} onChange={v => update("orderStatus", v)} />
                                   </Field>
                                 </div>
-                                {showInlineHelp && <div className="text-[11px] text-slate-400">Auto-generated by using the LastName-TownST.</div>}
-                                <Field label="Order Type" missing={data.highlightMissing.orderTypes} smart>
+                                <Field label="What caused the loss?" missing={data.highlightMissing.orderTypes} smart>
+                                  {showCoaching && !data.primaryLossType && !dismissedTips.has("Loss Type") && (
+                                    <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-2">
+                                      <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Loss Type"); e.target.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
+                                      🎓 <span className="font-bold">Loss Type:</span> Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.
+                                    </div>
+                                  )}
                                   <div className="flex flex-wrap gap-2" data-audit-key="orderTypes">
                                       {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map(ot=> (
                                           <ToggleMulti
                                             key={ot}
                                             label={ot}
-                                            title="Type of peril/damage involved."
-                                            checked={(data.orderTypes||[]).includes(ot)}
+                                            title={LOSS_TYPE_COACHING[ot] || "Type of peril/damage involved."}
+                                            checked={data.primaryLossType === ot || (ot === NON_RESTORATION_PRIMARY && isNonRestorationProject)}
                                             onChange={() => {
                                               if (ot === NON_RESTORATION_PRIMARY) {
                                                 toggleNonRestorationPrimary();
+                                                updateMany({ primaryLossType: NON_RESTORATION_PRIMARY });
                                                 return;
                                               }
-                                              toggleRestorationType(ot);
+                                              const newPrimary = data.primaryLossType === ot ? "" : ot;
+                                              const newOrderTypes = newPrimary ? [newPrimary, ...(data.secondaryContaminants || []).filter(s => s !== newPrimary)] : [...(data.secondaryContaminants || [])];
+                                              updateMany({ primaryLossType: newPrimary, orderTypes: newOrderTypes });
                                             }}
-                                            className={ot === "Water" && attentionWater ? "attention-fill" : ot === "Mold" && attentionMold ? "attention-fill" : ""}
+                                            className={ot === "Water" && attentionWater && data.primaryLossType !== "Water" && !(data.secondaryContaminants||[]).includes("Water") ? "attention-fill" : ot === "Mold" && attentionMold && data.primaryLossType !== "Mold" && !(data.secondaryContaminants||[]).includes("Mold") ? "attention-fill" : ""}
                                           />
                                       ))}
                                   </div>
                                 </Field>
+                                {showCoaching && data.primaryLossType && !isNonRestorationProject && (
+                                  <>
+                                    <div className="text-[11px] text-slate-400">Primary: <span className="font-semibold text-slate-600">{data.primaryLossType}</span>. Select additional contaminants below if applicable.</div>
+                                    {LOSS_TYPE_COACHING[data.primaryLossType] && (
+                                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">{data.primaryLossType}:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
                                 {isNonRestorationProject && (
                                   <Field label="Non-Restoration Type" missing={data.highlightMissing.nonRestorationSubtype}>
                                     <div className="flex flex-wrap gap-2" data-audit-key="nonRestorationSubtype">
@@ -8924,13 +10271,47 @@ export default function App(){
                                     </div>
                                   </Field>
                                 )}
-                                {(attentionWater || attentionMold) && (
-                                  <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
-                                    {attentionWater && <div>Still Wet selected → review Water loss type and severity.</div>}
-                                    {attentionMold && <div>Visible Mold selected → review Mold loss type, severity, and Mold coverage.</div>}
+                                {data.primaryLossType && !isNonRestorationProject && (
+                                  <Field label="Additional contaminants?">
+                                    <div className="flex flex-wrap gap-2">
+                                      {LOSS_TYPES.filter(t => t !== data.primaryLossType).map(t => (
+                                        <ToggleMulti
+                                          key={t}
+                                          label={t}
+                                          checked={(data.secondaryContaminants || []).includes(t)}
+                                          onChange={() => {
+                                            const next = (data.secondaryContaminants || []).includes(t)
+                                              ? (data.secondaryContaminants || []).filter(s => s !== t)
+                                              : [...(data.secondaryContaminants || []), t];
+                                            updateMany({ secondaryContaminants: next, orderTypes: [data.primaryLossType, ...next] });
+                                          }}
+                                          className={t === "Water" && attentionWater && !(data.secondaryContaminants||[]).includes("Water") ? "attention-fill" : t === "Mold" && attentionMold && !(data.secondaryContaminants||[]).includes("Mold") ? "attention-fill" : ""}
+                                        />
+                                      ))}
+                                    </div>
+                                    {showCoaching && <div className="text-[11px] text-slate-400">e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
+                                  </Field>
+                                )}
+                                {attentionWater && !(data.orderTypes||[]).includes("Water") && !dismissedTips.has("Water Suggestion") && (
+                                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Water Suggestion:</span> Still Wet was selected — consider adding Water as a contaminant.
                                   </div>
                                 )}
-                                {showInlineHelp && <div className="text-[11px] text-slate-400">Type of peril/damage involved.</div>}
+                                {attentionWater && (data.orderTypes||[]).includes("Water") && !dismissedTips.has("Water Confirmed") && (
+                                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Water Confirmed:</span> Review severity in Codes section below.
+                                  </div>
+                                )}
+                                {attentionMold && !(data.orderTypes||[]).includes("Mold") && !dismissedTips.has("Mold Suggestion") && (
+                                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Mold Suggestion:</span> Visible Mold was selected — consider adding Mold as a contaminant.
+                                  </div>
+                                )}
+                                {attentionMold && (data.orderTypes||[]).includes("Mold") && !dismissedTips.has("Mold Confirmed") && (
+                                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Mold Confirmed:</span> Review severity and <button type="button" onClick={(e) => { e.stopPropagation(); jumpToSectionAndSubsection("sec4", "insurance"); }} className="underline underline-offset-2 font-bold text-violet-800 hover:text-violet-900">Mold coverage limit in Insurance</button>.
+                                  </div>
+                                )}
                                 {(data.orderTypes || []).filter(t => LOSS_TYPES.includes(t)).map(type => {
                                     const details = (data.lossDetails || {})[type] || { causes: [], origins: [] };
                                     const isMinimized = minimizedLossTypes[type];
@@ -8961,6 +10342,7 @@ export default function App(){
                                                 <div className="p-4 grid gap-4 border-t border-sky-100 bg-white">
                                                     {hasSeverity && !isNonRestorationProject && (
                                                         <Field label="Severity" subtle>
+                                                            {showCoaching && !(data.severityCodes || []).length && <div className="text-[10px] text-slate-400 mb-1">Typically entered after the site inspection, not during intake.</div>}
                                                             <div className={`rounded-lg ${needsSeverityCode ? "border border-orange-200 bg-orange-50/60 p-2" : ""}`}>
                                                               <div className="flex gap-2" data-audit-key={`severity-${severityGroup.toLowerCase()}`}>{SEVERITY_LEVELS.map(level => { const code = `${severityGroup}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`h-9 w-9 rounded-lg text-sm font-bold transition-all border ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : needsSeverityCode ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100' : 'bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-200'} ${attentionForSeverity && !needsSeverityCode ? 'attention-outline' : ''}`}>{level}</button>); })}</div>
                                                               {needsSeverityCode && (
@@ -8971,7 +10353,19 @@ export default function App(){
                                                             </div>
                                                         </Field>
                                                     )}
-                                                    {hasCauses && (<Field label={`${type} Cause`} subtle><div className="flex flex-wrap gap-2">{CAUSES[type].map(c => (<ToggleMulti key={c} label={c} checked={(details.causes || []).includes(c)} onChange={() => updateLossDetail(type, 'causes', c)} />))}</div></Field>)}
+                                                    {hasCauses && (<Field label={`${type} Cause`} subtle><div className="flex flex-wrap gap-2">{CAUSES[type].map(c => {
+                                                      const isWarning = c.endsWith("⚠");
+                                                      const label = isWarning ? c.replace("⚠", "") : c;
+                                                      const causeKey = c;
+                                                      const isSelected = (details.causes || []).includes(causeKey);
+                                                      return (<ToggleMulti key={c} label={label} checked={isSelected} onChange={() => updateLossDetail(type, 'causes', causeKey)} className={isWarning && isSelected ? "!border-rose-400 !bg-rose-50 !text-rose-700" : isWarning ? "!border-amber-300 !text-amber-700" : ""} title={isWarning ? "Coverage verification required — confirm with adjuster" : ""} />);
+                                                    })}</div>
+                                                    {(details.causes || []).some(c => c.endsWith("⚠")) && (
+                                                      <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] text-rose-700 font-semibold">
+                                                        ⚠ Coverage verification required — some water losses are excluded or capped with a low limit. Always verify coverage for groundwater, flood, and sump pump failure with the adjuster before proceeding.
+                                                      </div>
+                                                    )}
+                                                    </Field>)}
                                                     {hasOrigins && (<Field label="Origin" subtle><div className="flex flex-wrap gap-2">{ORIGINS.map(o => (<ToggleMulti key={o} label={o} checked={(details.origins || []).includes(o)} onChange={() => updateLossDetail(type, 'origins', o)} />))}</div></Field>)}
                                                     {type === "Mold" && (
                                                       <div className="rounded-lg border border-orange-300 bg-orange-50 p-3">
@@ -9005,214 +10399,39 @@ export default function App(){
                             </SubSection>
 
                             <SubSection id="sec1-source" title="Source" open={sourceSubOpen} onToggle={(nextOpen) => setSourceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("source") ? "audit-outline" : ""}>
-                            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} onPromptRoleAssignment={openRoleAssignmentPrompt} />
+                            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showCoaching} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} onPromptRoleAssignment={openRoleAssignmentPrompt} />
                             </SubSection>
 
-                            <SubSection id="sec1-interview-panel" title="Interview" open={interviewSubOpen} onToggle={(nextOpen) => setInterviewSubOpen(!!nextOpen)} compact={compactMode}>
-                                <div id="sec1-interview">
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4 space-y-4">
-                                      <label className="text-xs font-bold text-sky-600 uppercase flex items-center gap-1">Conditions <span className="text-orange-500">⚡</span></label>
-                                      <div className="flex flex-wrap gap-3">
-                                          {[
-                                            {
-                                              id: "wet",
-                                              label: "Still Wet",
-                                              active: !!data.damageWasWet,
-                                              onToggle: () => updateSmart("damageWasWet", data.damageWasWet ? "N" : "Y"),
-                                              suggested: suggestWet
-                                            },
-                                            {
-                                              id: "mold",
-                                              label: "Visible Mold",
-                                              active: !!data.damageMoldMildew,
-                                              onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew)
-                                            },
-                                            {
-                                              id: "structural",
-                                              label: "Structural Damage",
-                                              active: data.structuralElectricDamage === "Y",
-                                              onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y")
-                                            },
-                                            {
-                                              id: "lights",
-                                              label: "No Electricity",
-                                              active: !!data.noLights,
-                                              onToggle: () => updateSmart("noLights", !data.noLights)
-                                            },
-                                            {
-                                              id: "heat",
-                                              label: "No Heat",
-                                              active: !!data.noHeat,
-                                              onToggle: () => updateSmart("noHeat", !data.noHeat)
-                                            },
-                                            {
-                                              id: "boarded",
-                                              label: "Boarded Up",
-                                              active: !!data.boardedUp,
-                                              onToggle: () => updateSmart("boardedUp", !data.boardedUp)
-                                            }
-                                          ].map(item => (
-                                            <button
-                                              key={item.id}
-                                              type="button"
-                                              onClick={item.onToggle}
-                                              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
-                                                item.active
-                                                  ? "border-orange-300 bg-orange-50 text-slate-800"
-                                                  : "border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:text-sky-700"
-                                              } ${item.suggested ? "suggested-field" : ""}`}
-                                            >
-                                              <span className={`inline-block h-2 w-2 rounded-full ${item.active ? "bg-sky-500" : "bg-slate-300"}`} />
-                                              <span>{item.label}</span>
-                                              {item.suggested ? (
-                                                <span className="ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold suggested-pill">
-                                                  Suggested
-                                                </span>
-                                              ) : null}
-                                            </button>
-                                          ))}
-                                      </div>
-                                  </div>
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
-                                      <div className="text-sm font-semibold text-sky-600 mb-3">Repairs Summary</div>
-                                      <div className="flex flex-wrap gap-2">
-                                      {["Just Cleaning", "Clean and Paint", "Cosmetic Damage", "Major Structural Damage", "Refinish Floors", "Replace Floors", "Complete Rebuild"].map(s => (
-                                          <ToggleMulti key={s} label={s} checked={data.repairsSummary === s} onChange={()=>update("repairsSummary", data.repairsSummary === s ? "" : s)} />
-                                        ))}
-                                      </div>
-                                  </div>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                        <Field label={<span className="text-sky-600">Living Situation</span>}>
-                                          <div className="flex flex-wrap gap-2">
-                                            {["Staying in home", "Moving", "Hotel", "Neighbor", "Relative", "Rental", "Other Home"].map(s => (
-                                              <ToggleMulti
-                                                key={s}
-                                                label={s}
-                                                checked={data.livingStatus === s}
-                                                onChange={() => updateLivingStatus(data.livingStatus === s ? "" : s)}
-                                              />
-                                            ))}
-                                          </div>
-                                        </Field>
-                                      </div>
-                                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200"><Field label={<span className="text-sky-600">Delivery + Storage Timeline</span>}><div className="flex flex-wrap gap-2">{["Deliver to Temp", "Deliver to Move", "Deliver to home ASAP", "Long-Term Storage"].map(s => (<ToggleMulti key={s} label={s} checked={data.processType === s} onChange={()=>update("processType", data.processType === s ? "" : s)} />))}</div></Field></div>
-                                  </div>
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
-                                      <div className="text-sm font-semibold text-sky-600 mb-3">Packout Summary</div>
-                                      <div className="flex flex-wrap gap-2">
-                                        {["Remove Rugs", "Remove Window Treatments", "Remove Hardware", "Remove Furniture", "Remove Electronics"].map(s => (
-                                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={()=>update("packoutSummary", toggleMulti(data.packoutSummary || [], s))} />
-                                        ))}
-                                      </div>
-                                  </div>
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4">
-                                      <div className="text-sm font-semibold text-sky-600 mb-3">Suggested Groups</div>
-                                      <div className="flex flex-wrap gap-2">
-                                        {SUGGESTED_GROUPS.map(g => {
-                                          const selected = (data.suggestedGroups || []).includes(g);
-                                          const link = getGroupLink(g);
-                                          const linkedAddr = (data.addresses || []).find(a => a.id === link.addressId);
-                                          if (!selected) {
-                                            return (
-                                              <ToggleMulti
-                                                key={g}
-                                                label={g}
-                                                title={SUGGESTED_GROUP_HELP[g]}
-                                                checked={false}
-                                                onChange={() => {
-                                                  const next = toggleMulti(data.suggestedGroups || [], g);
-                                                  update("suggestedGroups", next);
-                                                }}
-                                              />
-                                            );
-                                          }
-
-                                          return (
-                                            <div
-                                              key={g}
-                                              className="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-sky-50 px-2 py-1"
-                                              title={SUGGESTED_GROUP_HELP[g]}
-                                            >
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  const next = toggleMulti(data.suggestedGroups || [], g);
-                                                  update("suggestedGroups", next);
-                                                  if (!next.includes(g)) clearGroupLink(g);
-                                                }}
-                                                className="rounded-full border border-sky-300 bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700 hover:bg-sky-200"
-                                              >
-                                                {g}
-                                              </button>
-                                              <span className="h-4 w-px bg-sky-200" />
-                                              <button
-                                                type="button"
-                                                onClick={() => openGroupLinkModal(g)}
-                                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${link?.addressId ? "border-sky-300 bg-white text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
-                                                title="Link group to address/date"
-                                              >
-                                                <span>📍</span>
-                                                <span>{link?.addressId ? (linkedAddr?.type || "Address") : "Link"}</span>
-                                                {link?.date ? <span>• {link.date}</span> : null}
-                                              </button>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                  </div>
-                                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                    <div className="text-sm font-semibold text-sky-600 mb-3">Preferences & Care</div>
-                                    <div className="space-y-4">
-                                      <div className="flex items-center justify-between"><Field label="Medical Issues?" /><ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => update("familyMedicalIssues", v)} /></div>
-                                      {data.familyMedicalIssues === "Y" && (
-                                        <Textarea value={data.familyMedicalNote || ""} onChange={e=>update("familyMedicalNote", e.target.value)} placeholder="Details..." />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="Soap Allergies?" smart /><ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => update("soapFragAllergies", v)} /></div>
-                                      {data.soapFragAllergies === "Y" && (
-                                        <Textarea value={data.soapFragNote || ""} onChange={e=>update("soapFragNote", e.target.value)} placeholder="Allergy details..." />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="Self Cleaning?" /><ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} /></div>
-                                      {data.selfCleaning === "Y" && (
-                                        <Textarea value={data.selfCleaningNote || ""} onChange={e=>update("selfCleaningNote", e.target.value)} placeholder="What will they clean?" />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="Donate Items?" /><ToggleGroup options={["Y","N"]} value={data.donateSalvation || ""} onChange={v => update("donateSalvation", v)} /></div>
-                                      {data.donateSalvation === "Y" && (
-                                        <Textarea value={data.donateSalvationNote || ""} onChange={e=>update("donateSalvationNote", e.target.value)} placeholder="Items to donate..." />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="Use Dry Cleaner?" /><ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => update("useDryCleaner", v)} /></div>
-                                      {data.useDryCleaner === "Yes" && (
-                                        <Textarea value={data.useDryCleanerNote || ""} onChange={e=>update("useDryCleanerNote", e.target.value)} placeholder="Dry cleaner notes..." />
-                                      )}
-                                      <div className="flex items-center justify-between"><Field label="How do you dry laundry?" smart /><ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => updateHowDry(v)} /></div>
-                                      {data.howDryLaundry && data.howDryLaundry !== "Dryer" && (
-                                        <div className="text-xs suggested-text">Smart handling code applied based on laundry preference.</div>
-                                      )}
-                                      <div className="flex items-center justify-between">
-                                        <Field label="Need Storage?" />
-                                      <div className={`rounded-lg p-1 ${suggestStorage ? 'suggested-field' : ''} ${highlightStorageFromProcess ? 'attention-outline' : ''}`}>
-                                        <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => update("storageNeeded", v)} />
-                                      </div>
-                                      </div>
-                                      {suggestStorage && <div className="text-xs suggested-text">Suggested based on structural damage or process goal.</div>}
-                                      {highlightStorageFromProcess && (
-                                        <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-                                          Long-Term Storage selected → confirm Need Storage.
-                                        </div>
-                                      )}
-                                      {data.storageNeeded === "Y" && (
-                                        <div className="flex items-center gap-2">
-                                          <Input className={`w-24 ${suggestStorageMonths ? 'suggested-field' : ''}`} value={data.storageMonths || ""} onChange={e=>update("storageMonths", e.target.value)} placeholder="#" />
-                                          <span className="text-xs text-slate-500">months</span>
-                                          {suggestStorageMonths && <span className="text-[10px] font-bold suggested-pill rounded-full px-2 py-0.5">Suggested</span>}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {/* Repairs Summary moved into section above */}
+                            {/* Interview moved to slide-out panel — accessible from floating pill */}
+                            <button
+                              type="button"
+                              onClick={() => setInterviewPanelOpen(true)}
+                              className="w-full rounded-xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-left hover:bg-violet-50 transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base">🎤</span>
+                                  <span className="text-sm font-bold text-violet-700">Interview</span>
+                                  {(data.damageWasWet || data.damageMoldMildew || data.livingStatus || data.repairsSummary || (data.packoutSummary||[]).length) && (
+                                    <span className="text-[10px] text-violet-500">In progress</span>
+                                  )}
                                 </div>
-                            </SubSection>
+                                <span className="text-xs font-bold text-violet-600">Open →</span>
+                              </div>
+                              {(data.livingStatus || data.repairsSummary || (data.packoutSummary||[]).length > 0) && (
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  {data.livingStatus && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">{data.livingStatus}</span>}
+                                  {data.repairsSummary && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">{data.repairsSummary.split(", ")[0]}</span>}
+                                  {(data.packoutSummary||[]).length > 0 && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">{(data.packoutSummary||[]).length} items</span>}
+                                </div>
+                              )}
+                            </button>
 
+                            {/* Interview content moved to slide-out panel */}
+
+                            {/* Dead interview code removed */}
+                            {/* Codes — hidden during intake, shown post-inspection */}
+                            {["Pickup Complete","Tagging Complete","Ready to Bill"].includes(data.orderStatus) && (
                             <SubSection id="sec1-codes-panel" title="Codes" open={codesSubOpen} onToggle={(nextOpen) => { const next = !!nextOpen; setCodesSubOpen(next); if(next) setOpenCodes(true); }} compact={compactMode}>
                                 <div id="sec1-codes">
                                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:border-sky-300">
@@ -9225,7 +10444,7 @@ export default function App(){
                                             {!isNonRestorationProject && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">SEVERITY</div>
-                                                <div className="text-xs text-slate-500 mb-3">1 = No Rejects, 5 = Many Rejects (higher means more rejects).</div>
+                                                {showCoaching && <div className="text-xs text-slate-500 mb-1">Severity reject scale: 1 = None, 2 = Possible, 3 = Many expected, 5 = Extreme.</div>}
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">{SEVERITY_GROUPS.map(type => {
                                                   const hasGroupCode = (data.severityCodes || []).some(c => c.startsWith(`${type}-`));
                                                   const expectsGroupCode = expectedSeverityGroups.has(type);
@@ -9235,7 +10454,7 @@ export default function App(){
                                                     <div key={type} data-audit-key={`severity-${type.toLowerCase()}`} className={`rounded-lg border p-2 ${needsExpectedCode ? "border-orange-300 bg-orange-50/60" : "border-slate-200"} ${needsAttention && !needsExpectedCode ? "attention-outline" : ""}`}>
                                                       <div className="mb-1.5 flex items-center justify-between">
                                                         <div className="text-xs font-bold text-slate-600">{type}</div>
-                                                        {needsExpectedCode ? <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">Expected</span> : null}
+                                                        {needsExpectedCode ? <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">Suggested — {type} selected as order type</span> : null}
                                                       </div>
                                                       <div className="flex gap-1">
                                                         {SEVERITY_LEVELS.map(level => { const code = `${type}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`flex-1 rounded py-1 text-xs font-bold transition-all ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : needsExpectedCode ? 'bg-orange-50 border border-orange-300 text-orange-700 hover:bg-orange-100' : 'bg-slate-100 border border-slate-300 text-slate-600 hover:bg-slate-200'} ${needsAttention && !needsExpectedCode ? "attention-outline" : ""}`}>{level}</button>); })}
@@ -9245,15 +10464,71 @@ export default function App(){
                                                 })}</div>
                                               </div>
                                             )}
+                                            {/* Drill-down severity sliders */}
+                                            {(data.primaryLossType || (data.orderTypes||[]).some(t => ["Fire","Water","Puffback"].includes(t))) && (
+                                              <div>
+                                                <div className="mb-2 text-xs font-bold text-slate-400">DETAILED SEVERITY</div>
+                                                {showCoaching && <div className="text-xs text-slate-500 mb-3">Rate specific contaminant levels. 0 = None, 3 = Severe. Typically completed after the site inspection — not during intake.</div>}
+                                                <div className="grid gap-4 sm:grid-cols-2">
+                                                  {[
+                                                    { key: "fire", label: "Fire", fields: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"], colorStart: "#fef3c7", colorEnd: "#f97316" },
+                                                    { key: "water", label: "Water", fields: ["Water", "Humidity", "Musty Smell", "Visible Mildew", "Visible Mold", "Sprinkler Chemical", "Flood Cut Debris"], colorStart: "#dbeafe", colorEnd: "#3b82f6" },
+                                                    { key: "puffback", label: "Puffback", fields: ["Oil", "Soot", "Odor", "Oily Film"], colorStart: "#f3e8ff", colorEnd: "#7c3aed" },
+                                                  ].filter(section => {
+                                                    const types = data.orderTypes || [];
+                                                    if (section.key === "fire") return types.includes("Fire") || data.primaryLossType === "Fire";
+                                                    if (section.key === "water") return types.includes("Water") || data.primaryLossType === "Water" || (data.secondaryContaminants||[]).includes("Water");
+                                                    if (section.key === "puffback") return types.includes("Puffback") || data.primaryLossType === "Puffback" || (data.secondaryContaminants||[]).includes("Puffback");
+                                                    return false;
+                                                  }).map(section => {
+                                                    const sectionData = (data.lossSeverity || {})[section.key] || { values: {} };
+                                                    return (
+                                                      <div key={section.key} className="rounded-lg border border-slate-200 p-3">
+                                                        <div className="text-xs font-bold text-slate-600 mb-2">{section.label} Contaminants</div>
+                                                        <div className="flex items-center gap-3 mb-1">
+                                                          <span className="w-28 shrink-0" />
+                                                          <div className="flex-1 flex justify-between text-[9px] text-slate-400 font-bold px-1">
+                                                            <span>0 None</span><span>1 Low</span><span>2 Moderate</span><span>3 Severe</span>
+                                                          </div>
+                                                          <span className="w-4" />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                          {section.fields.map(field => {
+                                                            const val = (sectionData.values || {})[field] || 0;
+                                                            return (
+                                                              <div key={field} className="flex items-center gap-3">
+                                                                <span className="text-[11px] text-slate-600 w-28 shrink-0">{field}</span>
+                                                                <input
+                                                                  type="range" min="0" max="3" step="1" value={val}
+                                                                  onChange={e => {
+                                                                    const next = { ...(data.lossSeverity || initLossSeverity()) };
+                                                                    next[section.key] = { ...next[section.key], enabled: true, values: { ...(next[section.key]?.values || {}), [field]: Number(e.target.value) } };
+                                                                    next.touched = true;
+                                                                    update("lossSeverity", next);
+                                                                  }}
+                                                                  className="flex-1 h-1 rounded-full appearance-none outline-none"
+                                                                  style={{ background: `linear-gradient(to right, ${section.colorStart}, ${val > 0 ? section.colorEnd : '#e5e7eb'} ${(val/3)*100}%, #e5e7eb ${(val/3)*100}%)` }}
+                                                                />
+                                                                <span className="text-[10px] font-bold text-slate-500 w-4 text-right">{val}</span>
+                                                              </div>
+                                                            );
+                                                          })}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            )}
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className={suggestQ1 ? "suggested-field rounded-lg p-2" : ""}>
                                               <div className="mb-2 text-xs font-bold text-slate-400">QUALITY</div>
-                                              <div className="text-xs text-slate-500 mb-3">Q1 = Best Quality Expectation, Q5 = Worst Quality Expectation.</div>
-                                              {suggestQ1 && <div className="mb-2 text-[10px] font-bold suggested-pill inline-flex rounded-full px-2 py-0.5">Suggested: Q1</div>}
+                                              {showCoaching && <div className="text-xs text-slate-500 mb-1">Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).</div>}
+                                              {suggestQ1 && <div className="mb-2 text-[10px] font-bold suggested-pill inline-flex rounded-full px-2 py-0.5">Suggested: Q1 — based on insurance carrier or premium service</div>}
                                               <div className="flex flex-wrap gap-2">{QUALITY_CODES.map(q => (<ToggleMulti key={q} label={q} checked={data.qualityCode === q} onChange={() => update("qualityCode", q)} />))}</div>
                                             </div>
                                             <div className="border-t border-slate-100 my-1"></div>
-                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div><div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className="!px-3 !py-2 !text-sm" checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
+                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div>{showCoaching && <div className="text-xs text-slate-500 mb-3">Special processing instructions. Hover each code for its meaning.</div>}<div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className={`${compactMode ? '!px-2 !py-1 !text-xs' : '!px-2.5 !py-1.5 !text-xs'}`} checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -9343,6 +10618,7 @@ export default function App(){
                                   </div>
                                 </div>
                             </SubSection>
+                            )}
                         </div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec1')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
@@ -9350,10 +10626,152 @@ export default function App(){
                         </div>
                     </Section>
 
-                    <Section id="sec2" title="2. Customer" helpText="Add the customer + any key contacts (spouse, tenant, neighbor, PM)." isOpen={openSections.sec2} onHeaderClick={()=>handleToggleSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}>
+                    <Section id="sec2" noeSection="customer" title="2. Customer" helpText="The primary person(s) we are performing work for and their contacts or representatives." isOpen={openSections.sec2} onHeaderClick={()=>handleToggleSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}
+                    >
                       <div className="space-y-4">
-                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} />)}
+                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} onUpdatePets={(animals, considerations) => { update("householdAnimals", animals); update("sdsConsiderations", considerations); }} household={data.household || []} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
+                        {/* Household — people + pets at the household level */}
+                        {(() => {
+                          const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Snake", "Lizard", "Turtle", "Horse", "Other"];
+                          const personTypes = ["Child", "Infant", "Elderly", "Housekeeper", "Caretaker", "Tenant", "Roommate", "Other"];
+                          const members = data.household || [];
+                          const people = members.filter(m => m.category === "person");
+                          const pets = members.filter(m => m.category === "pet");
+
+                          const setHousehold = (next) => {
+                            update("household", next);
+                            // Sync householdAnimals string for narrative/SDS compatibility
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                            const sdsC = data.sdsConsiderations || [];
+                            if (petStr && !sdsC.includes("Pets")) update("sdsConsiderations", [...sdsC, "Pets"]);
+                            if (!petStr && sdsC.includes("Pets")) update("sdsConsiderations", sdsC.filter(s => s !== "Pets"));
+                          };
+
+                          const addMember = (category, type) => {
+                            const newId = safeUid();
+                            setHousehold([...members, { id: newId, category, type: type || (category === "pet" ? "Dog" : "Child"), name: "" }]);
+                            setTimeout(() => {
+                              const input = document.querySelector(`[data-household-id="${newId}"]`);
+                              if (input) input.focus();
+                            }, 50);
+                          };
+                          const updateMember = (id, field, val) => {
+                            setHousehold(members.map(m => m.id === id ? { ...m, [field]: val } : m));
+                          };
+                          const removeMember = (id) => {
+                            setHousehold(members.filter(m => m.id !== id));
+                          };
+                          const promoteToCustomer = (member) => {
+                            const nameParts = (member.name || "").trim().split(/\s+/);
+                            const first = nameParts[0] || "";
+                            const last = nameParts.slice(1).join(" ") || "";
+                            setData(p => ({
+                              ...p,
+                              customers: [...p.customers, initCustomer({ first, last, type: member.type || "Household" })],
+                              household: (p.household || []).filter(m => m.id !== member.id),
+                            }));
+                            setToast(`${member.name || "Member"} promoted to customer`);
+                          };
+
+                          const getPetIcon = (text) => {
+                            const t = (text || "").toLowerCase();
+                            if (/\bdog\b/.test(t)) return "🐕";
+                            if (/\bcat\b/.test(t)) return "🐈";
+                            if (/\bbird\b/.test(t)) return "🐦";
+                            if (/\bfish\b/.test(t)) return "🐟";
+                            if (/\brabbit\b/.test(t)) return "🐇";
+                            if (/\bhamster\b/.test(t)) return "🐹";
+                            if (/\bsnake|lizard|turtle\b/.test(t)) return "🐍";
+                            if (/\bhorse\b/.test(t)) return "🐴";
+                            return "🐕";
+                          };
+                          const getPersonIcon = (type) => {
+                            const t = (type || "").toLowerCase();
+                            if (/child|infant|baby/.test(t)) return "👶";
+                            if (/elderly/.test(t)) return "🧓";
+                            if (/housekeeper|caretaker/.test(t)) return "🏠";
+                            return "👤";
+                          };
+
+                          return (
+                            <div id="household-pets" className={`rounded-xl border bg-white shadow-sm ${householdEditOpen ? 'border-slate-200 px-4 py-3' : 'border-slate-100 px-4 py-2.5 cursor-pointer hover:border-slate-200 transition-colors'}`} data-noe-subsection="household" onClick={!householdEditOpen ? () => setHouseholdEditOpen(true) : undefined}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">🏠</span>
+                                <span className="text-xs font-bold text-slate-700">Other Household Members</span>
+                                <div className="flex-1" />
+                                {householdEditOpen && (
+                                  <>
+                                    <Select value="" onClick={e => e.stopPropagation()} onChange={e => { if (e.target.value) addMember("person", e.target.value); }} className="!w-auto !text-xs !py-1.5 !text-sky-600 !border-sky-200 !bg-sky-50/50">
+                                      <option value="">👤 + Person</option>
+                                      {personTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </Select>
+                                    <Select value="" onClick={e => e.stopPropagation()} onChange={e => { if (e.target.value) addMember("pet", e.target.value); }} className="!w-auto !text-xs !py-1.5 !text-sky-600 !border-sky-200 !bg-sky-50/50">
+                                      <option value="">🐕 + Pet</option>
+                                      {petTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </Select>
+                                  </>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-0.5 mb-1">Children, pets, and others at the home who aren't a contact on the order.</div>
+                              {!householdEditOpen ? (
+                                /* Compact read-only view */
+                                members.length > 0 ? (
+                                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                                    {members.map(m => {
+                                      const icon = m.category === "pet" ? getPetIcon(m.type) : getPersonIcon(m.type);
+                                      const label = m.name ? `${m.type} (${m.name.split(/\s+/)[0]})` : m.type;
+                                      return <span key={m.id} className="text-xs text-slate-600">{icon} {label}</span>;
+                                    })}
+                                  </div>
+                                ) : null
+                              ) : (
+                                /* Expanded edit view */
+                                <>
+                                  {members.length > 0 && (
+                                    <div className="space-y-1">
+                                      {people.length > 0 && (
+                                        <>
+                                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">People ({people.length})</div>
+                                          {people.map((m) => (
+                                            <div key={m.id} className="flex items-center gap-1.5 h-8">
+                                              <span className="text-sm shrink-0">{getPersonIcon(m.type)}</span>
+                                              <span className="text-[11px] font-semibold text-slate-600 w-[72px] shrink-0 truncate">{m.type || "Person"}</span>
+                                              <input data-household-id={m.id} value={m.name || ""} onChange={e => updateMember(m.id, "name", e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (m.name?.trim()) setHouseholdEditOpen(false); } }} placeholder="Name" className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-sky-400" />
+                                              <input value={m.age || ""} onChange={e => updateMember(m.id, "age", e.target.value)} placeholder="Age" className="w-12 rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-sky-400 text-center" />
+                                              {m.name && (
+                                                <button type="button" onClick={() => promoteToCustomer(m)} className="text-[10px] font-bold text-sky-600 hover:text-sky-700 shrink-0 whitespace-nowrap" title="Promote to customer with contact details">Make Contact</button>
+                                              )}
+                                              <button type="button" onClick={() => removeMember(m.id)} className="text-slate-400 hover:text-rose-500 text-xs shrink-0" title="Remove">✕</button>
+                                            </div>
+                                          ))}
+                                        </>
+                                      )}
+                                      {pets.length > 0 && (
+                                        <>
+                                          {people.length > 0 && <div className="border-t border-slate-100 my-0.5" />}
+                                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pets ({pets.length})</div>
+                                          {pets.map((m) => (
+                                            <div key={m.id} className="flex items-center gap-1.5 h-8">
+                                              <span className="text-sm shrink-0">{getPetIcon(m.type)}</span>
+                                              <span className="text-[11px] font-semibold text-slate-600 w-[72px] shrink-0 truncate">{m.type || "Pet"}</span>
+                                              <input data-household-id={m.id} value={m.name || ""} onChange={e => updateMember(m.id, "name", e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (m.name?.trim()) setHouseholdEditOpen(false); } }} placeholder="Name, breed, notes" className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-sky-400" />
+                                              <button type="button" onClick={() => removeMember(m.id)} className="text-slate-400 hover:text-rose-500 text-xs shrink-0" title="Remove">✕</button>
+                                            </div>
+                                          ))}
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="flex justify-end pt-2 mt-2 border-t border-slate-100">
+                                    <button type="button" onClick={() => setHouseholdEditOpen(false)} className="text-xs font-bold text-slate-500 hover:text-slate-700">Done</button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec2')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
                           <button onClick={() => goToNextSection('sec2')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec2')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
@@ -9361,7 +10779,8 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec3" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onHeaderClick={()=>handleToggleSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}>
+                    <Section id="sec3" noeSection="address" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onHeaderClick={()=>handleToggleSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}
+                    >
                       <div className="space-y-4">
                         {data.addresses.map((a,i)=><AddressItem key={a.id} addr={a} total={data.addresses.length} updateAddr={updateAddr} onRemove={removeAddr} index={i} highlightMissing={data.highlightMissing} auditOn={auditOn} onVerify={verifyAddressDemo} ToggleMulti={ToggleMulti} rentOrOwn={data.rentOrOwn} rentCoverageLimit={data.rentCoverageLimit} onRentOrOwnChange={(v)=>update("rentOrOwn", v)} onRentCoverageChange={(v)=>update("rentCoverageLimit", v)} forceShowCoords={i===0 ? showPrimaryCoords : false} autoOpenForTypePrompt={pendingAddressTypePromptId === a.id} autoFocusTypePrompt={pendingAddressTypePromptId === a.id} onTypePromptFocused={handleAddressTypePromptFocused} />)}
                         <div className="pt-2"><button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button></div>
@@ -9372,7 +10791,8 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec4" title="4. Billing & Companies" helpText="Who pays + who’s involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onHeaderClick={()=>handleToggleSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}>
+                    <Section id="sec4" noeSection="billing" title="4. Billing & Companies" helpText="Who pays + who is involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onHeaderClick={()=>handleToggleSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}
+                    >
                       <div className="grid gap-6">
                         <SubSection
                           id="sec4-companies"
@@ -9383,16 +10803,35 @@ export default function App(){
                           className={auditOn && auditTargets.subsections.has("companies") ? "audit-outline" : ""}
                           action={
                             <button
-                              onClick={() => { setCompaniesSubOpen(true); setAddCompanyModalOpen(true); }}
-                              className="rounded-full bg-sky-500 px-4 py-1.5 text-xs font-bold text-white shadow hover:bg-sky-600"
+                              onClick={() => setAddNewSystemModal({
+                                firstName: "", lastName: "", title: "", phone: "", email: "",
+                                companyName: "", companyType: "", companyPhone: "", companyWebsite: "", companyAddress: "",
+                                isNewCompany: false, source: "detailed-companies",
+                              })}
+                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-300 hover:text-sky-700"
                             >
-                              + Quick add
+                              + New to system
                             </button>
                           }
                         >
-                          <div className="mb-4">
+                          <div className="mb-4 space-y-3">
+                            <div className="rounded-lg border border-slate-200 bg-white p-3">
+                              <SearchSelect
+                                value=""
+                                onChange={v => {
+                                  const parsed = parseCombinedContact(v);
+                                  const type = autoTypeForCompany(parsed.company);
+                                  addCompanyFromSearch(type, v);
+                                  setToast(`Added ${parsed.contact ? parsed.contact + " at " : ""}${parsed.company || v}`);
+                                }}
+                                onQueryChange={() => {}}
+                                options={combinedContactOptions}
+                                placeholder="Search existing contacts and companies to add..."
+                                clearOnCommit
+                                maxResults={12}
+                              />
+                            </div>
                             <div className="flex items-start justify-between gap-3">
-                              <div className="pt-1 text-[11px] text-slate-500">Click a company type to add this company type.</div>
                               <div className="flex items-center gap-2">
                                 {pendingCompanyRoleCount > 0 && (
                                   <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">
@@ -9670,9 +11109,14 @@ export default function App(){
                             </div>
                           )}
                         </SubSection>
-                        <SubSection id="sec4-insurance" title="Insurance" open={insuranceSubOpen} onToggle={(nextOpen) => setInsuranceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
-                          <Field label="Insurance Claim?" smart action={<ToggleGroup options={["Yes","No"]} value={data.insuranceClaim} onChange={v=>update("insuranceClaim",v)} />} />
-                          <Field label="Direction of Payment"><ToggleGroup options={["Direct from Insurance","Check","Credit Card","Other"]} value={data.directionOfPayment} onChange={v=>update("directionOfPayment",v)} /></Field>
+                        <SubSection id="sec4-insurance" title={data.insuranceClaim === "No" ? "Insurance — No Claim" : "Insurance"} open={insuranceSubOpen} onToggle={(nextOpen) => setInsuranceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("insurance") ? "audit-outline" : ""}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-slate-700">Insurance Claim? <span className="text-orange-500 text-xs">⚡</span></span>
+                            <ToggleGroup options={["Yes","No"]} value={data.insuranceClaim} onChange={v=>update("insuranceClaim",v)} />
+                          </div>
+                          {data.insuranceClaim !== "No" && (
+                            <Field label="Direction of Payment"><ToggleGroup options={["Direct from Insurance","Check","Credit Card","Other"]} value={data.directionOfPayment} onChange={v=>update("directionOfPayment",v)} /></Field>
+                          )}
                           {data.insuranceClaim==="Yes" && (
                             <div className="animate-purple-section-fade slide-up rounded-xl bg-white p-4 grid gap-4 shadow-sm">
                               {insuranceAssignmentLinked ? (
@@ -9738,7 +11182,7 @@ export default function App(){
                                         <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"company",value:"",onSave:(name)=>handleInsuranceCompanyChange(name)})}>+</button>
                                       </div>
                                     </Field>
-                                    <Field label="National Carrier">
+                                    <Field label="National Carrier" noeField="nationalCarrier" smart="The parent insurance company (e.g., Allstate). Auto-linked from the insurance company when known.">
                                       <SearchSelect value={data.nationalCarrier} onChange={(v)=>update("nationalCarrier",v)} options={NATIONAL_CARRIERS} listId="national-carrier-list" placeholder="Auto-linked when available" className={getFlashClass("nationalCarrier")} />
                                     </Field>
                                   </div>
@@ -9775,6 +11219,9 @@ export default function App(){
                                   {data.insuranceCompany} satisfies the reporting placeholder requirement for this prototype.
                                 </div>
                               )}
+                              <Field label="Order Specific Email" subtle>
+                                <Input value={data.insuranceOrderEmail} onChange={e=>update("insuranceOrderEmail",e.target.value)} placeholder="special-email@carrier.com" />
+                              </Field>
                               <EntityPreferencePanel
                                 company={data.insuranceCompany}
                                 contact={data.insuranceAdjuster}
@@ -9784,24 +11231,18 @@ export default function App(){
                                 sessionInstructionKeys={sessionInstructionKeys}
                                 onMarkInstructionKeysSeen={markInstructionKeysSeen}
                               />
-                              <div className="grid grid-cols-2 gap-4">
-                                <Field label="Claim #"><Input value={data.claimNumber} onChange={e=>update("claimNumber",e.target.value)} /></Field>
-                                <Field label="Date of Loss"><DatePicker value={data.dateOfLoss} onChange={(v)=>update("dateOfLoss", v)} /></Field>
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <Field label="Work Order #"><Input value={data.workOrderNumber} onChange={e=>update("workOrderNumber",e.target.value)} placeholder="Work order" /></Field>
+                              <div className="grid grid-cols-3 gap-4">
+                                <Field label="Claim #" noeField="claimNumber"><Input value={data.claimNumber} onChange={e=>update("claimNumber",e.target.value)} placeholder="e.g. CLM-1001" /></Field>
                                 <Field label="Policy #"><Input value={data.policyNumber} onChange={e=>update("policyNumber",e.target.value)} placeholder="Policy number" /></Field>
+                                <Field label="Date of Loss" noeField="dateOfLoss"><DatePicker value={data.dateOfLoss} onChange={(v)=>update("dateOfLoss", v)} /></Field>
                               </div>
-                              <Field label="Order Specific Email">
-                                <Input value={data.insuranceOrderEmail} onChange={e=>update("insuranceOrderEmail",e.target.value)} placeholder="special-email@carrier.com" />
-                              </Field>
                               <div className="grid grid-cols-2 gap-4">
-                                <Field label="Contents Limit ($)"><Input value={data.contentsCoverageLimit} onChange={e=>update("contentsCoverageLimit",e.target.value)} placeholder="Coverage limit" /></Field>
-                                <Field label="Mold Limit ($)"><Input className={attentionMold ? "attention-fill" : ""} value={data.moldLimit} onChange={e=>update("moldLimit",e.target.value)} placeholder="Mold limit" /></Field>
+                                <Field label="Contents Limit ($)" noeField="contentsCoverageLimit"><Input value={data.contentsCoverageLimit} onChange={e=>update("contentsCoverageLimit",e.target.value)} placeholder="Policy coverage limit" /></Field>
+                                <Field label="Mold Limit ($)" noeField="moldLimit"><Input className={attentionMold ? "attention-fill" : ""} value={data.moldLimit} onChange={e=>update("moldLimit",e.target.value)} placeholder="Mold-specific limit" /></Field>
                               </div>
                               {attentionMold && (
                                 <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-                                  Visible Mold selected → confirm Mold Limit.
+                                  Confirm Mold Limit if this will be a mold claim.
                                 </div>
                               )}
                             </div>
@@ -9814,24 +11255,22 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec5" title="5. Schedule" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}>
+                    <Section id="sec5" noeSection="schedule" title="5. Schedule & Blockers" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}
+                    >
                       <div className="space-y-6">
                         <SubSection id="sec5-schedule" title="Schedule" open={scheduleSubOpen} onToggle={(nextOpen) => setScheduleSubOpen(!!nextOpen)} compact={compactMode}>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                          <button onClick={() => update('scheduleType', 'Scope')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Scope' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">📋</span><span className="font-bold text-xs">Scope Only</span></button>
-                          <button onClick={() => update('scheduleType', 'Pickup')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Pickup' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🚚</span><span className="font-bold text-xs">Pickup</span></button>
-                          <button onClick={() => update('scheduleType', 'In-Home')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'In-Home' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🏡</span><span className="font-bold text-xs">In-Home</span></button>
-                          <button onClick={() => update('scheduleType', 'Meeting')} className={`flex flex-col items-center justify-center gap-2 p-2 rounded-lg border-2 transition-all ${data.scheduleType === 'Meeting' ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}><span className="text-lg">🗓️</span><span className="font-bold text-xs">Meeting</span></button>
-                        </div>
+                        <Field label="Event Type">
+                          <ToggleGroup options={["Scope","Pickup","In-Home","Meeting"]} value={data.scheduleType} onChange={v => update("scheduleType", v)} />
+                        </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
                           <Field
                             label="Date"
                             action={
                               <button
                                 type="button"
-                                onClick={() => setNowDate()}
-                                className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                                title="Set to today"
+                                onClick={() => { setNowDate(); setNowTime(); updateMany({ eventFirm: true, pickupTimeTentative: false, scheduleStatus: "" }); }}
+                                className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold text-sky-700 hover:bg-sky-100"
+                                title="Set date to today, time to next half hour, and mark as firm"
                               >
                                 📅 Now
                               </button>
@@ -9842,14 +11281,24 @@ export default function App(){
                           <Field
                             label="Time"
                             action={
-                              <button
-                                type="button"
-                                onClick={() => setNowTime()}
-                                className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                                title="Set to now"
-                              >
-                                🕒 Now
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => updateMany({ pickupTime: '12:00 AM', pickupTimeTentative: true, eventFirm: false })}
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${data.pickupTime === '12:00 AM' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'border border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-700'}`}
+                                  title="Set time to TBD (12:00 AM placeholder)"
+                                >
+                                  TBD
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setNowTime(); updateMany({ eventFirm: true, pickupTimeTentative: false, scheduleStatus: "" }); }}
+                                  className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                                  title="Set to now and mark as firm"
+                                >
+                                  🕒 Now
+                                </button>
+                              </div>
                             }
                           >
                             <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseTick} />
@@ -9863,29 +11312,11 @@ export default function App(){
                             <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle" />
                           </Field>
                         </div>
-                        <Field label="Firm / Tentative">
-                          <div className="flex flex-wrap gap-2">
-                            <ToggleMulti
-                              label="Firm"
-                              checked={!!data.eventFirm}
-                              onChange={() => updateMany({ eventFirm: !data.eventFirm, pickupTimeTentative: false, scheduleStatus: !data.eventFirm ? "" : data.scheduleStatus })}
-                            />
-                            <ToggleMulti
-                              label="Tentative"
-                              checked={!!data.pickupTimeTentative}
-                              onChange={() => updateMany({ pickupTimeTentative: !data.pickupTimeTentative, eventFirm: false })}
-                              colorClass="!bg-orange-50 !border-orange-400 !text-orange-700"
-                            />
+                        {data.pickupTime === '12:00 AM' && (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 font-semibold">
+                            TBD — on the calendar but time not yet confirmed.
                           </div>
-                        </Field>
-                        <Field label="Scheduling Status">
-                          <div className="space-y-2">
-                            <div className={data.eventFirm ? "opacity-50 pointer-events-none" : ""}>
-                              <ToggleGroup options={["Schedule ASAP","Rep will Schedule"]} value={data.scheduleStatus} onChange={(v)=>updateMany({ scheduleStatus: v, eventFirm: false, pickupTimeTentative: false })} />
-                            </div>
-                            <div className="text-[11px] text-slate-400">Use when the event is not firm and the customer has not been contacted.</div>
-                          </div>
-                        </Field>
+                        )}
                         <Field label="Event Instructions">
                           <div className="relative rounded-lg border border-slate-200 bg-white p-3 space-y-3">
                             <div className="flex items-center justify-end gap-2">
@@ -9944,7 +11375,7 @@ export default function App(){
                             <AutoGrowTextarea
                               value={stripEventSystemLines(data.eventInstructions || "")}
                               onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
-                              placeholder="please enter instrucitons for this event"
+                              placeholder="Enter instructions for this event"
                               className={hasEventInstructions ? "" : "border-orange-300 focus:border-orange-400 focus:ring-orange-200/40"}
                             />
                             {showQuickInstructions && (
@@ -9970,23 +11401,45 @@ export default function App(){
                                 </div>
                               </div>
                             )}
-                            <div className="mt-3 border-t border-slate-100 pt-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <ToggleMulti label="Customer Contacted" checked={!!data.eventCustomerContacted} onChange={() => update("eventCustomerContacted", !data.eventCustomerContacted)} className="!text-[10px] !px-2 !py-1" />
-                                <ToggleMulti label="Bill To Contacted" checked={!!data.eventBillToContacted} onChange={() => update("eventBillToContacted", !data.eventBillToContacted)} className="!text-[10px] !px-2 !py-1" />
+                            <div className="mt-3 border-t border-slate-100 pt-3 space-y-3">
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Who is contacting the customer?</div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <ToggleMulti label="Already contacted" checked={data.contactAssignment === "done"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "done" ? "" : "done" })} className="!text-[10px] !px-2.5 !py-1" />
+                                  <ToggleMulti label="Rep will contact" checked={data.contactAssignment === "rep"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "rep" ? "" : "rep" })} className="!text-[10px] !px-2.5 !py-1" />
+                                  <ToggleMulti label="Office please contact" checked={data.contactAssignment === "office"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "office" ? "" : "office" })} className="!text-[10px] !px-2.5 !py-1" />
+                                  <ToggleMulti label="Enter only — do not contact" checked={data.contactAssignment === "enter-only"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "enter-only" ? "" : "enter-only" })} className="!text-[10px] !px-2.5 !py-1" />
+                                </div>
                               </div>
-                              <div className="mt-2 flex items-center gap-2">
-                                <Input
-                                  ref={eventNoteInputRef}
-                                  value={eventNoteDraft}
-                                  onChange={e=>setEventNoteDraft(e.target.value)}
-                                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEventNote(eventNoteDraft); setEventNoteDraft(""); } }}
-                                  placeholder="enter scheduling notes and attempts here"
-                                />
-                                <button onClick={() => { addEventNote(eventNoteDraft); setEventNoteDraft(""); }} className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600">Add</button>
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Contact Log</div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button type="button" onClick={() => { const entry = { id: safeUid(), text: "Customer contact attempted", at: formatShortTimestamp(), user: data.currentUser || "Unknown" }; setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])] })); setToast("Contact attempt logged"); }} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-100">
+                                    Log Attempt
+                                  </button>
+                                  <button type="button" onClick={() => { const entry = { id: safeUid(), text: "Customer contacted", at: formatShortTimestamp(), user: data.currentUser || "Unknown" }; setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])], eventCustomerContacted: true })); setToast("Customer contacted"); }} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">
+                                    Customer Contacted
+                                  </button>
+                                  <button type="button" onClick={() => { const entry = { id: safeUid(), text: "Bill To contacted", at: formatShortTimestamp(), user: data.currentUser || "Unknown" }; setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])], eventBillToContacted: true })); setToast("Bill To contacted"); }} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">
+                                    Bill To Contacted
+                                  </button>
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Notes</div>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    ref={eventNoteInputRef}
+                                    value={eventNoteDraft}
+                                    onChange={e=>setEventNoteDraft(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEventNote(eventNoteDraft); setEventNoteDraft(""); } }}
+                                    placeholder="e.g. Left voicemail, will try again at 2pm"
+                                  />
+                                  <button onClick={() => { addEventNote(eventNoteDraft); setEventNoteDraft(""); }} className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600 shrink-0">Add</button>
+                                </div>
                               </div>
                               {(data.eventNotes || []).length === 0 ? (
-                                <div className="text-xs text-slate-400 mt-2">No scheduling notes yet.</div>
+                                null
                               ) : (
                                 <div className="space-y-2 mt-2">
                                   {(showAllEventNotes ? (data.eventNotes || []) : (data.eventNotes || []).slice(0, 4)).map(n => (
@@ -10010,22 +11463,41 @@ export default function App(){
                           </div>
                         </Field>
                         <Field label="Who are we meeting?"><div className="flex flex-wrap gap-2">{(knownPeople.length > 0) ? knownPeople.map(p => (<ToggleMulti key={p} label={p} checked={(data.meetingWith || []).includes(p)} onChange={() => update("meetingWith", toggleMulti(data.meetingWith || [], p))}/>)) : <span className="text-sm text-slate-400 italic">Add customers or contacts first</span>}</div></Field>
-                        <div className="grid sm:grid-cols-2 gap-4">
-                          <button onClick={handleConfirmClick} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">✅ Send Confirmation</button>
-                          <button onClick={openReminderModal} className={`rounded-lg border px-4 py-3 text-sm font-semibold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 bg-white text-slate-600"}`}>⏰ {data.reminderEnabled ? "Edit Reminder" : "Schedule Reminder"}</button>
-                        </div>
-                        <div className="flex items-center justify-start border-t border-slate-100 pt-3">
-                          <button
-                            onClick={() => { update("addCRMlog", true); openCrmModal(); }}
-                            className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                          >
-                            + Add CRM Log
-                          </button>
-                        </div>
+                        {/* Live Event Preview */}
+                        {(data.scheduleType || data.pickupDate || data.eventAssignee || stripEventSystemLines(data.eventInstructions || "").trim()) && (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-2">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Event Preview</div>
+                            <div className="space-y-1 text-xs text-slate-700">
+                              {data.scheduleType && <div><span className="font-bold text-slate-500 w-16 inline-block">Type:</span> {data.scheduleType}</div>}
+                              {data.pickupDate && <div><span className="font-bold text-slate-500 w-16 inline-block">Date:</span> {data.pickupDate}{data.pickupTime && data.pickupTime !== '12:00 AM' ? ` at ${data.pickupTime}` : ""}{data.pickupTime === '12:00 AM' ? " (TBD)" : ""}{data.pickupTimeTentative ? " — Tentative" : ""}</div>}
+                              {data.eventAssignee && <div><span className="font-bold text-slate-500 w-16 inline-block">Assignee:</span> {data.eventAssignee}{data.eventVehicle ? ` · ${data.eventVehicle}` : ""}</div>}
+                              {(data.meetingWith || []).length > 0 && <div><span className="font-bold text-slate-500 w-16 inline-block">Meeting:</span> {data.meetingWith.join(", ")}</div>}
+                              {(() => { const addr = (data.addresses || []).find(a => a.isPrimary) || {}; const line = [addr.street, addr.city, addr.state].filter(Boolean).join(", "); return line ? <div><span className="font-bold text-slate-500 w-16 inline-block">Address:</span> {line}</div> : null; })()}
+                            </div>
+                            {stripEventSystemLines(data.eventInstructions || "").trim() && (
+                              <div className="border-t border-slate-200 pt-2 mt-1">
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Instructions</div>
+                                <div className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">{stripEventSystemLines(data.eventInstructions || "").trim().slice(0, 300)}{stripEventSystemLines(data.eventInstructions || "").trim().length > 300 ? "..." : ""}</div>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                              <button onClick={handleConfirmClick} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">Send Confirmation</button>
+                              <button onClick={openReminderModal} className={`rounded-full border px-3 py-1 text-[10px] font-bold ${data.reminderEnabled ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300"}`}>{data.reminderEnabled ? "Edit Reminder" : "Set Reminder"}</button>
+                            </div>
+                          </div>
+                        )}
                         </SubSection>
                         <SubSection id="sec5-bridge" title="Scope Update and Blockers" open={scheduleBridgeOpen} onToggle={(nextOpen) => setScheduleBridgeOpen(!!nextOpen)} compact={compactMode} className={bridgeSectionClass}>
                           <div className="space-y-4">
-                            <div className="flex justify-end">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowSdsPreview(true)}
+                                className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100"
+                                title="Preview the Same Day Scope document — the approval document sent to the adjuster"
+                              >
+                                Preview SDS
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => setEntryMode("same-day-scope")}
@@ -10237,7 +11709,7 @@ export default function App(){
                                         onClick={() => update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], item))}
                                         className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
-                                        <div className="h-[4.9rem] w-full flex items-center justify-center">
+                                        <div className="h-[4.9rem] w-full flex items-center justify-center overflow-hidden">
                                           <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
                                         <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
@@ -10262,7 +11734,7 @@ export default function App(){
                                         onClick={() => update("sdsObservations", toggleMulti(data.sdsObservations || [], item))}
                                         className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
-                                        <div className="h-[4.9rem] w-full flex items-center justify-center">
+                                        <div className="h-[4.9rem] w-full flex items-center justify-center overflow-hidden">
                                           <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
                                         <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
@@ -10287,7 +11759,7 @@ export default function App(){
                                         onClick={() => update("sdsServices", toggleMulti(data.sdsServices || [], item))}
                                         className={`h-[7.2rem] w-[7.2rem] rounded-lg p-1 flex flex-col items-center justify-between border-2 ${active ? "border-sky-400 bg-sky-50/40" : "border-transparent"} hover:border-sky-200`}
                                       >
-                                        <div className="h-[4.9rem] w-full flex items-center justify-center">
+                                        <div className="h-[4.9rem] w-full flex items-center justify-center overflow-hidden">
                                           <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
                                         <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
@@ -10298,6 +11770,77 @@ export default function App(){
                                   })}
                                 </div>
                               </div>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="text-xs font-bold text-sky-600 uppercase tracking-wider">Scope Photos</div>
+                                <label className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 cursor-pointer hover:bg-sky-100">
+                                  + Add Photos
+                                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => {
+                                    const files = Array.from(e.target.files || []);
+                                    const newPhotos = files.map(file => ({
+                                      id: safeUid(),
+                                      src: URL.createObjectURL(file),
+                                      fileName: file.name,
+                                      room: "",
+                                      note: "",
+                                      isCover: false,
+                                      createdAt: new Date().toISOString()
+                                    }));
+                                    update("sdsPhotos", [...(data.sdsPhotos || []), ...newPhotos]);
+                                    e.target.value = "";
+                                  }} />
+                                </label>
+                              </div>
+                              {(data.sdsPhotos || []).length > 0 ? (
+                                <div className="space-y-3">
+                                  {!data.sdsCoverPhoto && (
+                                    <div className="text-[10px] text-slate-400">Tip: Click "Cover" on a photo to set it as the SDS cover image.</div>
+                                  )}
+                                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                    {(data.sdsPhotos || []).map(photo => (
+                                      <div key={photo.id} className={`relative rounded-lg border overflow-hidden ${photo.id === data.sdsCoverPhoto ? 'border-sky-400 ring-2 ring-sky-200' : 'border-slate-200'}`}>
+                                        <img src={photo.src} alt={photo.note || "Scope photo"} className="w-full h-28 object-contain bg-slate-50" />
+                                        <div className="p-1.5 space-y-1">
+                                          <input
+                                            type="text"
+                                            value={photo.room || ""}
+                                            onChange={(e) => update("sdsPhotos", (data.sdsPhotos || []).map(p => p.id === photo.id ? { ...p, room: e.target.value } : p))}
+                                            placeholder="Room"
+                                            className="w-full text-[10px] border border-slate-200 rounded px-1 py-0.5"
+                                          />
+                                          <input
+                                            type="text"
+                                            value={photo.note || ""}
+                                            onChange={(e) => update("sdsPhotos", (data.sdsPhotos || []).map(p => p.id === photo.id ? { ...p, note: e.target.value } : p))}
+                                            placeholder="Note"
+                                            className="w-full text-[10px] border border-slate-200 rounded px-1 py-0.5"
+                                          />
+                                          <div className="flex gap-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => update("sdsCoverPhoto", data.sdsCoverPhoto === photo.id ? null : photo.id)}
+                                              className={`text-[9px] font-bold rounded px-1.5 py-0.5 ${photo.id === data.sdsCoverPhoto ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-sky-50'}`}
+                                            >
+                                              Cover
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => update("sdsPhotos", (data.sdsPhotos || []).filter(p => p.id !== photo.id))}
+                                              className="text-[9px] font-bold rounded px-1.5 py-0.5 bg-slate-100 text-rose-500 hover:bg-rose-50"
+                                            >
+                                              Remove
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-xs text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-lg">No photos added yet. Add scope photos to include in the SDS document.</div>
+                              )}
                             </div>
 
                             <div className="rounded-lg border border-slate-200 bg-slate-900 px-3 py-3">
@@ -10329,7 +11872,7 @@ export default function App(){
                     toggleMulti={toggleMulti} 
                     handleConfirmClick={handleConfirmClick}
                     setToast={setToast}
-                    showInlineHelp={showInlineHelp}
+                    showInlineHelp={showCoaching}
                     auditOn={auditOn}
                     onApplyReferrerRoles={applyReferrerRoles}
                     suggestedReferrerRoles={suggestedReferrerRoles}
@@ -10353,74 +11896,1115 @@ export default function App(){
                     toggleNonRestorationPrimary={toggleNonRestorationPrimary}
                     toggleRestorationType={toggleRestorationType}
                     selectNonRestorationSubtype={selectNonRestorationSubtype}
+                    onSwitchToDetailed={() => setEntryMode('detailed')}
                 />
               )}
 
             </div>
         </div>
 
-        <FloatingCapsule 
-            entryMode={entryMode} 
-            setEntryMode={setEntryMode} 
-            onSave={handleSaveClick} 
-            onPlan={() => setPlanModalOpen(true)}
-            onAudit={() => {
-              setAuditOn(prev => {
-                const next = !prev;
-                setAuditOpen(next);
-                if (next) runAudit();
-                return next;
-              });
-            }}
-            auditOn={auditOn}
+        <FloatingCapsule
+            entryMode={entryMode}
+            setEntryMode={setEntryMode}
+            onSave={handleSaveClick}
             setShowSearch={setShowSearch}
+            onInterview={() => setInterviewPanelOpen(v => !v)}
+            interviewPanelOpen={interviewPanelOpen}
+            onActionItems={() => setActionItemsOpen(v => !v)}
+            actionItemsOpen={actionItemsOpen}
+            actionItemCount={(() => { try { return computeAuditMissing().length; } catch { return 0; } })()}
+            modeButtonFlash={modeButtonFlash}
         />
 
-        {(auditOpen || auditOn) && (
-          <div className="fixed right-4 top-28 z-[80] w-[170px] rounded-2xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200">
-              <div className="text-sm font-bold text-slate-800">Audit</div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (auditOn) {
-                      setAuditOn(false);
-                      setAuditOpen(false);
-                    } else {
-                      setAuditOn(true);
-                      setAuditOpen(true);
-                      runAudit();
-                    }
-                  }}
-                  className={`text-[10px] font-bold px-2 py-1 rounded-full border ${auditOn ? 'audit-pill' : 'border-slate-200 text-slate-400'}`}
-                >
-                  {auditOn ? 'ON' : 'OFF'}
-                </button>
-                <button className="text-slate-400 hover:text-slate-600" onClick={() => { setAuditOn(false); setAuditOpen(false); }}>×</button>
-              </div>
-            </div>
-            <div className="px-3 py-2 text-[11px] text-slate-500 flex items-center justify-between">
-              <span>Critical fields + placeholders:</span>
-              <span className="font-bold text-slate-600">{auditPercent}% complete</span>
-            </div>
-            <div className="max-h-[520px] overflow-y-auto custom-scroll px-3 pb-3 space-y-2">
-              {auditMissing.length === 0 ? (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">All critical fields complete.</div>
-              ) : (
-                auditMissing.map((item, idx) => (
-                  <button
-                    key={`${item.key}-${idx}`}
-                    onClick={() => focusAuditItem(item)}
-                    className={`w-full text-left rounded-lg px-3 py-2 border hover:border-sky-300 hover:bg-sky-50 ${(item.key || "").startsWith("placeholder-") ? "audit-placeholder-pill" : "border-slate-200"}`}
-                  >
-                    <div className="text-xs font-bold text-slate-700">{item.label}</div>
-                    <div className="text-[10px] text-slate-400">{item.category === "placeholders" ? "Placeholder Queue" : "Go to section"}</div>
+        {/* Interview Docked Side Panel */}
+        {interviewPanelOpen && (
+          <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] z-[110] bg-white shadow-2xl flex flex-col border-l border-slate-200">
+              {(() => {
+                const interviewQuestions = [
+                  { key: "conditions", title: "Is anything still wet or damaged?", configKey: "damageWasWet",
+                    isAnswered: () => data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp,
+                    summary: () => [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural" : "", data.noLights ? "No Power" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""].filter(Boolean).join(", ") },
+                  { key: "repairs", title: "What repairs are being done?", configKey: "repairsSummary",
+                    isAnswered: () => !!data.repairsSummary,
+                    summary: () => data.repairsSummary || "" },
+                  { key: "living", title: "Where will the customer live during repairs?", configKey: "livingStatus",
+                    isAnswered: () => !!data.livingStatus,
+                    summary: () => data.livingStatus || "" },
+                  { key: "delivery", title: "Where should we make final delivery?", configKey: "processType",
+                    isAnswered: () => !!data.processType,
+                    summary: () => data.processType || "" },
+                  { key: "packout", title: "What are we picking up?", configKey: "packoutSummary",
+                    isAnswered: () => (data.packoutSummary || []).length > 0,
+                    summary: () => (data.packoutSummary || []).join(", ") },
+                  { key: "loadList", title: "What do we need to bring?", configKey: "loadList",
+                    isAnswered: () => (data.loadList || []).length > 0,
+                    summary: () => (data.loadList || []).join(", ") },
+                  { key: "considerations", title: "Special considerations", configKey: "sdsConsiderations",
+                    isAnswered: () => (data.sdsConsiderations || []).length > 0,
+                    summary: () => (data.sdsConsiderations || []).join(", ") },
+                  { key: "pets", title: "Pets in home?", configKey: "householdAnimals",
+                    isAnswered: () => (data.household || []).some(m => m.category === "pet"),
+                    summary: () => (data.household || []).filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ") },
+                  { key: "medical", title: "Medical issues?", configKey: "familyMedicalIssues", isAnswered: () => !!data.familyMedicalIssues, summary: () => data.familyMedicalIssues === "Y" ? "Yes" : "No" },
+                  { key: "allergies", title: "Soap/fragrance allergies?", configKey: "soapFragAllergies", isAnswered: () => !!data.soapFragAllergies, summary: () => data.soapFragAllergies === "Y" ? "Yes" : "No" },
+                  { key: "selfClean", title: "Self-clean anything?", configKey: "selfCleaning", isAnswered: () => !!data.selfCleaning, summary: () => data.selfCleaning === "Y" ? "Yes" : "No" },
+                  { key: "dryCleaner", title: "Use dry cleaner?", configKey: "useDryCleaner", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
+                  { key: "laundry", title: "How dry laundry?", configKey: "howDryLaundry", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
+                  { key: "storage", title: "Need storage?", configKey: "storageNeeded", isAnswered: () => !!data.storageNeeded, summary: () => data.storageNeeded === "Y" ? "Yes" : "No" },
+                  { key: "interests", title: "Activities & interests", configKey: "rushInterests", isAnswered: () => (data.rushInterests || []).length > 0, summary: () => (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ") },
+                  { key: "events", title: "Upcoming events", configKey: "upcomingEvents", isAnswered: () => (data.upcomingEvents || []).length > 0, summary: () => (data.upcomingEvents || []).map(e => e.name || "Event").join(", ") },
+                ];
+                const visibleQuestions = interviewQuestions.filter(q => isFieldVisible(q.configKey));
+                const answeredCount = visibleQuestions.filter(q => q.isAnswered()).length;
+                const logAnswer = (key) => {
+                  setData(p => ({ ...p, interviewLog: { ...(p.interviewLog || {}), [key]: { user: p.currentUser || "Unknown", at: formatShortTimestamp() } } }));
+                };
+                const getLog = (key) => (data.interviewLog || {})[key];
+                return (
+                  <>
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-violet-50 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🎤</span>
+                      <span className="text-sm font-bold text-violet-800">Interview</span>
+                      <span className="text-xs text-violet-500">{answeredCount} of {visibleQuestions.length}</span>
+                    </div>
+                    <button onClick={() => setInterviewPanelOpen(false)} className="text-violet-400 hover:text-violet-600 text-lg font-bold">×</button>
+                  </div>
+                  <div className="px-5 py-2 border-b border-slate-100">
+                    <div className="relative">
+                      <input value={interviewSearch} onChange={e => setInterviewSearch(e.target.value)} placeholder="Search questions..." className="w-full rounded-lg border border-slate-200 px-3 py-1.5 pr-7 text-xs text-slate-700 outline-none focus:border-violet-300 bg-slate-50/50" />
+                      {interviewSearch && <button type="button" onClick={() => setInterviewSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold">×</button>}
+                    </div>
+                  </div>
+                  </> );
+              })()}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {showCoaching && !interviewSearch && <div className="text-xs text-slate-400 mb-2">Ask the customer these questions during or before the initial visit.</div>}
+
+                {isFieldVisible("damageWasWet") && matchesInterviewSearch("Is anything still wet or damaged", "Still Wet Visible Mold Structural Damage No Electricity No Heat Boarded Up") && (() => {
+                  const answered = data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp;
+                  const summary = [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural" : "", data.noLights ? "No Power" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""].filter(Boolean).join(", ");
+                  const log = (data.interviewLog || {}).conditions;
+                  const expanded = interviewExpanded.conditions !== false;
+                  return <div className={`rounded-xl border ${answered ? 'border-emerald-200' : 'border-slate-200'} bg-white overflow-hidden`}>
+                  <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: !p.conditions})); if (!log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                    <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Is anything still wet or damaged?")}</div>
+                    {answered && !expanded && <div className="flex items-center gap-2"><span className="text-xs text-emerald-600">{summary}</span>{log && <span className="text-[9px] text-slate-300">{log.user} · {log.at}</span>}</div>}
                   </button>
-                ))
+                  {expanded && <div className="px-3 pb-3 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "wet", label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true, onToggle: () => updateSmart("damageWasWet", (data.damageWasWet === "Y" || data.damageWasWet === true) ? "N" : "Y") },
+                      { id: "mold", label: "Visible Mold", active: !!data.damageMoldMildew, onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew) },
+                      { id: "structural", label: "Structural Damage", active: data.structuralElectricDamage === "Y", onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y") },
+                      { id: "lights", label: "No Electricity", active: !!data.noLights, onToggle: () => updateSmart("noLights", !data.noLights) },
+                      { id: "heat", label: "No Heat", active: !!data.noHeat, onToggle: () => updateSmart("noHeat", !data.noHeat) },
+                      { id: "boarded", label: "Boarded Up", active: !!data.boardedUp, onToggle: () => updateSmart("boardedUp", !data.boardedUp) },
+                    ].map(item => (
+                      <ToggleMulti key={item.id} label={item.label} checked={item.active} onChange={() => { item.onToggle(); executeInterviewActions(item.label, !item.active); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(item.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                    ))}
+                  </div>
+                  {showCoaching && [
+                    { label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true },
+                    { label: "Visible Mold", active: !!data.damageMoldMildew },
+                    { label: "Structural Damage", active: data.structuralElectricDamage === "Y" },
+                    { label: "No Electricity", active: !!data.noLights },
+                    { label: "Boarded Up", active: !!data.boardedUp },
+                  ].filter(i => i.active && interviewActions[i.label]?.coaching).map(i => (
+                    <div key={i.label} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                      <span className="font-bold">{i.label}:</span> {interviewActions[i.label].coaching}
+                    </div>
+                  ))}
+                  {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                  </div>}
+                </div>;
+                })()}
+
+                {isFieldVisible("repairsSummary") && matchesInterviewSearch("repairs", "Just Cleaning Paint Refinish Floors Replace Floors Cosmetic Damage Major Structural Complete Rebuild") && (() => {
+                  const answered = !!data.repairsSummary;
+                  const summary = data.repairsSummary || "";
+                  const log = (data.interviewLog || {}).repairs;
+                  const expanded = interviewExpanded.repairs !== false;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("What repairs are being done?")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
+                            const current = (data.repairsSummary || "").split(", ").filter(Boolean);
+                            const isAdding = !current.includes(s);
+                            const next = isAdding ? [...current, s] : current.filter(x => x !== s);
+                            update("repairsSummary", next.join(", "));
+                            executeInterviewActions(s, isAdding);
+                          }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {showCoaching && ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].filter(s => (data.repairsSummary || "").includes(s) && interviewActions[s]?.coaching).map(s => (
+                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                          <span className="font-bold">{s}:</span> {interviewActions[s].coaching}
+                        </div>
+                      ))}
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Living Status */}
+                {isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving") && (() => {
+                  const answered = !!data.livingStatus; const log = (data.interviewLog || {}).living; const expanded = !answered || interviewExpanded.living;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Where will the customer live during repairs?")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 ml-2">{data.livingStatus}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {[{ label: "Staying in home" }, { label: "Hotel" }, { label: "Temp" }, { label: "Moving" }].map(s => (
+                          <ToggleMulti key={s.label} label={s.label} checked={data.livingStatus === s.label} onChange={() => { updateLivingStatus(data.livingStatus === s.label ? "" : s.label); if (s.label !== data.livingStatus) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {livingAddressPrompt.open && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 space-y-2">
+                          <div className="text-xs font-bold text-amber-800">Add {livingAddressPrompt.type} address?</div>
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={closeLivingAddressPrompt} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-50">Not Now</button>
+                            <button type="button" onClick={() => addLivingAddressFromPrompt("placeholder")} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">Create Placeholder</button>
+                            <button type="button" onClick={() => addLivingAddressFromPrompt("full")} className="rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Enter Address Now</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Delivery */}
+                {isFieldVisible("processType") && matchesInterviewSearch("final delivery", "Return Home ASAP Temp Address New Home Store Until Repaired") && (() => {
+                  const answered = !!data.processType; const log = (data.interviewLog || {}).delivery; const expanded = !answered || interviewExpanded.delivery;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, delivery: !p.delivery}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Where should we make final delivery?")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 ml-2">{data.processType}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {[{ label: "Return to Home ASAP", value: "Deliver ASAP" }, { label: "To Temp Address", value: "Deliver to Temp" }, { label: "To New Home", value: "Deliver to New Home" }, { label: "Store Until Home Repaired", value: "Long-Term Storage" }].map(s => (
+                          <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => { update("processType", data.processType === s.value ? "" : s.value); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Packout */}
+                {isFieldVisible("packoutSummary") && matchesInterviewSearch("picking up", "Rugs Window Treatments Clothing Bedding Furniture Art Electronics Hardware Appliances") && (() => {
+                  const answered = (data.packoutSummary || []).length > 0; const summary = (data.packoutSummary || []).join(", "); const log = (data.interviewLog || {}).packout; const expanded = interviewExpanded.packout !== false;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("What are we picking up?")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => { const isAdding = !(data.packoutSummary || []).includes(s); update("packoutSummary", toggleMulti(data.packoutSummary || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {showCoaching && (data.packoutSummary || []).filter(s => interviewActions[s]?.coaching).map(s => (
+                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                          <span className="font-bold">{s}:</span> {interviewActions[s].coaching}
+                        </div>
+                      ))}
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Load List */}
+                {isFieldVisible("loadList") && matchesInterviewSearch("need to bring", "Tall Ladder Extra Manpower Floor Protection Dollies Wardrobe Boxes TV Boxes Blankets Plastic Bags") && (() => {
+                  const answered = (data.loadList || []).length > 0; const summary = (data.loadList || []).join(", "); const log = (data.interviewLog || {}).loadList; const expanded = interviewExpanded.loadList !== false;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("What do we need to bring?")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Considerations */}
+                {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity") && (() => {
+                  const answered = (data.sdsConsiderations || []).length > 0; const summary = (data.sdsConsiderations || []).join(", "); const log = (data.interviewLog || {}).considerations; const expanded = interviewExpanded.considerations !== false;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Special considerations")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => { const isAdding = !(data.sdsConsiderations || []).includes(s); update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
+                        <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
+                          <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[["Det","special detergent"], ["NoDC","no dry clean"], ["Low","low heat"], ["NoDry","no dryer"], ["PPE","wear PPE"], ["Hand","hand finish"]].map(([code, desc]) => (
+                              <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} className="!text-[10px] !px-2 !py-1" />
+                            ))}
+                          </div>
+                          <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities" className="!text-xs !py-1.5" />
+                        </div>
+                      )}
+                      {showCoaching && (data.sdsConsiderations || []).filter(s => interviewActions[s]?.coaching).map(s => (
+                        <div key={`coach-${s}`} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                          <span className="font-bold">{s}:</span> {interviewActions[s].coaching}
+                        </div>
+                      ))}
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Pets in Home */}
+                {matchesInterviewSearch("pets animals dog cat", "dog cat bird fish rabbit hamster pet") && (() => {
+                  const pets = (data.household || []).filter(m => m.category === "pet");
+                  const answered = pets.length > 0;
+                  const summary = pets.map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ");
+                  const log = (data.interviewLog || {}).pets;
+                  const expanded = interviewExpanded.pets !== false;
+                  const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"];
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: !p.pets}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Pets in home?")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {petTypes.map(type => {
+                          const hasPet = pets.some(p => p.type === type);
+                          return <button key={type} type="button" onClick={() => {
+                            const members = data.household || [];
+                            let next;
+                            if (hasPet) {
+                              next = members.filter(m => !(m.category === "pet" && m.type === type));
+                            } else {
+                              next = [...members, { id: safeUid(), category: "pet", type, name: "" }];
+                            }
+                            update("household", next);
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                            const sdsC = data.sdsConsiderations || [];
+                            if (petStr && !sdsC.includes("Pets")) update("sdsConsiderations", [...sdsC, "Pets"]);
+                            if (!petStr && sdsC.includes("Pets")) update("sdsConsiderations", sdsC.filter(s => s !== "Pets"));
+                            if (!(data.sdsObservations || []).includes("Pets") && petStr) update("sdsObservations", [...(data.sdsObservations || []), "Pets"]);
+                            if (!petStr && (data.sdsObservations || []).includes("Pets")) update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
+                            setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                          }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${hasPet ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{type}</button>;
+                        })}
+                      </div>
+                      {pets.map(pet => (
+                        <div key={pet.id} className="flex items-center gap-2 bg-teal-50/50 rounded-lg border border-teal-100 px-3 py-1.5">
+                          <span className="text-[10px] font-bold text-teal-700">{pet.type}</span>
+                          <input value={pet.name || ""} onChange={e => {
+                            const next = (data.household || []).map(m => m.id === pet.id ? {...m, name: e.target.value} : m);
+                            update("household", next);
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                          }} placeholder="Pet name" className="flex-1 rounded border border-teal-200 px-2 py-0.5 text-[10px] text-slate-700 bg-white outline-none focus:border-teal-400" />
+                          <button type="button" onClick={() => {
+                            const next = (data.household || []).filter(m => m.id !== pet.id);
+                            update("household", next);
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                            if (!petStr) {
+                              update("sdsConsiderations", (data.sdsConsiderations || []).filter(s => s !== "Pets"));
+                              update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
+                            }
+                          }} className="text-slate-400 hover:text-rose-500 text-xs">×</button>
+                        </div>
+                      ))}
+                      {showCoaching && answered && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
+                        <span className="font-bold">Pets:</span> Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.
+                      </div>}
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Customer Preferences */}
+                {/* Individual preference questions */}
+                {[
+                  { key: "medical", configKey: "familyMedicalIssues", title: "Any medical issues?", searchTerms: "medical health asthma", isAnswered: () => !!data.familyMedicalIssues, summary: () => data.familyMedicalIssues === "Y" ? `Yes${data.familyMedicalNote ? ": " + data.familyMedicalNote : ""}` : "No" },
+                  { key: "allergies", configKey: "soapFragAllergies", title: "Soap or fragrance allergies?", searchTerms: "allergy allergies detergent soap fragrance sensitive", isAnswered: () => !!data.soapFragAllergies, summary: () => data.soapFragAllergies === "Y" ? `Yes${data.soapFragNote ? ": " + data.soapFragNote : ""}` : "No" },
+                  { key: "selfClean", configKey: "selfCleaning", title: "Self-clean anything?", searchTerms: "drawers undergarments linens towels baby items clean themselves", isAnswered: () => !!data.selfCleaning, summary: () => data.selfCleaning === "Y" ? `Yes${data.selfCleaningNote ? ": " + data.selfCleaningNote : ""}` : "No" },
+                  { key: "dryCleaner", configKey: "useDryCleaner", title: "Use a dry cleaner?", searchTerms: "dry cleaner dry cleaning", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
+                  { key: "laundry", configKey: "howDryLaundry", title: "How do they dry laundry?", searchTerms: "air dry low heat dryer machine", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
+                  { key: "storage", configKey: "storageNeeded", title: "Need storage?", searchTerms: "storage months long term warehouse", isAnswered: () => !!data.storageNeeded, summary: () => data.storageNeeded === "Y" ? `Yes${data.storageMonths ? ", " + data.storageMonths + " months" : ""}` : "No" },
+                ].filter(q => isFieldVisible(q.configKey) && matchesInterviewSearch(q.title, q.searchTerms || "")).map(q => {
+                  const answered = q.isAnswered(); const log = (data.interviewLog || {})[q.key];
+                  const needsFollowUp = (q.key === "storage" && data.storageNeeded === "Y") || (q.key === "medical" && data.familyMedicalIssues === "Y") || (q.key === "allergies" && data.soapFragAllergies === "Y") || (q.key === "selfClean" && data.selfCleaning === "Y");
+                  const expanded = !answered || interviewExpanded[q.key] || (needsFollowUp && interviewExpanded[q.key] !== false);
+                  return (
+                    <div key={q.key} className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                      <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: !p[q.key]})); if (answered && !log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                        <div className={`${expanded ? 'text-xs' : 'text-[11px]'} font-bold text-sky-600`}>{highlightSearch(q.title)}</div>
+                        {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{q.summary()}</span>}
+                      </button>
+                      {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                      {expanded && <div className="px-3 pb-3">
+                        {q.key === "medical" && <>
+                          <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => { update("familyMedicalIssues", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), medical: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e => update("familyMedicalNote", e.target.value)} placeholder="What medical issues?" className="!text-xs mt-2" />}
+                        </>}
+                        {q.key === "allergies" && <>
+                          <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => { update("soapFragAllergies", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), allergies: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="What allergies?" className="!text-xs mt-2" />}
+                        </>}
+                        {q.key === "selfClean" && <>
+                          <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => { update("selfCleaning", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), selfClean: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.selfCleaning === "Y" && <div className="mt-2 space-y-1.5">
+                            <div className="flex flex-wrap gap-1.5">
+                              {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
+                                const active = (data.selfCleaningNote || "").toLowerCase().includes(item.toLowerCase());
+                                return <button key={item} type="button" onClick={() => { const note = data.selfCleaningNote || ""; if (active) update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", ")); else update("selfCleaningNote", note ? `${note}, ${item}` : item); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{item}</button>;
+                              })}
+                            </div>
+                            <Input value={data.selfCleaningNote || ""} onChange={e => update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
+                          </div>}
+                        </>}
+                        {q.key === "dryCleaner" && <ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => { update("useDryCleaner", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), dryCleaner: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
+                        {q.key === "laundry" && <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => { updateHowDry(v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), laundry: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
+                        {q.key === "storage" && <>
+                          <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => { update("storageNeeded", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), storage: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.storageNeeded === "Y" && <div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-600">Months?</span><Input className="w-16 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" /></div>}
+                        </>}
+                      </div>}
+                    </div>
+                  );
+                })}
+
+                {/* Activities & Interests */}
+                {(() => {
+                  const answered = (data.rushInterests || []).length > 0;
+                  const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ");
+                  const log = (data.interviewLog || {}).interests;
+                  const expanded = !answered || interviewExpanded.interests;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !p.interests}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-xs' : 'text-[11px]'} font-bold text-sky-600`}>{highlightSearch("Activities & interests")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {RUSH_INTERESTS.map(i => {
+                          const active = (data.rushInterests || []).includes(i.id);
+                          return <button key={i.id} type="button" onClick={() => { update("rushInterests", active ? (data.rushInterests||[]).filter(x=>x!==i.id) : [...(data.rushInterests||[]), i.id]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${active ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`} title={i.desc}>
+                            {i.label}
+                          </button>;
+                        })}
+                      </div>
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Upcoming Events */}
+                {(() => {
+                  const answered = (data.upcomingEvents || []).length > 0;
+                  const summary = (data.upcomingEvents || []).map(e => e.name || "Event").join(", ");
+                  const log = (data.interviewLog || {}).events;
+                  const expanded = interviewExpanded.events !== false;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-xs' : 'text-[11px]'} font-bold text-sky-600`}>{highlightSearch("Upcoming trips & events")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      {showCoaching && <div className="text-[10px] text-slate-400">Any travel or formal events during the repair period? We'll make sure the right items are pulled and delivered on time.</div>}
+                      {(data.upcomingEvents || []).map(evt => (
+                        <div key={evt.id} className="p-2 rounded-lg border border-slate-200 bg-slate-50 grid grid-cols-3 gap-2 relative">
+                          <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents||[]).filter(e => e.id !== evt.id))} className="absolute top-1 right-1 text-slate-400 hover:text-rose-500 text-xs">×</button>
+                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Name</div><input value={evt.name||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" placeholder="e.g. Florida Trip" /></div>
+                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Type</div><select value={evt.type||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, type: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px] bg-white">{RUSH_EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
+                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Date</div><input type="date" value={evt.date||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, date: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" /></div>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "vacation_beach", date: "", name: ""}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full p-2 border-2 border-dashed border-slate-300 rounded-lg text-[10px] font-bold text-slate-500 hover:border-teal-400 hover:text-teal-600">+ Add Trip or Event</button>
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, events: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {false && isFieldVisible("familyMedicalIssues") && (() => {
+                  const answered = false;
+                  const summary = "";
+                  const log = null; const expanded = true;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, preferences: !p.preferences}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Customer preferences")}</div>
+                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">Medical issues?</span>
+                          <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => update("familyMedicalIssues", v)} />
+                        </div>
+                        {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e => update("familyMedicalNote", e.target.value)} placeholder="What medical issues?" className="!text-xs" />}
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">Soap/fragrance allergies?</span>
+                          <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => update("soapFragAllergies", v)} />
+                        </div>
+                        {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="What allergies?" className="!text-xs" />}
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">Self-clean anything?</span>
+                          <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => update("selfCleaning", v)} />
+                        </div>
+                        {data.selfCleaning === "Y" && (
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap gap-1.5">
+                              {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
+                                const active = (data.selfCleaningNote || "").toLowerCase().includes(item.toLowerCase());
+                                return <button key={item} type="button" onClick={() => { const note = data.selfCleaningNote || ""; if (active) update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", ")); else update("selfCleaningNote", note ? `${note}, ${item}` : item); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{item}</button>;
+                              })}
+                            </div>
+                            <Input value={data.selfCleaningNote || ""} onChange={e => update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">How do they dry laundry?</span>
+                          <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => updateHowDry(v)} />
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                          <span className="text-xs text-slate-700">Need storage?</span>
+                          <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => update("storageNeeded", v)} />
+                        </div>
+                        {data.storageNeeded === "Y" && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-600">How many months?</span>
+                            <Input className="w-20 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" />
+                          </div>
+                        )}
+                      </div>
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, preferences: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), preferences: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
+                    </div>}
+                  </div>;
+                })()}
+              </div>
+              <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+                <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100">Rush Guide</button>
+                <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-violet-500 px-5 py-2 text-sm font-bold text-white hover:bg-violet-600">Done</button>
+              </div>
+          </div>
+        )}
+
+        {/* Action Items Panel */}
+        {actionItemsOpen && (() => {
+          const missing = computeAuditMissing();
+          const blockers = (scopeBridgeState.pendingIssues || []).filter(Boolean);
+          const placeholders = [
+            ...(data.customers || []).filter(c => {
+              if (isPlaceholderFlagActive(c?.placeholder)) return true;
+              const hasName = hasMeaningfulValue(c?.first) && hasMeaningfulValue(c?.last);
+              const hasContact = hasMeaningfulValue(c?.phone) || hasMeaningfulValue(c?.email);
+              return !hasName || (hasMeaningfulValue(c?.first) && !hasContact);
+            }).map(c => ({ label: [c.first, c.last].filter(Boolean).join(" ") || "Customer", section: "sec2", type: "customer" })),
+            ...(data.addresses || []).filter(a => !a.inactive && isAddressPlaceholder(a)).map(a => ({ label: a.type || "Address", section: "sec3", type: "address" })),
+            ...(data.vendors || []).filter(v => v.incomplete).map(v => ({ label: v.contact || v.company || "Company", section: "sec4", type: "company" })),
+          ];
+          return (
+            <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] z-[110] bg-white shadow-2xl flex flex-col border-l border-slate-200">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-amber-50 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚡</span>
+                    <span className="text-sm font-bold text-amber-800">Action Items</span>
+                    <span className="text-xs text-amber-600">{missing.length + placeholders.length + blockers.length} items</span>
+                  </div>
+                  <button onClick={() => setActionItemsOpen(false)} className="text-amber-400 hover:text-amber-600 text-lg font-bold">×</button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {blockers.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Blockers</div>
+                      <div className="space-y-1">
+                        {blockers.map((b, i) => (
+                          <button key={`b-${i}`} onClick={() => { setActionItemsOpen(false); jumpToSection("sec5"); setTimeout(() => setScheduleBridgeOpen(true), 150); }} className="w-full text-left rounded-lg border border-rose-200 bg-rose-50/50 px-3 py-2 text-xs text-rose-800 hover:bg-rose-50">
+                            {b}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {placeholders.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Placeholders</div>
+                      <div className="space-y-1">
+                        {placeholders.map((p, i) => (
+                          <button key={`ph-${i}`} onClick={() => { setActionItemsOpen(false); setOpenSections(prev => ({ sec1: p.section === "sec1", sec2: p.section === "sec2", sec3: p.section === "sec3", sec4: p.section === "sec4", sec5: p.section === "sec5" })); setActiveSection(p.section); }} className="w-full text-left rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-800 hover:bg-amber-50">
+                            <span className="font-bold">{p.label}</span> <span className="text-amber-600">— {p.type}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {missing.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Missing Fields</div>
+                      <div className="space-y-1">
+                        {missing.map((m, i) => (
+                          <button key={`m-${i}`} onClick={() => { setActionItemsOpen(false); focusAuditItem(m); }} className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 hover:bg-sky-50 hover:border-sky-300">
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {data.reminderEnabled && data.reminderDate && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Reminders</div>
+                      <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2 text-xs text-sky-800">
+                        Reminder set for {data.reminderDate}{data.reminderTime ? ` at ${data.reminderTime}` : ""}
+                      </div>
+                    </div>
+                  )}
+                  {placeholders.length === 0 && missing.length === 0 && blockers.length === 0 && (
+                    <div className="text-center py-8 text-sm text-slate-400">No action items — looking good!</div>
+                  )}
+                </div>
+            </div>
+          );
+        })()}
+
+        {/* Field Configuration Page */}
+        {showFieldConfig && (
+          <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setShowFieldConfig(false); }} tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
+            <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-2 shadow-sm z-10">
+              <span className="text-sm font-bold text-slate-700">Field Configuration</span>
+              <input
+                value={configSearch}
+                onChange={e => setConfigSearch(e.target.value)}
+                placeholder="Search fields..."
+                className="ml-3 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-sky-400 w-48"
+              />
+              <span className="text-xs text-slate-400">{Object.keys(fieldConfig).length} fields</span>
+              <div className="flex-1" />
+              {configSelectedKeys.size > 0 && (
+                <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-lg px-3 py-1.5">
+                  <span className="text-xs font-bold text-sky-700">{configSelectedKeys.size} selected</span>
+                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], requiredInAudit: true}; }); return next; }); }} className="rounded-full border border-sky-300 bg-white px-2 py-0.5 text-[10px] font-bold text-sky-700 hover:bg-sky-50">Required: On</button>
+                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], requiredInAudit: false}; }); return next; }); }} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:bg-slate-50">Required: Off</button>
+                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], visible: true}; }); return next; }); }} className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">Show</button>
+                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], visible: false}; }); return next; }); }} className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-bold text-rose-600 hover:bg-rose-50">Hide</button>
+                  <button onClick={() => setConfigSelectedKeys(new Set())} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
+                </div>
               )}
+              <button onClick={() => { setFieldConfig({...DEFAULT_FIELD_CONFIG}); setBlockerRules([...DEFAULT_BLOCKER_RULES]); setToast("Reset to defaults"); }} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200">Reset Defaults</button>
+              <button onClick={() => setShowFieldConfig(false)} className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">Close</button>
+            </div>
+            <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto w-full space-y-6">
+              {FIELD_CONFIG_SECTIONS.map(section => {
+                const searchLower = configSearch.toLowerCase().trim();
+                const keys = Object.keys(fieldConfig).filter(k => {
+                  if (fieldConfig[k].category !== section.id) return false;
+                  if (!searchLower) return true;
+                  return fieldConfig[k].label.toLowerCase().includes(searchLower) || k.toLowerCase().includes(searchLower) || (fieldConfig[k].coaching || "").toLowerCase().includes(searchLower);
+                });
+                if (!keys.length) return null;
+                const allSelected = keys.every(k => configSelectedKeys.has(k));
+                return (
+                  <div key={section.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-100">
+                      <input type="checkbox" checked={allSelected} onChange={() => {
+                        setConfigSelectedKeys(prev => {
+                          const next = new Set(prev);
+                          if (allSelected) keys.forEach(k => next.delete(k));
+                          else keys.forEach(k => next.add(k));
+                          return next;
+                        });
+                      }} className="h-4 w-4 rounded" />
+                      <span className="text-sm font-bold text-slate-700">{section.label}</span>
+                      <span className="text-xs text-slate-400">{keys.length} fields</span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {keys.map(key => {
+                        const cfg = fieldConfig[key];
+                        const selected = configSelectedKeys.has(key);
+                        return (<React.Fragment key={key}>
+                          <div className={`flex items-center gap-3 px-4 py-2 text-sm ${!cfg.visible ? 'bg-slate-50/50 opacity-60' : ''}`}>
+                            <input type="checkbox" checked={selected} onChange={() => {
+                              setConfigSelectedKeys(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+                            }} className="h-3.5 w-3.5 rounded" />
+                            <span className="text-xs font-semibold text-slate-700 w-44 truncate" title={key}>{cfg.label}</span>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], visible: !prev[key].visible}}))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${cfg.visible ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-600'}`}>
+                                {cfg.visible ? 'Visible' : 'Hidden'}
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], requiredInAudit: !prev[key].requiredInAudit}}))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${cfg.requiredInAudit ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-400'}`}>
+                                {cfg.requiredInAudit ? 'Required' : 'Optional'}
+                              </button>
+                            </div>
+                            <select value={cfg.requiredAtStatus || "always"} onChange={e => setFieldConfig(prev => ({...prev, [key]: {...prev[key], requiredAtStatus: e.target.value}}))} className="text-[10px] border border-slate-200 rounded px-1.5 py-0.5 text-slate-600 bg-white">
+                              <option value="always">Always</option>
+                              <option value="never">Never</option>
+                              <option value="Intake Complete">Intake Complete</option>
+                              <option value="Pickup Complete">Pickup Complete</option>
+                              <option value="Tagging Complete">Tagging Complete</option>
+                              <option value="Ready to Bill">Ready to Bill</option>
+                            </select>
+                            {cfg.selectType && (
+                              <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], selectType: prev[key].selectType === "multi" ? "single" : "multi"}}))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${cfg.selectType === "multi" ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-400'}`}>
+                                {cfg.selectType === "multi" ? "Multi" : "Single"}
+                              </button>
+                            )}
+                            {cfg.condition && <span className="text-[9px] text-slate-400 truncate" title={JSON.stringify(cfg.condition)}>Conditional</span>}
+                            <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], _coachingOpen: !prev[key]._coachingOpen}}))} className={`text-[10px] ${cfg.coaching ? 'text-violet-500' : 'text-slate-300'} hover:text-violet-600`} title={cfg.coaching || "Add coaching text"}>🎓</button>
+                            <div className="flex-1" />
+                            <span className="text-[9px] text-slate-300 font-mono">{key}</span>
+                          </div>
+                          {cfg._coachingOpen && (
+                            <div className="px-4 pb-2 flex items-start gap-2">
+                              <span className="text-[10px] text-violet-500 shrink-0 pt-1">🎓</span>
+                              <input
+                                value={cfg.coaching || ""}
+                                onChange={e => setFieldConfig(prev => ({...prev, [key]: {...prev[key], coaching: e.target.value}}))}
+                                placeholder="Enter coaching guidance for this field..."
+                                className="flex-1 rounded border border-violet-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-violet-400 bg-violet-50/30"
+                              />
+                            </div>
+                          )}
+                        </React.Fragment>);
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Blocker Rules */}
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                  <span className="text-sm font-bold text-slate-700">Auto-Blocker Rules</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {blockerRules.map((rule, idx) => (
+                    <div key={rule.id} className="flex items-center gap-3 px-4 py-2">
+                      <button onClick={() => setBlockerRules(prev => prev.map((r, i) => i === idx ? {...r, enabled: !r.enabled} : r))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${rule.enabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-400'}`}>
+                        {rule.enabled ? 'Enabled' : 'Disabled'}
+                      </button>
+                      <span className="text-xs font-semibold text-slate-700">{rule.blockerText}</span>
+                      <span className="text-[10px] text-slate-400 flex-1">{rule.trigger}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Rush Guide — Auto-generated from order + interview data */}
+        {rushGuideOpen && (() => {
+          const livingMap = { "Staying in home": "home", "Hotel": "hotel", "Temp": "temp", "Moving": "moving" };
+          const repairMap = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
+          const orderSituation = livingMap[data.livingStatus] || "";
+          const firstRepair = (data.repairsSummary || "").split(", ").filter(Boolean)[0] || "";
+          const orderRepairType = repairMap[firstRepair] || "";
+          const household = data.household || [];
+          const people = household.filter(m => m.category === "person");
+          const pets = household.filter(m => m.category === "pet");
+          const primaryCustomer = (data.customers || [])[0] || {};
+          // Addresses
+          const allAddresses = data.addresses || [];
+          const primaryAddress = allAddresses.find(a => a.isPrimary) || allAddresses[0] || {};
+          const primaryAddrStr = [primaryAddress.street, primaryAddress.city, primaryAddress.state, primaryAddress.zip].filter(Boolean).join(", ");
+          const tempAddress = allAddresses.find(a => /temp|hotel|rental/i.test(a.type || "")) || {};
+          const tempAddrStr = [tempAddress.street, tempAddress.city, tempAddress.state, tempAddress.zip].filter(Boolean).join(", ");
+          // Age-aware family composition
+          const babies = people.filter(p => { const age = parseInt(p.age); return /infant|baby/i.test(p.type) || (age >= 0 && age <= 2); }).length;
+          const kids = people.filter(p => { const age = parseInt(p.age); return /child/i.test(p.type) || (age > 2 && age <= 17); }).length;
+          const elderly = people.filter(p => { const age = parseInt(p.age); return /elderly/i.test(p.type) || age >= 65; }).length;
+          const adults = Math.max(1, (data.customers || []).length);
+          const totalPeople = adults + kids + babies;
+          const petCount = pets.length;
+          const petNames = pets.map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ");
+          const considerations = data.sdsConsiderations || [];
+          const packoutItems = data.packoutSummary || [];
+          const interests = data.rushInterests || [];
+          const events = data.upcomingEvents || [];
+          const conditions = { wet: data.damageWasWet === "Y" || data.damageWasWet === true, mold: !!data.damageMoldMildew, structural: data.structuralElectricDamage === "Y", noLights: !!data.noLights, boarded: !!data.boardedUp };
+
+          const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === orderRepairType);
+          const now = new Date();
+          const estimatedReturn = repairInfo ? rushAddDays(now, repairInfo.days) : null;
+          const seasons = estimatedReturn ? rushGetSeasons(now, estimatedReturn) : [];
+
+          // Generate action plan
+          const rushItems = [];
+          const shortTermItems = [];
+          const seasonalWardrobes = [];
+          const eventDeliveries = [];
+          const reminders = [
+            "Remove Valuables: Please remove any valuables or highly personal items from your textiles.",
+            "No Need to Bag: You do not need to photograph, bag, or list any items — we will do that for you!"
+          ];
+
+          if (repairInfo || orderSituation) {
+            // Core essentials
+            rushItems.push(`Clothing & undergarments to last ${totalPeople} people a couple of weeks`);
+            rushItems.push("Daily footwear, sneakers, and belts");
+
+            // Living situation
+            if (orderSituation === "hotel" || orderSituation === "temp") rushItems.push("Suitcases, duffel bags, or overnight bags");
+            if (orderSituation === "home") {
+              rushItems.push("Daily household essentials (towels, shower curtains)");
+              shortTermItems.push("Temporary window shades (for privacy)");
+              shortTermItems.push("Throw rugs and daily bedding");
+              reminders.push("Since you are staying home, we will try to work as quietly as possible.");
+            } else if (orderSituation === "hotel") {
+              reminders.push("Hotels provide bedding and towels, so there is no need to rush those items.");
+              shortTermItems.push("Favorite blankets or pillows for comfort");
+            } else if (orderSituation === "temp") {
+              reminders.push("Most rentals are furnished so you likely will not need full bedding or towels unless preferred.");
+            }
+
+            // Family composition (age-aware)
+            if (babies > 0) { rushItems.push("Strollers, diaper bags, and car seats"); rushItems.push("Crib bedding, baby blankets, and sleep sacks"); }
+            if (kids > 0) { rushItems.push("Favorite comfort toys or stuffed animals"); }
+            if (elderly > 0) { rushItems.push("Medications, medical devices, and mobility aids"); reminders.push("We will be extra careful with fragile or sentimental items for elderly family members."); }
+            if (petCount > 0) rushItems.push(`Pet beds, leashes, and carrying crates${petNames ? ` (${petNames})` : ""}`);
+
+            // Considerations-driven items
+            if (considerations.includes("Pregnancy")) { rushItems.push("Maternity clothing and comfort items"); reminders.push("All items will be cleaned with baby-safe, hypoallergenic products."); }
+            if (considerations.includes("Premium Brands")) { reminders.push("Your high-end designer pieces will be routed for delicate hand-cleaning."); }
+
+            // Packout items → what's being picked up affects what needs rushing
+            if (packoutItems.includes("Clothing")) rushItems.push("Prioritize your most-needed clothing for the Rush delivery");
+            if (packoutItems.includes("Bedding") && orderSituation === "home") rushItems.push("Temporary bedding while yours is being cleaned");
+            if (packoutItems.includes("Electronics")) rushItems.push("Identify any electronics you need immediately (chargers, laptops)");
+
+            // Conditions-driven urgency
+            if (conditions.wet) reminders.push("URGENT: Wet items are being separated by color and treated immediately with anti-microbial.");
+            if (conditions.mold) reminders.push("Mold-affected items require special handling with PPE — do not disturb.");
+            if (conditions.boarded) reminders.push("Access may be limited — please confirm entry arrangements.");
+
+            // Interests / activities
+            if (interests.includes("school")) rushItems.push("School backpacks, uniforms, and kids sports gear");
+            if (interests.includes("workout")) rushItems.push("Workout clothes, sneakers, and gym equipment");
+            if (interests.includes("work_from_home")) shortTermItems.push("Home office supplies, desk accessories, and work materials");
+            if (interests.includes("religious")) shortTermItems.push("Formal religious attire, prayer items, and head coverings");
+
+            // Seasons
+            const hasSeason = (name) => seasons.some(s => s.name === name);
+            if (hasSeason("Spring")) seasonalWardrobes.push({ season: "Spring", items: ["Light jackets, windbreakers, and rain gear", "Transition layers (long sleeves, light sweaters)", "Sneakers and rain boots"] });
+            if (hasSeason("Summer") || interests.includes("summer_activities")) {
+              const items = ["Shorts, t-shirts, skirts, and lightweight clothing", "Sandals, open-toe shoes, and sunglasses"];
+              if (interests.includes("summer_activities")) items.push("Swimwear, beach bags, sun hats, and pool gear");
+              seasonalWardrobes.push({ season: "Summer", items });
+            }
+            if (hasSeason("Fall")) seasonalWardrobes.push({ season: "Fall", items: ["Sweaters, fleeces, and mid-weight coats", "Jeans, heavier pants, and closed-toe shoes"] });
+            if (hasSeason("Winter") || interests.includes("winter_sports")) {
+              const items = ["Heavy winter coats, parkas, and snow boots", "Gloves, scarves, thermal layers, and thick socks"];
+              if (interests.includes("winter_sports")) items.push("Skiing/snowboarding equipment, snow pants, and goggles");
+              seasonalWardrobes.push({ season: "Winter", items });
+            }
+
+            // Holiday/interest-driven seasonal deliveries
+            if (interests.includes("halloween") && estimatedReturn) {
+              const halloween = new Date(estimatedReturn.getFullYear(), 9, 31);
+              if (now < halloween && halloween <= estimatedReturn) seasonalWardrobes.push({ season: "Halloween", items: ["Costumes and accessories", "Halloween decorations and party supplies"] });
+            }
+            if (interests.includes("thanksgiving") && estimatedReturn) {
+              const tg = new Date(estimatedReturn.getFullYear(), 10, 27);
+              if (now < tg && tg <= estimatedReturn) seasonalWardrobes.push({ season: "Thanksgiving", items: ["Holiday table linens and servingware", "Fall decorations", "Formal holiday clothing"] });
+            }
+            if (interests.includes("christmas") && estimatedReturn) {
+              const xmas = new Date(estimatedReturn.getFullYear(), 11, 25);
+              if (now < xmas && xmas <= estimatedReturn) seasonalWardrobes.push({ season: "Christmas / Hanukkah", items: ["Holiday clothing and formal wear", "Holiday decorations and ornaments", "Gift wrapping supplies", "Stockings and holiday bedding"] });
+            }
+            if (interests.includes("easter") && estimatedReturn) {
+              const easter = new Date(estimatedReturn.getFullYear(), 3, 5);
+              if (now < easter && easter <= estimatedReturn) seasonalWardrobes.push({ season: "Easter / Passover", items: ["Spring formal attire", "Holiday table settings", "Children's Easter outfits"] });
+            }
+            if (interests.includes("graduation") && estimatedReturn) {
+              seasonalWardrobes.push({ season: "Graduation", items: ["Cap and gown", "Formal celebration attire", "Photography outfits"] });
+            }
+
+            // Events from interview data + rush guide overrides
+            events.forEach(evt => {
+              if (!evt.date) return;
+              const eventDate = new Date(evt.date);
+              if (estimatedReturn && eventDate > estimatedReturn) { reminders.push(`Your trip "${evt.name}" falls after repairs are expected to finish.`); return; }
+              const items: string[] = [];
+              if (evt.type === "vacation_beach") { items.push("Swimwear, resort wear, and sandals"); items.push("Beach bags, sunglasses, and sun hats"); items.push("Suitcases and travel luggage"); }
+              else if (evt.type === "vacation_ski") { items.push("Ski gear, thermal layers, heavy coats, and boots"); items.push("Suitcases and travel luggage"); }
+              else if (evt.type === "wedding") { items.push("Suits, formal dresses, dress shoes"); items.push("Ties, jewelry, and formal accessories"); }
+              else if (evt.type === "business") { items.push("Business professional attire and dress shoes"); items.push("Briefcase, garment bags, and carry-on luggage"); }
+              else if (evt.type === "sports") { items.push("Uniforms, cleats, and practice gear"); items.push("Sports equipment bags and gear"); }
+              // Check rush guide overrides for group assignment
+              const override = (rushGuideData as any).eventOverrides?.[evt.id];
+              const assignedGroup = override?.group || "event";
+              const eventAddress = override?.address || "";
+              if (assignedGroup === "rush") { rushItems.push(...items.map(i => `[${evt.name}] ${i}`)); }
+              else if (assignedGroup === "short") { shortTermItems.push(...items.map(i => `[${evt.name}] ${i}`)); }
+              else { eventDeliveries.push({ id: evt.id, name: evt.name, date: rushFormatDate(eventDate), items, address: eventAddress }); }
+            });
+          }
+
+          return (
+            <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setRushGuideOpen(false); }} tabIndex={-1}>
+              <div className="flex-shrink-0 flex items-center gap-3 bg-teal-600 px-5 py-3 shadow-sm z-10">
+                <span className="text-lg">📋</span>
+                <span className="text-sm font-bold text-white">Rush Guide</span>
+                {primaryCustomer.first && <span className="text-teal-200 text-xs">for {[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ")}</span>}
+                <div className="flex-1" />
+                <span className="text-teal-200 text-xs">Auto-generated from interview</span>
+                <button onClick={() => setRushGuideOpen(false)} className="text-teal-200 hover:text-white text-lg font-bold ml-3">×</button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <div className="max-w-3xl mx-auto p-6 space-y-6">
+
+                  {/* Step 1: Basics */}
+                  {false && rushGuideStep === 1 && <>
+                    <div><h2 className="text-xl font-bold text-slate-900 mb-1">Step 1: The Basics</h2><p className="text-sm text-slate-500">Confirm living situation and repair timeline.</p></div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Living Situation</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {RUSH_LIVING_SITUATIONS.map(s => (
+                          <button key={s.id} onClick={() => setRushGuideData(p => ({...p, situation: s.id}))} className={`p-3 rounded-xl border text-left ${orderSituation === s.id ? 'border-teal-500 bg-teal-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                            <div className={`text-sm font-bold ${orderSituation === s.id ? 'text-teal-800' : 'text-slate-700'}`}>{s.label}</div>
+                            <div className="text-[10px] text-slate-500">{s.desc}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Repair Type</div>
+                      <select value={orderRepairType} onChange={e => setRushGuideData(p => ({...p, repairType: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm">
+                        <option value="">Select...</option>
+                        {RUSH_REPAIR_TIMELINES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                      </select>
+                      {repairInfo && <div className="mt-2 rounded-lg bg-sky-50 border border-sky-100 px-3 py-2 text-xs text-sky-800">Expected return: <strong>{rushFormatDate(estimatedReturn)}</strong> · Seasons: {seasons.map(s => s.name).join(", ")}</div>}
+                    </div>
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                      <button disabled={!orderSituation || !orderRepairType} onClick={() => setRushGuideStep(2)} className="rounded-xl bg-teal-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400">Next →</button>
+                    </div>
+                  </>}
+
+                  {/* Step 2: Family */}
+                  {rushGuideStep === 2 && <>
+                    <div><button onClick={() => setRushGuideStep(1)} className="text-xs text-slate-400 hover:text-slate-600 mb-2">← Back</button><h2 className="text-xl font-bold text-slate-900 mb-1">Step 2: Family & Lifestyle</h2></div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[{id:"adults",label:"Adults"},{id:"kids",label:"Children"},{id:"babies",label:"Babies/Toddlers"},{id:"pets",label:"Pets"}].map(t => (
+                        <div key={t.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50">
+                          <span className="text-sm font-bold text-slate-700">{t.label}</span>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setRushGuideData(p => ({...p, family: {...family, [t.id]: Math.max(0, family[t.id]-1)}}))} className="w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-600 font-bold text-sm">-</button>
+                            <span className="w-4 text-center font-bold">{family[t.id]}</span>
+                            <button onClick={() => setRushGuideData(p => ({...p, family: {...family, [t.id]: family[t.id]+1}}))} className="w-7 h-7 rounded-full bg-teal-50 border border-teal-200 text-teal-700 font-bold text-sm">+</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Activities & Interests</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {RUSH_INTERESTS.map(i => {
+                          const active = (rushGuideData.interests || []).includes(i.id);
+                          return <button key={i.id} onClick={() => setRushGuideData(p => ({...p, interests: active ? p.interests.filter(x => x !== i.id) : [...(p.interests||[]), i.id]}))} className={`p-3 rounded-xl border text-center ${active ? 'border-teal-500 bg-teal-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                            <div className={`text-xs font-bold ${active ? 'text-teal-800' : 'text-slate-700'}`}>{i.label}</div>
+                            <div className="text-[9px] text-slate-500">{i.desc}</div>
+                          </button>;
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                      <button onClick={() => setRushGuideStep(3)} className="rounded-xl bg-teal-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-700">Next →</button>
+                    </div>
+                  </>}
+
+                  {/* Step 3: Events */}
+                  {rushGuideStep === 3 && <>
+                    <div><button onClick={() => setRushGuideStep(2)} className="text-xs text-slate-400 hover:text-slate-600 mb-2">← Back</button><h2 className="text-xl font-bold text-slate-900 mb-1">Step 3: Upcoming Trips & Events</h2><p className="text-sm text-slate-500">Any travel or formal events before {rushFormatDate(estimatedReturn)}?</p></div>
+                    <div className="space-y-3">
+                      {(rushGuideData.events || []).map(evt => (
+                        <div key={evt.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 grid grid-cols-3 gap-3 relative">
+                          <button onClick={() => setRushGuideData(p => ({...p, events: p.events.filter(e => e.id !== evt.id)}))} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 text-sm">×</button>
+                          <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Name</div><input value={evt.name} onChange={e => setRushGuideData(p => ({...p, events: p.events.map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev)}))} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" /></div>
+                          <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Type</div><select value={evt.type} onChange={e => setRushGuideData(p => ({...p, events: p.events.map(ev => ev.id === evt.id ? {...ev, type: e.target.value} : ev)}))} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white">{RUSH_EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
+                          <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Date</div><input type="date" value={evt.date} onChange={e => setRushGuideData(p => ({...p, events: p.events.map(ev => ev.id === evt.id ? {...ev, date: e.target.value} : ev)}))} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" /></div>
+                        </div>
+                      ))}
+                      <button onClick={() => setRushGuideData(p => ({...p, events: [...(p.events||[]), {id: safeUid(), type: "vacation_beach", date: "", name: ""}]}))} className="w-full p-3 border-2 border-dashed border-slate-300 rounded-xl text-sm font-bold text-slate-500 hover:border-teal-400 hover:text-teal-600">+ Add Trip or Event</button>
+                    </div>
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                      <button onClick={() => setRushGuideStep(4)} className="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-md">Generate Smart Checklist →</button>
+                    </div>
+                  </>}
+
+                  {/* Step 4: Results */}
+                  {(repairInfo || orderSituation) ? <>
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-900 mb-1">Rush Guide for {[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ") || "Customer"}</h2>
+                      {primaryAddrStr && <div className="text-sm text-slate-500 mb-3">{primaryAddrStr}</div>}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {orderSituation && <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{RUSH_LIVING_SITUATIONS.find(s => s.id === orderSituation)?.label || orderSituation}</span>}
+                        <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{totalPeople} People{petCount > 0 ? `, ${petCount} Pet${petCount > 1 ? "s" : ""}` : ""}</span>
+                        {kids > 0 && <span className="rounded-full bg-sky-100 border border-sky-200 px-3 py-1 text-xs font-bold text-sky-700">{kids} Child{kids > 1 ? "ren" : ""}</span>}
+                        {babies > 0 && <span className="rounded-full bg-pink-100 border border-pink-200 px-3 py-1 text-xs font-bold text-pink-700">{babies} Baby{babies > 1 ? "/Toddler" : ""}</span>}
+                        {elderly > 0 && <span className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">{elderly} Elderly</span>}
+                        {estimatedReturn && <span className="rounded-full bg-teal-100 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">Return: {rushFormatDate(estimatedReturn)}</span>}
+                        {seasons.length > 0 && <span className="rounded-full bg-violet-100 border border-violet-200 px-3 py-1 text-xs font-bold text-violet-700">Seasons: {seasons.map(s => s.name).join(", ")}</span>}
+                      </div>
+                    </div>
+
+                    {/* Reminders */}
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+                      <div className="text-xs font-bold text-amber-800 mb-2">Important Reminders</div>
+                      <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">{reminders.map((r,i) => <li key={i}>{r}</li>)}</ul>
+                    </div>
+
+                    {/* Rush Items */}
+                    <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                      <div className="bg-teal-600 px-5 py-4 text-white">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="font-bold text-lg">Rush Delivery</div>
+                            <div className="text-teal-100 text-xs">Delivered in 24 to 72 hours</div>
+                          </div>
+                        </div>
+                        {(orderSituation === "hotel" || orderSituation === "temp") && tempAddrStr ? (
+                          <div className="mt-2 text-teal-100 text-xs flex items-center gap-1"><span className="font-bold text-teal-200">Deliver to:</span> {tempAddrStr}</div>
+                        ) : primaryAddrStr ? (
+                          <div className="mt-2 text-teal-100 text-xs flex items-center gap-1"><span className="font-bold text-teal-200">Deliver to:</span> {primaryAddrStr}</div>
+                        ) : null}
+                      </div>
+                      <div className="p-5 space-y-2">
+                        {rushItems.map((item, i) => <div key={i} className="flex items-start gap-2"><span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" /><span className="text-sm text-slate-700">{item}</span></div>)}
+                      </div>
+                    </div>
+
+                    {/* Short Term */}
+                    {shortTermItems.length > 0 && <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                      <div className="bg-sky-600 px-5 py-4 text-white">
+                        <div className="font-bold text-lg">Home & Comfort (Short-Term)</div>
+                        <div className="text-sky-100 text-xs">Delivered in 1-4 weeks</div>
+                        {primaryAddrStr && <div className="mt-2 text-sky-100 text-xs"><span className="font-bold text-sky-200">Deliver to:</span> {primaryAddrStr}</div>}
+                      </div>
+                      <div className="p-5 space-y-2">
+                        {shortTermItems.map((item, i) => <div key={i} className="flex items-start gap-2"><span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" /><span className="text-sm text-slate-700">{item}</span></div>)}
+                      </div>
+                    </div>}
+
+                    {/* Seasonal */}
+                    {seasonalWardrobes.length > 0 && <div>
+                      <div className="text-lg font-bold text-slate-900 mb-3">Seasonal Wardrobes</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {seasonalWardrobes.map((w, i) => (
+                          <div key={i} className="rounded-xl border border-slate-200 overflow-hidden">
+                            <div className="bg-slate-100 px-3 py-2 border-b border-slate-200"><span className="font-bold text-sm text-slate-700">{w.season}</span></div>
+                            <div className="p-3 space-y-1">{w.items.map((item, j) => <div key={j} className="flex items-start gap-2"><span className="w-3 h-3 rounded-full bg-slate-200 shrink-0 mt-1" /><span className="text-xs text-slate-700">{item}</span></div>)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>}
+
+                    {/* Events */}
+                    {eventDeliveries.length > 0 && <div>
+                      <div className="text-lg font-bold text-slate-900 mb-3">Event Deliveries</div>
+                      <div className="grid grid-cols-1 gap-3">
+                        {eventDeliveries.map((evt: any, i) => {
+                          const override = (rushGuideData as any).eventOverrides?.[evt.id] || {};
+                          return (
+                          <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
+                            <div className="bg-indigo-600 px-4 py-3 text-white">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-bold">{evt.name}</div>
+                                  <div className="text-indigo-200 text-xs">{evt.date}</div>
+                                </div>
+                                <select value={override.group || "event"} onChange={e => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), group: e.target.value}}}))} className="rounded-lg bg-indigo-500 border border-indigo-400 text-white text-[10px] font-bold px-2 py-1">
+                                  <option value="event">Separate Delivery</option>
+                                  <option value="rush">Include in Rush</option>
+                                  <option value="short">Include in Short-Term</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="p-3 space-y-2">
+                              {evt.items.map((item: string, j: number) => <div key={j} className="text-xs text-slate-700">• {item}</div>)}
+                              <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                                <div className="text-[10px] font-bold text-slate-500 uppercase">Deliver to</div>
+                                <input value={override.address || ""} onChange={e => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), address: e.target.value}}}))} placeholder={primaryAddrStr || "Enter delivery address"} className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-300" />
+                                <div className="text-[10px] font-bold text-slate-500 uppercase">Deliver by</div>
+                                <input type="date" value={override.deliverBy || ""} onChange={e => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), deliverBy: e.target.value}}}))} className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-300" />
+                              </div>
+                            </div>
+                          </div>
+                          );
+                        })}
+                      </div>
+                    </div>}
+
+                    {/* Long Term */}
+                    <div className="rounded-2xl bg-slate-800 p-5 text-white">
+                      <div className="font-bold text-lg mb-1">Long-Term Storage & Final Delivery</div>
+                      <p className="text-slate-300 text-sm">Everything not marked for Rush or Short-Term will be securely packed, barcode-tracked, professionally cleaned, and stored in our climate-controlled facility until your repairs are finished.</p>
+                      {primaryAddrStr && <div className="mt-2 text-slate-400 text-xs"><span className="font-bold text-slate-300">Final delivery to:</span> {primaryAddrStr}</div>}
+                      {estimatedReturn && <div className="text-slate-400 text-xs mt-1"><span className="font-bold text-slate-300">Estimated:</span> {rushFormatDate(estimatedReturn)}</div>}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-3 pt-4 border-t border-slate-100">
+                      <button onClick={() => {
+                        const rushAddr = (orderSituation === "hotel" || orderSituation === "temp") && tempAddrStr ? tempAddrStr : primaryAddrStr;
+                        const text = `RUSH GUIDE - ${data.orderName || "Order"}\n` +
+                          (primaryAddrStr ? `Address: ${primaryAddrStr}\n` : "") + "\n" +
+                          `RUSH DELIVERY (24-72 hrs)${rushAddr ? ` → ${rushAddr}` : ""}:\n${rushItems.map(i => `• ${i}`).join("\n")}\n\n` +
+                          (shortTermItems.length ? `SHORT TERM (1-4 wks)${primaryAddrStr ? ` → ${primaryAddrStr}` : ""}:\n${shortTermItems.map(i => `• ${i}`).join("\n")}\n\n` : "") +
+                          (seasonalWardrobes.length ? seasonalWardrobes.map(w => `${w.season.toUpperCase()}:\n${w.items.map(i => `• ${i}`).join("\n")}`).join("\n\n") + "\n\n" : "") +
+                          (eventDeliveries.length ? eventDeliveries.map((e: any) => `EVENT: ${e.name} (${e.date})${e.address ? ` → ${e.address}` : ""}:\n${e.items.map((i: string) => `• ${i}`).join("\n")}`).join("\n\n") + "\n\n" : "") +
+                          `LONG-TERM STORAGE → Final delivery to ${primaryAddrStr || "TBD"}${estimatedReturn ? ` (est. ${rushFormatDate(estimatedReturn)})` : ""}\n\n` +
+                          `REMINDERS:\n${reminders.map(r => `• ${r}`).join("\n")}`;
+                        navigator.clipboard?.writeText(text).then(() => setToast("Rush Guide copied to clipboard"));
+                      }} className="rounded-xl border border-sky-300 bg-sky-50 px-5 py-2.5 text-sm font-bold text-sky-700 hover:bg-sky-100">Copy to Clipboard</button>
+                      <button onClick={() => {
+                        if (repairInfo) update("suggestedGroups", Array.from(new Set([...(data.suggestedGroups || []), repairInfo.group])));
+                        setToast("Rush Guide applied to order");
+                        setRushGuideOpen(false);
+                      }} className="rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-700">Apply to Order & Close</button>
+                    </div>
+                  </> : <div className="text-center py-12 space-y-3">
+                    <div className="text-4xl">📋</div>
+                    <div className="text-lg font-bold text-slate-700">Complete the interview to generate</div>
+                    <p className="text-sm text-slate-500 max-w-md mx-auto">The Rush Guide needs at least a living situation or repair type from the interview to generate personalized recommendations.</p>
+                    <button onClick={() => { setRushGuideOpen(false); setInterviewPanelOpen(true); }} className="rounded-xl bg-violet-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-violet-600">Open Interview</button>
+                  </div>}
+
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Old audit sidebar removed — now in Action Items panel */}
       
       {orderInstructionModal.isOpen && (
         <div className="fixed inset-0 z-[128] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
@@ -10518,8 +13102,118 @@ export default function App(){
           </div>
         </div>
       )}
-      {toast && <Toast message={toast} onClose={()=>setToast("")} />}
-      {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} />}
+      {toast && <Toast message={toast} onClose={()=>setToast("")} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
+      {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
+      {showSdsPreview && (
+        <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setShowSdsPreview(false); }} tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
+          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-2 shadow-sm z-10 relative">
+            <div className="flex items-center bg-slate-100 rounded-full p-0.5 gap-0.5">
+              <button onClick={() => { setShowSdsPreview(false); setEntryMode('detailed'); }} className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Order</button>
+              <button onClick={() => { setShowSdsPreview(false); setEntryMode('same-day-scope'); }} className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Scope</button>
+              <button className="rounded-full px-3 py-1.5 text-xs font-bold bg-white text-sky-700 shadow-sm">SDS</button>
+            </div>
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={() => setShowSdsPreview(false)}
+              className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 transition-colors"
+            >
+              ← Close SDS
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto p-4 max-w-4xl mx-auto w-full">
+            <SdsDocument
+              orderName={data.orderName || ""}
+              claimNumber={data.claimNumber || ""}
+              insuranceCompany={data.insuranceCompany || ""}
+              insuranceAdjuster={data.insuranceAdjuster || ""}
+              dateOfLoss={data.dateOfLoss || ""}
+              policyNumber={data.policyNumber || ""}
+              nationalCarrier={data.nationalCarrier || ""}
+              orderTypes={data.orderTypes || []}
+              primaryLossType={data.primaryLossType || ""}
+              address={(() => { const a = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {}; return [a.street, a.city, a.state].filter(Boolean).join(", "); })()}
+              lossSeverity={data.lossSeverity}
+              rooms={data.sdsRooms || []}
+              lossDetails={data.lossDetails || {}}
+              severityCodes={data.severityCodes || []}
+              selectedServices={data.sdsServices || []}
+              noeServiceOfferings={data.serviceOfferings || []}
+              customers={data.customers || []}
+              familyMedicalIssues={data.familyMedicalIssues}
+              soapFragAllergies={data.soapFragAllergies}
+              sdsConsiderations={data.sdsConsiderations || []}
+              sdsObservations={data.sdsObservations || []}
+              sdsServices={data.sdsServices || []}
+              sdsPhotos={mergedSdsPhotos}
+              sdsCoverPhoto={mergedSdsCoverPhoto}
+              scopeBridge={scopeBridgeState}
+              documentType="approval"
+              orderNarrative={orderNarrative}
+              orderNarrativeProse={buildNarrativeProse(orderNarrative, data)}
+              rushGuideTimeline={(() => {
+                const repairMap: Record<string,string> = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
+                const livingMap: Record<string,string> = { "Staying in home": "home", "Hotel": "hotel", "Temp": "temp", "Moving": "moving" };
+                const firstRepair = (data.repairsSummary || "").split(", ").filter(Boolean)[0] || "";
+                const repairId = repairMap[firstRepair];
+                const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === repairId);
+                const orderSit = livingMap[data.livingStatus] || "";
+                if (!repairInfo && !orderSit) return null;
+                const now = new Date();
+                const returnDate = repairInfo ? rushAddDays(now, repairInfo.days) : null;
+                const allAddr = data.addresses || [];
+                const primAddr = allAddr.find((a: any) => a.isPrimary) || allAddr[0] || {};
+                const primAddrStr = [primAddr.street, primAddr.city, primAddr.state, primAddr.zip].filter(Boolean).join(", ");
+                const tmpAddr = allAddr.find((a: any) => /temp|hotel|rental/i.test(a.type || "")) || {};
+                const tmpAddrStr = [tmpAddr.street, tmpAddr.city, tmpAddr.state, tmpAddr.zip].filter(Boolean).join(", ");
+                const rushAddr = (orderSit === "hotel" || orderSit === "temp") && tmpAddrStr ? tmpAddrStr : primAddrStr;
+
+                // Build Rush items
+                const household = data.household || [];
+                const pets = household.filter((m: any) => m.category === "pet");
+                const babies = household.filter((m: any) => /infant|baby/i.test(m.type)).length;
+                const kids = household.filter((m: any) => /child/i.test(m.type)).length;
+                const elderly = household.filter((m: any) => /elderly/i.test(m.type)).length;
+                const totalPeople = Math.max(1, (data.customers || []).length) + kids + babies;
+                const rItems: string[] = [];
+                rItems.push(`Clothing & undergarments for ${totalPeople} people`);
+                rItems.push("Daily footwear, sneakers, and belts");
+                if (orderSit === "hotel" || orderSit === "temp") rItems.push("Suitcases and overnight bags");
+                if (babies > 0) rItems.push("Strollers, diaper bags, crib bedding");
+                if (kids > 0) rItems.push("Favorite comfort toys");
+                if (elderly > 0) rItems.push("Medications and mobility aids");
+                if (pets.length > 0) rItems.push("Pet beds, leashes, and crates");
+                const stItems: string[] = [];
+                if (orderSit === "home") { stItems.push("Temporary window shades, throw rugs, daily bedding"); }
+
+                const timeline: any[] = [];
+                timeline.push({ group: "Rush Delivery", timeframe: "24-72 hours", desc: rItems.slice(0, 3).join("; "), items: rItems, address: rushAddr });
+                if (stItems.length > 0) timeline.push({ group: "Short-Term Home", timeframe: "1-4 weeks", desc: stItems.join("; "), items: stItems, address: primAddrStr });
+                if (returnDate) {
+                  const seasons = rushGetSeasons(now, returnDate);
+                  if (seasons.length > 1) timeline.push({ group: "Seasonal Wardrobes", timeframe: "2-8 weeks", desc: `Transition clothing for ${seasons.map(s => s.name).join(", ")}`, address: primAddrStr });
+                }
+                // Event deliveries
+                (data.upcomingEvents || []).forEach((evt: any) => {
+                  if (!evt.date) return;
+                  const ed = new Date(evt.date);
+                  if (returnDate && ed > returnDate) return;
+                  const eItems: string[] = [];
+                  if (evt.type === "vacation_beach") { eItems.push("Swimwear, resort wear, sandals, luggage"); }
+                  else if (evt.type === "vacation_ski") { eItems.push("Ski gear, thermal layers, boots, luggage"); }
+                  else if (evt.type === "wedding") { eItems.push("Formal attire, dress shoes, accessories"); }
+                  else if (evt.type === "business") { eItems.push("Business attire, briefcase, garment bags"); }
+                  else if (evt.type === "sports") { eItems.push("Uniforms, cleats, gear"); }
+                  if (eItems.length > 0) timeline.push({ group: evt.name || "Event", timeframe: rushFormatDate(ed), desc: eItems.join("; "), items: eItems, address: "" });
+                });
+                if (repairInfo) timeline.push({ group: "Final Delivery", timeframe: `${repairInfo.days} days (${rushFormatDate(returnDate!)})`, desc: "All remaining items after repairs complete", address: primAddrStr });
+                return timeline;
+              })()}
+              onClose={() => setShowSdsPreview(false)}
+            />
+          </div>
+        </div>
+      )}
       {smartConfirm.isOpen && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
@@ -10558,8 +13252,13 @@ export default function App(){
         </div>
       )}
       {roleAssignModal.isOpen && (
-        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[131] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-12 sm:pt-20">
-          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[131] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-12 sm:pt-20"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); applySelectedRoleAssignments(); }
+            if (e.key === "Escape") { e.preventDefault(); setRoleAssignModal(prev => ({ ...prev, isOpen: false })); }
+          }}
+        >
+          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden" tabIndex={-1} ref={el => el?.focus()}>
             <div className="bg-sky-500 px-6 py-4">
               <h3 className="text-xl font-bold text-white">Assign Company/Contact Roles</h3>
               <div className="mt-1 text-base text-sky-100">Apply badges for this company/contact now.</div>
@@ -10634,16 +13333,20 @@ export default function App(){
         </div>
       )}
 
-      {saveSummaryOpen && (
+      {previewOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="bg-sky-500 px-6 py-4">
-              <h3 className="text-xl font-bold text-white">Order Summary</h3>
+          <div className="w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden flex flex-col">
+            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-white">Review & Save</h3>
+                <div className="text-sky-100 text-xs mt-0.5">{orderNarrative.length} details captured{data.orderName ? ` — ${data.orderName}` : ""}</div>
+              </div>
+              <button onClick={() => setPreviewOpen(false)} className="text-white/70 hover:text-white text-lg font-bold">✕</button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto custom-scroll flex-1">
               {saveSummaryMissing.length > 0 && (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  <div className="font-bold mb-1">Missing Audit Fields</div>
+                  <div className="font-bold mb-1">Missing Fields ({saveSummaryMissing.length})</div>
                   <ul className="list-disc pl-5">
                     {saveSummaryMissing.map((m, idx) => (
                       <li key={`${m.key}-${idx}`}>{m.label}</li>
@@ -10651,22 +13354,57 @@ export default function App(){
                   </ul>
                 </div>
               )}
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="text-sm font-bold text-slate-700 mb-2">Entered Fields</div>
-                <div className="max-h-[320px] overflow-y-auto custom-scroll text-xs text-slate-700 space-y-1">
-                  {saveSummaryLines.length === 0 ? (
-                    <div className="text-slate-400">No fields entered yet.</div>
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <button type="button" onClick={() => setPreviewView("narrative")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "narrative" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>Narrative</button>
+                  <button type="button" onClick={() => setPreviewView("table")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "table" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>Table</button>
+                  <button type="button" onClick={() => setPreviewView("fields")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "fields" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>All Fields</button>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-5 py-4">
+                  {orderNarrative.length === 0 ? (
+                    <div className="text-sm text-slate-400 italic">No data entered yet.</div>
+                  ) : previewView === "narrative" ? (
+                    <div className="text-sm leading-relaxed text-slate-700 space-y-2">
+                      {buildNarrativeProse(orderNarrative, data).map((t, i) => <p key={i}>{t}</p>)}
+                    </div>
+                  ) : previewView === "table" ? (
+                    <div className="space-y-1.5">
+                      {orderNarrative.map((line, idx) => (
+                        <div key={idx} className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20 shrink-0 text-right">{line.section}</span>
+                          <span className="text-sm text-slate-700">{line.text}</span>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    saveSummaryLines.map((l, idx) => <div key={`${l}-${idx}`}>{l}</div>)
+                    <div className="text-xs text-slate-700 space-y-1 max-h-[320px] overflow-y-auto custom-scroll">
+                      {saveExportLines.length === 0 ? (
+                        <div className="text-slate-400">No fields entered yet.</div>
+                      ) : (
+                        saveExportLines.map((l, idx) => <div key={`${l}-${idx}`}>{l}</div>)
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => copyLines(saveSummaryLines)}
+                  className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100"
+                  onClick={() => {
+                    const nlt = (data.orderName ? `NLT: ${data.orderName}\n\n` : "") + orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
+                    copyLines(nlt.split("\n"));
+                  }}
                 >
-                  Copy Summary
+                  Copy as NLT
+                </button>
+                <button
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
+                  onClick={() => {
+                    const prose = buildNarrativeProse(orderNarrative, data).join("\n\n");
+                    copyLines(prose.split("\n"));
+                  }}
+                >
+                  Copy Narrative
                 </button>
                 <button
                   className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
@@ -10676,25 +13414,25 @@ export default function App(){
                 </button>
                 <button
                   className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => copyLines(saveExportLines)}
+                  onClick={() => {
+                    const narrative = orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
+                    const existing = stripEventSystemLines(data.eventInstructions || "").trim();
+                    const combined = existing ? `${existing}\n\n--- Order Summary ---\n${narrative}` : `--- Order Summary ---\n${narrative}`;
+                    update("eventInstructions", composeEventInstructions(combined, data, conditionSummary));
+                    setToast("Narrative added to Event Instructions");
+                  }}
                 >
-                  Copy All Fields
-                </button>
-                <button
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => downloadLines(saveExportLines, "order-all-fields.txt")}
-                >
-                  Download All Fields
+                  Send to Event Instructions
                 </button>
               </div>
             </div>
-            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
-              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setSaveSummaryOpen(false)}>Close</button>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 shrink-0">
+              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setPreviewOpen(false)}>Close</button>
               <button
                 className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
-                onClick={() => { setSaveSummaryOpen(false); validateGenerateScope(); }}
+                onClick={() => { setPreviewOpen(false); validateGenerateScope(); }}
               >
-                Continue Save
+                Save {recordWord}
               </button>
             </div>
           </div>
@@ -10873,6 +13611,117 @@ export default function App(){
                   Save Preset
                 </button>
               </div>
+              <div className="mb-3">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Built-in Samples</div>
+                <button onClick={() => {
+                  setData(prev => ({
+                    ...prev,
+                    orderName: "Olivo-BrooklynNY",
+                    isLead: false,
+                    orderStatus: "New",
+                    primaryLossType: "Water",
+                    orderTypes: ["Water", "Mold"],
+                    secondaryContaminants: ["Mold"],
+                    leadSourceCategory: "Referral",
+                    referringCompany: "State Farm",
+                    referrer: "Jamie Lee",
+                    salesRep: "Jim F",
+                    contactMethod: "Call",
+                    insuranceClaim: "Yes",
+                    insuranceCompany: "State Farm",
+                    insuranceAdjuster: "Jamie Lee",
+                    nationalCarrier: "State Farm",
+                    claimNumber: "CLM-2026-04821",
+                    policyNumber: "POL-SF-99281",
+                    dateOfLoss: "2026-04-15",
+                    billingPayer: "Insurance",
+                    directionOfPayment: "Direct from Insurance",
+                    damageWasWet: "Y",
+                    damageMoldMildew: true,
+                    structuralElectricDamage: "N",
+                    noLights: false,
+                    noHeat: false,
+                    boardedUp: false,
+                    livingStatus: "Hotel",
+                    processType: "Long-Term Storage",
+                    repairsSummary: "Replace Floors, Paint",
+                    packoutSummary: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Electronics"],
+                    loadList: ["Floor Protection", "Blankets", "TV Boxes", "Dollies", "Extra Manpower"],
+                    storageNeeded: "Y",
+                    storageMonths: "8",
+                    sdsConsiderations: ["Elderly", "Pets", "Skin Sensitivity"],
+                    sdsObservations: ["Pets", "Smoking"],
+                    sdsServices: ["Anti-Microbial", "Drying", "Content Manipulation", "Expert Stain Removal", "Fiber Protection"],
+                    serviceOfferings: ["Contents", "Furniture", "Rugs", "Textiles", "Pack-out", "Storage Only"],
+                    householdAnimals: "Dog Rex, Cat Whiskers",
+                    familyMedicalIssues: "N",
+                    soapFragAllergies: "Y",
+                    soapFragNote: "Fragrance-free only — skin sensitivity",
+                    selfCleaning: "Y",
+                    selfCleaningNote: "Drawers, Undergarments",
+                    howDryLaundry: "Air-Dry",
+                    useDryCleaner: "Yes",
+                    handlingCodes: ["Det", "NoDry", "Wet", "PPE"],
+                    severityCodes: ["Water-2", "Mold-1"],
+                    qualityCode: "Q1",
+                    lossSeverity: {
+                      touched: true,
+                      fire: { enabled: false, values: { "Heat": 0, "Soot": 0, "Odor": 0, "Extinguisher Powder": 0, "Remediation Debris": 0 } },
+                      water: { enabled: true, values: { "Water": 3, "Humidity": 2, "Musty Smell": 2, "Visible Mildew": 1, "Visible Mold": 2, "Sprinkler Chemical": 0, "Flood Cut Debris": 1 } },
+                      puffback: { enabled: false, values: { "Oil": 0, "Soot": 0, "Odor": 0, "Oily Film": 0 } },
+                    },
+                    sdsRooms: [
+                      { id: safeUid(), name: "Kitchen", affected: true, severitySelections: ["Water-3", "Mold-1"], tasks: ["Pack out all contents", "Remove wet rugs"], notes: "Burst pipe under sink. Standing water 2 inches. Mold starting behind cabinets." },
+                      { id: safeUid(), name: "Basement", affected: true, severitySelections: ["Water-2", "Mold-2"], tasks: ["Full pack out", "Dehumidification needed"], notes: "Water migrated from kitchen. Visible mold on walls and ceiling tiles. Strong musty odor." },
+                      { id: safeUid(), name: "Living Room", affected: true, severitySelections: ["Water-1"], tasks: ["Remove area rugs", "Pack out electronics"], notes: "Minor water damage to hardwood floors near kitchen entrance." },
+                      { id: safeUid(), name: "Master Bedroom", affected: false, severitySelections: [], tasks: ["Pack bedding for rush delivery"], notes: "Not directly affected but customer needs bedding rushed to hotel." },
+                      { id: safeUid(), name: "Kids Room", affected: false, severitySelections: [], tasks: ["Pack school supplies and toys"], notes: "Sofia's room — rush school backpack and comfort toys." },
+                    ],
+                    sdsPhotos: [
+                      { id: safeUid(), src: "/Gemini_Pets.png", room: "Kitchen", note: "Water damage under sink — burst pipe" },
+                      { id: safeUid(), src: "/Drying.png", room: "Kitchen", note: "Standing water on kitchen floor" },
+                      { id: safeUid(), src: "/Content_Manipulation.png", room: "Basement", note: "Mold visible on basement walls" },
+                      { id: safeUid(), src: "/Expert_Stain_Removal.png", room: "Basement", note: "Water staining on carpet" },
+                      { id: safeUid(), src: "/Gemini_Pets.png", room: "Living Room", note: "Hardwood floor water marks near kitchen" },
+                    ],
+                    suggestedGroups: ["RD", "LTD", "Storage Only"],
+                    moldCoverageConfirm: "$15,000",
+                    moldLimit: "15000",
+                    contentsCoverageLimit: "250000",
+                    customers: [
+                      { ...initCustomer({ first: "Maria", last: "Olivo", phone: "(718) 555-0142", email: "maria.olivo@email.com", type: "Policyholder", isPrimary: true, policyHolder: true, preferredContact: "Phone" }) },
+                      { ...initCustomer({ first: "Tony", last: "Olivo", phone: "(718) 555-0143", email: "tony.olivo@email.com", type: "Spouse" }) },
+                    ],
+                    addresses: [
+                      { ...initAddress({ street: "482 Atlantic Ave", apt: "3B", city: "Brooklyn", state: "NY", zip: "11217", type: "Apartment", isPrimary: true, isLossSite: true, lat: "40.6844", lng: "-73.9785" }) },
+                      { ...initAddress({ street: "Holiday Inn Downtown", city: "Brooklyn", state: "NY", zip: "11201", type: "Hotel" }) },
+                    ],
+                    household: [
+                      { id: safeUid(), category: "person", type: "Elderly", name: "Rosa Olivo", age: "78" },
+                      { id: safeUid(), category: "person", type: "Child", name: "Sofia", age: "7" },
+                      { id: safeUid(), category: "pet", type: "Dog", name: "Rex" },
+                      { id: safeUid(), category: "pet", type: "Cat", name: "Whiskers" },
+                    ],
+                    rushInterests: ["school", "christmas"],
+                    upcomingEvents: [
+                      { id: safeUid(), name: "Florida Vacation", type: "vacation_beach", date: "2026-07-15" },
+                      { id: safeUid(), name: "Sofia's Birthday", type: "wedding", date: "2026-05-20" },
+                    ],
+                    scheduleType: "Pickup",
+                    pickupDate: "2026-04-24",
+                    pickupTime: "9:00 AM",
+                    eventAssignee: "Jim F",
+                    eventVehicle: "Truck 4",
+                    contactAssignment: "office",
+                    eventInstructions: "Water damage from burst pipe in kitchen. Mold visible in basement. Elderly grandmother (78) staying — be patient and careful. Dog Rex and cat Whiskers on premises — keep doors closed. Customer prefers fragrance-free products. Air-dries all clothing.",
+                  }));
+                  setToast("Full SDS Sample loaded");
+                  setShowPresetModal(false);
+                }} className="w-full rounded-lg border border-teal-300 bg-teal-50 px-4 py-3 text-left hover:bg-teal-100 transition-colors">
+                  <div className="text-sm font-bold text-teal-800">Load Full SDS Sample</div>
+                  <div className="text-[10px] text-teal-600">Water + Mold loss, hotel stay, elderly + kids + pets, full interview, events, all SDS fields</div>
+                </button>
+              </div>
               <div className="max-h-64 overflow-auto rounded-xl border border-slate-200">
                 {testPresets.length === 0 ? (
                   <div className="p-4 text-sm text-slate-500">No presets yet.</div>
@@ -10902,14 +13751,91 @@ export default function App(){
         </div>
       )}
 
+      {addNewSystemModal && (
+        <div className="fixed inset-0 z-[140] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-8 sm:pt-16 overflow-auto"
+          onKeyDown={e => { if (e.key === "Escape") setAddNewSystemModal(null); }}
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden" tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
+            <div className="bg-sky-500 px-6 py-4">
+              <h3 className="text-lg font-bold text-white">Add New Contact / Company</h3>
+              <p className="text-sm text-sky-100">This will add them to the system for future orders.</p>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="space-y-3">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Company</div>
+                <SearchSelect
+                  value={addNewSystemModal.companyName}
+                  onChange={v => setAddNewSystemModal(p => ({ ...p, companyName: v, isNewCompany: !companies.some(c => normalizeCompany(c) === normalizeCompany(v)) }))}
+                  onQueryChange={() => {}}
+                  options={companies.map(c => ({ label: c, value: c, type: "company" }))}
+                  placeholder="Search existing or type new company..."
+                  onAddNew={v => setAddNewSystemModal(p => ({ ...p, companyName: v, isNewCompany: true }))}
+                />
+                {addNewSystemModal.companyName && (
+                  <div className={`text-[11px] font-semibold ${addNewSystemModal.isNewCompany ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {addNewSystemModal.isNewCompany ? `"${addNewSystemModal.companyName}" is new — will be created` : `"${addNewSystemModal.companyName}" found`}
+                  </div>
+                )}
+                {addNewSystemModal.isNewCompany && addNewSystemModal.companyName && (
+                  <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">New Company Details</div>
+                      <button type="button" onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(addNewSystemModal.companyName)}`, '_blank')} className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Search Google</button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {COMPANY_TYPES.map(type => (
+                        <button key={type} type="button" onClick={() => setAddNewSystemModal(p => ({ ...p, companyType: type }))}
+                          className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition-all ${addNewSystemModal.companyType === type ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
+                        >{type}</button>
+                      ))}
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Input value={addNewSystemModal.companyPhone || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, companyPhone: formatPhoneNumber(e.target.value) }))} placeholder="Company phone" />
+                      <Input value={addNewSystemModal.companyWebsite || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, companyWebsite: e.target.value }))} placeholder="Website" />
+                    </div>
+                    <Input value={addNewSystemModal.companyAddress || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, companyAddress: e.target.value }))} placeholder="Company address" />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact{addNewSystemModal.companyName ? ` at ${addNewSystemModal.companyName}` : ""}</div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input value={addNewSystemModal.firstName || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" />
+                  <Input value={addNewSystemModal.lastName || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" />
+                </div>
+                <Input value={addNewSystemModal.title || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, title: e.target.value }))} placeholder="Title (e.g. Adjuster, Project Manager, Owner)" />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input value={addNewSystemModal.phone || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, phone: formatPhoneNumber(e.target.value) }))} placeholder="Phone" />
+                  <Input value={addNewSystemModal.email || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, email: e.target.value }))} placeholder="Email" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex justify-between border-t border-slate-200">
+              <button onClick={() => setAddNewSystemModal(null)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700">Cancel</button>
+              <button
+                onClick={() => {
+                  const fullName = [addNewSystemModal.firstName, addNewSystemModal.lastName].filter(Boolean).join(" ");
+                  const companyName = addNewSystemModal.companyName || "";
+                  if (!fullName && !companyName) return;
+                  const inferredType = addNewSystemModal.isNewCompany ? (addNewSystemModal.companyType || "Other") : inferCompanyTypeFromName(companyName);
+                  const entry = { company: companyName, contact: fullName, type: inferredType, title: addNewSystemModal.title || "", id: safeUid() };
+                  update("vendors", [...(data.vendors || []), entry]);
+                  setToast(`Added ${fullName ? fullName + (companyName ? " at " + companyName : "") : companyName} to the system`);
+                  setAddNewSystemModal(null);
+                }}
+                disabled={!addNewSystemModal.firstName && !addNewSystemModal.companyName}
+                className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white hover:bg-sky-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Add to System & Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {addCompanyModalOpen && (
+          <div className="mb-4">
           <div
-            className="fixed inset-0 z-[110] flex items-start justify-center bg-slate-900/30 backdrop-blur-sm p-4 pt-12 sm:pt-20"
-            onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); setAddCompanyPanel(""); }}
-          >
-          <div
-            className="w-full max-w-5xl min-h-[34rem] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-visible fade-in sm:min-h-[40rem]"
-            onClick={(e)=>e.stopPropagation()}
+            className="w-full rounded-2xl bg-white border-2 border-sky-200 shadow-sm overflow-visible fade-in"
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -10923,15 +13849,23 @@ export default function App(){
                 setAddCompanyQuery("");
                 setAddCompanyPanel("");
               }
+              if (e.key === "Escape") {
+                setAddCompanyModalOpen(false);
+                setShowTypePicker(false);
+                setAddCompanyType("");
+                setNewCompanyDraft({ contact: "", company: "" });
+                setAddContactExisting({ contact: "", company: "" });
+                setCompanyModalCloseArmed(false);
+                setAddCompanyQuery("");
+                setAddCompanyPanel("");
+              }
             }}
           >
-            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
-              <div>
-                <div className="text-lg font-bold text-white">Add Existing Companies and Contacts</div>
-              </div>
+            <div className="bg-sky-50 border-b border-sky-200 px-5 py-3 flex items-center justify-between rounded-t-2xl">
+              <div className="text-sm font-bold text-sky-700">Add Existing Companies and Contacts</div>
               <button
                 onClick={() => { setAddCompanyModalOpen(false); setShowTypePicker(false); setAddCompanyType(""); setNewCompanyDraft({ contact: "", company: "" }); setAddContactExisting({ contact: "", company: "" }); setCompanyModalCloseArmed(false); setAddCompanyQuery(""); setAddCompanyPanel(""); }}
-                className="rounded-full border border-sky-200 px-3 py-1 text-[10px] font-bold text-white/90 hover:bg-sky-600"
+                className="rounded-full border border-sky-200 px-3 py-1 text-[10px] font-bold text-sky-600 hover:bg-sky-100"
               >
                 Close
               </button>
@@ -11084,7 +14018,7 @@ export default function App(){
           </div>
         </div>
       )}
-      
+
       {confirmDetails && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
               <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
@@ -11177,19 +14111,12 @@ export default function App(){
           </div>
       )}
 
-      {livingAddressPrompt.open && (
+      {livingAddressPrompt.open && !interviewPanelOpen && (
         <div className="fixed inset-0 z-[109] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5">
             <h3 className="text-lg font-bold text-slate-900 mb-2">Add {livingAddressPrompt.type} Address?</h3>
             <div className="text-sm text-slate-600 mb-4">
               No <span className="font-semibold">{livingAddressPrompt.type}</span> address exists yet.
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Choose how to continue:
-              <div className="mt-2 space-y-1">
-                <div>• Add address now with type preselected</div>
-                <div>• Use a TBD placeholder for now</div>
-              </div>
             </div>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
@@ -11202,16 +14129,16 @@ export default function App(){
               <button
                 type="button"
                 onClick={() => addLivingAddressFromPrompt("placeholder")}
-                className="rounded-lg border border-sky-300 bg-white px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-50"
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"
               >
-                Use TBD Placeholder
+                Create Placeholder
               </button>
               <button
                 type="button"
                 onClick={() => addLivingAddressFromPrompt("full")}
                 className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-white hover:bg-sky-600"
               >
-                Add Now
+                Enter Address Now
               </button>
             </div>
           </div>
@@ -11525,15 +14452,15 @@ export default function App(){
 
       {crmModal.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
+          <div className="w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden flex flex-col">
+            <div className="bg-sky-500 px-6 py-3 flex items-center justify-between shrink-0">
               <div>
-                <h3 className="text-xl font-bold text-white">Add CRM Log</h3>
-                <div className="text-sm text-sky-100">Capture outreach and follow-up actions.</div>
+                <h3 className="text-lg font-bold text-white">Add CRM Log</h3>
+                <div className="text-xs text-sky-100">Capture outreach and follow-up actions.</div>
               </div>
               <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" })}>×</button>
             </div>
-            <div className="p-6 space-y-5">
+            <div className="p-5 space-y-4 overflow-y-auto custom-scroll flex-1">
               <Field label="Type">
                 <Select value={crmModal.method} onChange={e=>setCrmModal(m=>({...m, method: e.target.value}))}>
                   {CONTACT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -11585,7 +14512,7 @@ export default function App(){
                 />
               </div>
             </div>
-            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+            <div className="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-200 shrink-0">
               <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" })}>Cancel</button>
               <button
                 className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"

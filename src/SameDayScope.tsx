@@ -613,12 +613,33 @@ const ORDER_CONTACTS = [
   { id: '4', name: 'Sally Fields', role: 'Tenant' },
 ];
 
+const severityGroupFromCode = (code = "") => String(code || "").split("-")[0];
+const severityLevelFromCode = (code = "") => String(code || "").split("-")[1] || "";
+const severityCodeWeight = (code = "") => {
+  const [group, level] = String(code || "").split("-");
+  if (!group || !level) return -1;
+  const groupIdx = Math.max(0, SEVERITY_GROUPS.indexOf(group));
+  const numericLevel = Number(level);
+  return groupIdx * 100 + (Number.isFinite(numericLevel) ? numericLevel : 0);
+};
+const sortSeverityCodes = (codes = []) =>
+  Array.from(new Set((codes || []).filter(Boolean))).sort((a, b) => severityCodeWeight(b) - severityCodeWeight(a));
+const compactSeverityLabel = (codes = []) =>
+  sortSeverityCodes(codes)
+    .map((code) => {
+      const [group, level] = String(code || "").split("-");
+      if (!group || !level) return "";
+      return `${group.slice(0, 1).toUpperCase()}${level}`;
+    })
+    .filter(Boolean)
+    .join(", ");
+
 const newRoom = (name, floor = "") => ({ id: uid(), name, floorLabel: /basement|attic/i.test(name) ? name : floor, photos: [], severitySelections: [], roomSeverityCodes: [], odorLevel: "", tasks: [], affected: null, hasCleaning: null, packOut: null, leaveOnsite: null, details: { packOut: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } }, leaveOnsite: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } } }, ui: { openRoom: false, openStatus: false, openNotes: true, openTasks: true, openCleanQ: false, openPackQ: false, openLeaveQ: false }, completedSections: {} });
 const buildAllProxy = () => ({ ...newRoom("Apply to Selected Room(s)"), id: "ALL", ui: { openRoom: true, openStatus: false, openNotes: false, openTasks: false, openCleanQ: false, openPackQ: false, openLeaveQ: false } });
 
 // --- Room Card Component ---
 
-const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggleSection, onSetField, onToggleSeverity, onToggleInline, onToggleRoomSeverity, orderSeverityCodes, mode, dynamicItemOptions, onSetTaskStatus, onSetTaskReason, onDeleteTask, onAddTask, onApplyChanges, bulkDirty, onDeleteRequest, selectedIds, onChangeNote, newlyAddedRoomId, onSetTaskQuantity, tourRefs }) => {
+const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggleSection, onSetField, onToggleSeverity, onToggleInline, onToggleRoomSeverity, orderSeverityCodes, mode, dynamicItemOptions, onSetTaskStatus, onSetTaskReason, onDeleteTask, onAddTask, onApplyChanges, bulkDirty, onDeleteRequest, selectedIds, onChangeNote, newlyAddedRoomId, onSetTaskQuantity, tourRefs, onOpenSeverity }) => {
     const cardRef = useRef(null);
 
     useEffect(() => {
@@ -670,9 +691,10 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
     }
     
     const showPackOutChip = room.details.packOut.locations.include.length > 0 || room.details.packOut.items.include.length > 0;
-    const effectiveRoomSeverityCodes = (room.roomSeverityCodes && room.roomSeverityCodes.length)
+    const effectiveRoomSeverityCodes = sortSeverityCodes((room.roomSeverityCodes && room.roomSeverityCodes.length)
       ? room.roomSeverityCodes
-      : (orderSeverityCodes || []);
+      : (orderSeverityCodes || []));
+    const roomSeverityChip = compactSeverityLabel(effectiveRoomSeverityCodes) || "Set";
     const severityGroups = Object.keys((orderSeverityCodes || []).reduce((acc, code) => {
       const [group] = String(code || "").split("-");
       if (group) acc[group] = true;
@@ -696,22 +718,6 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
                      {hasChangedTasks && <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800 flex-shrink-0">Changed</span>}
                   </div>
                   <div className="text-sm opacity-70">{room.floorLabel || ""}</div>
-                  {room.id !== 'ALL' && mode === 'scope' && (
-                    <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500" onClick={(e) => e.stopPropagation()}>
-                      <span className="font-semibold">Odor</span>
-                      <select
-                        value={room.odorLevel || ""}
-                        onChange={(e) => onSetField(room.id, "odorLevel", e.target.value)}
-                        className="border border-slate-200 rounded-md bg-white px-1.5 py-0.5 text-[11px]"
-                      >
-                        <option value="">—</option>
-                        <option value="0">0</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                      </select>
-                    </div>
-                  )}
                   {effectiveRoomSeverityCodes.length > 0 && (
                     <div className="mt-1 text-[11px] text-slate-500">
                       Severity: <span className="font-semibold">{effectiveRoomSeverityCodes.join(", ")}</span>
@@ -722,6 +728,16 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
             { room.id !== 'ALL' &&
             <div className="text-base font-medium flex items-center gap-4 flex-shrink-0">
              <div className="flex flex-col items-center"><span className="text-xs font-bold -mb-1">{room.photos.length}</span><button onClick={(e) => { e.stopPropagation(); alert(`Camera for room: ${room.name}`); }} className="p-1 hover:bg-slate-200 rounded-full"><Camera size={22} /></button></div>
+              {mode === 'scope' && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onOpenSeverity?.(room.id); }}
+                  className="rounded-full border border-sky-300 bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-700 hover:bg-sky-100"
+                  title="Open room severity"
+                >
+                  {roomSeverityChip}
+                </button>
+              )}
               {mode !== 'pack-out' && <button onClick={(e) => { e.stopPropagation(); onDeleteRequest(room.id); }} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={22}/></button>}
               {total > 0 ? (<span>{done}/{total}</span>) : (<span className="text-sm opacity-70">no tasks</span>) }
               {!isSelectionMode && <span className={`opacity-60 transition-transform ${room.ui?.openRoom ? "rotate-180" : ""}`}><ChevronDown size={27}/></span>}
@@ -776,20 +792,6 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
                                 <div className="text-[11px] text-slate-400">Defaults from Order severity. Click to override per room.</div>
                               </div>
                             )}
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs font-semibold text-slate-600">Odor Level</label>
-                              <select
-                                value={room.odorLevel || ""}
-                                onChange={(e) => onSetField(room.id, "odorLevel", e.target.value)}
-                                className="border rounded-lg px-2 py-1 text-xs bg-white"
-                              >
-                                <option value="">Select</option>
-                                <option value="0">0</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                              </select>
-                            </div>
                         </div>
                     </StatusSection>
                   </div>
@@ -1172,7 +1174,7 @@ const ScopeBridgeModal = ({ open, value, onClose, onApply, suggestedGroups = [] 
 };
 
 // --- Main App Component ---
-export default function SameDayScope({ onExit, eventInstructions, onEventInstructionsChange, serviceOfferings, onServiceOfferingsChange, suggestedGroups, onSuggestedGroupsChange, scopeBridge = createScopeBridgeState(), onScopeBridgeChange, lossSeverity, onLossSeverityChange, orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", addressLabel = "", customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsRooms = [], onSdsRoomsChange, sdsProjectFloors = [], onSdsProjectFloorsChange, sdsApartmentType = "", onSdsApartmentTypeChange, sdsPrebagged = "", onSdsPrebaggedChange, sdsInitialInstructions = [], onSdsInitialInstructionsChange, sdsInstructionAgreement = null, onSdsInstructionAgreementChange, sdsDisagreementNote = "", onSdsDisagreementNoteChange }) {
+export default function SameDayScope({ onExit, onNavigateToNoe, onNavigateToSds, eventInstructions, onEventInstructionsChange, serviceOfferings, onServiceOfferingsChange, suggestedGroups, onSuggestedGroupsChange, scopeBridge = createScopeBridgeState(), onScopeBridgeChange, lossSeverity, onLossSeverityChange, orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", addressLabel = "", customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], onSdsServicesChange, sdsRooms = [], onSdsRoomsChange, sdsProjectFloors = [], onSdsProjectFloorsChange, sdsApartmentType = "", onSdsApartmentTypeChange, sdsPrebagged = "", onSdsPrebaggedChange, sdsInitialInstructions = [], onSdsInitialInstructionsChange, sdsInstructionAgreement = null, onSdsInstructionAgreementChange, sdsDisagreementNote = "", onSdsDisagreementNoteChange }) {
   const [rooms, setRooms] = useState(Array.isArray(sdsRooms) ? sdsRooms : []);
   const [mode, setMode] = useState("scope");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -1209,7 +1211,8 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
   const [showSdsDoc, setShowSdsDoc] = useState(false);
   const [showScopeBridge, setShowScopeBridge] = useState(false);
   const [showSdsSetup, setShowSdsSetup] = useState(false);
-  const [sdsSelectedServices, setSdsSelectedServices] = useState([]);
+  const [sdsSelectedServices, setSdsSelectedServices] = useState(() => sdsServices || []);
+  const [sdsDocumentType, setSdsDocumentType] = useState("approval");
   const [selectedRoomFloors, setSelectedRoomFloors] = useState([]);
   const [selectedRoomTemplates, setSelectedRoomTemplates] = useState([]);
   const [bedroomCountDraft, setBedroomCountDraft] = useState("");
@@ -1247,18 +1250,27 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
 
   const SDS_SERVICE_OPTIONS = [
     { id: "Unpacking", icon: "/Gemini_Unpacking.png" },
-    { id: "Photo Inventory", icon: "/Gemini_Photo_Inventory.png" },
+    { id: "Photo Inventory", icon: "/Photo_Inventory.png" },
     { id: "Fiber Protection", icon: "/Gemini_Fiber_Protection.png" },
     { id: "Premium Brands", icon: "/Gemini_Premium_Brands.png" },
     { id: "Anti-Microbial", icon: "/Gemini_Anti_Microbial.png" },
     { id: "Fold ASAP", icon: "/Gemini_Fold_AMAP.png" },
-    { id: "Re-Hanging", icon: "/Gemini_Generated_Image_jv26rcjv26rcjv26.png" },
-    { id: "Drying", icon: "/Drying.jpg" },
-    { id: "Total Loss Inventory", icon: "/Total_Loss_Inventory.jpg" },
-    { id: "Content Manipulation", icon: "/Content_Manipulation.jpg" },
+    { id: "Re-Hanging", icon: "/Re_Hanging_Clean.png" },
+    { id: "Drying", icon: "/Drying.png" },
+    { id: "Total Loss Inventory", icon: "/Total_Loss_Inventory.png" },
+    { id: "Content Manipulation", icon: "/Content_Manipulation.png" },
+    { id: "Moving", icon: "/Moving.png" },
+    { id: "Rolling Racks", icon: "/Rolling_Racks.png" },
     { id: "High Density", icon: "/High_Density_Parking.png" },
-    { id: "Expert Stain Removal", icon: "/Expert_Stain_Removal.jpg" }
+    { id: "Expert Stain Removal", icon: "/Expert_Stain_Removal.png" }
   ];
+  const SDS_SETUP_ICON_CLASS_OVERRIDES = {
+    "Re-Hanging": "h-16 w-16 object-contain scale-[0.95]",
+    "Moving": "h-16 w-16 object-contain scale-[0.9]",
+    "Rolling Racks": "h-16 w-16 object-contain scale-[0.9]",
+    "Expert Stain Removal": "h-16 w-16 object-contain scale-[0.88]",
+  };
+  const getSdsSetupIconClass = (serviceId) => SDS_SETUP_ICON_CLASS_OVERRIDES[serviceId] || "h-16 w-16 object-contain";
 
   const setGroupsAndSync = (updater) => {
     setAnticipatedGroups(prev => {
@@ -1295,6 +1307,7 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
   const roomsSyncRef = useRef("");
   const floorsSyncRef = useRef("");
   const instructionsSyncRef = useRef("");
+  const sdsServicesSyncRef = useRef("");
 
   useEffect(() => {
     const serialized = JSON.stringify(Array.isArray(sdsRooms) ? sdsRooms : []);
@@ -1311,6 +1324,14 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
       onSdsRoomsChange?.(rooms);
     }
   }, [rooms, onSdsRoomsChange]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(sdsSelectedServices || []);
+    if (serialized !== sdsServicesSyncRef.current) {
+      sdsServicesSyncRef.current = serialized;
+      onSdsServicesChange?.(sdsSelectedServices);
+    }
+  }, [sdsSelectedServices, onSdsServicesChange]);
 
   useEffect(() => {
     const serialized = JSON.stringify(Array.isArray(sdsProjectFloors) ? sdsProjectFloors : []);
@@ -2218,12 +2239,16 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
           <button
             type="button"
             onClick={() => onExit?.()}
-            className="flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+            className="flex items-center gap-1 rounded-full border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100"
+            title="Back to start"
           >
-            <ArrowLeft size={16} />
-            Back
+            <ArrowLeft size={14} />
           </button>
-          <div className="text-lg font-bold text-slate-800">Same Day Scope</div>
+          <div className="flex items-center bg-slate-100 rounded-full p-0.5 gap-0.5">
+            <button onClick={() => onNavigateToNoe?.()} className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Order</button>
+            <button className="rounded-full px-3 py-1.5 text-xs font-bold bg-white text-sky-700 shadow-sm">Text Scope</button>
+            <button onClick={() => onNavigateToSds?.()} className="rounded-full px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">SDS</button>
+          </div>
           <button
             type="button"
             onClick={() => setShowScopeBridge(true)}
@@ -2774,6 +2799,28 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
               <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setShowSdsSetup(false)}>×</button>
             </div>
             <div className="p-6 space-y-4">
+              <div>
+                <div className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">SDS Type</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: "approval", label: "Approval", note: "Includes an Approve confirmation." },
+                    { id: "update", label: "Update", note: "Includes an Update Recieved confirmation." },
+                  ].map((option) => {
+                    const active = sdsDocumentType === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setSdsDocumentType(option.id)}
+                        className={`rounded-xl border px-3 py-2 text-left transition ${active ? "border-sky-400 bg-sky-50" : "border-slate-200 bg-white hover:border-sky-200"}`}
+                      >
+                        <div className="text-sm font-semibold text-slate-800">{option.label}</div>
+                        <div className="mt-1 text-[11px] text-slate-500">{option.note}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {SDS_SERVICE_OPTIONS.map(opt => {
                   const active = sdsSelectedServices.includes(opt.id);
@@ -2786,7 +2833,7 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
                     >
                       <div className="flex items-center gap-4">
                         <div className="h-16 w-16 flex items-center justify-center overflow-hidden">
-                          <img src={opt.icon} alt={opt.id} className="h-16 w-16 object-contain" />
+                          <img src={opt.icon} alt={opt.id} className={getSdsSetupIconClass(opt.id)} />
                         </div>
                         <div className="text-sm font-semibold text-slate-700">{opt.id}</div>
                       </div>
@@ -2832,6 +2879,7 @@ export default function SameDayScope({ onExit, eventInstructions, onEventInstruc
           sdsObservations={sdsObservations}
           sdsServices={sdsServices}
           scopeBridge={scopeBridgeSnapshot}
+          documentType={sdsDocumentType}
         />
       )}
     </div>
