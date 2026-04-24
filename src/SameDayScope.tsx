@@ -666,7 +666,7 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
     }, [room.tasks]);
     
     const isComplete = total > 0 && done === total;
-    const hasAnyInstructions = room.tasks.length > 0 || room.severitySelections.length > 0;
+    const hasAnyInstructions = (room.tasks || []).length > 0 || (room.severitySelections || []).length > 0;
 
     const instructionsHighlightClass = (room.packOut === true || room.leaveOnsite === true)
         ? 'border-sky-500 border-2 shadow-lg shadow-blue-500/20'
@@ -690,7 +690,7 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
       wrapperClass += " border-2 border-slate-200"; 
     }
     
-    const showPackOutChip = room.details.packOut.locations.include.length > 0 || room.details.packOut.items.include.length > 0;
+    const showPackOutChip = (room.details?.packOut?.locations?.include?.length || 0) > 0 || (room.details?.packOut?.items?.include?.length || 0) > 0;
     const effectiveRoomSeverityCodes = sortSeverityCodes((room.roomSeverityCodes && room.roomSeverityCodes.length)
       ? room.roomSeverityCodes
       : (orderSeverityCodes || []));
@@ -760,7 +760,7 @@ const RoomCard = ({ room, rooms, isSelectionMode, isSelected, onSelect, onToggle
                         <div className="space-y-3">
                             <div className="flex flex-wrap gap-1">
                               {SEVERITY_OPTIONS.map(s => (
-                                <button key={s} onClick={() => onToggleSeverity(room.id, s)} className={`px-2 py-0.5 text-xs rounded-full border ${room.severitySelections.includes(s) ? "bg-sky-500 text-white" : "bg-white"}`}>{s}</button>
+                                <button key={s} onClick={() => onToggleSeverity(room.id, s)} className={`px-2 py-0.5 text-xs rounded-full border ${(room.severitySelections || []).includes(s) ? "bg-sky-500 text-white" : "bg-white"}`}>{s}</button>
                               ))}
                             </div>
                             {severityGroups.length > 0 && (
@@ -1175,7 +1175,15 @@ const ScopeBridgeModal = ({ open, value, onClose, onApply, suggestedGroups = [] 
 
 // --- Main App Component ---
 export default function SameDayScope({ onExit, onNavigateToNoe, onNavigateToSds, eventInstructions, onEventInstructionsChange, serviceOfferings, onServiceOfferingsChange, suggestedGroups, onSuggestedGroupsChange, scopeBridge = createScopeBridgeState(), onScopeBridgeChange, lossSeverity, onLossSeverityChange, orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", addressLabel = "", customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], onSdsServicesChange, sdsRooms = [], onSdsRoomsChange, sdsProjectFloors = [], onSdsProjectFloorsChange, sdsApartmentType = "", onSdsApartmentTypeChange, sdsPrebagged = "", onSdsPrebaggedChange, sdsInitialInstructions = [], onSdsInitialInstructionsChange, sdsInstructionAgreement = null, onSdsInstructionAgreementChange, sdsDisagreementNote = "", onSdsDisagreementNoteChange }) {
-  const [rooms, setRooms] = useState(Array.isArray(sdsRooms) ? sdsRooms : []);
+  const [rooms, setRooms] = useState(() => {
+    const defaultDetails = { packOut: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } }, leaveOnsite: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } } };
+    return (Array.isArray(sdsRooms) ? sdsRooms : []).map(r => ({
+      severitySelections: [], roomSeverityCodes: [], tasks: [], affected: null, hasCleaning: null, packOut: null, leaveOnsite: null,
+      details: defaultDetails, ui: { openRoom: false, openStatus: false, openNotes: true, openTasks: true, openCleanQ: false, openPackQ: false, openLeaveQ: false }, completedSections: {},
+      ...r,
+      details: { ...defaultDetails, ...r.details, packOut: { locations: { include: [], exclude: [], ...r.details?.packOut?.locations }, items: { include: [], exclude: [], ...r.details?.packOut?.items } }, leaveOnsite: { locations: { include: [], exclude: [], ...r.details?.leaveOnsite?.locations }, items: { include: [], exclude: [], ...r.details?.leaveOnsite?.items } } },
+    }));
+  });
   const [mode, setMode] = useState("scope");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -1609,10 +1617,10 @@ export default function SameDayScope({ onExit, onNavigateToNoe, onNavigateToSds,
     return Array.from(items);
   }, [selectedServices, textileFilters]);
   
-  const totalTasks = useMemo(() => rooms.flatMap(r => r.tasks).length, [rooms]);
+  const totalTasks = useMemo(() => rooms.flatMap(r => r.tasks || []).length, [rooms]);
   const undoneTasks = useMemo(() => {
-    return rooms.flatMap(room => 
-        room.tasks.filter(task => task.status === 'pending')
+    return rooms.flatMap(room =>
+        (room.tasks || []).filter(task => task.status === 'pending')
                   .map(task => ({ ...task, roomName: room.name }))
     );
   }, [rooms]);
@@ -1620,9 +1628,9 @@ export default function SameDayScope({ onExit, onNavigateToNoe, onNavigateToSds,
   const visibleRooms = useMemo(() => {
     if (mode === 'pack-out' && showOnlyRoomsWithTasks) {
       return rooms.filter(room => {
-        if (room.tasks.length === 0) return false;
-        const doneCount = room.tasks.filter(t => t.status === 'done' || t.status === 'changed').length;
-        return doneCount < room.tasks.length;
+        if ((room.tasks || []).length === 0) return false;
+        const doneCount = (room.tasks || []).filter(t => t.status === 'done' || t.status === 'changed').length;
+        return doneCount < (room.tasks || []).length;
       });
     }
     return rooms;
@@ -1936,7 +1944,7 @@ export default function SameDayScope({ onExit, onNavigateToNoe, onNavigateToSds,
   const openChangeNoteModal = (roomId, taskId) => {
       const room = rooms.find(r => r.id === roomId);
       if(room) {
-          const task = room.tasks.find(t => t.id === taskId);
+          const task = (room.tasks || []).find(t => t.id === taskId);
           if(task) {
               setChangeNote(task.changeNote || "");
           }
@@ -1980,15 +1988,15 @@ export default function SameDayScope({ onExit, onNavigateToNoe, onNavigateToSds,
             return t;
         };
         const rebuildTasks = (room) => {
-            const preserved = room.tasks.filter(t => t.isFreeform);
+            const preserved = (room.tasks || []).filter(t => t.isFreeform);
             const generated = computeTasksFromDetails(room.details).map(t => ({ id: uid(), status: 'pending', photos: [], reason: '', ...t, isFreeform: false, quantity: 1 }));
             return [...preserved, ...generated];
         };
-        const setInc = new Set(r.details[key][group].include); 
-        if (setInc.has(value)) setInc.delete(value); else setInc.add(value); 
-        const upd = { ...r, details: { ...r.details, [key]: { ...r.details[key], [group]: { ...r.details[key][group], include: Array.from(setInc) } } } }; 
+        const setInc = new Set(r.details[key][group].include);
+        if (setInc.has(value)) setInc.delete(value); else setInc.add(value);
+        const upd = { ...r, details: { ...r.details, [key]: { ...r.details[key], [group]: { ...r.details[key][group], include: Array.from(setInc) } } } };
         setBulkDirty(true);
-        return { ...upd, tasks: rebuildTasks(upd) }; 
+        return { ...upd, tasks: rebuildTasks(upd) };
     };
     if (isSelectionMode) { setAllModel(updater); } else { setRooms(prev => prev.map(r => r.id === roomId ? updater(r) : r)); }
   };
@@ -2003,7 +2011,7 @@ export default function SameDayScope({ onExit, onNavigateToNoe, onNavigateToSds,
         return t;
     };
     const rebuildTasks = (room) => {
-        const preserved = room.tasks.filter(t => t.isFreeform);
+        const preserved = (room.tasks || []).filter(t => t.isFreeform);
         const generated = computeTasksFromDetails(room.details).map(t => ({ id: uid(), status: 'pending', photos: [], reason: '', ...t, isFreeform: false, quantity: 1 }));
         return [...preserved, ...generated];
     };

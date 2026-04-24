@@ -1750,6 +1750,23 @@ const DEFAULT_INTERVIEW_ACTIONS = {
   "Premium Brands":         { coaching: "We will route your high-end designer pieces for delicate hand-cleaning.", actions: [{ type: "sdsObservation", value: "Premium Brands" }] },
   "Skin Sensitivity":       { coaching: "We will process your garments using 100% dye-free and fragrance-free detergents.", actions: [{ type: "handlingCode", value: "Det" }] },
   "Pets":                   { coaching: "Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.", actions: [{ type: "sdsObservation", value: "Pets on site" }, { type: "eventInstruction", value: "Keep doors closed - pets on site" }] },
+
+  // Q8: Medical
+  "Medical Yes":            { coaching: "We'll make a note for the crew to be aware of medical conditions in the household.", actions: [{ type: "contactNote", value: "Medical issues" }, { type: "eventInstruction", value: "Household has medical considerations" }] },
+
+  // Q9: Allergies
+  "Allergies Yes":          { coaching: "We will use hypoallergenic, fragrance-free cleaning products.", actions: [{ type: "handlingCode", value: "Det" }, { type: "eventInstruction", value: "Use fragrance-free products only" }] },
+
+  // Q10: Self Clean
+  "SelfClean Yes":          { coaching: "We'll set aside those items and return them uncleaned as requested.", actions: [{ type: "eventInstruction", value: "Customer self-cleaning some items" }] },
+
+  // Q12: Laundry
+  "Air-Dry":                { coaching: "We'll air-dry all launderable items — no machine drying.", actions: [{ type: "handlingCode", value: "Low" }, { type: "eventInstruction", value: "Air-dry all items" }] },
+  "Low Heat":               { coaching: "We'll use low heat settings only on all items.", actions: [{ type: "handlingCode", value: "Low" }] },
+  "Dryer":                  { coaching: "", actions: [] },
+
+  // Q13: Storage
+  "Storage Yes":            { coaching: "We'll arrange safe, climate-controlled storage at our facility.", actions: [{ type: "suggestGroup", value: "Storage Only" }, { type: "eventInstruction", value: "Customer needs storage" }] },
 };
 
 // --- RUSH GUIDE ---
@@ -12053,31 +12070,97 @@ export default function App(){
                   </div>;
                 })()}
 
-                {/* Living Status */}
-                {isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving") && (() => {
-                  const answered = !!data.livingStatus; const log = (data.interviewLog || {}).living; const expanded = !answered || interviewExpanded.living;
+                {/* Living Timeline */}
+                {isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving Neighbor Relative Rental") && (() => {
+                  const timeline = data.livingTimeline || [];
+                  const answered = timeline.length > 0 || !!data.livingStatus;
+                  const summary = timeline.length > 0 ? timeline.map(s => s.type).join(" → ") : data.livingStatus || "";
+                  const log = (data.interviewLog || {}).living;
+                  const expanded = !answered || interviewExpanded.living;
+                  const STAY_TYPES = [
+                    { id: "Neighbor", icon: "🏘️", desc: "Staying next door" },
+                    { id: "Relative", icon: "👨‍👩‍👧", desc: "Family member's home" },
+                    { id: "Hotel", icon: "🏨", desc: "Hotel or motel" },
+                    { id: "Rental", icon: "🏠", desc: "Temporary rental" },
+                    { id: "Staying in home", icon: "🔧", desc: "Living on-site" },
+                    { id: "Moving", icon: "📦", desc: "Relocating permanently" },
+                  ];
+                  const addStay = (type: string) => {
+                    const next = [...timeline, { id: safeUid(), type, duration: "", address: "" }];
+                    update("livingTimeline", next);
+                    update("livingStatus", next[0]?.type || type);
+                    executeInterviewActions(type, true);
+                    setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                  };
+                  const updateStay = (id: string, field: string, val: string) => {
+                    const next = timeline.map(s => s.id === id ? {...s, [field]: val} : s);
+                    update("livingTimeline", next);
+                    if (next.length > 0) update("livingStatus", next[0].type);
+                  };
+                  const removeStay = (id: string) => {
+                    const next = timeline.filter(s => s.id !== id);
+                    update("livingTimeline", next);
+                    update("livingStatus", next[0]?.type || "");
+                  };
+                  const DURATION_OPTIONS = ["A few days", "1-2 weeks", "1 month", "2-3 months", "6+ months", "Until repairs done"];
+
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Where will the customer live during repairs?")}</div>
-                      {answered && !expanded && <span className="text-[10px] text-emerald-600 ml-2">{data.livingStatus}</span>}
+                      {answered && !expanded && <div className="flex items-center gap-1 ml-2">
+                        {timeline.length > 0 ? timeline.map((s, i) => (
+                          <span key={s.id} className="text-[10px] text-emerald-600">{i > 0 && " → "}{s.type}{s.duration ? ` (${s.duration})` : ""}</span>
+                        )) : <span className="text-[10px] text-emerald-600">{summary}</span>}
+                      </div>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {[{ label: "Staying in home" }, { label: "Hotel" }, { label: "Temp" }, { label: "Moving" }].map(s => (
-                          <ToggleMulti key={s.label} label={s.label} checked={data.livingStatus === s.label} onChange={() => { updateLivingStatus(data.livingStatus === s.label ? "" : s.label); if (s.label !== data.livingStatus) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
-                        ))}
-                      </div>
-                      {livingAddressPrompt.open && (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 space-y-2">
-                          <div className="text-xs font-bold text-amber-800">Add {livingAddressPrompt.type} address?</div>
-                          <div className="flex items-center gap-2">
-                            <button type="button" onClick={closeLivingAddressPrompt} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-50">Not Now</button>
-                            <button type="button" onClick={() => addLivingAddressFromPrompt("placeholder")} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">Create Placeholder</button>
-                            <button type="button" onClick={() => addLivingAddressFromPrompt("full")} className="rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Enter Address Now</button>
+                    {expanded && <div className="px-3 pb-3 space-y-3">
+                      {showCoaching && <div className="text-[10px] text-slate-400">Build the sequence of where the customer will stay during repairs. Each stay becomes a delivery point on the timeline.</div>}
+
+                      {/* Current timeline sequence */}
+                      {timeline.length > 0 && <div className="space-y-2">
+                        {timeline.map((stay, idx) => (
+                          <div key={stay.id} className="rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center">{idx + 1}</span>
+                                <span className="text-xs font-bold text-slate-700">{STAY_TYPES.find(t => t.id === stay.type)?.icon} {stay.type}</span>
+                              </div>
+                              <button type="button" onClick={() => removeStay(stay.id)} className="text-slate-400 hover:text-rose-500 text-xs">×</button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="text-[9px] font-bold text-slate-400 mb-0.5">How long?</div>
+                                <select value={stay.duration || ""} onChange={e => updateStay(stay.id, "duration", e.target.value)} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px] bg-white text-slate-700">
+                                  <option value="">Select...</option>
+                                  {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <div className="text-[9px] font-bold text-slate-400 mb-0.5">Address (optional)</div>
+                                <input value={stay.address || ""} onChange={e => updateStay(stay.id, "address", e.target.value)} placeholder="Enter address..." className="w-full rounded border border-slate-200 px-2 py-1 text-[10px] outline-none" />
+                              </div>
+                            </div>
                           </div>
+                        ))}
+                        {timeline.length > 0 && !timeline.some(s => s.type === "Staying in home" || s.type === "Moving") && (
+                          <div className="rounded-lg border border-dashed border-teal-300 bg-teal-50/30 px-3 py-1.5 text-[10px] text-teal-700">
+                            Tip: Add "Staying in home" as the last step when they return after repairs.
+                          </div>
+                        )}
+                      </div>}
+
+                      {/* Add stay buttons */}
+                      <div>
+                        <div className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">{timeline.length > 0 ? "Add next stay" : "Where first?"}</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {STAY_TYPES.map(t => (
+                            <button key={t.id} type="button" onClick={() => addStay(t.id)} className="rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all" title={t.desc}>{t.icon} {t.id}</button>
+                          ))}
                         </div>
-                      )}
+                      </div>
+
+                      {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, living: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
                     </div>}
                   </div>;
                 })()}
@@ -12094,7 +12177,7 @@ export default function App(){
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {[{ label: "Return to Home ASAP", value: "Deliver ASAP" }, { label: "To Temp Address", value: "Deliver to Temp" }, { label: "To New Home", value: "Deliver to New Home" }, { label: "Store Until Home Repaired", value: "Long-Term Storage" }].map(s => (
-                          <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => { update("processType", data.processType === s.value ? "" : s.value); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                          <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => { const isAdding = data.processType !== s.value; update("processType", isAdding ? s.value : ""); if (isAdding) executeInterviewActions(s.value, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
                     </div>}
@@ -12214,7 +12297,7 @@ export default function App(){
                             const sdsC = data.sdsConsiderations || [];
                             if (petStr && !sdsC.includes("Pets")) update("sdsConsiderations", [...sdsC, "Pets"]);
                             if (!petStr && sdsC.includes("Pets")) update("sdsConsiderations", sdsC.filter(s => s !== "Pets"));
-                            if (!(data.sdsObservations || []).includes("Pets") && petStr) update("sdsObservations", [...(data.sdsObservations || []), "Pets"]);
+                            if (!(data.sdsObservations || []).includes("Pets") && petStr) { update("sdsObservations", [...(data.sdsObservations || []), "Pets"]); executeInterviewActions("Pets", true); }
                             if (!petStr && (data.sdsObservations || []).includes("Pets")) update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
                             setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
                           }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${hasPet ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{type}</button>;
@@ -12271,15 +12354,15 @@ export default function App(){
                       {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                       {expanded && <div className="px-3 pb-3">
                         {q.key === "medical" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => { update("familyMedicalIssues", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), medical: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => { update("familyMedicalIssues", v); if (v === "Y") executeInterviewActions("Medical Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), medical: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
                           {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e => update("familyMedicalNote", e.target.value)} placeholder="What medical issues?" className="!text-xs mt-2" />}
                         </>}
                         {q.key === "allergies" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => { update("soapFragAllergies", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), allergies: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => { update("soapFragAllergies", v); if (v === "Y") executeInterviewActions("Allergies Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), allergies: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
                           {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="What allergies?" className="!text-xs mt-2" />}
                         </>}
                         {q.key === "selfClean" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => { update("selfCleaning", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), selfClean: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => { update("selfCleaning", v); if (v === "Y") executeInterviewActions("SelfClean Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), selfClean: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
                           {data.selfCleaning === "Y" && <div className="mt-2 space-y-1.5">
                             <div className="flex flex-wrap gap-1.5">
                               {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
@@ -12291,9 +12374,9 @@ export default function App(){
                           </div>}
                         </>}
                         {q.key === "dryCleaner" && <ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => { update("useDryCleaner", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), dryCleaner: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
-                        {q.key === "laundry" && <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => { updateHowDry(v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), laundry: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
+                        {q.key === "laundry" && <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => { updateHowDry(v); executeInterviewActions(v, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), laundry: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
                         {q.key === "storage" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => { update("storageNeeded", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), storage: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => { update("storageNeeded", v); if (v === "Y") executeInterviewActions("Storage Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), storage: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
                           {data.storageNeeded === "Y" && <div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-600">Months?</span><Input className="w-16 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" /></div>}
                         </>}
                       </div>}
@@ -12617,6 +12700,89 @@ export default function App(){
                   ))}
                 </div>
               </div>
+
+              {/* Interview Actions */}
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="px-4 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-bold text-violet-800">Interview Answer Actions</span>
+                    <span className="text-xs text-violet-500 ml-2">{Object.keys(interviewActions).length} answers configured</span>
+                  </div>
+                  <button onClick={() => { setInterviewActions({...DEFAULT_INTERVIEW_ACTIONS}); try { localStorage.removeItem("noe-interview-actions-v1"); } catch {} setToast("Interview actions reset"); }} className="rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[10px] font-bold text-violet-600 hover:bg-violet-50">Reset</button>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {(() => {
+                    const actionGroups = [
+                      { label: "Conditions", keys: ["Still Wet", "Visible Mold", "Structural Damage", "No Electricity", "No Heat", "Boarded Up"] },
+                      { label: "Repairs", keys: ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"] },
+                      { label: "Living Status", keys: ["Staying in home", "Hotel", "Temp", "Moving"] },
+                      { label: "Delivery", keys: ["Deliver ASAP", "Deliver to Temp", "Deliver to New Home", "Long-Term Storage"] },
+                      { label: "Packout", keys: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"] },
+                      { label: "Considerations", keys: ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"] },
+                      { label: "Preferences", keys: ["Medical Yes", "Allergies Yes", "SelfClean Yes", "Air-Dry", "Low Heat", "Dryer", "Storage Yes"] },
+                    ];
+                    const searchL = configSearch.toLowerCase().trim();
+                    const ACTION_TYPE_LABELS: Record<string,string> = { loadList: "Load List", handlingCode: "Handling Code", eventInstruction: "Event Instruction", sdsObservation: "SDS Observation", suggestGroup: "Suggest Group", blocker: "Blocker", contactNote: "Contact Note", addressPlaceholder: "Address Prompt", suggestOrderType: "Order Type", openMoldLimit: "Open Mold Limit" };
+                    return actionGroups.map(group => {
+                      const filteredKeys = group.keys.filter(k => !searchL || k.toLowerCase().includes(searchL) || (interviewActions[k]?.coaching || "").toLowerCase().includes(searchL));
+                      if (!filteredKeys.length) return null;
+                      return (
+                        <div key={group.label}>
+                          <div className="px-4 py-2 bg-slate-50/50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">{group.label}</div>
+                          {filteredKeys.map(key => {
+                            const cfg = interviewActions[key] || { coaching: "", actions: [] };
+                            const isOpen = (interviewActions[key] as any)?._open;
+                            return (
+                              <div key={key} className="border-t border-slate-50">
+                                <div className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-slate-50/50" onClick={() => setInterviewActions(prev => ({...prev, [key]: {...(prev[key] || {coaching:"",actions:[]}), _open: !isOpen}}))}>
+                                  <span className="text-xs font-semibold text-slate-700 w-48">{key}</span>
+                                  <div className="flex flex-wrap gap-1 flex-1">
+                                    {(cfg.actions || []).map((a: any, i: number) => (
+                                      <span key={i} className="rounded-full bg-sky-50 border border-sky-200 px-1.5 py-0.5 text-[9px] font-bold text-sky-700">{ACTION_TYPE_LABELS[a.type] || a.type}{a.value ? `: ${a.value}` : ""}</span>
+                                    ))}
+                                    {!(cfg.actions || []).length && <span className="text-[9px] text-slate-300">No actions</span>}
+                                  </div>
+                                  {cfg.coaching && <span className="text-[9px] text-violet-400 truncate max-w-[200px]" title={cfg.coaching}>🎓 {cfg.coaching.slice(0, 40)}...</span>}
+                                  <span className="text-slate-300 text-xs">{isOpen ? "▾" : "▸"}</span>
+                                </div>
+                                {isOpen && (
+                                  <div className="px-4 pb-3 space-y-2 bg-slate-50/30">
+                                    <div>
+                                      <div className="text-[10px] font-bold text-violet-600 mb-1">Coaching Text</div>
+                                      <textarea
+                                        value={cfg.coaching || ""}
+                                        onChange={e => { const v = e.target.value; setInterviewActions(prev => ({...prev, [key]: {...(prev[key] || {coaching:"",actions:[]}), coaching: v}})); }}
+                                        rows={2}
+                                        className="w-full rounded border border-violet-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-violet-400 bg-white"
+                                        placeholder="What to say to the customer..."
+                                      />
+                                    </div>
+                                    <div>
+                                      <div className="text-[10px] font-bold text-sky-600 mb-1">Actions</div>
+                                      <div className="space-y-1">
+                                        {(cfg.actions || []).map((a: any, i: number) => (
+                                          <div key={i} className="flex items-center gap-2 bg-white rounded border border-slate-200 px-2 py-1">
+                                            <select value={a.type} onChange={e => { const actions = [...(cfg.actions || [])]; actions[i] = {...actions[i], type: e.target.value}; setInterviewActions(prev => ({...prev, [key]: {...(prev[key] || {coaching:"",actions:[]}), actions}})); }} className="text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white text-slate-700">
+                                              {Object.entries(ACTION_TYPE_LABELS).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
+                                            </select>
+                                            <input value={a.value || ""} onChange={e => { const actions = [...(cfg.actions || [])]; actions[i] = {...actions[i], value: e.target.value}; setInterviewActions(prev => ({...prev, [key]: {...(prev[key] || {coaching:"",actions:[]}), actions}})); }} placeholder="Value" className="flex-1 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 outline-none" />
+                                            <button onClick={() => { const actions = (cfg.actions || []).filter((_: any, j: number) => j !== i); setInterviewActions(prev => ({...prev, [key]: {...(prev[key] || {coaching:"",actions:[]}), actions}})); }} className="text-rose-400 hover:text-rose-600 text-xs">×</button>
+                                          </div>
+                                        ))}
+                                        <button onClick={() => { const actions = [...(cfg.actions || []), { type: "loadList", value: "" }]; setInterviewActions(prev => ({...prev, [key]: {...(prev[key] || {coaching:"",actions:[]}), actions}})); }} className="text-[10px] font-bold text-sky-500 hover:text-sky-700">+ Add Action</button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -12657,12 +12823,84 @@ export default function App(){
           const estimatedReturn = repairInfo ? rushAddDays(now, repairInfo.days) : null;
           const seasons = estimatedReturn ? rushGetSeasons(now, estimatedReturn) : [];
 
+          // Smart address resolution from living timeline
+          const livingTimeline = data.livingTimeline || [];
+          const timelineHotel = livingTimeline.find(s => s.type === "Hotel");
+          const timelineRental = livingTimeline.find(s => s.type === "Rental" || s.type === "Temp");
+          const hotelAddress = allAddresses.find(a => /hotel/i.test(a.type || "")) || {};
+          const hotelAddrStr = timelineHotel?.address || [hotelAddress.street, hotelAddress.city, hotelAddress.state, hotelAddress.zip].filter(Boolean).join(", ");
+          const rentalAddress = allAddresses.find(a => /temp|rental/i.test(a.type || "")) || {};
+          const rentalAddrStr = timelineRental?.address || [rentalAddress.street, rentalAddress.city, rentalAddress.state, rentalAddress.zip].filter(Boolean).join(", ");
+          // Determine delivery pattern from timeline or single status
+          const isLongTerm = repairInfo && repairInfo.days > 30;
+          const hasHotel = livingTimeline.some(s => s.type === "Hotel") || orderSituation === "hotel" || !!hotelAddrStr;
+          const hasRental = livingTimeline.some(s => s.type === "Rental" || s.type === "Temp") || orderSituation === "temp" || !!rentalAddrStr;
+          const rushDeliverTo = hasHotel && hotelAddrStr ? hotelAddrStr : hasRental && rentalAddrStr ? rentalAddrStr : tempAddrStr || primaryAddrStr;
+          const rentalDeliverTo = rentalAddrStr || tempAddrStr || primaryAddrStr;
+          const finalDeliverTo = primaryAddrStr;
+          // Duration helpers for Gantt bands
+          const DURATION_DAYS: Record<string, number> = { "A few days": 5, "1-2 weeks": 14, "1 month": 30, "2-3 months": 75, "6+ months": 180, "Until repairs done": 0 };
+          const computeTimelineBands = () => {
+            if (livingTimeline.length === 0) return [];
+            const bands: {type: string; startDate: Date; endDate: Date; address: string; color: string}[] = [];
+            const BAND_COLORS: Record<string, string> = { "Neighbor": "bg-orange-400", "Relative": "bg-pink-400", "Hotel": "bg-amber-400", "Rental": "bg-sky-400", "Temp": "bg-sky-400", "Staying in home": "bg-emerald-400", "Moving": "bg-violet-400" };
+            // Calculate start dates for each stay using durations
+            const starts: Date[] = [new Date(now)];
+            for (let i = 0; i < livingTimeline.length - 1; i++) {
+              const days = DURATION_DAYS[livingTimeline[i].duration] || 30;
+              starts.push(rushAddDays(starts[i], days));
+            }
+            // Each band runs from its start to the next band's start (contiguous, no gaps)
+            // Last band runs to estimatedReturn or 30 days out
+            const totalEnd = estimatedReturn || rushAddDays(now, 90);
+            livingTimeline.forEach((stay, i) => {
+              const start = starts[i];
+              const end = i < livingTimeline.length - 1 ? starts[i + 1] : totalEnd;
+              bands.push({ type: stay.type, startDate: start, endDate: end, address: stay.address || "", color: BAND_COLORS[stay.type] || "bg-slate-400" });
+            });
+            return bands;
+          };
+          const timelineBands = computeTimelineBands();
+
+          // Compute season change moments during repair window
+          const seasonChanges: {name: string; startDate: Date; items: string[]; events: string[]}[] = [];
+          if (estimatedReturn) {
+            const SEASON_DATES = [
+              { name: "Spring", month: 2, day: 20, items: ["Light jackets, windbreakers, and rain gear", "Transition layers (long sleeves, light sweaters)", "Sneakers and rain boots"], events: ["Graduation", "Prom", "Easter / Passover", "Spring Break"] },
+              { name: "Summer", month: 5, day: 20, items: ["Shorts, t-shirts, skirts, and lightweight clothing", "Sandals, open-toe shoes, and sunglasses", "Swimwear, beach bags, sun hats, and pool gear"], events: ["Beach Vacations", "Summer Camp", "July 4th", "Outdoor Weddings"] },
+              { name: "Fall", month: 8, day: 22, items: ["Sweaters, fleeces, and mid-weight coats", "Jeans, heavier pants, and closed-toe shoes", "Boots and layering pieces"], events: ["Back to School", "Halloween", "Thanksgiving"] },
+              { name: "Winter", month: 11, day: 21, items: ["Heavy winter coats, parkas, and snow boots", "Gloves, scarves, thermal layers, and thick socks", "Holiday formal wear"], events: ["Christmas / Hanukkah", "New Year's Eve", "Ski Trips"] },
+            ];
+            SEASON_DATES.forEach(s => {
+              const changeDate = new Date(now.getFullYear(), s.month, s.day);
+              if (changeDate <= now) changeDate.setFullYear(changeDate.getFullYear() + 1);
+              if (changeDate > now && changeDate <= estimatedReturn) {
+                const enrichedItems = [...s.items];
+                if (s.name === "Summer" && interests.includes("summer_activities")) enrichedItems.push("Pool toys, beach towels, water shoes");
+                if (s.name === "Winter" && interests.includes("winter_sports")) enrichedItems.push("Skiing/snowboarding equipment, snow pants, goggles");
+                if (s.name === "Spring" && interests.includes("graduation")) enrichedItems.push("Cap and gown, formal celebration attire");
+                if (s.name === "Fall" && interests.includes("school")) enrichedItems.push("School backpacks, uniforms, kids sports gear");
+                seasonChanges.push({ name: s.name, startDate: changeDate, items: enrichedItems, events: s.events });
+              }
+            });
+          }
+
+          // Holiday events — computed outside conditional so Gantt can access
+          const holidayEvents: {id: string; name: string; date: Date; items: string[]}[] = [];
+          if (estimatedReturn) {
+            if (interests.includes("halloween")) { const d = new Date(now.getFullYear(), 9, 31); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_halloween", name: "Halloween", date: d, items: ["Costumes and accessories", "Halloween decorations and party supplies"] }); }
+            if (interests.includes("thanksgiving")) { const d = new Date(now.getFullYear(), 10, 27); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_thanksgiving", name: "Thanksgiving", date: d, items: ["Holiday table linens and servingware", "Fall decorations", "Formal holiday clothing"] }); }
+            if (interests.includes("christmas")) { const d = new Date(now.getFullYear(), 11, 25); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_christmas", name: "Christmas / Hanukkah", date: d, items: ["Holiday clothing and formal wear", "Holiday decorations and ornaments", "Gift wrapping supplies", "Stockings and holiday bedding"] }); }
+            if (interests.includes("easter")) { const d = new Date(now.getFullYear(), 3, 5); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_easter", name: "Easter / Passover", date: d, items: ["Spring formal attire", "Holiday table settings", "Children's Easter outfits"] }); }
+            if (interests.includes("graduation")) { const d = new Date(now.getFullYear(), 4, 15); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_graduation", name: "Graduation", date: d, items: ["Cap and gown", "Formal celebration attire", "Photography outfits"] }); }
+          }
+
           // Generate action plan
-          const rushItems = [];
-          const shortTermItems = [];
-          const seasonalWardrobes = [];
-          const eventDeliveries = [];
-          const reminders = [
+          const rushItems: string[] = [];
+          const shortTermItems: string[] = [];
+          const seasonalWardrobes: {id: string; season: string; date: string; rawDate: Date; items: string[]; events: string[]; assignedGroup: string}[] = [];
+          const eventDeliveries: {id: string; name: string; date: string; items: string[]; address: string}[] = [];
+          const reminders: string[] = [
             "Remove Valuables: Please remove any valuables or highly personal items from your textiles.",
             "No Need to Bag: You do not need to photograph, bag, or list any items — we will do that for you!"
           ];
@@ -12681,7 +12919,7 @@ export default function App(){
               reminders.push("Since you are staying home, we will try to work as quietly as possible.");
             } else if (orderSituation === "hotel") {
               reminders.push("Hotels provide bedding and towels, so there is no need to rush those items.");
-              shortTermItems.push("Favorite blankets or pillows for comfort");
+              rushItems.push("Favorite blankets or pillows for comfort");
             } else if (orderSituation === "temp") {
               reminders.push("Most rentals are furnished so you likely will not need full bedding or towels unless preferred.");
             }
@@ -12709,44 +12947,36 @@ export default function App(){
             // Interests / activities
             if (interests.includes("school")) rushItems.push("School backpacks, uniforms, and kids sports gear");
             if (interests.includes("workout")) rushItems.push("Workout clothes, sneakers, and gym equipment");
-            if (interests.includes("work_from_home")) shortTermItems.push("Home office supplies, desk accessories, and work materials");
-            if (interests.includes("religious")) shortTermItems.push("Formal religious attire, prayer items, and head coverings");
+            if (interests.includes("work_from_home")) { if (hasRental) shortTermItems.push("Home office supplies, desk accessories, and work materials"); else rushItems.push("Home office supplies, desk accessories, and work materials"); }
+            if (interests.includes("religious")) { if (hasRental) shortTermItems.push("Formal religious attire, prayer items, and head coverings"); else rushItems.push("Formal religious attire, prayer items, and head coverings"); }
 
-            // Seasons
-            const hasSeason = (name) => seasons.some(s => s.name === name);
-            if (hasSeason("Spring")) seasonalWardrobes.push({ season: "Spring", items: ["Light jackets, windbreakers, and rain gear", "Transition layers (long sleeves, light sweaters)", "Sneakers and rain boots"] });
-            if (hasSeason("Summer") || interests.includes("summer_activities")) {
-              const items = ["Shorts, t-shirts, skirts, and lightweight clothing", "Sandals, open-toe shoes, and sunglasses"];
-              if (interests.includes("summer_activities")) items.push("Swimwear, beach bags, sun hats, and pool gear");
-              seasonalWardrobes.push({ season: "Summer", items });
-            }
-            if (hasSeason("Fall")) seasonalWardrobes.push({ season: "Fall", items: ["Sweaters, fleeces, and mid-weight coats", "Jeans, heavier pants, and closed-toe shoes"] });
-            if (hasSeason("Winter") || interests.includes("winter_sports")) {
-              const items = ["Heavy winter coats, parkas, and snow boots", "Gloves, scarves, thermal layers, and thick socks"];
-              if (interests.includes("winter_sports")) items.push("Skiing/snowboarding equipment, snow pants, and goggles");
-              seasonalWardrobes.push({ season: "Winter", items });
-            }
+            // Season change deliveries — each can be assigned to a group
+            // Default logic: rental exists → deliver to rental. No rental → include in rush (if soon) or keep separate for a hotel LTD
+            const defaultSeasonGroup = (dateMs: number) => {
+              if (hasRental) return "short"; // deliver to rental
+              const daysOut = (dateMs - now.getTime()) / 86400000;
+              if (daysOut < 30) return "rush"; // soon enough to include in rush
+              return "separate"; // will need a separate delivery to hotel
+            };
+            seasonChanges.forEach(sc => {
+              const scId = `season_${sc.name.toLowerCase()}`;
+              const override = (rushGuideData as any).seasonOverrides?.[scId];
+              const assignedGroup = override?.group || defaultSeasonGroup(sc.startDate.getTime());
+              seasonalWardrobes.push({ id: scId, season: sc.name, date: rushFormatDate(sc.startDate), rawDate: sc.startDate, items: sc.items, events: sc.events, assignedGroup });
+            });
 
-            // Holiday/interest-driven seasonal deliveries
-            if (interests.includes("halloween") && estimatedReturn) {
-              const halloween = new Date(estimatedReturn.getFullYear(), 9, 31);
-              if (now < halloween && halloween <= estimatedReturn) seasonalWardrobes.push({ season: "Halloween", items: ["Costumes and accessories", "Halloween decorations and party supplies"] });
-            }
-            if (interests.includes("thanksgiving") && estimatedReturn) {
-              const tg = new Date(estimatedReturn.getFullYear(), 10, 27);
-              if (now < tg && tg <= estimatedReturn) seasonalWardrobes.push({ season: "Thanksgiving", items: ["Holiday table linens and servingware", "Fall decorations", "Formal holiday clothing"] });
-            }
-            if (interests.includes("christmas") && estimatedReturn) {
-              const xmas = new Date(estimatedReturn.getFullYear(), 11, 25);
-              if (now < xmas && xmas <= estimatedReturn) seasonalWardrobes.push({ season: "Christmas / Hanukkah", items: ["Holiday clothing and formal wear", "Holiday decorations and ornaments", "Gift wrapping supplies", "Stockings and holiday bedding"] });
-            }
-            if (interests.includes("easter") && estimatedReturn) {
-              const easter = new Date(estimatedReturn.getFullYear(), 3, 5);
-              if (now < easter && easter <= estimatedReturn) seasonalWardrobes.push({ season: "Easter / Passover", items: ["Spring formal attire", "Holiday table settings", "Children's Easter outfits"] });
-            }
-            if (interests.includes("graduation") && estimatedReturn) {
-              seasonalWardrobes.push({ season: "Graduation", items: ["Cap and gown", "Formal celebration attire", "Photography outfits"] });
-            }
+            // Process holiday events as seasonal wardrobes
+            holidayEvents.forEach(he => {
+              const override = (rushGuideData as any).seasonOverrides?.[he.id];
+              const assignedGroup = override?.group || defaultSeasonGroup(he.date.getTime());
+              seasonalWardrobes.push({ id: he.id, season: he.name, date: rushFormatDate(he.date), rawDate: he.date, items: he.items, events: [], assignedGroup });
+            });
+
+            // Merge seasonal items assigned to rush/short into those arrays
+            seasonalWardrobes.forEach(sw => {
+              if (sw.assignedGroup === "rush") rushItems.push(...sw.items.map(i => `[${sw.season}] ${i}`));
+              if (sw.assignedGroup === "short") shortTermItems.push(...sw.items.map(i => `[${sw.season}] ${i}`));
+            });
 
             // Events from interview data + rush guide overrides
             events.forEach(evt => {
@@ -12765,6 +12995,7 @@ export default function App(){
               const eventAddress = override?.address || "";
               if (assignedGroup === "rush") { rushItems.push(...items.map(i => `[${evt.name}] ${i}`)); }
               else if (assignedGroup === "short") { shortTermItems.push(...items.map(i => `[${evt.name}] ${i}`)); }
+              else if (assignedGroup === "rental") { /* shown in rental delivery section */ }
               else { eventDeliveries.push({ id: evt.id, name: evt.name, date: rushFormatDate(eventDate), items, address: eventAddress }); }
             });
           }
@@ -12860,21 +13091,382 @@ export default function App(){
                     </div>
                   </>}
 
-                  {/* Step 4: Results */}
-                  {(repairInfo || orderSituation) ? <>
+                  {/* Results */}
+                  {(repairInfo || orderSituation) ? (() => {
+                    // Collect seasonal items assigned to rental
+                    const rentalSeasonalItems = seasonalWardrobes.filter(sw => sw.assignedGroup === "rental");
+                    const separateSeasonals = seasonalWardrobes.filter(sw => sw.assignedGroup === "separate");
+
+                    // Delivery groups — computed at outer scope so seasonal/event sections can reference them
+                    const hasHouseholdItems = packoutItems.some(p => ["Rugs", "Window Treatments", "Furniture", "Art", "Appliances"].includes(p));
+                    const DELIVERY_COLORS = ["bg-teal-600", "bg-sky-600", "bg-indigo-600", "bg-amber-600", "bg-emerald-700"];
+                    const deliveryGroups: {id: string; label: string; date: Date; icon: string; items: string[]; location: string; address: string; householdTags?: string[]; color: string}[] = [];
+                    // 1) Rush
+                    const rushDate = rushAddDays(now, 2);
+                    const rushBandIdx = timelineBands.length > 0 ? 0 : 0;
+                    const rushLoc = timelineBands.length > 0 ? { location: timelineBands[0].type, address: timelineBands[0].address } : { location: hasHotel ? "Hotel" : hasRental ? "Rental" : "Home", address: rushDeliverTo };
+                    deliveryGroups.push({ id: "rush", label: "Rush Delivery", date: rushDate, icon: "⚡", items: rushItems, location: rushLoc.location, address: rushLoc.address, color: DELIVERY_COLORS[0] });
+                    // 2) Rental (only if rental exists)
+                    if (hasRental && timelineBands.length > 1) {
+                      const rentalBand = timelineBands.find(b => ["Rental", "Temp"].includes(b.type));
+                      if (rentalBand) {
+                        const stDelivery = rushAddDays(rentalBand.startDate, 3);
+                        deliveryGroups.push({ id: "rental", label: "Rental Delivery", date: stDelivery, icon: "📦", items: shortTermItems, location: rentalBand.type, address: rentalBand.address, color: DELIVERY_COLORS[1] });
+                      }
+                    }
+                    // 3) Final
+                    if (estimatedReturn) {
+                      const finalHouseholdTags: string[] = [];
+                      if (packoutItems.includes("Rugs")) finalHouseholdTags.push("Rugs laid");
+                      if (packoutItems.includes("Window Treatments")) finalHouseholdTags.push("Drapes hung");
+                      if (packoutItems.includes("Furniture")) finalHouseholdTags.push("Furniture placed");
+                      if (packoutItems.includes("Art")) finalHouseholdTags.push("Art re-hung");
+                      if (packoutItems.includes("Appliances")) finalHouseholdTags.push("Appliances installed");
+                      deliveryGroups.push({ id: "final", label: "Final Delivery", date: estimatedReturn, icon: "🏡", items: ["All remaining wardrobe and household items"], location: "Home", address: finalDeliverTo, householdTags: finalHouseholdTags, color: DELIVERY_COLORS[deliveryGroups.length] });
+                    }
+                    // Custom deliveries created by user
+                    const customDeliveries = ((rushGuideData as any).customDeliveries || []) as {id: string; label: string; dateStr: string; address: string; sourceId: string}[];
+                    // Address resolver from timeline bands
+                    const resolveAddressAtDate = (d: Date) => {
+                      for (const b of timelineBands) { if (d >= b.startDate && d < b.endDate) return { location: b.type, address: b.address }; }
+                      if (timelineBands.length) { const last = timelineBands[timelineBands.length - 1]; return { location: last.type, address: last.address }; }
+                      return { location: hasHotel ? "Hotel" : "Home", address: primaryAddrStr };
+                    };
+                    customDeliveries.forEach(cd => {
+                      const cdDate = new Date(cd.dateStr);
+                      const loc = resolveAddressAtDate(cdDate);
+                      deliveryGroups.push({ id: cd.id, label: cd.label, date: cdDate, icon: "📦", items: [], location: loc.location, address: cd.address || loc.address, color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length] });
+                    });
+                    // Sort by date
+                    deliveryGroups.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+                    // Helper to create a new custom delivery
+                    const createCustomDelivery = (label: string, dateStr: string, sourceId: string) => {
+                      const loc = resolveAddressAtDate(new Date(dateStr));
+                      const newId = `custom_${safeUid()}`;
+                      setRushGuideData((p: any) => ({
+                        ...p,
+                        customDeliveries: [...((p.customDeliveries || []) as any[]), { id: newId, label, dateStr, address: loc.address, sourceId }],
+                        seasonOverrides: { ...(p.seasonOverrides || {}), [sourceId]: { ...((p.seasonOverrides || {})[sourceId] || {}), group: newId } },
+                      }));
+                    };
+                    const createCustomDeliveryForEvent = (label: string, dateStr: string, sourceId: string) => {
+                      const loc = resolveAddressAtDate(new Date(dateStr));
+                      const newId = `custom_${safeUid()}`;
+                      setRushGuideData((p: any) => ({
+                        ...p,
+                        customDeliveries: [...((p.customDeliveries || []) as any[]), { id: newId, label, dateStr, address: loc.address, sourceId }],
+                        eventOverrides: { ...(p.eventOverrides || {}), [sourceId]: { ...((p.eventOverrides || {})[sourceId] || {}), group: newId } },
+                      }));
+                    };
+                    const removeCustomDelivery = (id: string) => {
+                      setRushGuideData((p: any) => {
+                        const next = { ...p, customDeliveries: ((p.customDeliveries || []) as any[]).filter((cd: any) => cd.id !== id) };
+                        // Unassign anything pointing to this group
+                        const so = { ...(next.seasonOverrides || {}) }; Object.keys(so).forEach(k => { if (so[k]?.group === id) so[k] = { ...so[k], group: "unassigned" }; }); next.seasonOverrides = so;
+                        const eo = { ...(next.eventOverrides || {}) }; Object.keys(eo).forEach(k => { if (eo[k]?.group === id) eo[k] = { ...eo[k], group: "unassigned" }; }); next.eventOverrides = eo;
+                        return next;
+                      });
+                    };
+                    // Build text for different output modes
+                    const buildFullText = () => {
+                      let t = `RUSH GUIDE — ${data.orderName || "Order"}\nFor: ${[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ")}\n`;
+                      if (primaryAddrStr) t += `Home: ${primaryAddrStr}\n`;
+                      if (hasHotel && hotelAddrStr) t += `Hotel: ${hotelAddrStr}\n`;
+                      if (hasRental && rentalDeliverTo) t += `Rental: ${rentalDeliverTo}\n`;
+                      t += `\n━━━ DELIVERY TIMELINE ━━━\n\n`;
+                      t += `1. RUSH DELIVERY (24-72 hrs) → ${rushDeliverTo || "TBD"}\n${rushItems.map(i => `   • ${i}`).join("\n")}\n\n`;
+                      if (shortTermItems.length) t += `2. SHORT-TERM (1-4 wks) → ${primaryAddrStr || "TBD"}\n${shortTermItems.map(i => `   • ${i}`).join("\n")}\n\n`;
+                      if (rentalSeasonalItems.length) { t += `3. RENTAL DELIVERY → ${rentalDeliverTo || "TBD"}\n   All seasonal wardrobe items for:\n`; rentalSeasonalItems.forEach(sw => { t += `   ${sw.season} (${sw.date}):\n${sw.items.map(i => `      • ${i}`).join("\n")}\n`; }); t += "\n"; }
+                      separateSeasonals.forEach(sw => { t += `SEASONAL: ${sw.season} (${sw.date})\n${sw.items.map(i => `   • ${i}`).join("\n")}\n\n`; });
+                      eventDeliveries.forEach(e => { t += `EVENT: ${e.name} (${e.date})${e.address ? ` → ${e.address}` : ""}\n${e.items.map(i => `   • ${i}`).join("\n")}\n\n`; });
+                      t += `FINAL DELIVERY → ${finalDeliverTo || "TBD"}${estimatedReturn ? ` (est. ${rushFormatDate(estimatedReturn)})` : ""}\nAll remaining items after repairs complete.\n\n`;
+                      t += `REMINDERS:\n${reminders.map(r => `• ${r}`).join("\n")}`;
+                      return t;
+                    };
+                    const buildRushOnlyText = () => {
+                      let t = `RUSH ITEMS — ${data.orderName || "Order"}\nDeliver to: ${rushDeliverTo || "TBD"} (24-72 hours)\n\n`;
+                      t += rushItems.map(i => `• ${i}`).join("\n");
+                      t += `\n\nREMINDERS:\n${reminders.filter(r => /urgent|valuables|bag/i.test(r)).map(r => `• ${r}`).join("\n")}`;
+                      return t;
+                    };
+                    const buildPickupText = () => {
+                      let t = `PICKUP EVENT NOTES — ${data.orderName || "Order"}\n\n`;
+                      t += `RUSH ITEMS (pull first):\n${rushItems.map(i => `□ ${i}`).join("\n")}\n\n`;
+                      if (shortTermItems.length) t += `SHORT-TERM ITEMS (tag for priority):\n${shortTermItems.map(i => `□ ${i}`).join("\n")}\n\n`;
+                      seasonalWardrobes.forEach(sw => { t += `${sw.season.toUpperCase()} ITEMS (tag: ${sw.assignedGroup === "rental" ? "deliver to rental" : sw.season}):\n${sw.items.map(i => `□ ${i}`).join("\n")}\n\n`; });
+                      t += `REMINDERS:\n${reminders.map(r => `• ${r}`).join("\n")}`;
+                      return t;
+                    };
+                    return <>
                     <div>
                       <h2 className="text-2xl font-bold text-slate-900 mb-1">Rush Guide for {[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ") || "Customer"}</h2>
-                      {primaryAddrStr && <div className="text-sm text-slate-500 mb-3">{primaryAddrStr}</div>}
-                      <div className="flex flex-wrap gap-2 mb-4">
+                      {primaryAddrStr && <div className="text-sm text-slate-500">{primaryAddrStr}</div>}
+                      <div className="flex flex-wrap gap-2 mt-3 mb-4">
                         {orderSituation && <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{RUSH_LIVING_SITUATIONS.find(s => s.id === orderSituation)?.label || orderSituation}</span>}
                         <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{totalPeople} People{petCount > 0 ? `, ${petCount} Pet${petCount > 1 ? "s" : ""}` : ""}</span>
-                        {kids > 0 && <span className="rounded-full bg-sky-100 border border-sky-200 px-3 py-1 text-xs font-bold text-sky-700">{kids} Child{kids > 1 ? "ren" : ""}</span>}
-                        {babies > 0 && <span className="rounded-full bg-pink-100 border border-pink-200 px-3 py-1 text-xs font-bold text-pink-700">{babies} Baby{babies > 1 ? "/Toddler" : ""}</span>}
-                        {elderly > 0 && <span className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">{elderly} Elderly</span>}
+                        {isLongTerm && <span className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">Long-Term Order</span>}
                         {estimatedReturn && <span className="rounded-full bg-teal-100 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">Return: {rushFormatDate(estimatedReturn)}</span>}
-                        {seasons.length > 0 && <span className="rounded-full bg-violet-100 border border-violet-200 px-3 py-1 text-xs font-bold text-violet-700">Seasons: {seasons.map(s => s.name).join(", ")}</span>}
+                        {seasonChanges.length > 0 && <span className="rounded-full bg-violet-100 border border-violet-200 px-3 py-1 text-xs font-bold text-violet-700">{seasonChanges.length} Season Change{seasonChanges.length > 1 ? "s" : ""}</span>}
                       </div>
                     </div>
+
+                    {/* (Timeline overview removed — integrated into Gantt below) */}
+
+                    {/* Unified Delivery Timeline */}
+                    {estimatedReturn && (() => {
+                      const timelineStart = new Date(now);
+                      const displacementMs = estimatedReturn.getTime() - now.getTime();
+                      const bufferMs = Math.max(displacementMs * 0.5, 30 * 86400000);
+                      const rawEnd = estimatedReturn.getTime() + bufferMs;
+                      const minEnd = now.getTime() + 90 * 86400000;
+                      const maxEnd = now.getTime() + 548 * 86400000;
+                      const timelineEnd = new Date(Math.min(maxEnd, Math.max(minEnd, rawEnd)));
+                      const totalMs = timelineEnd.getTime() - timelineStart.getTime();
+                      const pct = (d: Date) => Math.max(0, Math.min(100, ((d.getTime() - timelineStart.getTime()) / totalMs) * 100));
+                      const monthLabels: {label: string; pct: number}[] = [];
+                      for (let m = new Date(timelineStart.getFullYear(), timelineStart.getMonth() + 1, 1); m <= timelineEnd; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+                        monthLabels.push({ label: m.toLocaleDateString("en-US", { month: "short" }), pct: pct(m) });
+                      }
+                      // Living situation bands — from timeline sequence or fallback
+                      const bands: {label: string; color: string; startPct: number; widthPct: number; address: string}[] = [];
+                      if (timelineBands.length > 0) {
+                        timelineBands.forEach(b => {
+                          const sp = pct(b.startDate);
+                          const ep = pct(b.endDate);
+                          bands.push({ label: b.type, color: b.color, startPct: sp, widthPct: Math.max(ep - sp, 1), address: b.address });
+                        });
+                      } else {
+                        if (hasHotel && hasRental) {
+                          const hotelEnd = rushAddDays(now, isLongTerm ? 14 : 7);
+                          bands.push({ label: "Hotel", color: "bg-amber-400", startPct: pct(now), widthPct: pct(hotelEnd) - pct(now), address: hotelAddrStr });
+                          bands.push({ label: "Rental", color: "bg-sky-400", startPct: pct(hotelEnd), widthPct: pct(estimatedReturn) - pct(hotelEnd), address: rentalAddrStr });
+                        } else if (hasHotel) {
+                          bands.push({ label: "Hotel", color: "bg-amber-400", startPct: pct(now), widthPct: pct(estimatedReturn) - pct(now), address: hotelAddrStr });
+                        } else if (hasRental) {
+                          bands.push({ label: "Rental", color: "bg-sky-400", startPct: pct(now), widthPct: pct(estimatedReturn) - pct(now), address: rentalAddrStr });
+                        } else {
+                          bands.push({ label: "Home", color: "bg-emerald-400", startPct: pct(now), widthPct: pct(estimatedReturn) - pct(now), address: primaryAddrStr });
+                        }
+                        bands.push({ label: "Home", color: "bg-emerald-400", startPct: pct(estimatedReturn), widthPct: 100 - pct(estimatedReturn), address: primaryAddrStr });
+                      }
+
+                      // All possible pins
+                      const SEASON_ICONS: Record<string, string> = { Spring: "🌷", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
+                      const HOLIDAY_ICONS: Record<string, string> = { Halloween: "🎃", Thanksgiving: "🦃", "Christmas / Hanukkah": "🎄", "Easter / Passover": "🐣", Graduation: "🎓" };
+                      const EVENT_ICONS: Record<string, string> = { vacation_beach: "🏖️", vacation_ski: "⛷️", wedding: "💒", business: "💼", sports: "⚽" };
+
+                      const allPins: {id: string; label: string; icon: string; date: Date; pctPos: number; category: "season"|"holiday"|"event"; defaultOn: boolean}[] = [];
+                      seasonChanges.forEach(sc => allPins.push({ id: `s_${sc.name}`, label: sc.name, icon: SEASON_ICONS[sc.name] || "📅", date: sc.startDate, pctPos: pct(sc.startDate), category: "season", defaultOn: true }));
+                      holidayEvents.forEach(he => allPins.push({ id: he.id, label: he.name, icon: HOLIDAY_ICONS[he.name] || "🎉", date: he.date, pctPos: pct(he.date), category: "holiday", defaultOn: true }));
+                      events.forEach(evt => { if (evt.date) { const d = new Date(evt.date); if (d <= timelineEnd) allPins.push({ id: `ev_${evt.id}`, label: evt.name || RUSH_EVENT_TYPES.find(t => t.id === evt.type)?.label || "Event", icon: EVENT_ICONS[evt.type] || "📌", date: d, pctPos: pct(d), category: "event", defaultOn: true }); } });
+
+                      const pins = (rushGuideData as any).pins || {};
+                      const pinPositions = (rushGuideData as any).pinPositions || {};
+                      const isPinOn = (id: string, def: boolean) => pins[id] !== undefined ? pins[id] : def;
+                      const togglePin = (id: string) => setRushGuideData((p: any) => ({ ...p, pins: { ...(p.pins || {}), [id]: !isPinOn(id, true) } }));
+
+                      const timelineRef = React.createRef<HTMLDivElement>();
+                      const handleDrag = (pinId: string, e: React.MouseEvent) => {
+                        e.preventDefault();
+                        const bar = timelineRef.current;
+                        if (!bar) return;
+                        const onMove = (me: MouseEvent) => {
+                          const rect = bar.getBoundingClientRect();
+                          const x = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width));
+                          setRushGuideData((p: any) => ({ ...p, pinPositions: { ...(p.pinPositions || {}), [pinId]: x * 100 } }));
+                        };
+                        const onUp = () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+                        document.addEventListener("mousemove", onMove);
+                        document.addEventListener("mouseup", onUp);
+                      };
+
+                      return (
+                        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                          <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-bold text-slate-800">Year-Ahead Timeline</div>
+                              <div className="text-[10px] text-slate-500">Toggle pins to mark needs. Drag to reposition.</div>
+                            </div>
+                            <div className="text-[10px] text-slate-400">{rushFormatDate(now)} → {rushFormatDate(timelineEnd)}</div>
+                          </div>
+
+                          {/* Pin toggles */}
+                          <div className="px-4 py-2 border-b border-slate-100 flex flex-wrap gap-1.5">
+                            {allPins.map(pin => {
+                              const on = isPinOn(pin.id, pin.defaultOn);
+                              return <button key={pin.id} onClick={() => togglePin(pin.id)} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-all ${on ? "border-teal-400 bg-teal-50 text-teal-800" : "border-slate-200 text-slate-400 opacity-60"}`} title={`${pin.label} — ${rushFormatDate(pin.date)}`}>{pin.icon} {pin.label}</button>;
+                            })}
+                          </div>
+
+                          {/* Timeline visualization */}
+                          <div className="px-4 py-4">
+
+                            {/* === ABOVE: Events (staggered heights) → Months → Bar === */}
+
+                            {/* Event/season pins — staggered to avoid overlap */}
+                            {(() => {
+                              const activePins = allPins.filter(p => isPinOn(p.id, p.defaultOn))
+                                .map(pin => ({ ...pin, pos: pinPositions[pin.id] !== undefined ? pinPositions[pin.id] : pin.pctPos }))
+                                .sort((a, b) => a.pos - b.pos);
+                              // Stagger: assign rows to avoid horizontal overlap (labels ~8% wide)
+                              const rows: number[] = [];
+                              const rowEnds: number[] = [];
+                              activePins.forEach(pin => {
+                                let row = 0;
+                                for (let r = 0; r < rowEnds.length; r++) {
+                                  if (pin.pos > rowEnds[r] + 8) { row = r; break; }
+                                  row = r + 1;
+                                }
+                                rows.push(row);
+                                rowEnds[row] = pin.pos;
+                              });
+                              const maxRow = rows.length ? Math.max(...rows) : 0;
+                              const rowHeight = 18; // px per stagger row
+                              const totalEventHeight = (maxRow + 1) * rowHeight + 16; // +16 for connector line
+                              return (
+                                <div className="relative mb-0.5" style={{ height: totalEventHeight }}>
+                                  {activePins.map((pin, idx) => {
+                                    const row = rows[idx];
+                                    const topOffset = row * rowHeight;
+                                    const lineHeight = totalEventHeight - topOffset - 14; // line from label to bottom edge
+                                    return (
+                                      <div key={pin.id} className="absolute cursor-grab active:cursor-grabbing group" style={{ left: `${pin.pos}%`, transform: "translateX(-50%)", top: topOffset }} onMouseDown={e => handleDrag(pin.id, e)} title={`${pin.label} — ${rushFormatDate(pin.date)} — drag to reposition`}>
+                                        <div className="flex flex-col items-center">
+                                          <div className="flex items-center gap-0.5">
+                                            <span className="text-[10px]">{pin.icon}</span>
+                                            <span className="text-[7px] font-bold text-slate-500 whitespace-nowrap group-hover:text-teal-700">{pin.label}</span>
+                                          </div>
+                                          <div className="w-px bg-slate-200 group-hover:bg-teal-400" style={{ height: lineHeight }} />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
+
+                            {/* Month labels — tight above the bar */}
+                            <div className="relative h-4">
+                              {monthLabels.map((m, i) => (
+                                <div key={i} className="absolute flex flex-col items-center" style={{ left: `${m.pct}%`, transform: "translateX(-50%)" }}>
+                                  <span className="text-[9px] text-slate-400 font-bold">{m.label}</span>
+                                  <div className="w-px h-1 bg-slate-300" />
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* === THE BAR: Location bands === */}
+                            <div ref={timelineRef} className="relative h-7 bg-slate-100 rounded-lg overflow-hidden">
+                              {bands.map((b, i) => (
+                                <div key={i} className={`absolute top-0 bottom-0 ${b.color} flex items-center justify-center cursor-default`} style={{ left: `${b.startPct}%`, width: `${Math.max(b.widthPct, 1)}%` }} title={`${b.label}${b.address ? `\n→ ${b.address}` : ""}`}>
+                                  <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">{b.label}</span>
+                                </div>
+                              ))}
+                              <div className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-10" style={{ left: `${pct(now)}%` }} title="Today" />
+                            </div>
+
+                            {/* === BELOW THE BAR: Delivery markers pointing up — click to scroll === */}
+                            <div className="relative h-14 mt-0.5">
+                              {deliveryGroups.map((dg, i) => (
+                                <div key={dg.id} className="absolute flex flex-col items-center cursor-pointer hover:scale-110 transition-transform" style={{ left: `${pct(dg.date)}%`, transform: "translateX(-50%)" }} onClick={() => {
+                                  const el = document.getElementById(`delivery-card-${dg.id}`);
+                                  if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("ring-2", "ring-offset-2", "ring-sky-400"); setTimeout(() => el.classList.remove("ring-2", "ring-offset-2", "ring-sky-400"), 2000); }
+                                }} title={`Click to view #${i + 1} ${dg.label}`}>
+                                  <div className="w-px h-2 bg-slate-400" />
+                                  <div className={`${dg.color} rounded-full w-6 h-6 flex items-center justify-center text-white text-[10px] font-bold shadow-sm border-2 border-white`}>{i + 1}</div>
+                                  <div className="text-[7px] font-bold text-slate-600 whitespace-nowrap mt-0.5">{dg.label}</div>
+                                  <div className="text-[7px] text-slate-400 whitespace-nowrap">{rushFormatDate(dg.date)}</div>
+                                </div>
+                              ))}
+                            </div>
+
+                          </div>
+
+                          {/* Delivery group cards with merged sublists */}
+                          <div className="px-4 pb-4 space-y-3">
+                            {deliveryGroups.map((dg, i) => {
+                              // Find seasonal/event items assigned to this delivery group
+                              const mergedSeasons = seasonalWardrobes.filter(sw => {
+                                const ovr = (rushGuideData as any).seasonOverrides?.[sw.id] || {};
+                                return (ovr.group || sw.assignedGroup) === dg.id;
+                              });
+                              const mergedEvents = (data.upcomingEvents || []).filter((evt: any) => {
+                                const ovr = (rushGuideData as any).eventOverrides?.[evt.id] || {};
+                                return ovr.group === dg.id;
+                              });
+                              return (
+                              <div key={dg.id} id={`delivery-card-${dg.id}`} className="rounded-2xl border border-slate-200 overflow-hidden transition-all duration-300">
+                                <div className={`${dg.color} px-4 py-3 text-white flex items-center gap-3`}>
+                                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-bold shrink-0">{i + 1}</div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-sm">{dg.icon} {dg.label}</div>
+                                    <div className="text-[10px] text-white/80">{rushFormatDate(dg.date)} → {dg.location}{dg.address ? ` — ${dg.address}` : ""}</div>
+                                  </div>
+                                  {(mergedSeasons.length > 0 || mergedEvents.length > 0) && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold">+{mergedSeasons.length + mergedEvents.length} added</span>}
+                                  {dg.id.startsWith("custom_") && <button type="button" onClick={() => removeCustomDelivery(dg.id)} className="rounded-full bg-white/20 hover:bg-white/30 px-2 py-0.5 text-[9px] font-bold text-white" title="Delete this delivery group">Delete</button>}
+                                </div>
+                                <div className="bg-white p-4 space-y-2">
+                                  {/* Core items */}
+                                  {dg.items.map((item, j) => (
+                                    <div key={j} className="flex items-start gap-2">
+                                      <span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" />
+                                      <span className="text-sm text-slate-700">{item}</span>
+                                    </div>
+                                  ))}
+                                  {dg.householdTags && dg.householdTags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 pt-1">
+                                      {dg.householdTags.map((tag, j) => <span key={j} className="rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold">{tag}</span>)}
+                                    </div>
+                                  )}
+                                  {/* Merged seasonal sublists — color-coded with remove button */}
+                                  {mergedSeasons.map(sw => {
+                                    const removeFromGroup = () => setRushGuideData((p: any) => ({...p, seasonOverrides: {...(p.seasonOverrides || {}), [sw.id]: {...((p.seasonOverrides || {})[sw.id] || {}), group: "unassigned"}}}));
+                                    return (
+                                    <div key={sw.id} className="mt-2 rounded-lg border-l-4 border-violet-400 bg-violet-50/40 px-3 py-2">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <div className="text-[10px] font-bold text-violet-700">{sw.season} — {sw.date}</div>
+                                        <button type="button" onClick={removeFromGroup} className="rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[9px] font-bold text-violet-500 hover:bg-violet-50 hover:text-violet-700 transition-all" title="Remove from this delivery">Remove</button>
+                                      </div>
+                                      {sw.items.map((item, j) => (
+                                        <div key={j} className="flex items-start gap-2">
+                                          <span className="w-3 h-3 rounded border border-violet-300 shrink-0 mt-0.5" />
+                                          <span className="text-xs text-slate-600">{item}</span>
+                                        </div>
+                                      ))}
+                                    </div>);
+                                  })}
+                                  {/* Merged event sublists — color-coded with remove button */}
+                                  {mergedEvents.map((evt: any) => {
+                                    const evtItems: string[] = [];
+                                    if (evt.type === "vacation_beach") { evtItems.push("Swimwear, resort wear, sandals", "Beach bags, sunglasses, luggage"); }
+                                    else if (evt.type === "vacation_ski") { evtItems.push("Ski gear, thermal layers, boots, luggage"); }
+                                    else if (evt.type === "wedding") { evtItems.push("Formal attire, dress shoes, accessories"); }
+                                    else if (evt.type === "business") { evtItems.push("Business attire, briefcase, garment bags"); }
+                                    else if (evt.type === "sports") { evtItems.push("Uniforms, cleats, gear"); }
+                                    const removeFromGroup = () => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), group: "unassigned"}}}));
+                                    return (
+                                      <div key={evt.id} className="mt-2 rounded-lg border-l-4 border-indigo-400 bg-indigo-50/40 px-3 py-2">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <div className="text-[10px] font-bold text-indigo-700">{evt.name || "Event"} — {evt.date ? rushFormatDate(new Date(evt.date)) : ""}</div>
+                                          <button type="button" onClick={removeFromGroup} className="rounded-full border border-indigo-200 bg-white px-2 py-0.5 text-[9px] font-bold text-indigo-500 hover:bg-indigo-50 hover:text-indigo-700 transition-all" title="Remove from this delivery">Remove</button>
+                                        </div>
+                                        {evtItems.map((item, j) => (
+                                          <div key={j} className="flex items-start gap-2">
+                                            <span className="w-3 h-3 rounded border border-indigo-300 shrink-0 mt-0.5" />
+                                            <span className="text-xs text-slate-600">{item}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>);
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Reminders */}
                     <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
@@ -12882,120 +13474,195 @@ export default function App(){
                       <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">{reminders.map((r,i) => <li key={i}>{r}</li>)}</ul>
                     </div>
 
-                    {/* Rush Items */}
-                    <div className="rounded-2xl border border-slate-200 overflow-hidden">
-                      <div className="bg-teal-600 px-5 py-4 text-white">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="font-bold text-lg">Rush Delivery</div>
-                            <div className="text-teal-100 text-xs">Delivered in 24 to 72 hours</div>
-                          </div>
+                    {/* (Delivery cards integrated into Gantt timeline below) */}
+
+                    {/* Season Changes — optional deliveries to consider */}
+                    {(() => {
+                      const unassignedSeasons = seasonalWardrobes.filter(sw => {
+                        const ovr = (rushGuideData as any).seasonOverrides?.[sw.id] || {};
+                        const grp = ovr.group || sw.assignedGroup;
+                        return !deliveryGroups.some(dg => dg.id === grp);
+                      });
+                      const unassignedEvents = eventDeliveries.filter((evt: any) => {
+                        const ovr = (rushGuideData as any).eventOverrides?.[evt.id] || {};
+                        const grp = ovr.group || "event";
+                        return !deliveryGroups.some(dg => dg.id === grp);
+                      });
+                      return (unassignedSeasons.length > 0 || unassignedEvents.length > 0) ? <>
+                      {unassignedSeasons.length > 0 && <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="text-lg font-bold text-slate-900">Optional Deliveries to Consider</div>
+                          <div className="text-xs text-slate-500">{hasRental
+                            ? "These seasonal items can be delivered to the rental, or included in Rush/Final."
+                            : "If repairs run long, you may need these items. Include in Rush for now, or keep as a separate delivery to the hotel if/when needed. If they return home in time, these go in the Final Delivery."}</div>
                         </div>
-                        {(orderSituation === "hotel" || orderSituation === "temp") && tempAddrStr ? (
-                          <div className="mt-2 text-teal-100 text-xs flex items-center gap-1"><span className="font-bold text-teal-200">Deliver to:</span> {tempAddrStr}</div>
-                        ) : primaryAddrStr ? (
-                          <div className="mt-2 text-teal-100 text-xs flex items-center gap-1"><span className="font-bold text-teal-200">Deliver to:</span> {primaryAddrStr}</div>
-                        ) : null}
                       </div>
-                      <div className="p-5 space-y-2">
-                        {rushItems.map((item, i) => <div key={i} className="flex items-start gap-2"><span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" /><span className="text-sm text-slate-700">{item}</span></div>)}
-                      </div>
-                    </div>
-
-                    {/* Short Term */}
-                    {shortTermItems.length > 0 && <div className="rounded-2xl border border-slate-200 overflow-hidden">
-                      <div className="bg-sky-600 px-5 py-4 text-white">
-                        <div className="font-bold text-lg">Home & Comfort (Short-Term)</div>
-                        <div className="text-sky-100 text-xs">Delivered in 1-4 weeks</div>
-                        {primaryAddrStr && <div className="mt-2 text-sky-100 text-xs"><span className="font-bold text-sky-200">Deliver to:</span> {primaryAddrStr}</div>}
-                      </div>
-                      <div className="p-5 space-y-2">
-                        {shortTermItems.map((item, i) => <div key={i} className="flex items-start gap-2"><span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" /><span className="text-sm text-slate-700">{item}</span></div>)}
-                      </div>
-                    </div>}
-
-                    {/* Seasonal */}
-                    {seasonalWardrobes.length > 0 && <div>
-                      <div className="text-lg font-bold text-slate-900 mb-3">Seasonal Wardrobes</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        {seasonalWardrobes.map((w, i) => (
-                          <div key={i} className="rounded-xl border border-slate-200 overflow-hidden">
-                            <div className="bg-slate-100 px-3 py-2 border-b border-slate-200"><span className="font-bold text-sm text-slate-700">{w.season}</span></div>
-                            <div className="p-3 space-y-1">{w.items.map((item, j) => <div key={j} className="flex items-start gap-2"><span className="w-3 h-3 rounded-full bg-slate-200 shrink-0 mt-1" /><span className="text-xs text-slate-700">{item}</span></div>)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>}
-
-                    {/* Events */}
-                    {eventDeliveries.length > 0 && <div>
-                      <div className="text-lg font-bold text-slate-900 mb-3">Event Deliveries</div>
-                      <div className="grid grid-cols-1 gap-3">
-                        {eventDeliveries.map((evt: any, i) => {
-                          const override = (rushGuideData as any).eventOverrides?.[evt.id] || {};
+                      <div className="space-y-3">
+                        {unassignedSeasons.map(sw => {
+                          const setGrp = (g: string) => setRushGuideData((p: any) => ({...p, seasonOverrides: {...(p.seasonOverrides || {}), [sw.id]: {...((p.seasonOverrides || {})[sw.id] || {}), group: g}}}));
                           return (
-                          <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
-                            <div className="bg-indigo-600 px-4 py-3 text-white">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="font-bold">{evt.name}</div>
-                                  <div className="text-indigo-200 text-xs">{evt.date}</div>
+                            <div key={sw.id} className="rounded-xl border border-slate-200 overflow-hidden">
+                              <div className="px-4 py-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div>
+                                    <div className="font-bold text-sm text-slate-800">{sw.season}</div>
+                                    <div className="text-[10px] text-slate-500">{sw.date}{sw.events.length > 0 ? ` — ${sw.events.join(", ")}` : ""}</div>
+                                  </div>
                                 </div>
-                                <select value={override.group || "event"} onChange={e => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), group: e.target.value}}}))} className="rounded-lg bg-indigo-500 border border-indigo-400 text-white text-[10px] font-bold px-2 py-1">
-                                  <option value="event">Separate Delivery</option>
-                                  <option value="rush">Include in Rush</option>
-                                  <option value="short">Include in Short-Term</option>
-                                </select>
+                                <div className="space-y-1 mb-3">
+                                  {sw.items.map((item, j) => <div key={j} className="flex items-start gap-2"><span className="w-3 h-3 rounded-full bg-slate-200 shrink-0 mt-1" /><span className="text-xs text-slate-700">{item}</span></div>)}
+                                </div>
+                                {(
+                                  <div className="flex gap-2">
+                                    <div className="flex-1">
+                                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Add to existing delivery</div>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {deliveryGroups.map((dg, di) => (
+                                          <button key={dg.id} type="button" onClick={() => setGrp(dg.id)} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-[10px] font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all bg-white">
+                                            #{di + 1} {dg.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="border-l border-slate-200 pl-2">
+                                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Or</div>
+                                      <button type="button" onClick={() => createCustomDelivery(`${sw.season} Delivery`, sw.rawDate.toISOString().split("T")[0], sw.id)} className="rounded-lg border-2 border-dashed border-violet-300 px-3 py-1.5 text-[10px] font-bold text-violet-600 hover:border-violet-400 hover:bg-violet-50 transition-all bg-white">
+                                        + Create New Delivery
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            <div className="p-3 space-y-2">
-                              {evt.items.map((item: string, j: number) => <div key={j} className="text-xs text-slate-700">• {item}</div>)}
-                              <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                                <div className="text-[10px] font-bold text-slate-500 uppercase">Deliver to</div>
-                                <input value={override.address || ""} onChange={e => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), address: e.target.value}}}))} placeholder={primaryAddrStr || "Enter delivery address"} className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-300" />
-                                <div className="text-[10px] font-bold text-slate-500 uppercase">Deliver by</div>
-                                <input type="date" value={override.deliverBy || ""} onChange={e => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), deliverBy: e.target.value}}}))} className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-300" />
-                              </div>
-                            </div>
-                          </div>
                           );
                         })}
                       </div>
                     </div>}
 
-                    {/* Long Term */}
-                    <div className="rounded-2xl bg-slate-800 p-5 text-white">
-                      <div className="font-bold text-lg mb-1">Long-Term Storage & Final Delivery</div>
-                      <p className="text-slate-300 text-sm">Everything not marked for Rush or Short-Term will be securely packed, barcode-tracked, professionally cleaned, and stored in our climate-controlled facility until your repairs are finished.</p>
-                      {primaryAddrStr && <div className="mt-2 text-slate-400 text-xs"><span className="font-bold text-slate-300">Final delivery to:</span> {primaryAddrStr}</div>}
-                      {estimatedReturn && <div className="text-slate-400 text-xs mt-1"><span className="font-bold text-slate-300">Estimated:</span> {rushFormatDate(estimatedReturn)}</div>}
-                    </div>
+                    {/* Trip/Event Deliveries — only unassigned */}
+                    {unassignedEvents.length > 0 && <div>
+                      <div className="text-lg font-bold text-slate-900 mb-3">Trip & Event Deliveries</div>
+                      <div className="space-y-3">
+                        {unassignedEvents.map((evt: any) => {
+                          const ovr = (rushGuideData as any).eventOverrides?.[evt.id] || {};
+                          const evtGrp = ovr.group || "event";
+                          const setEvtGrp = (g: string) => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), group: g}}}));
+                          const assignedTarget = deliveryGroups.find(dg => dg.id === evtGrp);
+                          const isAssigned = !!assignedTarget;
+                          return (
+                          <div key={evt.id} className="rounded-xl border border-slate-200 overflow-hidden">
+                            <div className="px-4 py-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div>
+                                  <div className="font-bold text-sm text-slate-800">{evt.name}</div>
+                                  <div className="text-[10px] text-slate-500">{evt.date}</div>
+                                </div>
+                              </div>
+                              <div className="space-y-1 mb-3">
+                                {evt.items.map((item: string, j: number) => <div key={j} className="flex items-start gap-2"><span className="w-3 h-3 rounded-full bg-slate-200 shrink-0 mt-1" /><span className="text-xs text-slate-700">{item}</span></div>)}
+                              </div>
+                              {(
+                                <div className="flex gap-2">
+                                  <div className="flex-1">
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Add to existing delivery</div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {deliveryGroups.map((dg, di) => (
+                                        <button key={dg.id} type="button" onClick={() => setEvtGrp(dg.id)} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-[10px] font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all bg-white">
+                                          #{di + 1} {dg.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="border-l border-slate-200 pl-2">
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Or</div>
+                                    <button type="button" onClick={() => { if (evt.date) createCustomDeliveryForEvent(evt.name || "Event Delivery", evt.date, evt.id); else setEvtGrp("event"); }} className="rounded-lg border-2 border-dashed border-indigo-300 px-3 py-1.5 text-[10px] font-bold text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-all bg-white">
+                                      + Create New Delivery
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>);
+                        })}
+                      </div>
+                    </div>}
+                    </> : null;
+                    })()}
 
-                    {/* Actions */}
-                    <div className="flex gap-3 pt-4 border-t border-slate-100">
-                      <button onClick={() => {
-                        const rushAddr = (orderSituation === "hotel" || orderSituation === "temp") && tempAddrStr ? tempAddrStr : primaryAddrStr;
-                        const text = `RUSH GUIDE - ${data.orderName || "Order"}\n` +
-                          (primaryAddrStr ? `Address: ${primaryAddrStr}\n` : "") + "\n" +
-                          `RUSH DELIVERY (24-72 hrs)${rushAddr ? ` → ${rushAddr}` : ""}:\n${rushItems.map(i => `• ${i}`).join("\n")}\n\n` +
-                          (shortTermItems.length ? `SHORT TERM (1-4 wks)${primaryAddrStr ? ` → ${primaryAddrStr}` : ""}:\n${shortTermItems.map(i => `• ${i}`).join("\n")}\n\n` : "") +
-                          (seasonalWardrobes.length ? seasonalWardrobes.map(w => `${w.season.toUpperCase()}:\n${w.items.map(i => `• ${i}`).join("\n")}`).join("\n\n") + "\n\n" : "") +
-                          (eventDeliveries.length ? eventDeliveries.map((e: any) => `EVENT: ${e.name} (${e.date})${e.address ? ` → ${e.address}` : ""}:\n${e.items.map((i: string) => `• ${i}`).join("\n")}`).join("\n\n") + "\n\n" : "") +
-                          `LONG-TERM STORAGE → Final delivery to ${primaryAddrStr || "TBD"}${estimatedReturn ? ` (est. ${rushFormatDate(estimatedReturn)})` : ""}\n\n` +
-                          `REMINDERS:\n${reminders.map(r => `• ${r}`).join("\n")}`;
-                        navigator.clipboard?.writeText(text).then(() => setToast("Rush Guide copied to clipboard"));
-                      }} className="rounded-xl border border-sky-300 bg-sky-50 px-5 py-2.5 text-sm font-bold text-sky-700 hover:bg-sky-100">Copy to Clipboard</button>
-                      <button onClick={() => {
-                        if (repairInfo) update("suggestedGroups", Array.from(new Set([...(data.suggestedGroups || []), repairInfo.group])));
-                        setToast("Rush Guide applied to order");
-                        setRushGuideOpen(false);
-                      }} className="rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-700">Apply to Order & Close</button>
+                    {/* (Final delivery card integrated into Gantt timeline) */}
+
+                    {/* Output Actions */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                      <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">Share & Apply</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => { navigator.clipboard?.writeText(buildFullText()).then(() => setToast("Full Rush Guide copied")); }} className="rounded-xl border border-sky-300 bg-white px-4 py-2.5 text-xs font-bold text-sky-700 hover:bg-sky-50 text-left">
+                          <div className="text-sm">Full Guide</div>
+                          <div className="text-[10px] text-slate-400 font-normal">Copy complete guide for email/text to customer</div>
+                        </button>
+                        <button onClick={() => { navigator.clipboard?.writeText(buildRushOnlyText()).then(() => setToast("Rush-only list copied")); }} className="rounded-xl border border-teal-300 bg-white px-4 py-2.5 text-xs font-bold text-teal-700 hover:bg-teal-50 text-left">
+                          <div className="text-sm">Rush Only</div>
+                          <div className="text-[10px] text-slate-400 font-normal">Copy rush items only — send to customer for review</div>
+                        </button>
+                        <button onClick={() => {
+                          const pickupText = buildPickupText();
+                          setData(p => {
+                            const current = (p.eventInstructions || "").trim();
+                            const combined = current ? `${current}\n\n--- RUSH GUIDE PICKUP NOTES ---\n${pickupText}` : `--- RUSH GUIDE PICKUP NOTES ---\n${pickupText}`;
+                            return { ...p, eventInstructions: combined };
+                          });
+                          setToast("Rush Guide added to pickup event instructions");
+                        }} className="rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 text-left">
+                          <div className="text-sm">Add to Pickup Event</div>
+                          <div className="text-[10px] text-slate-400 font-normal">Add checklists to event instructions for crew review</div>
+                        </button>
+                        <button onClick={() => {
+                          if (repairInfo) update("suggestedGroups", Array.from(new Set([...(data.suggestedGroups || []), repairInfo.group])));
+                          setToast("Rush Guide applied to order");
+                          setRushGuideOpen(false);
+                        }} className="rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-teal-700 text-left">
+                          <div className="text-sm">Apply & Close</div>
+                          <div className="text-[10px] text-teal-200 font-normal">Apply suggested groups to order and close</div>
+                        </button>
+                      </div>
                     </div>
-                  </> : <div className="text-center py-12 space-y-3">
+                  </>;
+                  })() : <div className="text-center py-12 space-y-4 max-w-md mx-auto">
                     <div className="text-4xl">📋</div>
-                    <div className="text-lg font-bold text-slate-700">Complete the interview to generate</div>
-                    <p className="text-sm text-slate-500 max-w-md mx-auto">The Rush Guide needs at least a living situation or repair type from the interview to generate personalized recommendations.</p>
-                    <button onClick={() => { setRushGuideOpen(false); setInterviewPanelOpen(true); }} className="rounded-xl bg-violet-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-violet-600">Open Interview</button>
+                    <div className="text-lg font-bold text-slate-700">Answer these interview questions first</div>
+                    <p className="text-sm text-slate-500">The Rush Guide needs at least one of these to generate your delivery timeline and recommendations.</p>
+                    <div className="space-y-2 text-left">
+                      <div className={`rounded-xl border-2 p-3 ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-lg ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "text-emerald-500" : "text-amber-500"}`}>{data.livingStatus || (data.livingTimeline || []).length > 0 ? "✓" : "!"}</span>
+                          <div>
+                            <div className="text-sm font-bold text-slate-700">Where will the customer live during repairs?</div>
+                            <div className="text-xs text-slate-500">{data.livingStatus || (data.livingTimeline || []).length > 0 ? `Answered: ${(data.livingTimeline || []).length > 0 ? (data.livingTimeline || []).map((s: any) => s.type).join(" → ") : data.livingStatus}` : "Hotel, Rental, Staying in home, etc. — determines delivery addresses"}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`rounded-xl border-2 p-3 ${data.repairsSummary ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-lg ${data.repairsSummary ? "text-emerald-500" : "text-amber-500"}`}>{data.repairsSummary ? "✓" : "!"}</span>
+                          <div>
+                            <div className="text-sm font-bold text-slate-700">What repairs are being done?</div>
+                            <div className="text-xs text-slate-500">{data.repairsSummary ? `Answered: ${data.repairsSummary}` : "Just Cleaning, Paint, Replace Floors, etc. — determines repair timeline"}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-400 pt-2">These questions also enhance the Rush Guide when answered:</div>
+                    <div className="flex flex-wrap justify-center gap-1.5">
+                      {[
+                        { label: "Packout items", done: (data.packoutSummary || []).length > 0 },
+                        { label: "Conditions", done: !!(data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y") },
+                        { label: "Considerations", done: (data.sdsConsiderations || []).length > 0 },
+                        { label: "Activities", done: (data.rushInterests || []).length > 0 },
+                        { label: "Upcoming events", done: (data.upcomingEvents || []).length > 0 },
+                        { label: "Pets", done: (data.household || []).some((m: any) => m.category === "pet") },
+                      ].map(q => <span key={q.label} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${q.done ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 text-slate-400"}`}>{q.done ? "✓" : "○"} {q.label}</span>)}
+                    </div>
+                    <button onClick={() => { setRushGuideOpen(false); setInterviewPanelOpen(true); }} className="rounded-xl bg-violet-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-600 mt-2">Open Interview</button>
                   </div>}
 
                 </div>
