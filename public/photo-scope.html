@@ -129,10 +129,10 @@
     .input-field{width:100%;padding:12px 16px;font-size:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);font-family:var(--font);margin-bottom:14px;outline:none;box-shadow:0 1px 2px rgba(15,23,42,.03)}
     .input-field:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(var(--accent-rgb),.12)}
     .input-label{font-size:13px;font-weight:600;color:var(--text-sec);margin-bottom:6px;display:block;width:100%}
-    .offering-row{width:100%;display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:1px solid var(--border);background:var(--surface);cursor:pointer;margin-bottom:10px;transition:all .12s;box-shadow:var(--shadow)}
-    .offering-row.selected{border-width:2px;border-color:var(--accent);background:var(--accent-light)}
-    .offering-num{font-family:var(--mono);font-size:13px;color:var(--text-muted);width:20px}
-    .offering-label{font-size:16px;font-weight:600;flex:1}
+    .offering-row{width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;margin-bottom:4px;transition:all .12s}
+    .offering-row.selected{border-width:2px;border-color:var(--accent);background:var(--accent-light);padding:6px 9px}
+    .offering-num{font-family:var(--mono);font-size:10px;color:var(--text-muted);width:14px}
+    .offering-label{font-size:13px;font-weight:600;flex:1}
     .offering-subsummary{font-size:11px;font-weight:500;color:var(--text-muted);margin-top:4px;line-height:1.35}
     .offering-sub-btn{padding:6px 10px;border-radius:999px;border:1px solid var(--accent-border);background:var(--surface);color:var(--accent-dark);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap}
     .offering-sub-btn:hover{background:var(--accent-light)}
@@ -381,10 +381,10 @@
     .empty-link{margin-top:4px;background:none;border:none;cursor:pointer;font-family:var(--font);font-size:14px;font-weight:700;color:var(--accent-dark)}
 
     /* ── Orders hero ── */
-    .orders-hero{padding:0 24px 20px;background:#fafbfc;border-bottom:1px solid var(--border)}
-    .orders-logo{display:flex;align-items:flex-start;margin-bottom:8px;overflow:hidden;max-height:110pt}
-    .orders-logo img{height:120pt;width:auto;object-fit:contain;display:block;transform:scale(1.35) translateX(20px);transform-origin:top left}
-    .orders-tagline{font-size:13px;color:var(--text-sec)}
+    .orders-hero{padding:48px 24px 24px;background:#fafbfc;border-bottom:1px solid var(--border);text-align:center}
+    .orders-logo{display:flex;justify-content:center;margin-bottom:14px}
+    .orders-logo img{width:96px;height:96px;border-radius:20px;object-fit:cover;box-shadow:0 6px 20px rgba(0,0,0,0.1)}
+    .orders-tagline{font-size:13px;color:var(--text-sec);margin-top:4px}
 
     /* ── Collapsible floor sections on Order screen ── */
     /* ── Floor section ── */
@@ -628,7 +628,8 @@
         <span>Guided mode</span>
         <button class="guide-toggle-btn off" id="guide-toggle">OFF</button>
       </div>
-      <div class="pad16"><button class="btn btn-amber btn-lg btn-full" id="btn-new-order">New Order →</button></div>
+      <div class="pad16"><button class="btn btn-lg btn-full" id="btn-new-order" style="background:#93c5fd;color:#1e3a5f;border:none;box-shadow:0 2px 8px rgba(37,99,235,0.15)">New Order →</button></div>
+      <div style="padding:0 16px 8px;text-align:center;display:none" id="noe-import-wrap"><button id="btn-add-from-noe" style="width:100%;background:#d1fae5;color:#065f46;font-weight:700;padding:12px;border-radius:12px;border:none;font-size:14px;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.1)">Add from NOE →</button></div>
       <div id="guide-welcome-slot"></div>
       <div class="sec-label">Recent Orders</div>
       <div id="orders-list"></div>
@@ -738,8 +739,9 @@
       <div id="floors-list"></div>
     </div>
     <div id="order-scope-footer" style="padding:10px 16px 16px;border-top:1px solid var(--border);flex-shrink:0">
-      <button class="btn btn-white btn-md btn-full" id="btn-order-pickup" style="margin-bottom:10px">📦 Pickup Utility</button>
-      <button class="btn btn-white btn-md btn-full" id="btn-order-interview" style="margin-bottom:10px">📝 Interview</button>
+      <button class="btn btn-white btn-md btn-full" id="btn-order-pickup" style="margin-bottom:10px">Pickup Utility</button>
+      <button class="btn btn-white btn-md btn-full" id="btn-order-interview" style="margin-bottom:10px">Interview</button>
+      <button class="btn btn-white btn-md btn-full" id="btn-order-add-noe" style="margin-bottom:10px;display:none;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;border:none">Add from NOE</button>
       <button class="btn btn-amber btn-lg btn-full" id="btn-scope-done">✓ Complete Scope</button>
     </div>
   </div>
@@ -5098,9 +5100,100 @@ if('serviceWorker' in navigator && !/localhost|127\.0\.0\.1/i.test(location.host
     });
 
     document.body.prepend(banner);
-
-    // Offset the rest of the UI to account for the banner
     document.body.style.paddingTop = '32px';
+
+    // Show the "Add from NOE" button on the orders screen
+    var noeWrap = document.getElementById('noe-import-wrap');
+    if (noeWrap) noeWrap.style.display = 'block';
+
+    // Helper: apply NOE context to an existing order
+    function applyNoeToOrder(order) {
+      if (!order || !ctx) return;
+      // Services
+      if (ctx.services && ctx.services.length) {
+        var psOfferings = order.offerings || [];
+        ctx.services.forEach(function(s) { if (psOfferings.indexOf(s) < 0) psOfferings.push(s); });
+        order.offerings = psOfferings;
+      }
+      // Severity
+      if (ctx.severityCodes && ctx.severityCodes.length) {
+        var sevMap = { 'Fire': 'fire', 'Water': 'water', 'Mold': 'mold', 'Puffback': 'pb', 'Debris': 'debris' };
+        if (!order.severity) order.severity = typeof emptySev === 'function' ? emptySev() : {};
+        ctx.severityCodes.forEach(function(code) {
+          var parts = String(code || '').split('-');
+          var group = sevMap[parts[0]];
+          var level = parseInt(parts[1]) || 0;
+          if (group && level > 0) {
+            if (!order.severity[group]) order.severity[group] = { sev: 0, details: {} };
+            order.severity[group].sev = Math.max(order.severity[group].sev, level);
+          }
+        });
+      }
+      // Rooms from NOE
+      if (ctx.rooms && ctx.rooms.length && order.floors) {
+        var existingRooms = [];
+        order.floors.forEach(function(f) { f.rooms.forEach(function(r) { existingRooms.push(r.name); }); });
+        var targetFloor = order.floors[0];
+        ctx.rooms.forEach(function(roomName) {
+          if (existingRooms.indexOf(roomName) < 0 && targetFloor) {
+            targetFloor.rooms.push({ name: roomName, displayName: roomName, photos: [], severity: null, severitySelections: [], tasks: [], affected: null, hasCleaning: null, packOut: null, leaveOnsite: null });
+          }
+        });
+      }
+      // Interview
+      var iv = ctx.interview;
+      if (iv && typeof iv === 'object') {
+        if (!order.interview) order.interview = typeof normalizeInterviewState === 'function' ? normalizeInterviewState(null) : { answers: {} };
+        var ans = order.interview.answers || {};
+        if (Array.isArray(iv.conditions) && iv.conditions.length) ans.conditions = iv.conditions;
+        if (Array.isArray(iv.repairs) && iv.repairs.length) ans.repairs = iv.repairs;
+        if (iv.living) ans.living = iv.living;
+        if (iv.delivery) ans.delivery = iv.delivery;
+        if (Array.isArray(iv.packout) && iv.packout.length) ans.packout = iv.packout;
+        if (Array.isArray(iv.loadList) && iv.loadList.length) ans.loadList = iv.loadList;
+        if (Array.isArray(iv.considerations) && iv.considerations.length) ans.considerations = iv.considerations;
+        if (Array.isArray(iv.suggestedGroups) && iv.suggestedGroups.length) ans.suggestedGroups = iv.suggestedGroups;
+        if (iv.medicalIssues === true || iv.medicalIssues === false) ans.medicalIssues = iv.medicalIssues;
+        if (iv.soapAllergies === true || iv.soapAllergies === false) ans.soapAllergies = iv.soapAllergies;
+        if (iv.selfCleaning === true || iv.selfCleaning === false) ans.selfCleaning = iv.selfCleaning;
+        if (iv.useDryCleaner) ans.useDryCleaner = iv.useDryCleaner;
+        if (iv.dryLaundry) ans.dryLaundry = iv.dryLaundry;
+        if (iv.needStorage === true || iv.needStorage === false) ans.needStorage = iv.needStorage;
+        if (Array.isArray(iv.petsInHome) && iv.petsInHome.length) ans.petsInHome = iv.petsInHome;
+        if (Array.isArray(iv.interests) && iv.interests.length) ans.interests = iv.interests;
+        if (Array.isArray(iv.upcomingEvents) && iv.upcomingEvents.length) ans.upcomingEvents = iv.upcomingEvents;
+        order.interview.answers = ans;
+      }
+      // Considerations / observations
+      if (ctx.considerations && ctx.considerations.length) order.considerations = ctx.considerations;
+      if (ctx.observations && ctx.observations.length) order.observations = ctx.observations;
+      if (ctx.handlingCodes && ctx.handlingCodes.length) order.handlingCodes = ctx.handlingCodes;
+      if (ctx.suggestedGroups && ctx.suggestedGroups.length) order.suggestedGroups = ctx.suggestedGroups;
+    }
+
+    // "Add from NOE" on orders screen — creates new order with NOE data
+    var btnAddNoe = document.getElementById('btn-add-from-noe');
+    if (btnAddNoe) {
+      btnAddNoe.addEventListener('click', function() {
+        // Click "New Order" to start the wizard
+        banner.click();
+      });
+    }
+
+    // "Add from NOE" on order screen — merges into current order
+    var btnOrderNoe = document.getElementById('btn-order-add-noe');
+    if (btnOrderNoe) {
+      btnOrderNoe.style.display = 'block';
+      btnOrderNoe.addEventListener('click', function() {
+        if (typeof curOrder !== 'undefined' && curOrder) {
+          applyNoeToOrder(curOrder);
+          if (typeof renderOrder === 'function') renderOrder();
+          if (typeof renderInterviewUIs === 'function') renderInterviewUIs();
+          if (typeof showToast === 'function') showToast('NOE data applied to order');
+        }
+      });
+    }
+
   } catch(e) {}
 })();
 </script>

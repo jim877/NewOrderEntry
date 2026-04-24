@@ -3411,7 +3411,7 @@ const StartScreen = ({ onSelect }) => {
         <div className="mt-5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Start Detailed →</div>
       </button>
       <div className="flex flex-col items-center p-10 rounded-3xl bg-white border border-slate-200 shadow-xl">
-        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl">📦</div>
+        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center overflow-hidden"><img src="/Scope_Icon.svg" alt="Scope" className="h-14 w-14" /></div>
         <h2 className="text-2xl font-bold text-slate-800 mb-3">Same Day Scope</h2>
         <p className="text-center text-slate-500 text-sm mb-2">Room-by-room scope for pack-out instructions or photo documentation.</p>
         <div className="mt-2 text-xs text-slate-400 text-center mb-5">Best for: on-site at the home, field work</div>
@@ -3420,14 +3420,14 @@ const StartScreen = ({ onSelect }) => {
             onClick={() => onSelect('same-day-scope')}
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 transition-all"
           >
-            📝 Text-Based Scope
+            Text-Based Scope
             <div className="text-[10px] font-normal text-slate-400 mt-0.5">Task lists, notes, and SDS document</div>
           </button>
           <button
             onClick={() => onSelect('photo-scope')}
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 transition-all"
           >
-            📷 Photo-Based Scope
+            Photo-Based Scope
             <div className="text-[10px] font-normal text-slate-400 mt-0.5">Camera-first walkthrough with photo tagging</div>
           </button>
         </div>
@@ -3950,7 +3950,7 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, setShowSearch, onInt
                 <button
                     data-noe-action="action-items"
                     onClick={onActionItems}
-                    className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-amber-50 text-slate-600 hover:text-amber-600 bg-slate-50 relative"
+                    className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all relative ${actionItemsOpen ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'hover:bg-amber-50 text-slate-600 hover:text-amber-600 bg-slate-50'}`}
                 >
                     <span className="text-xs sm:text-sm font-bold">Action Items</span>
                     {actionItemCount > 0 && (
@@ -11922,16 +11922,19 @@ export default function App(){
             setEntryMode={setEntryMode}
             onSave={handleSaveClick}
             setShowSearch={setShowSearch}
-            onInterview={() => setInterviewPanelOpen(v => !v)}
+            onInterview={() => { setInterviewPanelOpen(v => !v); setActionItemsOpen(false); }}
             interviewPanelOpen={interviewPanelOpen}
-            onActionItems={() => setActionItemsOpen(v => !v)}
+            onActionItems={() => { setActionItemsOpen(v => !v); setInterviewPanelOpen(false); }}
             actionItemsOpen={actionItemsOpen}
             actionItemCount={(() => { try { return computeAuditMissing().length; } catch { return 0; } })()}
             modeButtonFlash={modeButtonFlash}
         />
 
         {/* Interview Docked Side Panel */}
-        {interviewPanelOpen && (
+        {interviewPanelOpen && (() => {
+          const rushPlanningRecommended = (data.suggestedGroups || []).some((g: string) => ["RD","RFD","STD","STFD"].includes(g)) || (data.packoutSummary || []).some((p: string) => ["Clothing","Bedding","Electronics","Furniture","Appliances"].includes(p)) || !!(data.livingStatus && data.livingStatus !== "Staying in home") || (data.livingTimeline || []).some((s: any) => s.type !== "Staying in home");
+          const rushPlanningVisible = interviewExpanded.rushPlanning !== undefined ? interviewExpanded.rushPlanning : rushPlanningRecommended;
+          return (
           <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] z-[110] bg-white shadow-2xl flex flex-col border-l border-slate-200">
               {(() => {
                 const interviewQuestions = [
@@ -12066,8 +12069,21 @@ export default function App(){
                   </div>;
                 })()}
 
-                {/* Living Timeline */}
-                {isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving Neighbor Relative Rental") && (() => {
+                {/* Rush Planning Section — collapsible, auto-expands when recommended */}
+                <div className={`rounded-xl border overflow-hidden ${rushPlanningRecommended ? "border-teal-200" : "border-slate-200"}`}>
+                  <button type="button" onClick={() => setInterviewExpanded(p => ({...p, rushPlanning: !rushPlanningVisible}))} className={`w-full flex items-center justify-between px-3 py-2 text-left ${rushPlanningRecommended ? "bg-teal-50 hover:bg-teal-100" : "bg-slate-50 hover:bg-slate-100"}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold ${rushPlanningRecommended ? "text-teal-700" : "text-slate-500"}`}>Rush Planning</span>
+                      {rushPlanningRecommended && <span className="rounded-full bg-teal-500 text-white px-2 py-0.5 text-[9px] font-bold">Recommended</span>}
+                      {!rushPlanningRecommended && <span className="text-[10px] text-slate-400">Expand if delivery planning is needed</span>}
+                    </div>
+                    <span className="text-slate-400 text-xs">{rushPlanningVisible ? "▾" : "▸"}</span>
+                  </button>
+                </div>
+
+                {/* Living Timeline — inside rush planning */}
+                {rushPlanningVisible &&
+                isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving Neighbor Relative Rental") && (() => {
                   const timeline = data.livingTimeline || [];
                   const answered = timeline.length > 0 || !!data.livingStatus;
                   const summary = timeline.length > 0 ? timeline.map(s => s.type).join(" → ") : data.livingStatus || "";
@@ -12380,8 +12396,8 @@ export default function App(){
                   );
                 })}
 
-                {/* Activities & Interests */}
-                {(() => {
+                {/* Activities & Interests — inside rush planning */}
+                {rushPlanningVisible && (() => {
                   const answered = (data.rushInterests || []).length > 0;
                   const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ");
                   const log = (data.interviewLog || {}).interests;
@@ -12405,8 +12421,8 @@ export default function App(){
                   </div>;
                 })()}
 
-                {/* Upcoming Events */}
-                {(() => {
+                {/* Upcoming Events — inside rush planning */}
+                {rushPlanningVisible && (() => {
                   const answered = (data.upcomingEvents || []).length > 0;
                   const summary = (data.upcomingEvents || []).map(e => e.name || "Event").join(", ");
                   const log = (data.interviewLog || {}).events;
@@ -12491,11 +12507,11 @@ export default function App(){
                 })()}
               </div>
               <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-4">
-                <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100">Rush Guide</button>
+                {rushPlanningVisible && <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100">Rush Guide</button>}
                 <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-violet-500 px-5 py-2 text-sm font-bold text-white hover:bg-violet-600">Done</button>
               </div>
           </div>
-        )}
+        ); })()}
 
         {/* Action Items Panel */}
         {actionItemsOpen && (() => {
