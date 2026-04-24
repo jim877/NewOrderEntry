@@ -1850,27 +1850,59 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
               </SdsWidgetSection>
               {rushGuideTimeline && rushGuideTimeline.length > 0 && (
                 <SdsWidgetSection title="Recommended Delivery Timeline" subtitle="Our suggested delivery schedule based on your repair timeline and family needs.">
+                  {/* Horizontal timeline bar */}
+                  <div className="mb-6">
+                    <div className="flex items-center">
+                      {rushGuideTimeline.map((item, i) => {
+                        const colors = ['bg-teal-600', 'bg-sky-500', 'bg-indigo-500', 'bg-amber-500', 'bg-emerald-700'];
+                        const color = colors[i % colors.length];
+                        return (
+                          <React.Fragment key={i}>
+                            <div className="flex flex-col items-center" style={{ minWidth: 60 }}>
+                              <div className={`w-9 h-9 rounded-full ${color} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>{i + 1}</div>
+                              <div className="text-[9px] font-bold text-slate-700 mt-1 text-center whitespace-nowrap">{item.group}</div>
+                              <div className="text-[8px] text-slate-400 text-center">{item.timeframe}</div>
+                              {item.address && <div className="text-[7px] text-slate-400 text-center truncate max-w-[100px]">→ {item.address}</div>}
+                            </div>
+                            {i < rushGuideTimeline.length - 1 && (
+                              <div className="flex-1 h-0.5 bg-slate-200 mx-1 mt-[-18px]" />
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Delivery group cards */}
                   <div className="space-y-3">
-                    {rushGuideTimeline.map((item, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <div className="flex flex-col items-center shrink-0">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${i === 0 ? 'bg-teal-600' : i === rushGuideTimeline.length - 1 ? 'bg-slate-700' : 'bg-sky-500'}`}>{i + 1}</div>
-                          {i < rushGuideTimeline.length - 1 && <div className="w-0.5 h-6 bg-slate-200" />}
+                    {rushGuideTimeline.map((item, i) => {
+                      const colors = ['bg-teal-600', 'bg-sky-500', 'bg-indigo-500', 'bg-amber-500', 'bg-emerald-700'];
+                      const borderColors = ['border-teal-200', 'border-sky-200', 'border-indigo-200', 'border-amber-200', 'border-emerald-200'];
+                      const bgColors = ['bg-teal-50', 'bg-sky-50', 'bg-indigo-50', 'bg-amber-50', 'bg-emerald-50'];
+                      const color = colors[i % colors.length];
+                      const borderColor = borderColors[i % borderColors.length];
+                      const bgColor = bgColors[i % bgColors.length];
+                      return (
+                        <div key={i} className={`rounded-xl border ${borderColor} overflow-hidden`}>
+                          <div className={`${color} px-4 py-2.5 text-white flex items-center gap-3`}>
+                            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold">{i + 1}</div>
+                            <div>
+                              <div className="text-sm font-bold">{item.group}</div>
+                              <div className="text-[10px] text-white/80">{item.timeframe}{item.address ? ` → ${item.address}` : ""}</div>
+                            </div>
+                          </div>
+                          <div className={`${bgColor} px-4 py-3`}>
+                            {item.items && item.items.length > 0 ? (
+                              <ul className="space-y-1">
+                                {item.items.map((line, j) => <li key={j} className="text-xs text-slate-700 flex items-start gap-2"><span className="w-3 h-3 rounded border border-slate-300 shrink-0 mt-0.5" />{line}</li>)}
+                              </ul>
+                            ) : (
+                              <div className="text-xs text-slate-600">{item.desc}</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="pb-2 flex-1">
-                          <div className="text-sm font-bold text-slate-800">{item.group}</div>
-                          <div className="text-xs text-slate-500">{item.timeframe}</div>
-                          {item.address && <div className="text-[10px] text-slate-400 mt-0.5">→ {item.address}</div>}
-                          {item.items && item.items.length > 0 ? (
-                            <ul className="mt-1 space-y-0.5">
-                              {item.items.map((line, j) => <li key={j} className="text-xs text-slate-600">• {line}</li>)}
-                            </ul>
-                          ) : (
-                            <div className="text-xs text-slate-600 mt-0.5">{item.desc}</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </SdsWidgetSection>
               )}
