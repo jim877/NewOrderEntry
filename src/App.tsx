@@ -3420,32 +3420,45 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
   ];
   const [interviewAnswers, setInterviewAnswers] = useState<Record<string, string | string[] | boolean | null>>(() => {
     if (!orderData) return {};
+    const d = orderData as any;
     const a: Record<string, string | string[] | boolean | null> = {};
-    if (orderData.livingStatus) a.living = orderData.livingStatus;
-    if (orderData.repairsSummary) a.repairs = orderData.repairsSummary.split(", ").filter(Boolean);
-    if (orderData.familyMedicalIssues === "Y") a.medicalIssues = true;
-    if (orderData.familyMedicalIssues === "N") a.medicalIssues = false;
-    if (orderData.familyMedicalNote) a.medicalIssues_note = orderData.familyMedicalNote;
-    if (orderData.soapFragAllergies === "Y") a.soapAllergies = true;
-    if (orderData.soapFragAllergies === "N") a.soapAllergies = false;
-    if (orderData.soapFragNote) a.soapAllergies_note = orderData.soapFragNote;
-    if (orderData.selfCleaning === "Y") a.selfCleaning = true;
-    if (orderData.selfCleaning === "N") a.selfCleaning = false;
-    if (orderData.storageNeeded === "Y") a.needStorage = true;
-    if (orderData.storageNeeded === "N") a.needStorage = false;
-    if (orderData.useDryCleaner) a.useDryCleaner = orderData.useDryCleaner;
-    if (orderData.howDryLaundry) a.dryLaundry = orderData.howDryLaundry;
-    if (orderData.processType) a.delivery = orderData.processType;
-    if (orderData.loadList?.length) a.loadList = orderData.loadList;
-    if (orderData.packoutSummary?.length) a.packout = orderData.packoutSummary;
-    if (orderData.sdsConsiderations?.length) a.considerations = orderData.sdsConsiderations;
+    // Living / delivery
+    if (d.livingStatus) a.living = d.livingStatus;
+    if (d.processType) a.delivery = d.processType;
+    // Repairs
+    if (d.repairsSummary) a.repairs = String(d.repairsSummary).split(", ").filter(Boolean);
+    // Boolean questions with notes
+    if (d.familyMedicalIssues === "Y" || d.familyMedicalIssues === true) a.medicalIssues = true;
+    if (d.familyMedicalIssues === "N" || d.familyMedicalIssues === false) a.medicalIssues = false;
+    if (d.familyMedicalNote) a.medicalIssues_note = d.familyMedicalNote;
+    if (d.soapFragAllergies === "Y" || d.soapFragAllergies === true) a.soapAllergies = true;
+    if (d.soapFragAllergies === "N" || d.soapFragAllergies === false) a.soapAllergies = false;
+    if (d.soapFragNote) a.soapAllergies_note = d.soapFragNote;
+    if (d.selfCleaning === "Y" || d.selfCleaning === true) a.selfCleaning = true;
+    if (d.selfCleaning === "N" || d.selfCleaning === false) a.selfCleaning = false;
+    if (d.selfCleaningNote) a.selfCleaning_note = d.selfCleaningNote;
+    if (d.storageNeeded === "Y" || d.storageNeeded === true) a.needStorage = true;
+    if (d.storageNeeded === "N" || d.storageNeeded === false) a.needStorage = false;
+    // Single-select
+    if (d.useDryCleaner) a.useDryCleaner = d.useDryCleaner;
+    if (d.howDryLaundry) a.dryLaundry = d.howDryLaundry;
+    // Multi-select lists
+    if (d.loadList?.length) a.loadList = d.loadList;
+    if (d.packoutSummary?.length) a.packout = d.packoutSummary;
+    if (d.sdsConsiderations?.length) a.considerations = d.sdsConsiderations;
+    if (d.suggestedGroups?.length) a.suggestedGroups = d.suggestedGroups;
+    // Conditions from boolean flags
     const conditions: string[] = [];
-    if (orderData.damageWasWet) conditions.push("Still Wet");
-    if (orderData.damageMoldMildew) conditions.push("Visible Mold");
-    if (orderData.noHeat) conditions.push("No Heat");
-    if (orderData.noLights) conditions.push("No Electricity");
-    if (orderData.boardedUp) conditions.push("Boarded Up");
+    if (d.damageWasWet === true || d.damageWasWet === "Y") conditions.push("Still Wet");
+    if (d.damageMoldMildew === true || d.damageMoldMildew === "Y") conditions.push("Visible Mold");
+    if (d.structuralElectricDamage) conditions.push("Structural Damage");
+    if (d.noLights === true || d.noLights === "Y") conditions.push("No Electricity");
+    if (d.noHeat === true || d.noHeat === "Y") conditions.push("No Heat");
+    if (d.boardedUp === true || d.boardedUp === "Y") conditions.push("Boarded Up");
     if (conditions.length) a.conditions = conditions;
+    // Pets
+    const pets = (d.customers || []).flatMap((c: any) => (c.pets || []).map((p: any) => p.type || p.name || "")).filter(Boolean);
+    if (pets.length) a.petsInHome = pets;
     return a;
   });
   const [showInterview, setShowInterview] = useState(false);
@@ -3532,24 +3545,33 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
   const [damageTypes, setDamageTypes] = useState<Record<string, number>>(() => {
     if (!orderData) return {};
     const dt: Record<string, number> = {};
+    const d = orderData as any;
+    // Read from primaryLossType
+    if (d.primaryLossType) {
+      const code = d.primaryLossType.toLowerCase();
+      if (code.includes("fire")) dt.fire = 1;
+      if (code.includes("water")) dt.water = 1;
+      if (code.includes("mold")) dt.mold = 1;
+      if (code.includes("puffback")) dt.puffback = 1;
+    }
     // Read from orderTypes (e.g. ["Fire", "Water"])
-    (orderData.orderTypes || []).forEach((t: string) => {
-      const code = t.toLowerCase();
-      if (code === "fire") dt.fire = 1;
-      else if (code === "water") dt.water = 1;
-      else if (code === "mold") dt.mold = 1;
-      else if (code === "puffback") dt.puffback = 1;
+    (d.orderTypes || []).forEach((t: string) => {
+      const code = (t || "").toLowerCase();
+      if (code.includes("fire")) dt.fire = Math.max(dt.fire || 0, 1);
+      else if (code.includes("water")) dt.water = Math.max(dt.water || 0, 1);
+      else if (code.includes("mold")) dt.mold = Math.max(dt.mold || 0, 1);
+      else if (code.includes("puffback")) dt.puffback = Math.max(dt.puffback || 0, 1);
     });
     // Read severity levels from lossSeverity
-    const sev = orderData.lossSeverity as any;
-    if (sev?.touched) {
-      if (sev.fire?.enabled) { const max = Math.max(...Object.values(sev.fire.values as Record<string, number>), 0); if (max > 0) dt.fire = max; }
-      if (sev.water?.enabled) { const max = Math.max(...Object.values(sev.water.values as Record<string, number>), 0); if (max > 0) dt.water = max; }
-      if (sev.puffback?.enabled) { const max = Math.max(...Object.values(sev.puffback.values as Record<string, number>), 0); if (max > 0) dt.puffback = max; }
+    const sev = d.lossSeverity;
+    if (sev) {
+      if (sev.fire?.enabled) { const vals = Object.values(sev.fire.values || {}); const max = vals.length ? Math.max(...vals as number[]) : 0; if (max > 0) dt.fire = max; }
+      if (sev.water?.enabled) { const vals = Object.values(sev.water.values || {}); const max = vals.length ? Math.max(...vals as number[]) : 0; if (max > 0) dt.water = max; }
+      if (sev.puffback?.enabled) { const vals = Object.values(sev.puffback.values || {}); const max = vals.length ? Math.max(...vals as number[]) : 0; if (max > 0) dt.puffback = max; }
     }
     // Read from severityCodes (e.g. ["F1", "W2"])
-    (orderData.severityCodes || []).forEach((c: string) => {
-      const match = c.match(/^([FWMPD])(\d)$/);
+    (d.severityCodes || []).forEach((c: string) => {
+      const match = (c || "").match(/^([FWMPD])(\d)$/);
       if (match) {
         const map: Record<string, string> = { F: "fire", W: "water", M: "mold", P: "puffback", D: "debris" };
         const key = map[match[1]];
@@ -3559,12 +3581,13 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     return dt;
   });
   const [damageDetails, setDamageDetails] = useState<Record<string, Record<string, number>>>(() => {
-    if (!orderData?.lossSeverity) return {};
-    const sev = orderData.lossSeverity as any;
+    if (!orderData) return {};
+    const sev = (orderData as any).lossSeverity;
+    if (!sev) return {};
     const dd: Record<string, Record<string, number>> = {};
-    if (sev.fire?.enabled && sev.fire.values) dd.fire = { ...sev.fire.values };
-    if (sev.water?.enabled && sev.water.values) dd.water = { ...sev.water.values };
-    if (sev.puffback?.enabled && sev.puffback.values) dd.puffback = { ...sev.puffback.values };
+    if (sev.fire?.values) dd.fire = { ...sev.fire.values };
+    if (sev.water?.values) dd.water = { ...sev.water.values };
+    if (sev.puffback?.values) dd.puffback = { ...sev.puffback.values };
     return dd;
   });
   const [expandedDamage, setExpandedDamage] = useState<string | null>(null);
