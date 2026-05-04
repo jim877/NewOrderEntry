@@ -3506,9 +3506,9 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     townhouse: "building", lowrise: "unit", highrise: "unit", storefront: "building", commercial: "unit",
   };
   const selectedPropObj = PROPERTY_TYPES.find(p => p.id === propType);
-  const [workScope, setWorkScope] = useState<"unit" | "floor" | "building" | "">(noeApt ? "unit" : "");
   // Pre-populate unit number from NOE address apt field
   const noeApt = (() => { const addr = orderData?.addresses?.[0]; return (addr as any)?.apt || ""; })();
+  const [workScope, setWorkScope] = useState<"unit" | "floor" | "building" | "">(noeApt ? "unit" : "");
   const [unitNumber, setUnitNumber] = useState(noeApt);
   const [unitFloorLevel, setUnitFloorLevel] = useState<number | "">("");
   const [buildingFloorLevel, setBuildingFloorLevel] = useState<number | "">("");
