@@ -4780,7 +4780,7 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
             <span className="flex-1 text-[15px] font-bold text-slate-800">Photo Walkthrough</span>
             <button onClick={() => { onOrderUpdate?.({}); onClose(); }} className="rounded-full px-3 py-1.5 text-xs font-bold bg-blue-600 text-white">Done</button>
           </div>
-          <iframe src="/photo-scope.html" className="flex-1 w-full border-0" title="Photo Scope" />
+          <iframe src="/photo-scope.html?autostart=1" className="flex-1 w-full border-0" title="Photo Scope" />
         </div>
       )}
     </div>

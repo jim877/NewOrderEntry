@@ -5093,6 +5093,15 @@ window.addEventListener('load',()=>{
       if(window.go) window.go('scr-camera');
     },1000);
   }
+  /* Auto-start from Scope Wizard V2 — skip landing, go straight to order */
+  if(new URLSearchParams(location.search).get('autostart')==='1'){
+    setTimeout(()=>{
+      if(window.orders && window.orders.length>0){
+        window.curOrder=window.orders[0];
+        if(window.go) window.go('scr-order');
+      }
+    },500);
+  }
 });
 </script>
 <script>
