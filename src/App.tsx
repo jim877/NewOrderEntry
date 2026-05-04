@@ -4896,11 +4896,9 @@ const InstructionDemo = ({ onClose }: { onClose: () => void; orderData?: any; on
 };
 const StartScreen = ({ onSelect }) => {
   const [showGuidelines, setShowGuidelines] = useState(false);
-  const [showScopeWizard, setShowScopeWizard] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 fade-in scale-in">
-      {showScopeWizard && <ScopeWizardV2 onClose={() => setShowScopeWizard(false)} />}
       <div className="text-center mb-10">
         <h1 className="text-5xl font-extrabold text-slate-900 mb-2 tracking-tight">New Order Entry</h1>
         <p className="text-lg text-slate-500">How much detail do you have right now?</p>
@@ -4956,7 +4954,7 @@ const StartScreen = ({ onSelect }) => {
       <div className="flex gap-4 mt-10">
         <button
           type="button"
-          onClick={() => setShowScopeWizard(true)}
+          onClick={() => onSelect('scope')}
           className="inline-flex items-center gap-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-6 py-3 shadow-md"
           style={{ boxShadow: "0 4px 12px rgba(37,99,235,.3)" }}
         >
@@ -11613,6 +11611,12 @@ export default function App(){
         }, 3000);
       }
     }
+    if (mode === "scope") {
+      setData(prev => ({ ...prev, isLead: null, eventAssignee: prev.eventAssignee || prev.currentUser || "" }));
+      setEntryMode("detailed");
+      setTimeout(() => setShowScopeWizardMain(true), 200);
+      return;
+    }
     if (mode === "detailed") {
       setData(prev => ({ ...prev, isLead: null, eventAssignee: prev.eventAssignee || prev.currentUser || "" }));
     }
@@ -11798,7 +11802,7 @@ export default function App(){
             setShowSampleDataModal={setShowSampleDataModal}
             onOpenPresets={() => setShowPresetModal(true)}
             onOpenFieldConfig={() => setShowFieldConfig(true)}
-            onShowScopeWizard={() => setShowScopeWizardMain(true)}
+            onShowScopeWizard={() => { console.log("[Scope button] setting showScopeWizardMain, data.addresses:", data.addresses?.length, "addr0.buildingType:", (data.addresses?.[0] as any)?.buildingType); setShowScopeWizardMain(true); }}
             interviewPanelOpen={interviewPanelOpen}
             actionItemsOpen={actionItemsOpen}
             presetCount={testPresets.length}
