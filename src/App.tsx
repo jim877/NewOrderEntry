@@ -3655,7 +3655,7 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
         let n = 2; while (existing.has(`${base} ${n}`)) n++;
         finalName = `${base} ${n}`;
       }
-      next[fi] = { ...next[fi], rooms: [...next[fi].rooms, { name: finalName, affected: false }] };
+      next[fi] = { ...next[fi], rooms: [...next[fi].rooms, { name: finalName, affected: activeDamage.length > 0 }] };
       return next;
     });
   };
@@ -4165,8 +4165,8 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                   ))}
                   {/* Add floor */}
                   <div className="flex flex-wrap gap-2">
-                    {!homeRooms.some(f => /basement/i.test(f.name)) && <button onClick={() => setHomeRooms(prev => [{ name: "Basement", rooms: [{ name: "Rec", affected: false }, { name: "Laundry", affected: false }, { name: "Storage", affected: false }] }, ...prev])} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Basement</button>}
-                    {!homeRooms.some(f => /attic/i.test(f.name)) && <button onClick={() => setHomeRooms(prev => [...prev, { name: "Attic", rooms: [{ name: "Attic", affected: false }] }])} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Attic</button>}
+                    {!homeRooms.some(f => /basement/i.test(f.name)) && <button onClick={() => { const aff = activeDamage.length > 0; setHomeRooms(prev => [{ name: "Basement", rooms: [{ name: "Rec", affected: aff }, { name: "Laundry", affected: aff }, { name: "Storage", affected: aff }] }, ...prev]); }} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Basement</button>}
+                    {!homeRooms.some(f => /attic/i.test(f.name)) && <button onClick={() => { const aff = activeDamage.length > 0; setHomeRooms(prev => [...prev, { name: "Attic", rooms: [{ name: "Attic", affected: aff }] }]); }} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Attic</button>}
                     <button onClick={() => setHomeRooms(prev => [...prev, { name: `Floor ${prev.length + 1}`, rooms: [] }])} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Floor</button>
                   </div>
                 </>
