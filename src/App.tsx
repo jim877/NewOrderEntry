@@ -1918,6 +1918,7 @@ const DEFAULT_FORM={
   reminderDate: "",
   reminderTime: "",
   eventAssignee: "",
+  eventAttendee: "",
   eventVehicle: "",
   quickInstructionNotes: [],
   // Property description
@@ -3748,9 +3749,12 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
   const [depthLevel, setDepthLevel] = useState(2);
   const SERVICES = ["Appliance", "Art", "Consulting", "Contents", "Furniture", "Hand Clean", "Pack-out", "Rugs", "Storage Only", "Textiles", "TLI", "Expert Stain Removal"];
   const [selectedServices, setSelectedServices] = useState<Record<string, boolean>>(() => {
-    if (!orderData?.serviceOfferings?.length) return {};
+    if (!orderData) return {};
+    const d = orderData as any;
+    const offerings = d.serviceOfferings || d.sdsServices || [];
+    if (!offerings.length) return {};
     const s: Record<string, boolean> = {};
-    (orderData.serviceOfferings as string[]).forEach(svc => { s[svc] = true; });
+    offerings.forEach((svc: string) => { if (svc) s[svc] = true; });
     return s;
   });
 
@@ -6436,9 +6440,12 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseSignal} />
                     </Field>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <Field label="Assignee">
                     <Input value={data.eventAssignee} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" />
+                  </Field>
+                  <Field label="Attendee">
+                    <Input value={(data as any).eventAttendee || ""} onChange={e=>update("eventAttendee", e.target.value)} placeholder="Who will be there?" />
                   </Field>
                   <Field label="Vehicle">
                     <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle (optional)" />
@@ -6559,9 +6566,21 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                           update("vendors", [...(data.vendors || []), entry]);
                         }
                         if (addNewModal.source === "referrer") {
-                          const display = fullName && companyName ? `${fullName} — ${companyName}` : fullName || companyName;
                           update("referrer", fullName);
                           update("referringCompany", companyName);
+                          // Auto-create CRM log for new referral
+                          const referralLog = {
+                            id: Date.now().toString(),
+                            createdAt: new Date().toISOString(),
+                            method: "System",
+                            owner: data.currentUser || data.salesRep || "",
+                            subject: "New Order Referral",
+                            orderLink: data.orderNumber || "",
+                            notes: `Referral from ${fullName ? fullName + (companyName ? " at " + companyName : "") : companyName}. Order #${data.orderNumber || "—"}.`,
+                            followUp: null,
+                            notify: { salesRep: true, orderLead: false, others: [] },
+                          };
+                          setData(prev => ({ ...prev, crmLogs: [...(prev.crmLogs || []), referralLog] }));
                         }
                         setToast?.(`Added ${fullName ? fullName + (companyName ? " at " + companyName : "") : companyName} to the system`);
                         setAddNewModal(null);
