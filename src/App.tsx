@@ -1482,6 +1482,14 @@ function initAddress(overrides={}){
     name:"", googleQuery:"", street:"", apt:"", city:"", state:"", zip:"", lng:"", lat:"",
     beds:"", baths:"", sqft:"", people:"", infants:"", otherUnitsAffected:"", otherUnitsNote:"",
     coiRequired:"", coiRequestedAt:"", coiRequestedBy:"", coiProvidedAt:"", coiProvidedBy:"", coiContactNote:"",
+    // Building & access — persists across orders at this address
+    buildingType:"", // trailer, house, largehouse, estate, townhouse, lowrise, highrise, storefront, commercial
+    buildingWorkScope:"", // building, unit, partial
+    buildingParking:{} as Record<string,boolean>, // Driveway, Street, Parking Garage, etc.
+    buildingAccess:{} as Record<string,boolean>, // Elevator, Stairs, COI Required, etc.
+    buildingUnitNumber:"",
+    buildingUnitFloor:"" as number | "",
+    buildingFloors:"" as number | "",
     placeholder: null,
     ...overrides };
 }
@@ -1912,6 +1920,16 @@ const DEFAULT_FORM={
   eventAssignee: "",
   eventVehicle: "",
   quickInstructionNotes: [],
+  // Property description
+  propertyType: "" as string, // "house" | "apartment" | "condo" | "townhouse" | "commercial"
+  propertyFloors: "" as number | "",
+  propertyBedrooms: "" as number | "",
+  propertyBathrooms: "" as number | "",
+  propertyHasBasement: false,
+  propertyHasAttic: false,
+  propertyRooms: [] as {name: string; floor: string; affected: boolean; depth: number; notes: string; severityOverrides?: Record<string,number>; handlingCodes?: string[]; qualityCode?: string; isOrigin?: boolean}[],
+  propertyImpactScope: "" as string, // "entire" | "partial" | "unknown"
+
   sdsConsiderations: [],
   sdsObservations: [],
   sdsServices: [],
@@ -3376,12 +3394,1413 @@ const AI_TIME_SAVING_TIPS = [
   "Use keyboard shortcuts: Press Tab or Enter to move forward, and Shift + Tab or Shift + Enter to move backward through fields. Keyboard navigation can speed up data entry and reduce reliance on the mouse."
 ];
 
-// --- START SCREEN ---
+// --- SCOPE WIZARD V2 — Guided question-by-question flow ---
+const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => void; orderData?: typeof DEFAULT_FORM; onOrderUpdate?: (updates: Partial<typeof DEFAULT_FORM>) => void }) => {
+  const [step, setStep] = useState(1);
+  const totalSteps = 4;
+  const [roomPass, setRoomPass] = useState<1 | 2 | 3>(1);
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
+
+  // Interview system
+  const INTERVIEW_SECTIONS = [
+    { id: "conditions", title: "Current conditions?", type: "multi" as const, critical: true, options: ["Still Wet", "Visible Mold", "Structural Damage", "No Electricity", "No Heat", "Boarded Up"] },
+    { id: "repairs", title: "What repairs are being done?", type: "multi" as const, critical: true, options: ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural", "Complete Rebuild"] },
+    { id: "living", title: "Where will customer live?", type: "single" as const, critical: true, options: ["Staying in home", "Hotel", "Temp", "Moving", "Relative", "Rental"] },
+    { id: "delivery", title: "Final delivery?", type: "single" as const, critical: true, options: ["Deliver ASAP", "Deliver to Temp", "Deliver to New Home", "Long-Term Storage"] },
+    { id: "packout", title: "What are we picking up?", type: "multi" as const, critical: true, options: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Appliances"] },
+    { id: "medicalIssues", title: "Medical issues?", type: "boolean" as const, critical: true },
+    { id: "soapAllergies", title: "Soap/fragrance allergies?", type: "boolean" as const, critical: true },
+    { id: "dryLaundry", title: "How do they dry laundry?", type: "single" as const, critical: true, options: ["Air-Dry", "Low Heat", "Dryer"] },
+    { id: "needStorage", title: "Need storage?", type: "boolean" as const, critical: true },
+    { id: "loadList", title: "What do we need to bring?", type: "multi" as const, critical: false, options: ["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes"] },
+    { id: "considerations", title: "Special considerations", type: "multi" as const, critical: false, options: ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory", "Premium Brands"] },
+    { id: "petsInHome", title: "Pets in home?", type: "multi" as const, critical: false, options: ["Dog", "Cat", "Bird", "Fish", "Other"] },
+    { id: "selfCleaning", title: "Self-clean anything?", type: "boolean" as const, critical: false },
+    { id: "useDryCleaner", title: "Use a dry cleaner?", type: "single" as const, critical: false, options: ["Yes", "No", "Rarely"] },
+  ];
+  const [interviewAnswers, setInterviewAnswers] = useState<Record<string, string | string[] | boolean | null>>(() => {
+    if (!orderData) return {};
+    const a: Record<string, string | string[] | boolean | null> = {};
+    if (orderData.livingStatus) a.living = orderData.livingStatus;
+    if (orderData.repairsSummary) a.repairs = orderData.repairsSummary.split(", ").filter(Boolean);
+    if (orderData.familyMedicalIssues === "Y") a.medicalIssues = true;
+    if (orderData.familyMedicalIssues === "N") a.medicalIssues = false;
+    if (orderData.familyMedicalNote) a.medicalIssues_note = orderData.familyMedicalNote;
+    if (orderData.soapFragAllergies === "Y") a.soapAllergies = true;
+    if (orderData.soapFragAllergies === "N") a.soapAllergies = false;
+    if (orderData.soapFragNote) a.soapAllergies_note = orderData.soapFragNote;
+    if (orderData.selfCleaning === "Y") a.selfCleaning = true;
+    if (orderData.selfCleaning === "N") a.selfCleaning = false;
+    if (orderData.storageNeeded === "Y") a.needStorage = true;
+    if (orderData.storageNeeded === "N") a.needStorage = false;
+    if (orderData.useDryCleaner) a.useDryCleaner = orderData.useDryCleaner;
+    if (orderData.howDryLaundry) a.dryLaundry = orderData.howDryLaundry;
+    if (orderData.processType) a.delivery = orderData.processType;
+    if (orderData.loadList?.length) a.loadList = orderData.loadList;
+    if (orderData.packoutSummary?.length) a.packout = orderData.packoutSummary;
+    if (orderData.sdsConsiderations?.length) a.considerations = orderData.sdsConsiderations;
+    const conditions: string[] = [];
+    if (orderData.damageWasWet) conditions.push("Still Wet");
+    if (orderData.damageMoldMildew) conditions.push("Visible Mold");
+    if (orderData.noHeat) conditions.push("No Heat");
+    if (orderData.noLights) conditions.push("No Electricity");
+    if (orderData.boardedUp) conditions.push("Boarded Up");
+    if (conditions.length) a.conditions = conditions;
+    return a;
+  });
+  const [showInterview, setShowInterview] = useState(false);
+  const interviewAnswered = INTERVIEW_SECTIONS.filter(s => s.critical).filter(s => {
+    const a = interviewAnswers[s.id];
+    return a !== undefined && a !== null && (Array.isArray(a) ? a.length > 0 : a !== "");
+  }).length;
+  const interviewTotal = INTERVIEW_SECTIONS.filter(s => s.critical).length;
+  const [wizSelectedRooms2, setWizSelectedRooms2] = useState<Set<string>>(new Set());
+  const [bulkEditing, setBulkEditing] = useState(false);
+
+  // Step 1: Property type
+  const PROPERTY_TYPES = [
+    { id: "trailer", label: "Trailer" },
+    { id: "house", label: "House" },
+    { id: "largehouse", label: "Large House" },
+    { id: "estate", label: "Estate" },
+    { id: "townhouse", label: "Townhome" },
+    { id: "lowrise", label: "Low-Rise" },
+    { id: "highrise", label: "High-Rise" },
+    { id: "storefront", label: "Storefront" },
+    { id: "commercial", label: "Commercial" },
+  ];
+  const ACCESS_FOR_TYPE: Record<string, { label: string; items: string[] }[]> = {
+    trailer:    [{ label: "Parking", items: ["Driveway", "Street"] }, { label: "Access", items: ["Difficult Access", "Dangerous Driveway", "Gated"] }],
+    house:      [{ label: "Parking", items: ["Driveway", "Street", "Garage", "Lot"] }, { label: "Access", items: ["Stairs", "Gated", "Dirt Road", "Dangerous Driveway"] }],
+    largehouse: [{ label: "Parking", items: ["Driveway", "Street", "Garage", "Lot"] }, { label: "Access", items: ["Stairs", "Gated", "Long Walk", "Dirt Road", "Dangerous Driveway"] }],
+    estate:     [{ label: "Parking", items: ["Driveway", "Garage"] }, { label: "Access", items: ["Gated/Security", "Long Walk", "COI Required"] }],
+    townhouse:  [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Stairs", "Difficult Access"] }],
+    lowrise:    [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Stairs", "Elevator", "Long Walk", "Gated", "COI Required", "Limited Hours"] }],
+    highrise:   [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Elevator", "Service Entrance", "Long Walk", "Gated/Security", "COI Required", "Limited Hours"] }],
+    storefront: [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Service Entrance", "Limited Hours", "COI Required"] }],
+    commercial: [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Elevator", "Service Entrance", "Long Walk", "Security", "COI Required", "Limited Hours"] }],
+  };
+  const ACCESS_DEFAULTS: Record<string, string[]> = {
+    trailer:    ["Driveway"],
+    house:      ["Driveway"],
+    largehouse: ["Driveway"],
+    estate:     ["Driveway", "Gated/Security", "Long Walk"],
+    townhouse:  ["Street"],
+    lowrise:    ["Street", "Stairs"],
+    highrise:   ["Parking Garage", "Elevator"],
+    storefront: ["Street"],
+    commercial: ["Parking Garage", "Elevator"],
+  };
+  const [propType, setPropType] = useState(orderData?.propertyType || "");
+  const [propSubType, setPropSubType] = useState("");
+  const [accessDetails, setAccessDetails] = useState<Record<string, boolean>>({});
+  const [showAccess, setShowAccess] = useState(false);
+  // Unit info — for multi-unit buildings
+  const isMultiUnit = ["house", "largehouse", "estate", "townhouse", "lowrise", "highrise", "storefront", "commercial"].includes(propType);
+  const isHouseType = ["house", "largehouse", "estate"].includes(propType);
+  // Only show scope toggle when the default might be wrong
+  const showScopeToggle = ["house", "largehouse", "townhouse", "lowrise"].includes(propType);
+  // Auto-defaults: houses/estates/trailers = entire, highrises/commercial = unit
+  const SCOPE_DEFAULTS: Record<string, "unit" | "building"> = {
+    trailer: "building", house: "building", largehouse: "building", estate: "building",
+    townhouse: "building", lowrise: "unit", highrise: "unit", storefront: "building", commercial: "unit",
+  };
+  const selectedPropObj = PROPERTY_TYPES.find(p => p.id === propType);
+  const [workScope, setWorkScope] = useState<"unit" | "floor" | "building" | "">(noeApt ? "unit" : "");
+  // Pre-populate unit number from NOE address apt field
+  const noeApt = (() => { const addr = orderData?.addresses?.[0]; return (addr as any)?.apt || ""; })();
+  const [unitNumber, setUnitNumber] = useState(noeApt);
+  const [unitFloorLevel, setUnitFloorLevel] = useState<number | "">("");
+  const [buildingFloorLevel, setBuildingFloorLevel] = useState<number | "">("");
+
+  // Step 2: Size
+  const [floors, setFloors] = useState<number | "">(orderData?.propertyFloors || "");
+  const [beds, setBeds] = useState<number | "">(orderData?.propertyBedrooms || "");
+  const [baths, setBaths] = useState<number | "">(orderData?.propertyBathrooms || "");
+  const [sqft, setSqft] = useState("");
+  const [hasBasement, setHasBasement] = useState(orderData?.propertyHasBasement || false);
+  const [hasAttic, setHasAttic] = useState(orderData?.propertyHasAttic || false);
+
+  // Step 3: Damage
+  const DAMAGE_TYPES = [
+    { id: "fire", label: "Fire", icon: "\u{1F525}", color: "bg-orange-500", light: "bg-orange-50", border: "border-orange-300", details: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"] },
+    { id: "water", label: "Water", icon: "\u{1F4A7}", color: "bg-blue-500", light: "bg-blue-50", border: "border-blue-300", details: ["Water", "Humidity", "Musty Smell", "Visible Mildew", "Visible Mold", "Sprinkler Chemical", "Flood Cut Debris"] },
+    { id: "mold", label: "Mold", icon: "\u{1F7E2}", color: "bg-green-500", light: "bg-green-50", border: "border-green-300", details: ["Spores", "Visible Mold", "Mildew"] },
+    { id: "puffback", label: "Puffback", icon: "\u{1F4A8}", color: "bg-slate-500", light: "bg-slate-50", border: "border-slate-400", details: ["Oil", "Soot", "Odor", "Oily Film"] },
+    { id: "debris", label: "Debris", icon: "\u{1FAA8}", color: "bg-stone-500", light: "bg-stone-50", border: "border-stone-300", details: ["Structural", "Contents", "Other"] },
+  ];
+  const [damageTypes, setDamageTypes] = useState<Record<string, number>>({});
+  const [damageDetails, setDamageDetails] = useState<Record<string, Record<string, number>>>({});
+  const [expandedDamage, setExpandedDamage] = useState<string | null>(null);
+  const [uniformSeverity, setUniformSeverity] = useState(true); // same severity for all rooms
+  const toggleDamage = (id: string) => {
+    const wasActive = (damageTypes[id] || 0) > 0;
+    setDamageTypes(p => ({ ...p, [id]: wasActive ? 0 : 1 }));
+    if (!wasActive) setExpandedDamage(id); else setExpandedDamage(null);
+    // If turning off and no other damage types are active, mark all rooms as not affected
+    if (wasActive) {
+      const remaining = Object.entries(damageTypes).filter(([k, v]) => k !== id && v > 0);
+      if (remaining.length === 0) markAll(false);
+    }
+  };
+  const setDamageLevel = (id: string, level: number) => {
+    setDamageTypes(p => ({ ...p, [id]: level }));
+    // If set to 0 and no other active types, mark all rooms not affected
+    if (level === 0) {
+      const remaining = Object.entries(damageTypes).filter(([k, v]) => k !== id && v > 0);
+      if (remaining.length === 0) markAll(false);
+    }
+  };
+  const activeDamage = Object.entries(damageTypes).filter(([, v]) => v > 0);
+
+  // Step 4: Impact — generate rooms then mark affected
+  type RoomEntry = { name: string; affected: boolean };
+  type FloorEntry = { name: string; rooms: RoomEntry[] };
+  const [homeRooms, setHomeRooms] = useState<FloorEntry[]>([]);
+  const [roomSevOverrides, setRoomSevOverrides] = useState<Record<string, Record<string, number>>>({});
+  const [roomHandlingCodes, setRoomHandlingCodes] = useState<Record<string, string[]>>({});
+  const [roomQualityCodes, setRoomQualityCodes] = useState<Record<string, string>>({});
+  const [roomNotes, setRoomNotes] = useState<Record<string, string>>({});
+  const [roomDepthOverrides, setRoomDepthOverrides] = useState<Record<string, number>>({});
+  const [originRoom, setOriginRoom] = useState<string>("");
+  const [editingFloorSev, setEditingFloorSev] = useState<number | null>(null);
+  const [floorSevOverrides, setFloorSevOverrides] = useState<Record<number, Record<string, number>>>({}); // fi → {fire: 2, water: 1}
+  const [dragRoomV2, setDragRoomV2] = useState<{fi: number; ri: number} | null>(null);
+  const LINKED_ROOMS_V2: Record<string, string> = { "Master": "Master Bath", "Master Bath": "Master" };
+  const handleDropV2 = (targetFi: number) => {
+    if (!dragRoomV2 || dragRoomV2.fi === targetFi) { setDragRoomV2(null); return; }
+    setHomeRooms(prev => {
+      const next = prev.map(f => ({ ...f, rooms: [...f.rooms] }));
+      const room = next[dragRoomV2.fi].rooms[dragRoomV2.ri];
+      const linkedName = LINKED_ROOMS_V2[room.name];
+      const linkedRi = linkedName ? next[dragRoomV2.fi].rooms.findIndex(r => r.name === linkedName) : -1;
+      if (linkedRi >= 0) {
+        const linked = next[dragRoomV2.fi].rooms[linkedRi];
+        next[dragRoomV2.fi].rooms.splice(linkedRi, 1);
+        next[targetFi].rooms.push(linked);
+      }
+      const adjRi = next[dragRoomV2.fi].rooms.findIndex(r => r === room);
+      if (adjRi >= 0) { next[dragRoomV2.fi].rooms.splice(adjRi, 1); next[targetFi].rooms.push(room); }
+      return next;
+    });
+    setDragRoomV2(null);
+  };
+  const addRoomV2 = (fi: number, name: string) => {
+    setHomeRooms(prev => {
+      const next = [...prev];
+      const existing = new Set(next.flatMap(f => f.rooms.map(r => r.name)));
+      let finalName = name;
+      if (existing.has(name)) {
+        const base = name.replace(/\s+\d+$/, "");
+        let n = 2; while (existing.has(`${base} ${n}`)) n++;
+        finalName = `${base} ${n}`;
+      }
+      next[fi] = { ...next[fi], rooms: [...next[fi].rooms, { name: finalName, affected: false }] };
+      return next;
+    });
+  };
+  const [editingRoom, setEditingRoom] = useState<{fi: number; ri: number} | null>(null);
+  const [renamingRoomV2, setRenamingRoomV2] = useState<{fi: number; ri: number} | null>(null);
+  const [renameTextV2, setRenameTextV2] = useState("");
+  const [addingToFloorV2, setAddingToFloorV2] = useState<number | null>(null);
+  const [addSearchV2, setAddSearchV2] = useState("");
+  const ROOM_LIST_V2 = ["Master", "Bedroom", "Guest Room", "Nursery", "Master Bath", "Bathroom", "Half Bath", "Hall Bath", "Living", "Family", "Great Room", "Den", "Office", "Study", "Kitchen", "Kitchenette", "Dining", "Pantry", "Bar", "Hallway", "Foyer", "Entry", "Closet", "Walk-in Closet", "Storage", "Laundry", "Utility", "Garage", "Porch", "Patio", "Rec", "Playroom", "Game", "Gym", "Media", "Theater", "Attic"];
+  // Photo Scope reason codes — what are we doing with this room's contents
+  const REASON_CODES = [
+    { code: "BEF", label: "Before", desc: "Before photos only", primary: true },
+    { code: "PU", label: "Pick Up", desc: "Pack and remove", primary: true },
+    { code: "CC", label: "Customer Cleaning", desc: "Customer will clean", primary: true },
+    { code: "IH", label: "InHome", desc: "Clean on-site", primary: true },
+    { code: "SVC", label: "Services", desc: "Special services needed", primary: true },
+    { code: "TLI", label: "Total Loss", desc: "Total loss inventory", primary: true },
+    { code: "COE", label: "Cash Out Estimate", desc: "Estimate for cash-out", primary: false },
+    { code: "CTW", label: "Throwing Out", desc: "Items to discard", primary: false },
+    { code: "DNT", label: "Do Not Touch", desc: "Leave as-is", primary: false },
+    { code: "NWC", label: "Not Worth Cleaning", desc: "Cost exceeds value", primary: false },
+    { code: "OV", label: "Other Vendor", desc: "Another vendor handling", primary: false },
+    { code: "UND", label: "Undecided", desc: "TBD", primary: false },
+  ];
+  const DEPARTMENTS = ["All", "Window Treats", "Rugs", "Bedding", "Exposed", "Clothes", "Closets", "Drawers"];
+  const [roomReasonCodes, setRoomReasonCodes] = useState<Record<string, string[]>>({});
+  const [roomDepartments, setRoomDepartments] = useState<Record<string, string[]>>({});
+
+  const HANDLING_CODES_V2 = [
+    { code: "Box", desc: "Return items in boxes" },
+    { code: "Damp", desc: "Tag within 5 days" },
+    { code: "DC", desc: "Dry clean all items" },
+    { code: "DNR", desc: "Do not reject" },
+    { code: "Det", desc: "Special detergent" },
+    { code: "FMP", desc: "Fold as much as possible" },
+    { code: "Hand", desc: "Hand finish pressed items" },
+    { code: "Hang", desc: "Use customer's hangers" },
+    { code: "Low", desc: "Dry on low heat" },
+    { code: "NoDC", desc: "Do not dry clean" },
+    { code: "NoDry", desc: "Cannot be dried in dryer" },
+    { code: "PPC", desc: "Potential problem claim" },
+    { code: "PPE", desc: "Wear PPE when handling" },
+    { code: "STAR", desc: "Premium items, special hangers" },
+    { code: "VIC", desc: "Very important claim" },
+    { code: "Wet", desc: "Still wet, tag/treat ASAP" },
+  ];
+  const QUALITY_CODES = ["Q1", "Q2", "Q3", "Q5"];
+  const [impactMode, setImpactMode] = useState<"all" | "floors" | "rooms" | "">("");
+  const [expandedFloor, setExpandedFloor] = useState<number | null>(null);
+
+  const generateRooms = () => {
+    const result: FloorEntry[] = [];
+    const nFloors = typeof floors === "number" ? floors : 1;
+    const nBeds = typeof beds === "number" ? beds : 2;
+    const nBaths = typeof baths === "number" ? baths : 1;
+    if (nFloors <= 1) {
+      const rooms: RoomEntry[] = [{ name: "Living", affected: false }, { name: "Kitchen", affected: false }, { name: "Dining", affected: false }];
+      for (let i = 1; i <= nBeds; i++) rooms.push({ name: i === 1 ? "Master" : `Bedroom ${i}`, affected: false });
+      for (let i = 1; i <= nBaths; i++) rooms.push({ name: nBaths === 1 ? "Bathroom" : i === 1 ? "Master Bath" : `Bath ${i}`, affected: false });
+      if (!hasBasement) rooms.push({ name: "Laundry", affected: false });
+      result.push({ name: "Floor 1", rooms });
+    } else {
+      const f1: RoomEntry[] = [{ name: "Living", affected: false }, { name: "Kitchen", affected: false }, { name: "Dining", affected: false }, { name: "Half Bath", affected: false }];
+      if (!hasBasement) f1.push({ name: "Laundry", affected: false });
+      result.push({ name: "Floor 1", rooms: f1 });
+      for (let f = 2; f < nFloors; f++) result.push({ name: `Floor ${f}`, rooms: [{ name: "Family", affected: false }, { name: "Office", affected: false }] });
+      const top: RoomEntry[] = [];
+      for (let i = 1; i <= nBeds; i++) top.push({ name: i === 1 ? "Master" : `Bedroom ${i}`, affected: false });
+      for (let i = 1; i <= nBaths; i++) top.push({ name: nBaths === 1 ? "Bathroom" : i === 1 ? "Master Bath" : `Bath ${i}`, affected: false });
+      result.push({ name: `Floor ${nFloors}`, rooms: top });
+    }
+    if (hasBasement) result.unshift({ name: "Basement", rooms: [{ name: "Rec", affected: false }, { name: "Laundry", affected: false }, { name: "Storage", affected: false }] });
+    if (hasAttic) result.push({ name: "Attic", rooms: [{ name: "Attic", affected: false }] });
+    setHomeRooms(result);
+  };
+
+  const markAll = (affected: boolean) => setHomeRooms(prev => prev.map(f => ({ ...f, rooms: f.rooms.map(r => ({ ...r, affected })) })));
+  const markFloor = (fi: number) => setHomeRooms(prev => { const next = [...prev]; const allOn = next[fi].rooms.every(r => r.affected); next[fi] = { ...next[fi], rooms: next[fi].rooms.map(r => ({ ...r, affected: !allOn })) }; return next; });
+  const markRoom = (fi: number, ri: number) => setHomeRooms(prev => { const next = [...prev]; const rooms = [...next[fi].rooms]; rooms[ri] = { ...rooms[ri], affected: !rooms[ri].affected }; next[fi] = { ...next[fi], rooms }; return next; });
+  const totalAffected = homeRooms.reduce((s, f) => s + f.rooms.filter(r => r.affected).length, 0);
+  const totalRoomCount = homeRooms.reduce((s, f) => s + f.rooms.length, 0);
+
+  // Step 5: Services scope
+  const DEPTH_LEVELS = [
+    { id: 1, label: "Specific Items", short: "Specific", desc: "A rug, drapes, specific pieces" },
+    { id: 2, label: "Exposed Surfaces", short: "Exposed", desc: "Bedding, rugs, drapes, surfaces" },
+    { id: 3, label: "Exposed + Closets", short: "Closets", desc: "Add hanging + folded from closets" },
+    { id: 4, label: "Exposed + Closets + Drawers", short: "Drawers", desc: "Add dresser, cabinet contents" },
+    { id: 5, label: "Everything", short: "Everything", desc: "All contents including bins, electronics" },
+  ];
+  const [depthLevel, setDepthLevel] = useState(2);
+  const SERVICES = ["Appliance", "Art", "Consulting", "Contents", "Furniture", "Hand Clean", "Pack-out", "Rugs", "Storage Only", "Textiles", "TLI", "Expert Stain Removal"];
+  const [selectedServices, setSelectedServices] = useState<Record<string, boolean>>({});
+
+  // Step labels
+  const stepLabels = ["Building", "Space", "Severity", "Rooms"];
+  const stepQuestions = [
+    "Building type",
+    propType === "trailer" ? "Trailer size" : isHouseType ? "Home size" : "Unit size",
+    "What type of damage occurred?",
+    roomPass === 1 ? "Confirm rooms" : roomPass === 2 ? "Which areas were affected?" : "Set instructions",
+  ];
+
+  // Auto-generate rooms and default all to affected when entering step 4
+  const advanceStep = () => {
+    if (step === 3) {
+      if (homeRooms.length === 0) generateRooms();
+      // Default all rooms to affected — user deselects what's not impacted
+      setTimeout(() => markAll(true), 0);
+    }
+    if (step < totalSteps) setStep(step + 1);
+  };
+
+  const canAdvance = step === 1 ? !!propType : step === 2 ? floors !== "" : step === 3 ? activeDamage.length > 0 : true;
+
+  return (
+    <div className="fixed inset-0 z-[300] bg-slate-900/60 flex items-center justify-center p-4" style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div className="w-[393px] max-w-full bg-white rounded-[44px] shadow-2xl flex flex-col overflow-hidden relative" style={{ height: "852px", maxHeight: "95vh", boxShadow: "0 0 0 1px rgba(148,163,184,.28), 0 22px 56px rgba(15,23,42,.16)" }}>
+
+      {/* Dynamic Island */}
+      <div className="absolute top-0 left-0 right-0 h-[46px] flex items-end justify-center pb-1.5 z-50 pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-1.5 rounded-[18px] bg-[#1a1a1a] px-3.5 h-7 min-w-[100px]">
+          {stepLabels.map((_, i) => {
+            const active = step === i + 1;
+            const complete = step > i + 1;
+            return (
+              <React.Fragment key={i}>
+                {i > 0 && <div className={`flex-1 min-w-1 h-0.5 ${complete ? "bg-blue-500/60" : "bg-white/30"}`} />}
+                <div className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${active ? "bg-blue-600 text-white" : complete ? "bg-blue-500/60 text-white" : "bg-white/25 text-white/80"}`}>{i + 1}</div>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Nav bar */}
+      <div className="flex-shrink-0 flex items-center gap-2 px-4 bg-white/95 backdrop-blur-sm border-b border-slate-200" style={{ paddingTop: "52px", minHeight: "94px" }}>
+        {step > 1 && (
+          <button onClick={() => setStep(step - 1)} className="w-[34px] h-[34px] rounded-xl flex items-center justify-center hover:bg-blue-50 transition-colors">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
+        )}
+        <div className="flex-1">
+          <span className="text-[17px] font-bold text-slate-900 tracking-tight">{stepLabels[step - 1]}</span>
+          <div className="text-[11px] text-slate-400 mt-0.5">Step {step} of {totalSteps}</div>
+        </div>
+        <button onClick={onClose} className="w-[34px] h-[34px] rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 text-lg font-bold">×</button>
+      </div>
+
+      {/* Progress bar — tap to jump to completed steps */}
+      <div className="flex-shrink-0 px-4 pt-2 pb-1 bg-white">
+        <div className="flex gap-1">
+          {stepLabels.map((label, i) => {
+            const canJump = i + 1 < step;
+            return (
+              <button key={i} onClick={() => { if (canJump) setStep(i + 1); }} disabled={!canJump && i + 1 !== step} className={`flex-1 flex flex-col items-center gap-1 ${canJump ? "cursor-pointer" : ""}`}>
+                <div className={`w-full h-1.5 rounded-full transition-all ${step > i + 1 ? "bg-blue-500" : step === i + 1 ? "bg-blue-400" : "bg-slate-200"}`} />
+                <span className={`text-[11px] font-semibold ${step === i + 1 ? "text-blue-600" : step > i + 1 ? "text-blue-500" : "text-slate-400"}`}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto bg-[#f5f7fb]" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className="px-4 pt-4 pb-28">
+          {/* Question */}
+          <div className="mb-4">
+            <div className="text-[18px] font-bold text-slate-900 leading-tight">{stepQuestions[step - 1]}</div>
+          </div>
+
+          {/* Step 1: Property Type */}
+          {step === 1 && (() => {
+            // Uses individual PNGs if available, falls back to inline SVG
+            const svgFallbacks: Record<string, React.ReactNode> = {
+              trailer: <svg viewBox="0 0 48 48" className="w-14 h-14"><rect x="4" y="20" width="40" height="14" rx="2.5" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5"/><rect x="8" y="24" width="6" height="5" rx="1" fill="currentColor" opacity=".35"/><rect x="18" y="24" width="6" height="5" rx="1" fill="currentColor" opacity=".35"/><rect x="34" y="24" width="6" height="7" rx="1" fill="currentColor" opacity=".3"/></svg>,
+              house: <svg viewBox="0 0 48 48" className="w-14 h-14"><path d="M24 8L6 24h5v16h10v-10h6v10h10V24h5L24 8z" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>,
+              largehouse: <svg viewBox="0 0 64 48" className="w-14 h-14"><path d="M28 6L6 22h4v18h36V22h4L28 6z" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><rect x="42" y="22" width="16" height="18" rx="1.5" fill="currentColor" opacity=".12" stroke="currentColor" strokeWidth="1.5"/></svg>,
+              estate: <svg viewBox="0 0 72 48" className="w-14 h-14"><rect x="2" y="32" width="3" height="14" rx=".5" fill="currentColor" opacity=".5"/><rect x="67" y="32" width="3" height="14" rx=".5" fill="currentColor" opacity=".5"/><path d="M5 35h10M5 38h10M5 41h10M57 35h10M57 38h10M57 41h10" stroke="currentColor" strokeWidth="1.2" opacity=".35"/><path d="M36 4L14 20h4v18h36V20h4L36 4z" fill="currentColor" opacity=".18" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>,
+              townhouse: <svg viewBox="0 0 48 48" className="w-14 h-14"><path d="M12 18L5 25v17h14V25L12 18z" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M24 14l-7 7v21h14V21l-7-7z" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M36 18l-7 7v17h14V25l-7-7z" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>,
+              lowrise: <svg viewBox="0 0 48 48" className="w-14 h-14"><rect x="8" y="14" width="32" height="28" rx="2.5" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5"/><rect x="14" y="19" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/><rect x="28" y="19" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/><rect x="14" y="29" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/><rect x="28" y="29" width="5" height="5" rx="1" fill="currentColor" opacity=".4"/></svg>,
+              highrise: <svg viewBox="0 0 48 48" className="w-14 h-14"><rect x="12" y="4" width="24" height="38" rx="2.5" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5"/><rect x="17" y="9" width="4" height="4" rx=".5" fill="currentColor" opacity=".4"/><rect x="27" y="9" width="4" height="4" rx=".5" fill="currentColor" opacity=".4"/><rect x="17" y="16" width="4" height="4" rx=".5" fill="currentColor" opacity=".4"/><rect x="27" y="16" width="4" height="4" rx=".5" fill="currentColor" opacity=".4"/><rect x="17" y="23" width="4" height="4" rx=".5" fill="currentColor" opacity=".4"/><rect x="27" y="23" width="4" height="4" rx=".5" fill="currentColor" opacity=".4"/><rect x="17" y="30" width="4" height="4" rx=".5" fill="currentColor" opacity=".4"/><rect x="27" y="30" width="4" height="4" rx=".5" fill="currentColor" opacity=".4"/></svg>,
+              storefront: <svg viewBox="0 0 48 48" className="w-14 h-14"><rect x="4" y="16" width="40" height="26" rx="2.5" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5"/><path d="M4 16l5-10h30l5 10" fill="currentColor" opacity=".1" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><rect x="10" y="26" width="12" height="12" rx="1" fill="currentColor" opacity=".3"/><rect x="28" y="26" width="10" height="16" rx="1" fill="currentColor" opacity=".25"/></svg>,
+              commercial: <svg viewBox="0 0 48 48" className="w-14 h-14"><rect x="4" y="8" width="40" height="34" rx="2.5" fill="currentColor" opacity=".15" stroke="currentColor" strokeWidth="1.5"/><rect x="10" y="14" width="6" height="5" rx="1" fill="currentColor" opacity=".35"/><rect x="21" y="14" width="6" height="5" rx="1" fill="currentColor" opacity=".35"/><rect x="32" y="14" width="6" height="5" rx="1" fill="currentColor" opacity=".35"/><rect x="10" y="24" width="6" height="5" rx="1" fill="currentColor" opacity=".35"/><rect x="21" y="24" width="6" height="5" rx="1" fill="currentColor" opacity=".35"/><rect x="32" y="24" width="6" height="5" rx="1" fill="currentColor" opacity=".35"/></svg>,
+            };
+            const BuildingIcon = ({ id }: { id: string }) => {
+              const [imgError, setImgError] = React.useState(false);
+              if (imgError) return <>{svgFallbacks[id] || null}</>;
+              // Each icon gets custom scale + vertical position to look centered despite baked-in whitespace
+              const sizes: Record<string, number> = {
+                trailer: 150, house: 125, largehouse: 118, estate: 118,
+                townhouse: 120, lowrise: 120, highrise: 125, storefront: 120, commercial: 118,
+              };
+              const sz = sizes[id] || 125;
+              const nudge: Record<string, number> = {
+                trailer: 0, house: 20, largehouse: 20, estate: 0,
+                townhouse: 20, lowrise: 20, highrise: 20, storefront: 15, commercial: 12,
+              };
+              return (
+                <div className="w-full flex items-center justify-center overflow-hidden" style={{ height: 70 }}>
+                  <img src={`/icons/${id}.png`} alt={id} className="max-w-none" style={{ width: sz, height: sz, objectFit: "contain", marginTop: nudge[id] || 0 }} onError={() => setImgError(true)} />
+                </div>
+              );
+            };
+            return (
+            <div className="space-y-3">
+              {/* Show full grid when nothing selected, compact bar when selected */}
+              {!propType ? (
+                <div className="grid grid-cols-3 gap-2.5">
+                  {PROPERTY_TYPES.map(pt => (
+                    <button key={pt.id} onClick={() => { setPropType(pt.id); setPropSubType(""); setWorkScope(noeApt ? "unit" : (SCOPE_DEFAULTS[pt.id] || "building")); const defs: Record<string,boolean> = {}; (ACCESS_DEFAULTS[pt.id] || []).forEach(k => { defs[k] = true; }); setAccessDetails(defs); }} className="flex flex-col items-center rounded-[14px] border-2 px-1 py-1 transition-all border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:text-slate-500">
+                      {<BuildingIcon id={pt.id} />}
+                      <div className="flex items-center gap-1">
+                        <span className="text-[12px] font-bold leading-tight text-center text-slate-700">{pt.label}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <button onClick={() => setPropType("")} className="w-full flex items-center gap-3 rounded-[14px] border-2 border-blue-500 bg-blue-50 px-4 py-2.5 text-left">
+                  <div className="text-blue-600 shrink-0" style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <img src={`/icons/${propType}.png`} alt={propType} className="w-16 h-16 object-contain" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-[14px] font-bold text-blue-700">{selectedPropObj?.label}</span>
+                    {propType === "highrise" && <span className="ml-1.5 rounded px-1 py-0.5 text-[9px] font-bold bg-blue-600 text-white">6+</span>}
+                  </div>
+                  <span className="text-[12px] font-bold text-blue-500">Change</span>
+                </button>
+              )}
+              {/* Access & Logistics — contextual per type */}
+              {propType && (
+                <div className="space-y-3">
+                  {(ACCESS_FOR_TYPE[propType] || ACCESS_FOR_TYPE.house).map(group => (
+                    <div key={group.label}>
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-1.5 px-1">{group.label}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.items.map(item => (
+                          <button key={item} onClick={() => setAccessDetails(p => ({ ...p, [item]: !p[item] }))} className={`rounded-full border-2 px-3.5 py-1.5 text-[12px] font-semibold transition-all ${accessDetails[item] ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"}`}>{item}</button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Unit or Entire — for multi-unit building types */}
+              {propType && (SCOPE_DEFAULTS[propType] === "unit" || showScopeToggle) && (
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-1.5 px-1">Unit / Suite</div>
+                    <div className="flex gap-2">
+                      <input value={unitNumber} onChange={e => { setUnitNumber(e.target.value); if (e.target.value) setWorkScope("unit"); }} placeholder="e.g. 112, Suite 4B" className="flex-1 h-11 rounded-[12px] border-2 border-slate-200 px-4 text-[15px] font-bold text-slate-800 outline-none focus:border-blue-400 bg-white" />
+                      <button onClick={() => { setWorkScope("building"); setUnitNumber(""); setUnitFloorLevel(""); }} className={`rounded-[12px] border-2 px-4 h-11 text-[13px] font-bold transition-all ${workScope === "building" && !unitNumber ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>Entire Building</button>
+                    </div>
+                  </div>
+                  {unitNumber && (
+                    <div>
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-1.5 px-1">Unit is on floor</div>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <button key={n} onClick={() => setUnitFloorLevel(n)} className={`flex-1 h-10 rounded-[10px] border-2 text-[14px] font-bold transition-all ${unitFloorLevel === n ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{n}</button>
+                        ))}
+                        <button onClick={() => { const v = prompt("Floor:"); if (v) setUnitFloorLevel(Number(v)); }} className={`w-10 h-10 rounded-[10px] border-2 text-[13px] font-bold ${typeof unitFloorLevel === "number" && unitFloorLevel > 5 ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-400"}`}>{typeof unitFloorLevel === "number" && unitFloorLevel > 5 ? unitFloorLevel : "+"}</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>);
+          })()}
+
+          {/* Step 2: Unit details */}
+          {step === 2 && (
+            <div className="space-y-4">
+              {/* Floors — hidden for trailers (always 1) */}
+              {propType === "trailer" && floors !== 1 && (() => { setFloors(1); return null; })()}
+              {propType !== "trailer" && <div>
+                <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">{!isHouseType && isMultiUnit && workScope !== "building" ? "Floors in Unit" : "Floors"}</div>
+                <div className="flex gap-2">
+                  {(isMultiUnit ? [1, 2, 3] : [1, 2, 3, 4]).map(n => (
+                    <button key={n} onClick={() => setFloors(n)} className={`flex-1 h-12 rounded-[12px] border-2 text-[16px] font-bold transition-all ${floors === n ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{n}</button>
+                  ))}
+                  <button onClick={() => { const v = prompt("Floors:"); if (v) setFloors(Number(v)); }} className={`w-12 h-12 rounded-[12px] border-2 text-[14px] font-bold ${typeof floors === "number" && floors > (isMultiUnit ? 3 : 4) ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-400"}`}>{typeof floors === "number" && floors > (isMultiUnit ? 3 : 4) ? floors : "+"}</button>
+                </div>
+                {/* Basement / Attic — not for trailers */}
+                {propType !== "trailer" && (isHouseType || workScope === "building") && (
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => setHasBasement(!hasBasement)} className={`flex-1 rounded-[10px] border-2 py-2 text-[13px] font-bold transition-all ${hasBasement ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>
+                      {hasBasement ? "Basement ✓" : "+ Basement"}
+                    </button>
+                    <button onClick={() => setHasAttic(!hasAttic)} className={`flex-1 rounded-[10px] border-2 py-2 text-[13px] font-bold transition-all ${hasAttic ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>
+                      {hasAttic ? "Attic ✓" : "+ Attic"}
+                    </button>
+                  </div>
+                )}
+              </div>}
+              {/* Beds */}
+              <div>
+                <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Bedrooms</div>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button key={n} onClick={() => setBeds(n)} className={`flex-1 h-12 rounded-[12px] border-2 text-[16px] font-bold transition-all ${beds === n ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{n}</button>
+                  ))}
+                  <button onClick={() => { const v = prompt("Bedrooms:"); if (v) setBeds(Number(v)); }} className={`w-12 h-12 rounded-[12px] border-2 text-[14px] font-bold ${typeof beds === "number" && beds > 5 ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-400"}`}>{typeof beds === "number" && beds > 5 ? beds : "+"}</button>
+                </div>
+              </div>
+              {/* Sq ft slider — range adapts to property type */}
+              {(() => {
+                const ranges: Record<string, { min: number; max: number; step: number; def: number; marks: [string, string, string, string] }> = {
+                  trailer:    { min: 200, max: 2000, step: 50, def: 800, marks: ["200", "500", "1k", "2k"] },
+                  house:      { min: 500, max: 5000, step: 100, def: 1800, marks: ["500", "1.5k", "3k", "5k"] },
+                  largehouse: { min: 2000, max: 10000, step: 100, def: 4000, marks: ["2k", "4k", "7k", "10k"] },
+                  estate:     { min: 3000, max: 25000, step: 500, def: 8000, marks: ["3k", "8k", "15k", "25k"] },
+                  townhouse:  { min: 800, max: 4000, step: 100, def: 1600, marks: ["800", "1.5k", "2.5k", "4k"] },
+                  lowrise:    { min: 400, max: 3000, step: 50, def: 1000, marks: ["400", "1k", "2k", "3k"] },
+                  highrise:   { min: 400, max: 5000, step: 50, def: 1200, marks: ["400", "1.5k", "3k", "5k"] },
+                  storefront: { min: 500, max: 15000, step: 100, def: 2000, marks: ["500", "3k", "8k", "15k"] },
+                  commercial: { min: 1000, max: 100000, step: 500, def: 10000, marks: ["1k", "10k", "50k", "100k"] },
+                };
+                const r = ranges[propType] || ranges.house;
+                return (
+                <div>
+                  <div className="text-center mb-3">
+                    <span className={`text-[28px] font-extrabold tabular-nums ${sqft ? "text-blue-700" : "text-slate-300"}`}>{sqft ? Number(sqft).toLocaleString() : "—"}</span>
+                    <span className={`text-[14px] font-bold ml-1.5 ${sqft ? "text-blue-500" : "text-slate-300"}`}>Square Feet</span>
+                  </div>
+                  <input type="range" min={r.min} max={r.max} step={r.step} value={sqft || String(r.def)} onChange={e => setSqft(e.target.value)} className="w-full h-2 rounded-full appearance-none bg-slate-200 accent-blue-600 cursor-pointer" />
+                  <div className="flex justify-between mt-1.5">
+                    {r.marks.map((m, i) => <span key={i} className="text-[12px] font-semibold text-slate-500">{m}</span>)}
+                  </div>
+                </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Step 3: Damage with expandable sub-categories */}
+          {step === 3 && (
+            <div className="space-y-3">
+              {/* Uniform severity toggle */}
+              {activeDamage.length > 0 && (
+                <div className="flex items-center justify-between rounded-[14px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <span className="text-[13px] font-semibold text-slate-700">Same severity throughout?</span>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => setUniformSeverity(true)} className={`rounded-[8px] border-2 px-3.5 py-1.5 text-[12px] font-bold transition-all ${uniformSeverity ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>Yes</button>
+                    <button onClick={() => setUniformSeverity(false)} className={`rounded-[8px] border-2 px-3.5 py-1.5 text-[12px] font-bold transition-all ${!uniformSeverity ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>No</button>
+                  </div>
+                </div>
+              )}
+              {DAMAGE_TYPES.map(dt => {
+                const level = damageTypes[dt.id] || 0;
+                const isActive = level > 0;
+                const isExpanded = expandedDamage === dt.id;
+                const details = damageDetails[dt.id] || {};
+                return (
+                  <div key={dt.id} className={`rounded-[16px] border-2 overflow-hidden transition-all ${isActive ? dt.border : "border-slate-200"} bg-white`}>
+                    <button onClick={() => toggleDamage(dt.id)} className={`w-full flex items-center justify-between px-4 py-3 text-left ${isActive ? dt.light : ""}`}>
+                      <div className={`text-[16px] font-bold ${isActive ? "text-slate-900" : "text-slate-600"}`}><span className="mr-1.5">{dt.icon}</span>{dt.label}</div>
+                      {isActive && <span className={`rounded-full ${dt.color} px-2.5 py-0.5 text-[12px] font-bold text-white`}>{dt.label[0]}{level}</span>}
+                      {!isActive && <span className="text-[13px] text-slate-400">Tap to add</span>}
+                    </button>
+                    {isActive && (
+                      <div className="px-4 py-3 border-t border-slate-100 space-y-3">
+                        <div>
+                          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Severity</div>
+                          <div className="flex gap-2">
+                            {[1, 2, 3].map(n => (
+                              <button key={n} onClick={() => setDamageLevel(dt.id, n)} className={`flex-1 h-10 rounded-[10px] border-2 text-[15px] font-bold transition-all ${level === n ? `${dt.color} text-white border-transparent` : "border-slate-200 text-slate-500"}`}>{n}</button>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Sub-categories — expandable */}
+                        <button onClick={() => setExpandedDamage(isExpanded ? null : dt.id)} className="w-full flex items-center justify-between text-left">
+                          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px]">Details</span>
+                          <div className="flex items-center gap-1.5">
+                            {!isExpanded && Object.entries(details).filter(([,v]) => v > 0).length > 0 && (
+                              <span className="text-[11px] text-slate-500">{Object.entries(details).filter(([,v]) => v > 0).map(([k,v]) => `${k} ${v}`).join(", ")}</span>
+                            )}
+                            <span className="text-slate-400 text-[11px]">{isExpanded ? "▾" : "▸"}</span>
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="space-y-2">
+                            {dt.details.map(detail => {
+                              const dVal = details[detail] || 0;
+                              return (
+                                <div key={detail} className="flex items-center justify-between">
+                                  <span className="text-[13px] font-medium text-slate-700">{detail}</span>
+                                  <div className="flex gap-1.5">
+                                    {[0, 1, 2, 3].map(n => (
+                                      <button key={n} onClick={() => {
+                                        setDamageDetails(p => ({ ...p, [dt.id]: { ...(p[dt.id] || {}), [detail]: n } }));
+                                        const updated = { ...(damageDetails[dt.id] || {}), [detail]: n };
+                                        const maxVal = Math.max(...Object.values(updated), 0);
+                                        if (maxVal > level) setDamageLevel(dt.id, maxVal);
+                                      }} className={`w-9 h-8 rounded-[8px] border-2 text-[12px] font-bold transition-all ${dVal === n ? (n > 0 ? `${dt.color} text-white border-transparent` : "border-slate-400 bg-slate-100 text-slate-600") : "border-slate-200 text-slate-500"}`}>{n}</button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Step 4: Rooms — tabbed view with 3 passes */}
+          {step === 4 && (
+            <div className="space-y-3">
+              {/* Pass indicator — 3 passes */}
+              <div className="flex rounded-[10px] bg-slate-100 p-1">
+                {([
+                  { id: 1 as const, label: "Rooms" },
+                  { id: 2 as const, label: "Impact" },
+                  { id: 3 as const, label: "Instructions" },
+                ]).map(pass => (
+                  <button key={pass.id} onClick={() => setRoomPass(pass.id)} className={`flex-1 rounded-[8px] py-2 text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 ${roomPass === pass.id ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${roomPass > pass.id ? "bg-blue-600 text-white" : roomPass === pass.id ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-400"}`}>{roomPass > pass.id ? "✓" : pass.id}</span>
+                    {pass.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Interview button */}
+              <button onClick={() => setShowInterview(true)} className={`w-full flex items-center justify-between rounded-[12px] border px-4 py-2.5 transition-all ${interviewAnswered === interviewTotal ? "border-green-300 bg-green-50" : interviewAnswered > 0 ? "border-blue-200 bg-blue-50/30" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+                <span className="text-[13px] font-bold text-slate-700">Interview</span>
+                <span className={`text-[12px] font-bold ${interviewAnswered === interviewTotal ? "text-green-600" : interviewAnswered > 0 ? "text-blue-600" : "text-slate-400"}`}>{interviewAnswered}/{interviewTotal} critical</span>
+              </button>
+
+              {/* Pass 1: Rooms — add, delete, rename, drag only */}
+              {roomPass === 1 && (
+                <>
+                  <div className="text-[12px] text-slate-500 px-1">{totalRoomCount} rooms across {homeRooms.length} floors. Tap name to rename, drag to move.</div>
+                  {homeRooms.map((floor, fi) => (
+                    <div key={fi} className={`rounded-[14px] border overflow-hidden shadow-sm transition-all ${dragRoomV2 && dragRoomV2.fi !== fi ? "border-blue-300 bg-blue-50/20" : "border-slate-200 bg-white"}`} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }} onDrop={e => { e.preventDefault(); handleDropV2(fi); }}>
+                      <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                        <span className="text-[13px] font-bold text-slate-800">{floor.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[12px] font-semibold text-slate-400">{floor.rooms.length}</span>
+                          <button onClick={() => { if (window.confirm(`Delete ${floor.name}?`)) setHomeRooms(prev => prev.filter((_, i) => i !== fi)); }} className="h-6 w-6 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center text-sm font-bold">×</button>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-slate-100">
+                        {floor.rooms.map((room, ri) => (
+                          renamingRoomV2?.fi === fi && renamingRoomV2?.ri === ri ? (
+                            <div key={ri} className="px-4 py-2 flex items-center gap-2 bg-blue-50">
+                              <input value={renameTextV2} onChange={e => setRenameTextV2(e.target.value)} onKeyDown={e => {
+                                if (e.key === "Enter" && renameTextV2.trim()) { setHomeRooms(prev => { const next = [...prev]; const rooms = [...next[fi].rooms]; rooms[ri] = { ...rooms[ri], name: renameTextV2.trim() }; next[fi] = { ...next[fi], rooms }; return next; }); setRenamingRoomV2(null); }
+                                if (e.key === "Escape") setRenamingRoomV2(null);
+                              }} autoFocus className="flex-1 rounded-[8px] border-2 border-blue-400 px-3 py-1.5 text-[13px] font-bold text-slate-800 outline-none bg-white" />
+                              <button onClick={() => { if (renameTextV2.trim()) { setHomeRooms(prev => { const next = [...prev]; const rooms = [...next[fi].rooms]; rooms[ri] = { ...rooms[ri], name: renameTextV2.trim() }; next[fi] = { ...next[fi], rooms }; return next; }); setRenamingRoomV2(null); }}} className="h-8 w-8 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center">✓</button>
+                              <button onClick={() => setRenamingRoomV2(null)} className="h-8 w-8 rounded-lg text-slate-500 text-sm font-bold flex items-center justify-center hover:bg-slate-100">×</button>
+                            </div>
+                          ) : (
+                            <div key={ri} draggable onDragStart={() => setDragRoomV2({fi, ri})} onDragEnd={() => setDragRoomV2(null)} onMouseDown={() => setDragRoomV2({fi, ri})} onMouseUp={() => setDragRoomV2(null)} className={`px-3 py-2.5 flex items-center gap-2.5 cursor-grab active:cursor-grabbing transition-all ${dragRoomV2?.fi === fi && dragRoomV2?.ri === ri ? "outline outline-2 outline-orange-400 rounded-lg bg-orange-50/30" : ""}`}>
+                              <span onClick={() => { setRenamingRoomV2({fi, ri}); setRenameTextV2(room.name); }} className="flex-1 text-[14px] font-semibold text-slate-800 cursor-text">{room.name}</span>
+                              <button onClick={() => setHomeRooms(prev => { const next = [...prev]; next[fi] = { ...next[fi], rooms: next[fi].rooms.filter((_, i) => i !== ri) }; return next; })} className="h-7 w-7 rounded-full flex items-center justify-center text-sm font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0">×</button>
+                            </div>
+                          )
+                        ))}
+                        {/* Add room — inline search */}
+                        {addingToFloorV2 === fi ? (
+                          <div className="px-3 py-3 bg-slate-50/80">
+                            <div className="flex gap-2 items-center mb-2">
+                              <input value={addSearchV2} onChange={e => setAddSearchV2(e.target.value)} onKeyDown={e => {
+                                if (e.key === "Enter" && addSearchV2.trim()) {
+                                  const match = ROOM_LIST_V2.find(r => r.toLowerCase().startsWith(addSearchV2.toLowerCase()));
+                                  addRoomV2(fi, match || addSearchV2.trim());
+                                  setAddSearchV2("");
+                                }
+                                if (e.key === "Escape") { setAddingToFloorV2(null); setAddSearchV2(""); }
+                              }} autoFocus placeholder="Type room name..." className="flex-1 rounded-[10px] border-2 border-slate-200 px-3 py-2 text-[13px] font-medium text-slate-800 outline-none focus:border-blue-400 bg-white" />
+                              <button onClick={() => { setAddingToFloorV2(null); setAddSearchV2(""); }} className="text-[13px] font-bold text-slate-500">Done</button>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-auto">
+                              {(() => {
+                                const existing = new Set(homeRooms.flatMap(f => f.rooms.map(r => r.name)));
+                                const repeatable = new Set(["Bedroom", "Bathroom", "Half Bath", "Closet", "Walk-in Closet", "Hallway", "Storage"]);
+                                return (addSearchV2.trim() ? ROOM_LIST_V2.filter(r => r.toLowerCase().includes(addSearchV2.toLowerCase())) : ROOM_LIST_V2.slice(0, 14)).filter(r => !existing.has(r) || repeatable.has(r));
+                              })().map(r => (
+                                <button key={r} onClick={() => { addRoomV2(fi, r); setAddSearchV2(""); }} className="rounded-full bg-white border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700">{r}</button>
+                              ))}
+                              {addSearchV2.trim() && !ROOM_LIST_V2.some(r => r.toLowerCase() === addSearchV2.toLowerCase()) && (
+                                <button onClick={() => { addRoomV2(fi, addSearchV2.trim()); setAddSearchV2(""); }} className="rounded-full bg-blue-50 border border-blue-300 px-3 py-1 text-[11px] font-bold text-blue-700">+ "{addSearchV2.trim()}"</button>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setAddingToFloorV2(fi)} className="w-full px-4 py-2 text-left text-[12px] font-bold text-blue-500 hover:bg-slate-50">+ Add room</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {/* Add floor */}
+                  <div className="flex flex-wrap gap-2">
+                    {!homeRooms.some(f => /basement/i.test(f.name)) && <button onClick={() => setHomeRooms(prev => [{ name: "Basement", rooms: [{ name: "Rec", affected: false }, { name: "Laundry", affected: false }, { name: "Storage", affected: false }] }, ...prev])} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Basement</button>}
+                    {!homeRooms.some(f => /attic/i.test(f.name)) && <button onClick={() => setHomeRooms(prev => [...prev, { name: "Attic", rooms: [{ name: "Attic", affected: false }] }])} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Attic</button>}
+                    <button onClick={() => setHomeRooms(prev => [...prev, { name: `Floor ${prev.length + 1}`, rooms: [] }])} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Floor</button>
+                  </div>
+                </>
+              )}
+
+              {/* Pass 2: Impact — mark affected, severity badges, floor severity edit */}
+              {roomPass === 2 && (
+                <>
+                  <div className="flex items-center justify-between px-1">
+                    <span className={`text-[13px] font-bold ${totalAffected === totalRoomCount ? "text-blue-700" : "text-slate-700"}`}>
+                      {totalAffected === totalRoomCount ? "Entire Property" : `${totalAffected} of ${totalRoomCount} rooms`}
+                    </span>
+                    <div className="flex gap-2">
+                      <button onClick={() => markAll(true)} className={`rounded-full border px-3 py-1 text-[11px] font-bold ${totalAffected === totalRoomCount ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-300 text-slate-600"}`}>All</button>
+                      <button onClick={() => markAll(false)} className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-bold text-slate-600">Clear</button>
+                    </div>
+                  </div>
+                  {homeRooms.map((floor, fi) => {
+                    const floorAff = floor.rooms.filter(r => r.affected).length;
+                    return (
+                      <div key={fi} className="rounded-[14px] border border-slate-200 bg-white overflow-hidden shadow-sm">
+                        <button onClick={() => markFloor(fi)} className={`w-full px-4 py-2.5 border-b border-slate-100 flex items-center justify-between text-left ${floorAff === floor.rooms.length && floor.rooms.length > 0 ? "bg-blue-50" : "bg-slate-50"}`}>
+                          <span className="text-[13px] font-bold text-slate-800">{floor.name}</span>
+                          <div className="flex items-center gap-2">
+                            {activeDamage.length > 0 && floorAff > 0 && (
+                              <button onClick={(e) => { e.stopPropagation(); setEditingFloorSev(editingFloorSev === fi ? null : fi); }} className="flex items-center gap-0.5">
+                                {activeDamage.map(([code, level]) => {
+                                  const dt = DAMAGE_TYPES.find(d => d.id === code);
+                                  const floorLevel = floorSevOverrides[fi]?.[code] ?? level;
+                                  return dt ? <span key={code} className={`rounded-full ${dt.color} px-1.5 py-0.5 text-[9px] font-bold text-white`}>{dt.label[0]}{floorLevel}</span> : null;
+                                })}
+                              </button>
+                            )}
+                            <span className={`text-[12px] font-bold ${floorAff > 0 ? "text-blue-600" : "text-slate-400"}`}>{floorAff}/{floor.rooms.length}</span>
+                          </div>
+                        </button>
+                        {editingFloorSev === fi && (
+                          <div className="px-3 py-2.5 bg-slate-50 border-b border-slate-100 space-y-2">
+                            {activeDamage.map(([code, level]) => {
+                              const dt = DAMAGE_TYPES.find(d => d.id === code);
+                              if (!dt) return null;
+                              const floorLevel = floorSevOverrides[fi]?.[code] ?? level;
+                              return (
+                                <div key={code} className="flex items-center justify-between">
+                                  <span className="text-[12px] font-semibold text-slate-700">{dt.icon} {dt.label}</span>
+                                  <div className="flex gap-1">
+                                    {[0, 1, 2, 3].map(n => (
+                                      <button key={n} onClick={() => {
+                                        // Set floor-level override
+                                        setFloorSevOverrides(p => ({ ...p, [fi]: { ...(p[fi] || {}), [code]: n } }));
+                                        // Apply to all affected rooms on this floor
+                                        floor.rooms.forEach((r, ri) => { if (r.affected) { setRoomSevOverrides(p => ({ ...p, [`${fi}-${ri}`]: { ...(p[`${fi}-${ri}`] || {}), [code]: n } })); }});
+                                      }} className={`w-9 h-8 rounded-[7px] border-2 text-[12px] font-bold transition-all ${floorLevel === n ? (n > 0 ? `${dt.color} text-white border-transparent` : "border-slate-400 bg-slate-100 text-slate-600") : "border-slate-200 text-slate-500"}`}>{n}</button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <button onClick={() => setEditingFloorSev(null)} className="text-[11px] font-bold text-blue-600">Done</button>
+                          </div>
+                        )}
+                        <div className="divide-y divide-slate-100">
+                          {floor.rooms.map((room, ri) => {
+                            const rKey = `${fi}-${ri}`;
+                            const overrides = roomSevOverrides[rKey] || {};
+                            return (
+                              <div key={ri} className={`px-4 py-2.5 flex items-center gap-3 ${room.affected ? "bg-blue-50/40" : ""}`}>
+                                <button onClick={() => markRoom(fi, ri)} className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${room.affected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300"}`}>
+                                  {room.affected && <span className="text-[10px] font-bold">✓</span>}
+                                </button>
+                                <span onClick={() => markRoom(fi, ri)} className={`flex-1 text-[14px] cursor-pointer ${room.affected ? "font-semibold text-slate-800" : "text-slate-400"}`}>{room.name}</span>
+                                {room.affected ? (
+                                  <button onClick={(e) => { e.stopPropagation(); setEditingRoom({fi, ri}); }} className="flex items-center gap-1">
+                                    {activeDamage.map(([code, level]) => {
+                                      const dt = DAMAGE_TYPES.find(d => d.id === code);
+                                      if (!dt) return null;
+                                      const roomLevel = overrides[code] ?? floorSevOverrides[fi]?.[code] ?? level;
+                                      return <span key={code} className={`rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${roomLevel > 0 ? dt.color : "bg-slate-300"}`}>{dt.label[0]}{roomLevel}</span>;
+                                    })}
+                                  </button>
+                                ) : (
+                                  <span className="rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-400">Not Affected</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Pass 3: Instructions — multi-select + bulk apply */}
+              {roomPass === 3 && (() => {
+                const [selectedKeys, setSelectedKeys] = [wizSelectedRooms2, setWizSelectedRooms2];
+                const rKey2 = (fi: number, ri: number) => `${fi}-${ri}`;
+                const isSelected2 = (fi: number, ri: number) => selectedKeys.has(rKey2(fi, ri));
+                const toggleSel = (fi: number, ri: number) => setSelectedKeys(p => { const n = new Set(p); n.has(rKey2(fi, ri)) ? n.delete(rKey2(fi, ri)) : n.add(rKey2(fi, ri)); return n; });
+                const selectFloor2 = (fi: number) => {
+                  setSelectedKeys(p => {
+                    const n = new Set(p);
+                    const keys = homeRooms[fi].rooms.map((r, ri) => r.affected ? rKey2(fi, ri) : "").filter(Boolean);
+                    const allOn = keys.every(k => n.has(k));
+                    keys.forEach(k => allOn ? n.delete(k) : n.add(k));
+                    return n;
+                  });
+                };
+                const selectAll2 = () => {
+                  const keys = new Set<string>();
+                  homeRooms.forEach((f, fi) => f.rooms.forEach((r, ri) => { if (r.affected) keys.add(rKey2(fi, ri)); }));
+                  setSelectedKeys(keys);
+                };
+                const clearSel = () => setSelectedKeys(new Set());
+                const applyBulkHandling = (code: string) => {
+                  setRoomHandlingCodes(p => {
+                    const next = { ...p };
+                    selectedKeys.forEach(key => {
+                      const curr = next[key] || [];
+                      next[key] = curr.includes(code) ? curr : [...curr, code];
+                    });
+                    return next;
+                  });
+                };
+                const applyBulkDepth = (d: number) => {
+                  // Per-room depth not stored separately yet — just update the default
+                  setDepthLevel(d);
+                };
+                const applyBulkService = (svc: string) => {
+                  setSelectedServices(p => ({ ...p, [svc]: true }));
+                };
+                const selNames: string[] = [];
+                selectedKeys.forEach(key => { const [fi, ri] = key.split("-").map(Number); const r = homeRooms[fi]?.rooms[ri]; if (r) selNames.push(r.name); });
+
+                return (
+                <>
+                  {/* Selection action bar */}
+                  {selectedKeys.size > 0 && (
+                    <div className="sticky top-0 z-10 rounded-[14px] border-2 border-blue-400 bg-blue-50 px-4 py-3 flex items-center justify-between shadow-sm">
+                      <span className="text-[14px] font-bold text-blue-800">{selNames.length === 1 ? selNames[0] : `${selNames.length} rooms selected`}</span>
+                      <div className="flex gap-2">
+                        <button onClick={() => setBulkEditing(true)} className="rounded-[10px] bg-blue-600 px-5 py-2 text-[13px] font-bold text-white hover:bg-blue-700 shadow-sm" style={{ boxShadow: "0 4px 10px rgba(37,99,235,.25)" }}>Edit</button>
+                        <button onClick={clearSel} className="rounded-[10px] border border-slate-300 px-3 py-2 text-[12px] font-bold text-slate-600 bg-white hover:bg-slate-50">Clear</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Select rooms, then edit */}
+                  <div className="text-[12px] text-slate-500 px-1">Select rooms to apply instructions.</div>
+                  <div className="flex items-center gap-2 flex-wrap px-1">
+                    <button onClick={selectAll2} className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 bg-white">All</button>
+                    {homeRooms.map((f, fi) => f.rooms.some(r => r.affected) ? (
+                      <button key={fi} onClick={() => selectFloor2(fi)} className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-100 bg-white">{f.name}</button>
+                    ) : null)}
+                  </div>
+
+                  {/* Room list with checkboxes */}
+                  {homeRooms.map((floor, fi) => {
+                    const affectedRooms = floor.rooms.map((r, ri) => ({ room: r, ri })).filter(x => x.room.affected);
+                    if (!affectedRooms.length) return null;
+                    return (
+                      <div key={fi} className="rounded-[14px] border border-slate-200 bg-white overflow-hidden shadow-sm">
+                        <button onClick={() => selectFloor2(fi)} className="w-full bg-slate-50 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between text-left">
+                          <span className="text-[13px] font-bold text-slate-700">{floor.name}</span>
+                          <span className="text-[12px] font-bold text-blue-600">{affectedRooms.length}</span>
+                        </button>
+                        <div className="divide-y divide-slate-100">
+                          {affectedRooms.map(({ room, ri }) => {
+                            const rKey = `${fi}-${ri}`;
+                            const roomDepth = roomDepthOverrides[rKey] ?? depthLevel;
+                            const depthLabel = DEPTH_LEVELS.find(l => l.id === roomDepth)?.short || "—";
+                            const overrides = roomSevOverrides[rKey] || {};
+                            const sel = isSelected2(fi, ri);
+                            return (
+                              <div key={ri} className={`px-3 py-2.5 flex items-center gap-2.5 ${sel ? "bg-blue-50/60" : "hover:bg-slate-50"}`}>
+                                <button onClick={() => toggleSel(fi, ri)} className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${sel ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300"}`}>
+                                  {sel && <span className="text-[10px] font-bold">✓</span>}
+                                </button>
+                                <button onClick={() => setEditingRoom({fi, ri})} className="flex-1 text-left text-[14px] font-semibold text-slate-800">{room.name}</button>
+                                <span className="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] font-bold">{depthLabel}</span>
+                                {activeDamage.map(([code, level]) => {
+                                  const dt = DAMAGE_TYPES.find(d => d.id === code);
+                                  if (!dt) return null;
+                                  const roomLevel = overrides[code] ?? floorSevOverrides[fi]?.[code] ?? level;
+                                  return <span key={code} className={`rounded-full ${dt.color} px-1.5 py-0.5 text-[10px] font-bold text-white`}>{dt.label[0]}{roomLevel}</span>;
+                                })}
+                                {(roomHandlingCodes[rKey]?.length || 0) > 0 && <span className="rounded-full bg-blue-100 text-blue-700 px-1.5 py-0.5 text-[9px] font-bold">{roomHandlingCodes[rKey].length}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Interview bottom sheet */}
+      {showInterview && (
+        <>
+          <div className="absolute inset-0 bg-black/30 z-20" onClick={() => setShowInterview(false)} />
+          <div className="absolute bottom-0 left-0 right-0 z-30 bg-white rounded-t-[22px] shadow-2xl" style={{ maxHeight: "85%", boxShadow: "0 -8px 30px rgba(0,0,0,.15)" }}>
+            <div className="flex flex-col items-center pt-2 pb-1"><div className="w-10 h-1 rounded-full bg-slate-300" /></div>
+            <div className="px-4 pb-2 flex items-center justify-between">
+              <div>
+                <span className="text-[15px] font-bold text-slate-800">Interview</span>
+                <span className="text-[12px] text-slate-500 ml-2">{interviewAnswered}/{interviewTotal} critical</span>
+              </div>
+              <button onClick={() => setShowInterview(false)} className="rounded-[10px] border border-slate-200 px-3 py-1.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50">Done</button>
+            </div>
+            <div className="overflow-auto border-t border-slate-100" style={{ maxHeight: "calc(85vh - 60px)" }}>
+              {INTERVIEW_SECTIONS.map(section => {
+                const answer = interviewAnswers[section.id];
+                const noteKey = `${section.id}_note`;
+                const noteVal = (interviewAnswers[noteKey] as string) || "";
+                const hasAnswer = answer !== undefined && answer !== null && answer !== "" && (!Array.isArray(answer) || answer.length > 0);
+                return (
+                  <div key={section.id} className="px-4 py-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-[13px] font-semibold ${section.critical ? "text-slate-800" : "text-slate-600"}`}>{section.title}</span>
+                      {section.critical && <span className="text-[9px] font-bold text-red-400">REQUIRED</span>}
+                    </div>
+                    {section.type === "boolean" && (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          {["Yes", "No"].map(opt => (
+                            <button key={opt} onClick={() => setInterviewAnswers(p => ({ ...p, [section.id]: opt === "Yes" }))} className={`flex-1 rounded-[10px] border-2 py-2.5 text-[13px] font-bold transition-all ${answer === (opt === "Yes") ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{opt}</button>
+                          ))}
+                        </div>
+                        {answer === true && (
+                          <input value={noteVal} onChange={e => setInterviewAnswers(p => ({ ...p, [noteKey]: e.target.value }))} placeholder="Details (optional)..." className="w-full rounded-[8px] border border-slate-200 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-blue-400" />
+                        )}
+                      </div>
+                    )}
+                    {section.type === "single" && section.options && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {section.options.map(opt => (
+                          <button key={opt} onClick={() => setInterviewAnswers(p => ({ ...p, [section.id]: p[section.id] === opt ? "" : opt }))} className={`rounded-[10px] border-2 px-3.5 py-2 text-[12px] font-bold transition-all ${answer === opt ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{opt}</button>
+                        ))}
+                      </div>
+                    )}
+                    {section.type === "multi" && section.options && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {section.options.map(opt => {
+                          const selected = Array.isArray(answer) && answer.includes(opt);
+                          return (
+                            <button key={opt} onClick={() => setInterviewAnswers(p => {
+                              const curr = Array.isArray(p[section.id]) ? (p[section.id] as string[]) : [];
+                              return { ...p, [section.id]: selected ? curr.filter(o => o !== opt) : [...curr, opt] };
+                            })} className={`rounded-[10px] border-2 px-3.5 py-2 text-[12px] font-bold transition-all ${selected ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{opt}</button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Bulk edit bottom sheet */}
+      {bulkEditing && wizSelectedRooms2.size > 0 && (() => {
+        const selKeys = Array.from(wizSelectedRooms2);
+        const selRoomNames = selKeys.map(k => { const [fi, ri] = k.split("-").map(Number); return homeRooms[fi]?.rooms[ri]?.name || ""; }).filter(Boolean);
+        const applyToAll = (fn: (rKey: string) => void) => selKeys.forEach(fn);
+        return (
+        <>
+          <div className="absolute inset-0 bg-black/30 z-20" onClick={() => setBulkEditing(false)} />
+          <div className="absolute bottom-0 left-0 right-0 z-30 bg-white rounded-t-[22px] shadow-2xl" style={{ maxHeight: "75%", boxShadow: "0 -8px 30px rgba(0,0,0,.15)" }}>
+            <div className="flex flex-col items-center pt-2 pb-1"><div className="w-10 h-1 rounded-full bg-slate-300" /></div>
+            <div className="px-4 pb-2 flex items-center justify-between">
+              <div>
+                <div className="text-[15px] font-bold text-slate-800">{selRoomNames.length} rooms</div>
+                {selRoomNames.length <= 4 && <div className="text-[11px] text-slate-500 mt-0.5">{selRoomNames.join(", ")}</div>}
+              </div>
+              <button onClick={() => setBulkEditing(false)} className="rounded-[10px] border border-slate-200 px-3 py-1.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50">Done</button>
+            </div>
+            <div className="overflow-auto border-t border-slate-100" style={{ maxHeight: "calc(75vh - 60px)" }}>
+              {/* Cleaning Instructions */}
+              <div className="px-4 py-3 border-b border-slate-100">
+                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Cleaning Instructions</div>
+                <div className="flex gap-1.5">
+                  {DEPTH_LEVELS.map(lvl => (
+                    <button key={lvl.id} onClick={() => applyToAll(rKey => setRoomDepthOverrides(p => ({ ...p, [rKey]: lvl.id })))} className={`flex-1 rounded-[8px] border-2 py-1.5 text-center transition-all ${depthLevel === lvl.id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}>
+                      <div className={`text-[10px] font-bold ${depthLevel >= lvl.id ? "text-blue-700" : "text-slate-500"}`}>{lvl.id}</div>
+                      <div className={`text-[7px] font-semibold ${depthLevel >= lvl.id ? "text-blue-500" : "text-slate-400"}`}>{lvl.short}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Severity */}
+              {activeDamage.length > 0 && (
+                <div className="px-4 py-3 border-b border-slate-100 space-y-2.5">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px]">Severity</div>
+                  {activeDamage.map(([code, level]) => {
+                    const dt = DAMAGE_TYPES.find(d => d.id === code);
+                    if (!dt) return null;
+                    return (
+                      <div key={code} className="flex items-center justify-between">
+                        <span className="text-[13px] font-semibold text-slate-700">{dt.icon} {dt.label}</span>
+                        <div className="flex gap-1.5">
+                          {[0, 1, 2, 3].map(n => (
+                            <button key={n} onClick={() => applyToAll(rKey => setRoomSevOverrides(p => ({ ...p, [rKey]: { ...(p[rKey] || {}), [code]: n } })))} className={`w-10 h-9 rounded-[8px] border-2 text-[13px] font-bold transition-all ${level === n ? (n > 0 ? `${dt.color} text-white border-transparent` : "border-slate-400 bg-slate-100 text-slate-600") : "border-slate-200 text-slate-500"}`}>{n}</button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Handling codes */}
+              <div className="px-4 py-3 border-b border-slate-100">
+                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Handling Codes</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {HANDLING_CODES_V2.map(hc => (
+                    <button key={hc.code} onClick={() => applyToAll(rKey => setRoomHandlingCodes(p => {
+                      const curr = p[rKey] || [];
+                      return { ...p, [rKey]: curr.includes(hc.code) ? curr : [...curr, hc.code] };
+                    }))} title={hc.desc} className="rounded-full border-2 px-3 py-1.5 text-[12px] font-bold transition-all border-slate-200 text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700">{hc.code}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Services */}
+              <div className="px-4 py-3 border-b border-slate-100">
+                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Services</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SERVICES.map(s => (
+                    <button key={s} onClick={() => setSelectedServices(p => ({ ...p, [s]: !p[s] }))} className={`rounded-full border-2 px-3 py-1.5 text-[12px] font-semibold transition-all ${selectedServices[s] ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{s}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Room instructions text — appears on SDS cover photo */}
+              <div className="px-4 py-3">
+                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Room Instructions</div>
+                <textarea value={(() => { const first = selKeys[0]; return roomNotes[first] || ""; })()} onChange={e => applyToAll(rKey => setRoomNotes(p => ({ ...p, [rKey]: e.target.value })))} rows={3} placeholder="Instructions for these rooms — will appear on SDS cover photo..." className="w-full rounded-[10px] border-2 border-slate-200 px-3 py-2.5 text-[13px] outline-none focus:border-blue-400 resize-none bg-white" />
+                {/* Summary preview */}
+                {(() => {
+                  const depth = DEPTH_LEVELS.find(l => l.id === depthLevel)?.short || "";
+                  const sevCodes = activeDamage.map(([code, level]) => `${DAMAGE_TYPES.find(d => d.id === code)?.label[0]}${level}`).join(" ");
+                  const hCodes = (() => { const first = selKeys[0]; return (roomHandlingCodes[first] || []).join(", "); })();
+                  const svcs = Object.entries(selectedServices).filter(([,v]) => v).map(([k]) => k).join(", ");
+                  const note = roomNotes[selKeys[0]] || "";
+                  const hasSummary = depth || sevCodes || hCodes || svcs || note;
+                  return hasSummary ? (
+                    <div className="mt-2 rounded-[10px] bg-slate-50 border border-slate-200 px-3 py-2">
+                      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-1">SDS Preview</div>
+                      <div className="text-[12px] text-slate-700 space-y-0.5">
+                        {depth && <div><span className="font-bold">Cleaning:</span> {depth}</div>}
+                        {sevCodes && <div><span className="font-bold">Severity:</span> {sevCodes}</div>}
+                        {hCodes && <div><span className="font-bold">Handling:</span> {hCodes}</div>}
+                        {svcs && <div><span className="font-bold">Services:</span> {svcs}</div>}
+                        {note && <div><span className="font-bold">Notes:</span> {note}</div>}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            </div>
+          </div>
+        </>
+        );
+      })()}
+
+      {/* Room detail bottom sheet — clean accordion */}
+      {editingRoom && (() => {
+        const { fi, ri } = editingRoom;
+        const room = homeRooms[fi]?.rooms[ri];
+        if (!room) return null;
+        const rKey = `${fi}-${ri}`;
+        const overrides = roomSevOverrides[rKey] || {};
+        const codes = roomHandlingCodes[rKey] || [];
+        const qCode = roomQualityCodes[rKey] || "";
+        const note = roomNotes[rKey] || "";
+        const thisRoomDepth = roomDepthOverrides[rKey] ?? depthLevel;
+        const depthShort = DEPTH_LEVELS.find(l => l.id === thisRoomDepth)?.short || "—";
+        const sevSummary = activeDamage.map(([code, level]) => { const o = overrides[code] ?? floorSevOverrides[fi]?.[code] ?? level; const dt = DAMAGE_TYPES.find(d => d.id === code); return dt && o > 0 ? `${dt.label[0]}${o}` : ""; }).filter(Boolean).join(" ");
+
+        return (
+        <>
+          <div className="absolute inset-0 bg-black/30 z-20" onClick={() => setEditingRoom(null)} />
+          <div className="absolute bottom-0 left-0 right-0 z-30 bg-white rounded-t-[22px] shadow-2xl" style={{ maxHeight: "80%", boxShadow: "0 -8px 30px rgba(0,0,0,.15)" }}>
+            <div className="flex flex-col items-center pt-2 pb-1"><div className="w-10 h-1 rounded-full bg-slate-300" /></div>
+            {/* Header — room name + status chips + done */}
+            <div className="px-4 pb-3 flex items-center gap-2">
+              <div className="flex-1">
+                <div className="text-[16px] font-bold text-slate-800">{room.name}</div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <button onClick={() => markRoom(fi, ri)} className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${room.affected ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-400"}`}>{room.affected ? "Affected" : "Not Affected"}</button>
+                  {room.affected && <span className="text-[11px] font-bold text-slate-500">{depthShort}</span>}
+                  {sevSummary && <span className="text-[11px] font-bold text-slate-500">{sevSummary}</span>}
+                  {codes.length > 0 && <span className="text-[11px] font-bold text-blue-500">{codes.length} codes</span>}
+                  {originRoom === rKey && <span className="text-[11px] font-bold text-red-500">Origin</span>}
+                </div>
+              </div>
+              <button onClick={() => setEditingRoom(null)} className="rounded-[10px] border border-slate-200 px-3 py-1.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50">Done</button>
+            </div>
+
+            {/* Scrollable sections */}
+            <div className="overflow-auto border-t border-slate-100" style={{ maxHeight: "calc(80vh - 80px)" }}>
+              {room.affected && (<>
+                {/* Cleaning + Severity — always visible */}
+                <div className="px-4 py-3 border-b border-slate-100 space-y-3">
+                  <div className="flex gap-1.5">
+                    {DEPTH_LEVELS.map(lvl => (
+                      <button key={lvl.id} onClick={() => setRoomDepthOverrides(p => ({ ...p, [rKey]: lvl.id }))} className={`flex-1 rounded-[8px] border-2 py-2 text-center transition-all ${thisRoomDepth === lvl.id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}>
+                        <div className={`text-[11px] font-bold ${thisRoomDepth >= lvl.id ? "text-blue-700" : "text-slate-500"}`}>{lvl.id}</div>
+                        <div className={`text-[8px] font-semibold ${thisRoomDepth >= lvl.id ? "text-blue-500" : "text-slate-400"}`}>{lvl.short}</div>
+                      </button>
+                    ))}
+                  </div>
+                  {activeDamage.map(([code, level]) => {
+                    const dt = DAMAGE_TYPES.find(d => d.id === code);
+                    if (!dt) return null;
+                    const roomLevel = overrides[code] ?? floorSevOverrides[fi]?.[code] ?? level;
+                    return (
+                      <div key={code} className="flex items-center justify-between">
+                        <span className="text-[13px] font-semibold text-slate-700">{dt.icon} {dt.label}</span>
+                        <div className="flex gap-1">
+                          {[0, 1, 2, 3].map(n => (
+                            <button key={n} onClick={() => setRoomSevOverrides(p => ({ ...p, [rKey]: { ...(p[rKey] || {}), [code]: n } }))} className={`w-9 h-8 rounded-[7px] border-2 text-[12px] font-bold transition-all ${roomLevel === n ? (n > 0 ? `${dt.color} text-white border-transparent` : "border-slate-400 bg-slate-100 text-slate-600") : "border-slate-200 text-slate-500"}`}>{n}</button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Instructions — reason codes + departments */}
+                <div className="px-4 py-3 border-b border-slate-100 space-y-3">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px]">Instructions</div>
+                  <div className="space-y-1">
+                    {REASON_CODES.filter(r => r.primary).map((rc, i) => {
+                      const selected = (roomReasonCodes[rKey] || []).includes(rc.code);
+                      return (
+                        <button key={rc.code} onClick={() => setRoomReasonCodes(p => {
+                          const curr = p[rKey] || [];
+                          return { ...p, [rKey]: curr.includes(rc.code) ? curr.filter(c => c !== rc.code) : [...curr, rc.code] };
+                        })} className={`w-full flex items-center gap-3 rounded-[10px] border px-3 py-2 text-left transition-all ${selected ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}>
+                          <span className={`w-5 text-[12px] font-bold ${selected ? "text-blue-600" : "text-slate-400"}`}>{i + 1}</span>
+                          <span className={`flex-1 text-[13px] font-semibold ${selected ? "text-blue-700" : "text-slate-700"}`}>{rc.label}</span>
+                          {selected && <span className="text-blue-500 text-[12px] font-bold">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Secondary reasons — show only if any primary selected */}
+                  {(roomReasonCodes[rKey] || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {REASON_CODES.filter(r => !r.primary).map(rc => {
+                        const selected = (roomReasonCodes[rKey] || []).includes(rc.code);
+                        return (
+                          <button key={rc.code} onClick={() => setRoomReasonCodes(p => {
+                            const curr = p[rKey] || [];
+                            return { ...p, [rKey]: curr.includes(rc.code) ? curr.filter(c => c !== rc.code) : [...curr, rc.code] };
+                          })} className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${selected ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{rc.label}</button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Departments */}
+                  {(roomReasonCodes[rKey] || []).length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-1.5">Departments</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {DEPARTMENTS.map(dept => {
+                          const selected = (roomDepartments[rKey] || []).includes(dept);
+                          return (
+                            <button key={dept} onClick={() => setRoomDepartments(p => {
+                              const curr = p[rKey] || [];
+                              if (dept === "All") return { ...p, [rKey]: curr.includes("All") ? [] : ["All"] };
+                              const without = curr.filter(d => d !== "All");
+                              return { ...p, [rKey]: without.includes(dept) ? without.filter(d => d !== dept) : [...without, dept] };
+                            })} className={`rounded-full border px-3 py-1.5 text-[12px] font-bold transition-all ${selected ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{dept}</button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Codes — Quality + Handling + Origin in one section */}
+                <div className="px-4 py-3 border-b border-slate-100 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1">
+                      {QUALITY_CODES.map(q => (
+                        <button key={q} onClick={() => setRoomQualityCodes(p => ({ ...p, [rKey]: p[rKey] === q ? "" : q }))} className={`w-10 h-8 rounded-[7px] border-2 text-[11px] font-bold transition-all ${qCode === q ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>{q}</button>
+                      ))}
+                    </div>
+                    <button onClick={() => setOriginRoom(originRoom === rKey ? "" : rKey)} className={`rounded-full border-2 px-3 py-1 text-[11px] font-bold transition-all ${originRoom === rKey ? "border-red-500 bg-red-50 text-red-700" : "border-slate-200 text-slate-500"}`}>{originRoom === rKey ? "Origin ✓" : "Origin"}</button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {HANDLING_CODES_V2.map(hc => (
+                      <button key={hc.code} onClick={() => setRoomHandlingCodes(p => {
+                        const curr = p[rKey] || [];
+                        return { ...p, [rKey]: curr.includes(hc.code) ? curr.filter(c => c !== hc.code) : [...curr, hc.code] };
+                      })} title={hc.desc} className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${codes.includes(hc.code) ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{hc.code}</button>
+                    ))}
+                  </div>
+                  {codes.length > 0 && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                      {codes.map(c => { const m = HANDLING_CODES_V2.find(h => h.code === c); return m ? <span key={c} className="text-[10px] text-blue-600"><span className="font-bold">{c}</span> {m.desc}</span> : null; })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div className="px-4 py-3">
+                  <textarea value={note} onChange={e => setRoomNotes(p => ({ ...p, [rKey]: e.target.value }))} rows={2} placeholder="Room instructions — appears on SDS cover photo..." className="w-full rounded-[10px] border-2 border-slate-200 px-3 py-2.5 text-[13px] outline-none focus:border-blue-400 resize-none bg-white" />
+                </div>
+              </>)}
+            </div>
+          </div>
+        </>
+        );
+      })()}
+
+      {/* Footer */}
+      <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 bg-white/95 backdrop-blur-sm flex justify-between gap-3">
+        {step > 1 || (step === 4 && roomPass > 1) ? (
+          <button onClick={() => { if (step === 4 && roomPass > 1) { setRoomPass((roomPass - 1) as 1 | 2 | 3); } else setStep(step - 1); }} className="rounded-[14px] border border-slate-200 bg-white px-5 py-3.5 text-[14px] font-bold text-slate-600 hover:bg-slate-50 shadow-sm">Back</button>
+        ) : <div />}
+        {step < totalSteps ? (
+          <button onClick={advanceStep} disabled={!canAdvance} className="rounded-[14px] bg-blue-600 px-6 py-3.5 text-[16px] font-bold text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 shadow-sm transition-all" style={{ boxShadow: "0 8px 18px rgba(37,99,235,.22)" }}>
+            Next
+          </button>
+        ) : roomPass < 3 ? (
+          <button onClick={() => setRoomPass((roomPass + 1) as 2 | 3)} className="rounded-[14px] bg-blue-600 px-6 py-3.5 text-[16px] font-bold text-white hover:bg-blue-700 shadow-sm transition-all" style={{ boxShadow: "0 8px 18px rgba(37,99,235,.22)" }}>
+            Next
+          </button>
+        ) : (
+          <button onClick={() => {
+            // Sync ALL scope data to order — rooms, severity, instructions, access, services
+            const roomsWithOverrides = homeRooms.flatMap((f, fi) => f.rooms.map((r, ri) => {
+              const rKey = `${fi}-${ri}`;
+              return {
+                name: r.name,
+                floor: f.name,
+                affected: r.affected,
+                depth: roomDepthOverrides[rKey] ?? depthLevel,
+                severityOverrides: roomSevOverrides[rKey] || {},
+                handlingCodes: roomHandlingCodes[rKey] || [],
+                qualityCode: roomQualityCodes[rKey] || "",
+                notes: roomNotes[rKey] || "",
+                isOrigin: originRoom === rKey,
+                reasonCodes: roomReasonCodes[rKey] || [],
+                departments: roomDepartments[rKey] || [],
+              };
+            }));
+            onOrderUpdate?.({
+              propertyType: propType,
+              propertyFloors: floors,
+              propertyBedrooms: beds,
+              propertyBathrooms: baths,
+              propertyHasBasement: hasBasement,
+              propertyHasAttic: hasAttic,
+              propertyRooms: roomsWithOverrides,
+              propertyImpactScope: totalAffected === totalRoomCount ? "entire" : totalAffected > 0 ? "partial" : "unknown",
+              // Damage types + details
+              orderTypes: activeDamage.map(([code]) => {
+                const dt = DAMAGE_TYPES.find(d => d.id === code);
+                return dt?.label || code;
+              }),
+              // Services
+              serviceOfferings: Object.entries(selectedServices).filter(([, v]) => v).map(([k]) => k),
+              // Sync to SDS fields
+              sdsProjectFloors: homeRooms.map(f => f.name),
+              sdsRooms: roomsWithOverrides.filter(r => r.affected).map(r => ({
+                id: `${r.floor}-${r.name}`.replace(/\s/g, "-").toLowerCase(),
+                name: r.name,
+                floor: r.floor,
+                affected: true,
+                severitySelections: r.severityOverrides || {},
+                tasks: r.reasonCodes || [],
+                notes: r.notes || "",
+                handlingCodes: r.handlingCodes || [],
+                qualityCode: r.qualityCode || "",
+                departments: r.departments || [],
+                depth: r.depth,
+                isOrigin: r.isOrigin || false,
+              })),
+              sdsServices: Object.entries(selectedServices).filter(([, v]) => v).map(([k]) => k),
+              // Sync severity codes
+              severityCodes: activeDamage.map(([code, level]) => {
+                const dt = DAMAGE_TYPES.find(d => d.id === code);
+                return dt ? `${dt.label[0]}${level}` : "";
+              }).filter(Boolean),
+              primaryLossType: activeDamage[0] ? DAMAGE_TYPES.find(d => d.id === activeDamage[0][0])?.label || "" : "",
+              // Interview answers mapped to NOE fields
+              ...(interviewAnswers.living ? { livingStatus: interviewAnswers.living as string } : {}),
+              ...(interviewAnswers.repairs ? { repairsSummary: (interviewAnswers.repairs as string[]).join(", ") } : {}),
+              ...(interviewAnswers.medicalIssues !== undefined ? { familyMedicalIssues: interviewAnswers.medicalIssues ? "Y" : "N", familyMedicalNote: (interviewAnswers.medicalIssues_note as string) || "" } : {}),
+              ...(interviewAnswers.soapAllergies !== undefined ? { soapFragAllergies: interviewAnswers.soapAllergies ? "Y" : "N", soapFragNote: (interviewAnswers.soapAllergies_note as string) || "" } : {}),
+              ...(interviewAnswers.selfCleaning !== undefined ? { selfCleaning: interviewAnswers.selfCleaning ? "Y" : "N" } : {}),
+              ...(interviewAnswers.needStorage !== undefined ? { storageNeeded: interviewAnswers.needStorage ? "Y" : "N" } : {}),
+              ...(interviewAnswers.useDryCleaner ? { useDryCleaner: interviewAnswers.useDryCleaner as string } : {}),
+              ...(interviewAnswers.dryLaundry ? { howDryLaundry: interviewAnswers.dryLaundry as string } : {}),
+              ...(interviewAnswers.loadList ? { loadList: interviewAnswers.loadList as string[] } : {}),
+              ...(interviewAnswers.delivery ? { processType: interviewAnswers.delivery as string } : {}),
+              ...(interviewAnswers.packout ? { packoutSummary: interviewAnswers.packout as string[] } : {}),
+              ...(interviewAnswers.considerations ? { sdsConsiderations: interviewAnswers.considerations as string[] } : {}),
+              ...(interviewAnswers.suggestedGroups ? { suggestedGroups: interviewAnswers.suggestedGroups as string[] } : {}),
+              // Condition flags
+              ...(Array.isArray(interviewAnswers.conditions) ? {
+                damageWasWet: (interviewAnswers.conditions as string[]).includes("Still Wet"),
+                damageMoldMildew: (interviewAnswers.conditions as string[]).includes("Visible Mold"),
+                noHeat: (interviewAnswers.conditions as string[]).includes("No Heat"),
+                noLights: (interviewAnswers.conditions as string[]).includes("No Electricity"),
+                boardedUp: (interviewAnswers.conditions as string[]).includes("Boarded Up"),
+              } : {}),
+            });
+            // Write scope data to localStorage for Photo Scope — both keys
+            try {
+              const scopeFloors = homeRooms.map((f, fi) => ({
+                name: f.name,
+                rooms: f.rooms.map((r, ri) => {
+                  const rk = `${fi}-${ri}`;
+                  return {
+                    name: r.name,
+                    affected: r.affected,
+                    severity: roomSevOverrides[rk] || {},
+                    reasonCodes: roomReasonCodes[rk] || [],
+                    departments: roomDepartments[rk] || [],
+                    handlingCodes: roomHandlingCodes[rk] || [],
+                    qualityCode: roomQualityCodes[rk] || "",
+                    depth: roomDepthOverrides[rk] ?? depthLevel,
+                    notes: roomNotes[rk] || "",
+                    isOrigin: originRoom === rk,
+                  };
+                }),
+              }));
+              // Full scope data
+              localStorage.setItem("noe-scope-wizard-data", JSON.stringify({
+                buildingType: propType, workScope, unitNumber, unitFloorLevel, accessDetails,
+                damageTypes, damageDetails, uniformSeverity,
+                floors: scopeFloors,
+                services: Object.entries(selectedServices).filter(([, v]) => v).map(([k]) => k),
+                depthLevel, timestamp: Date.now(),
+              }));
+              // Photo Scope compatible format — rooms as flat list + severity codes
+              const affectedRoomNames = homeRooms.flatMap(f => f.rooms.filter(r => r.affected).map(r => r.name));
+              const sevCodes = activeDamage.map(([code, level]) => {
+                const dt = DAMAGE_TYPES.find(d => d.id === code);
+                return dt ? `${dt.label[0]}${level}` : "";
+              }).filter(Boolean);
+              localStorage.setItem("noe-photo-scope-context", JSON.stringify({
+                orderName: orderData?.orderName || "",
+                customerName: "",
+                address: "",
+                lossType: activeDamage[0]?.[0] || "",
+                orderTypes: activeDamage.map(([code]) => DAMAGE_TYPES.find(d => d.id === code)?.label || code),
+                rooms: affectedRoomNames.length ? affectedRoomNames : ["Kitchen", "Living", "Bedroom", "Bathroom"],
+                severityCodes: sevCodes,
+                handlingCodes: Object.values(roomHandlingCodes).flat(),
+                services: Object.entries(selectedServices).filter(([, v]) => v).map(([k]) => k),
+                scopeWizardFloors: scopeFloors,
+                interview: interviewAnswers,
+                timestamp: Date.now(),
+              }));
+            } catch {}
+            setShowWalkthrough(true);
+          }} className="rounded-[14px] bg-blue-600 px-5 py-3.5 text-[16px] font-bold text-white hover:bg-blue-700 shadow-sm" style={{ boxShadow: "0 8px 18px rgba(37,99,235,.22)" }}>Start Walkthrough</button>
+        )}
+      </div>
+
+      {/* Photo Scope walkthrough — embedded after wizard */}
+      {showWalkthrough && (
+        <div className="absolute inset-0 z-50 bg-white flex flex-col rounded-[44px] overflow-hidden">
+          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 z-10">
+            <button onClick={() => setShowWalkthrough(false)} className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100">
+              <span className="text-sm">←</span>
+            </button>
+            <span className="flex-1 text-[15px] font-bold text-slate-800">Photo Walkthrough</span>
+            <button onClick={() => { onOrderUpdate?.({}); onClose(); }} className="rounded-full px-3 py-1.5 text-xs font-bold bg-blue-600 text-white">Done</button>
+          </div>
+          <iframe src="/photo-scope.html" className="flex-1 w-full border-0" title="Photo Scope" />
+        </div>
+      )}
+    </div>
+    </div>
+  );
+};
+
+// --- V1 REMOVED — using ScopeWizardV2 ---
+
+// Stub for backward compatibility
+const InstructionDemo = ({ onClose }: { onClose: () => void; orderData?: any; onOrderUpdate?: any }) => {
+  return <ScopeWizardV2 onClose={onClose} />;
+};
 const StartScreen = ({ onSelect }) => {
   const [showGuidelines, setShowGuidelines] = useState(false);
+  const [showScopeWizard, setShowScopeWizard] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 fade-in scale-in">
+      {showScopeWizard && <ScopeWizardV2 onClose={() => setShowScopeWizard(false)} />}
       <div className="text-center mb-10">
         <h1 className="text-5xl font-extrabold text-slate-900 mb-2 tracking-tight">New Order Entry</h1>
         <p className="text-lg text-slate-500">How much detail do you have right now?</p>
@@ -3417,30 +4836,40 @@ const StartScreen = ({ onSelect }) => {
         <div className="mt-2 text-xs text-slate-400 text-center mb-5">Best for: on-site at the home, field work</div>
         <div className="flex flex-col gap-3 w-full">
           <button
-            onClick={() => onSelect('same-day-scope')}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 transition-all"
-          >
-            Text-Based Scope
-            <div className="text-[10px] font-normal text-slate-400 mt-0.5">Task lists, notes, and SDS document</div>
-          </button>
-          <button
             onClick={() => onSelect('photo-scope')}
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 transition-all"
           >
-            Photo-Based Scope
+            Photo Scope
             <div className="text-[10px] font-normal text-slate-400 mt-0.5">Camera-first walkthrough with photo tagging</div>
+          </button>
+          <button
+            onClick={() => onSelect('sds-preview')}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 transition-all"
+          >
+            SDS Document
+            <div className="text-[10px] font-normal text-slate-400 mt-0.5">Generate the Same Day Service PDF</div>
           </button>
         </div>
       </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setShowGuidelines(v => !v)}
-        className="mt-10 inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-600"
-      >
-        Usage guidelines {showGuidelines ? "▾" : "▸"}
-      </button>
+      <div className="flex gap-4 mt-10">
+        <button
+          type="button"
+          onClick={() => setShowScopeWizard(true)}
+          className="inline-flex items-center gap-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-6 py-3 shadow-md"
+          style={{ boxShadow: "0 4px 12px rgba(37,99,235,.3)" }}
+        >
+          Start Scope
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowGuidelines(v => !v)}
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-600"
+        >
+          Usage guidelines {showGuidelines ? "▾" : "▸"}
+        </button>
+      </div>
       {showGuidelines && (
         <div className="mt-4 w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="text-sm font-bold uppercase tracking-widest text-sky-600">AI App Usage Guidelines</div>
@@ -3685,7 +5114,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 };
 
 // --- UNIFIED FLOATING HEADER (PROGRESS HEADER) ---
-const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, onShowSds, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount, onOpenFieldConfig, interviewPanelOpen, actionItemsOpen }) => {
+const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, onShowSds, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount, onOpenFieldConfig, onShowScopeWizard, interviewPanelOpen, actionItemsOpen }) => {
     const steps = [
         { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }] },
         { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
@@ -3908,6 +5337,13 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                             >
                                 <span>Test Data Presets</span>
                                 <span>{presetCount ? `(${presetCount})` : "▤"}</span>
+                            </button>
+                            <button
+                                onClick={() => { onShowScopeWizard?.(); setShowSettings(false); }}
+                                className="w-full mt-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all hover:bg-blue-50 text-blue-600"
+                            >
+                                <span>Scope Wizard</span>
+                                <span>⬡</span>
                             </button>
                             <button
                                 onClick={onOpenFieldConfig}
@@ -5540,6 +6976,7 @@ export default function App(){
   const quickNudgeShownRef = useRef(false);
   const [modeButtonFlash, setModeButtonFlash] = useState(false);
   const [showSdsPreview, setShowSdsPreview] = useState(false);
+  const [showScopeWizardMain, setShowScopeWizardMain] = useState(false);
   const orderNameInputRef = useRef(null);
   const scheduleDateRef = useRef(null);
   const scheduleTimeRef = useRef(null);
@@ -8242,6 +9679,72 @@ export default function App(){
     return () => clearInterval(poll);
   }, []);
 
+  // Poll for full scope sync (rooms, floors, severity, interview)
+  useEffect(() => {
+    let lastSyncAt = "";
+    const poll = setInterval(() => {
+      try {
+        const raw = localStorage.getItem("noe-scope-sync");
+        if (!raw) return;
+        const sync = JSON.parse(raw);
+        if (!sync || sync.updatedAt === lastSyncAt) return;
+        lastSyncAt = sync.updatedAt;
+        setData(prev => {
+          const patch: any = {};
+          // Rooms
+          if (sync.sdsRooms && sync.sdsRooms.length) patch.sdsRooms = sync.sdsRooms;
+          // Floors
+          if (sync.sdsProjectFloors && sync.sdsProjectFloors.length) patch.sdsProjectFloors = sync.sdsProjectFloors;
+          // Severity codes
+          if (sync.severityCodes && sync.severityCodes.length) patch.severityCodes = sync.severityCodes;
+          // Offerings
+          if (sync.offerings && sync.offerings.length) {
+            const merged = Array.from(new Set([...(prev.serviceOfferings || []), ...sync.offerings]));
+            if (merged.length > (prev.serviceOfferings || []).length) patch.serviceOfferings = merged;
+          }
+          // Suggested groups
+          if (sync.suggestedGroups && sync.suggestedGroups.length) {
+            const merged = Array.from(new Set([...(prev.suggestedGroups || []), ...sync.suggestedGroups]));
+            if (merged.length > (prev.suggestedGroups || []).length) patch.suggestedGroups = merged;
+          }
+          // Considerations
+          if (sync.considerations && sync.considerations.length) {
+            const merged = Array.from(new Set([...(prev.sdsConsiderations || []), ...sync.considerations]));
+            if (merged.length > (prev.sdsConsiderations || []).length) patch.sdsConsiderations = merged;
+          }
+          // Interview answers — Photo Scope overwrites NOE
+          const iv = sync.interview || {};
+          if (iv.conditions && iv.conditions.length) {
+            patch.damageWasWet = iv.conditions.includes("Still Wet") ? "Y" : (prev.damageWasWet || "");
+            patch.damageMoldMildew = iv.conditions.includes("Visible Mold") || !!prev.damageMoldMildew;
+            patch.structuralElectricDamage = iv.conditions.includes("Structural Damage") ? "Y" : (prev.structuralElectricDamage || "");
+            patch.noLights = iv.conditions.includes("No Electricity") || !!prev.noLights;
+            patch.noHeat = iv.conditions.includes("No Heat") || !!prev.noHeat;
+            patch.boardedUp = iv.conditions.includes("Boarded Up") || !!prev.boardedUp;
+          }
+          if (iv.repairs && iv.repairs.length) patch.repairsSummary = iv.repairs.join(", ");
+          if (iv.living) patch.livingStatus = iv.living;
+          if (iv.delivery) patch.processType = iv.delivery;
+          if (iv.packout && iv.packout.length) patch.packoutSummary = iv.packout;
+          if (iv.loadList && iv.loadList.length) patch.loadList = iv.loadList;
+          if (iv.medicalIssues === true) patch.familyMedicalIssues = "Y";
+          if (iv.medicalIssues === false) patch.familyMedicalIssues = "N";
+          if (iv.soapAllergies === true) patch.soapFragAllergies = "Y";
+          if (iv.soapAllergies === false) patch.soapFragAllergies = "N";
+          if (iv.selfCleaning === true) patch.selfCleaning = "Y";
+          if (iv.selfCleaning === false) patch.selfCleaning = "N";
+          if (iv.useDryCleaner) patch.useDryCleaner = iv.useDryCleaner;
+          if (iv.dryLaundry) patch.howDryLaundry = iv.dryLaundry;
+          if (iv.needStorage === true) patch.storageNeeded = "Y";
+          if (iv.needStorage === false) patch.storageNeeded = "N";
+          if (Object.keys(patch).length === 0) return prev;
+          return { ...prev, ...patch };
+        });
+      } catch {}
+    }, 2000);
+    return () => clearInterval(poll);
+  }, []);
+
   const mergedSdsPhotos = useMemo(() => {
     const manual = data.sdsPhotos || [];
     const fromScope = photoScopeData?.photos || [];
@@ -9943,6 +11446,11 @@ export default function App(){
     if (mode === "detailed") {
       setData(prev => ({ ...prev, isLead: null, eventAssignee: prev.eventAssignee || prev.currentUser || "" }));
     }
+    if (mode === "sds-preview") {
+      setEntryMode("detailed");
+      setData(prev => ({ ...prev, isLead: null, eventAssignee: prev.eventAssignee || prev.currentUser || "" }));
+      setTimeout(() => setShowSdsPreview(true), 100);
+    }
   };
 
   if (entryMode === 'start') return <div data-noe-mode="start" data-noe-app="new-order-entry"><StartScreen onSelect={handleEntryModeSelect} /></div>;
@@ -10120,10 +11628,19 @@ export default function App(){
             setShowSampleDataModal={setShowSampleDataModal}
             onOpenPresets={() => setShowPresetModal(true)}
             onOpenFieldConfig={() => setShowFieldConfig(true)}
+            onShowScopeWizard={() => setShowScopeWizardMain(true)}
             interviewPanelOpen={interviewPanelOpen}
             actionItemsOpen={actionItemsOpen}
             presetCount={testPresets.length}
         />
+
+        {showScopeWizardMain && (
+          <ScopeWizardV2
+            onClose={() => setShowScopeWizardMain(false)}
+            orderData={data as any}
+            onOrderUpdate={(updates) => { Object.entries(updates).forEach(([k, v]) => update(k, v)); }}
+          />
+        )}
 
         <div ref={appContentRef} data-noe-mode={entryMode} data-noe-app="new-order-entry" className={`min-h-screen bg-slate-50 pb-32 font-sans fade-in scale-in ${compactMode ? 'compact-mode' : ''} ${entryMode === 'detailed' ? 'pt-28' : 'pt-24'}`} style={(interviewPanelOpen || actionItemsOpen) ? { marginRight: '480px', transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}>
             
@@ -13905,7 +15422,7 @@ export default function App(){
               scopeBridge={scopeBridgeState}
               documentType="approval"
               orderNarrative={orderNarrative}
-              orderNarrativeProse={buildNarrativeProse(orderNarrative, data)}
+              orderNarrativeProse={(data as any).orderNarrativeProseOverride || buildNarrativeProse(orderNarrative, data)}
               rushGuideTimeline={(() => {
                 const repairMap: Record<string,string> = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
                 const livingMap: Record<string,string> = { "Staying in home": "home", "Hotel": "hotel", "Temp": "temp", "Moving": "moving" };
@@ -13965,6 +15482,27 @@ export default function App(){
                 return timeline;
               })()}
               onClose={() => setShowSdsPreview(false)}
+              onPhotoNoteChange={(photoId: string, note: string) => {
+                // Update in sdsPhotos
+                setData(prev => ({
+                  ...prev,
+                  sdsPhotos: (prev.sdsPhotos || []).map((p: any) => p.id === photoId ? { ...p, note } : p),
+                }));
+                // Also update in localStorage scope photos
+                try {
+                  const raw = localStorage.getItem("noe-scope-photos");
+                  if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed?.photos) {
+                      parsed.photos = parsed.photos.map((p: any) => p.id === photoId ? { ...p, note } : p);
+                      localStorage.setItem("noe-scope-photos", JSON.stringify(parsed));
+                    }
+                  }
+                } catch {}
+              }}
+              onNarrativeChange={(prose: string[]) => {
+                update("orderNarrativeProseOverride", prose);
+              }}
             />
           </div>
         </div>
