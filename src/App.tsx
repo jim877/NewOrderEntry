@@ -5307,7 +5307,7 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                            <h1 className="text-base font-bold text-slate-900 leading-none">{title}</h1>
                            <div className="flex items-center bg-slate-100 rounded-full p-0.5 gap-0.5">
                              <button className="rounded-full px-2.5 py-1 text-[10px] font-bold bg-white text-sky-700 shadow-sm">Order</button>
-                             <button onClick={() => setEntryMode('same-day-scope')} className="rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Scope</button>
+                             <button onClick={() => onShowScopeWizard?.()} className="rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">Scope</button>
                              <button onClick={onShowSds} className="rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all">SDS</button>
                            </div>
                          </div>
