@@ -6896,6 +6896,8 @@ export default function App(){
   const [timeCloseTick, setTimeCloseTick] = useState(0);
   const [welcomeModal, setWelcomeModal] = useState({ isOpen: false, customerId: null, note: "", selectedSpecialDocs: [] });
   const [showWelcomeQuickNotes, setShowWelcomeQuickNotes] = useState(false);
+  const [editContactModal, setEditContactModal] = useState<{ isOpen: boolean; companyName: string; contactName: string; contactTitle: string; contactEmail: string; contactPhone: string; } | null>(null);
+
   const [crmModal, setCrmModal] = useState({
     isOpen: false,
     method: "",
@@ -10916,11 +10918,25 @@ export default function App(){
 
   const openCompanyRolePicker = (role) => {
     if (!role?.type) return;
-    setAddCompanyType(role.type);
-    setShowTypePicker(false);
-    setAddCompanyModalOpen(true);
-    setCompaniesSubOpen(true);
-    setTimeout(() => addCompanyInputRef.current?.focus(), 100);
+    // If contact exists, open edit modal; otherwise open add modal
+    const contacts = entryContactList(role);
+    const firstContact = contacts[0];
+    if (firstContact?.name) {
+      setEditContactModal({
+        isOpen: true,
+        companyName: role.companyName || "",
+        contactName: firstContact.name || "",
+        contactTitle: getTitleForContact(firstContact.name) || "",
+        contactEmail: "",
+        contactPhone: "",
+      });
+    } else {
+      setAddCompanyType(role.type);
+      setShowTypePicker(false);
+      setAddCompanyModalOpen(true);
+      setCompaniesSubOpen(true);
+      setTimeout(() => addCompanyInputRef.current?.focus(), 100);
+    }
   };
 
   useEffect(() => {
@@ -15100,6 +15116,14 @@ export default function App(){
                                       ))}
                                     </div>);
                                   })}
+                                  {/* Delivery group notes */}
+                                  <textarea
+                                    value={(rushGuideData as any).deliveryNotes?.[dg.id] || ""}
+                                    onChange={e => setRushGuideData((p: any) => ({ ...p, deliveryNotes: { ...(p.deliveryNotes || {}), [dg.id]: e.target.value } }))}
+                                    placeholder="Notes for this delivery group..."
+                                    rows={2}
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-blue-400 resize-none mt-2"
+                                  />
                                   {/* Merged event sublists — color-coded with remove button */}
                                   {mergedEvents.map((evt: any) => {
                                     const evtItems: string[] = [];
@@ -15127,6 +15151,30 @@ export default function App(){
                                 </div>
                               </div>);
                             })}
+                            {/* Share buttons */}
+                            <div className="px-4 pb-4 flex gap-2">
+                              <button onClick={() => {
+                                const lines = deliveryGroups.map((dg, i) => {
+                                  const dgNotes = (rushGuideData as any).deliveryNotes?.[dg.id] || "";
+                                  return `${i + 1}. ${dg.label} (${rushFormatDate(dg.date)})\n${dg.items.map(item => `  - ${item}`).join("\n")}${dgNotes ? `\n  Note: ${dgNotes}` : ""}`;
+                                }).join("\n\n");
+                                const text = `Rush Guide - ${data.orderName || "Order"}\n\n${lines}`;
+                                if (navigator.share) { navigator.share({ title: "Rush Guide", text }); }
+                                else { navigator.clipboard.writeText(text); setToast?.("Copied to clipboard"); }
+                              }} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-all">
+                                Share / Copy
+                              </button>
+                              <button onClick={() => {
+                                const lines = deliveryGroups.map((dg, i) => {
+                                  const dgNotes = (rushGuideData as any).deliveryNotes?.[dg.id] || "";
+                                  return `${i + 1}. ${dg.label} (${rushFormatDate(dg.date)})%0A${dg.items.map(item => `  - ${item}`).join("%0A")}${dgNotes ? `%0ANote: ${dgNotes}` : ""}`;
+                                }).join("%0A%0A");
+                                const subject = encodeURIComponent(`Rush Guide - ${data.orderName || "Order"}`);
+                                window.open(`mailto:?subject=${subject}&body=${lines}`);
+                              }} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-bold text-blue-600 hover:bg-blue-50 transition-all">
+                                Email
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -16844,6 +16892,78 @@ export default function App(){
                   </div>
               </div>
           </div>
+      )}
+
+      {/* Edit Contact Modal */}
+      {editContactModal?.isOpen && (
+        <div className="fixed inset-0 z-[200] bg-black/40 flex items-center justify-center p-4" onClick={() => setEditContactModal(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-800">Edit Contact</h3>
+              <button onClick={() => setEditContactModal(null)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">×</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase">Name</label>
+                <input value={editContactModal.contactName} onChange={e => setEditContactModal(p => p ? { ...p, contactName: e.target.value } : p)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase">Company</label>
+                <input value={editContactModal.companyName} onChange={e => setEditContactModal(p => p ? { ...p, companyName: e.target.value } : p)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase">Title</label>
+                <input value={editContactModal.contactTitle} onChange={e => setEditContactModal(p => p ? { ...p, contactTitle: e.target.value } : p)} placeholder="e.g. Senior Adjuster" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase">Email</label>
+                  <input value={editContactModal.contactEmail} onChange={e => setEditContactModal(p => p ? { ...p, contactEmail: e.target.value } : p)} placeholder="email@company.com" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase">Phone</label>
+                  <input value={editContactModal.contactPhone} onChange={e => setEditContactModal(p => p ? { ...p, contactPhone: e.target.value } : p)} placeholder="(555) 123-4567" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
+                </div>
+              </div>
+              {/* Role badges */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase">Roles</label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {["Referrer", "Bill-To", "Adjuster", "Public Adjuster", "Contractor", "Building Mgmt"].map(role => {
+                    const isActive = (() => {
+                      if (role === "Referrer") return data.referrer === editContactModal.contactName || data.referringCompany === editContactModal.companyName;
+                      if (role === "Bill-To") return data.billingCompany === editContactModal.companyName;
+                      if (role === "Adjuster") return data.insuranceAdjuster === editContactModal.contactName;
+                      return false;
+                    })();
+                    return (
+                      <button key={role} onClick={() => {
+                        if (role === "Referrer") { update("referrer", editContactModal.contactName); update("referringCompany", editContactModal.companyName); }
+                        if (role === "Bill-To") { update("billingCompany", editContactModal.companyName); update("billingContact", editContactModal.contactName); }
+                        if (role === "Adjuster") { update("insuranceAdjuster", editContactModal.contactName); update("adjusterCompany", editContactModal.companyName); }
+                      }} className={`rounded-full border-2 px-3 py-1 text-xs font-bold transition-all ${isActive ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{role}{isActive ? " ✓" : ""}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setEditContactModal(null)} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={() => {
+                // Save changes — update vendor details
+                const m = editContactModal;
+                const vendorIdx = (data.vendors || []).findIndex((v: any) => v.contact === m.contactName || v.company === m.companyName);
+                if (vendorIdx >= 0) {
+                  const next = [...(data.vendors || [])];
+                  next[vendorIdx] = { ...next[vendorIdx], contact: m.contactName, company: m.companyName };
+                  update("vendors", next);
+                }
+                setEditContactModal(null);
+                setToast?.("Contact updated");
+              }} className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700">Save</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {crmModal.isOpen && (
