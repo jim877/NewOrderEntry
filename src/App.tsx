@@ -4407,10 +4407,15 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                       </div>
                     )}
                     {section.type === "single" && section.options && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {section.options.map(opt => (
-                          <button key={opt} onClick={() => setInterviewAnswers(p => ({ ...p, [section.id]: p[section.id] === opt ? "" : opt }))} className={`rounded-[10px] border-2 px-3.5 py-2 text-[12px] font-bold transition-all ${answer === opt ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{opt}</button>
-                        ))}
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {section.options.map(opt => (
+                            <button key={opt} onClick={() => setInterviewAnswers(p => ({ ...p, [section.id]: p[section.id] === opt ? "" : opt }))} className={`rounded-[10px] border-2 px-3.5 py-2 text-[12px] font-bold transition-all ${answer === opt ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{opt}</button>
+                          ))}
+                        </div>
+                        {answer && (
+                          <input value={noteVal} onChange={e => setInterviewAnswers(p => ({ ...p, [noteKey]: e.target.value }))} placeholder="Details (optional)..." className="w-full rounded-[8px] border border-slate-200 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-blue-400" />
+                        )}
                       </div>
                     )}
                     {section.type === "multi" && section.options && (
@@ -10296,9 +10301,15 @@ export default function App(){
   const knownPeople = useMemo(()=>{
     const s=new Set();
     (data.customers||[]).forEach(c=>{ if(c.first||c.last) s.add((c.first+' '+c.last).trim()); });
-    [data.insuranceAdjuster,data.publicAdjuster,data.independentAdjuster,data.tpaContact].forEach(n=>{ if(n) s.add(n);});
-    if(data.referrer) s.add(data.referrer); 
-    Object.values(data.vendorDetails||{}).forEach(v=>{ if(v&&v.contact) s.add(v.contact)}); 
+    // Adjusters with company
+    if(data.insuranceAdjuster) s.add(data.adjusterCompany ? `${data.insuranceAdjuster} - ${data.adjusterCompany}` : data.insuranceAdjuster);
+    if(data.publicAdjuster) s.add(data.publicAdjustingCompany ? `${data.publicAdjuster} - ${data.publicAdjustingCompany}` : data.publicAdjuster);
+    if(data.independentAdjuster) s.add(data.independentAdjustingCo ? `${data.independentAdjuster} - ${data.independentAdjustingCo}` : data.independentAdjuster);
+    if(data.tpaContact) s.add(data.tpaCompany ? `${data.tpaContact} - ${data.tpaCompany}` : data.tpaContact);
+    // Referrer with company
+    if(data.referrer) s.add(data.referringCompany ? `${data.referrer} - ${data.referringCompany}` : data.referrer);
+    // Vendors with company
+    Object.entries(data.vendorDetails||{}).forEach(([company, v]: [string, any])=>{ if(v&&v.contact) s.add(`${v.contact} - ${company}`); });
     (data.peopleQuick||[]).forEach(m=>{ if(m.first) s.add(m.first); });
     return Array.from(s).filter(Boolean);
   },[data]);
