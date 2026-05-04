@@ -6445,12 +6445,9 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseSignal} />
                     </Field>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Assignee">
                     <Input value={data.eventAssignee} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" />
-                  </Field>
-                  <Field label="Attendee">
-                    <Input value={(data as any).eventAttendee || ""} onChange={e=>update("eventAttendee", e.target.value)} placeholder="Who will be there?" />
                   </Field>
                   <Field label="Vehicle">
                     <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle (optional)" />
@@ -12954,9 +12951,12 @@ export default function App(){
                             <TimePicker value={data.pickupTime} onChange={(v)=>update("pickupTime", v)} closeSignal={timeCloseTick} />
                           </Field>
                         </div>
-                        <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="grid sm:grid-cols-3 gap-4">
                           <Field label="Event Assignee">
                             <Input value={data.eventAssignee} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" />
+                          </Field>
+                          <Field label="Attendee">
+                            <Input value={(data as any).eventAttendee || ""} onChange={e=>update("eventAttendee", e.target.value)} placeholder="Who will be there?" />
                           </Field>
                           <Field label="Vehicle">
                             <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle" />
