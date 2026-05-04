@@ -3505,10 +3505,20 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     storefront: ["Street"],
     commercial: ["Parking Garage", "Elevator"],
   };
-  const noeAddr = (orderData?.addresses as any)?.[0] || {};
-  const [propType, setPropType] = useState(orderData?.propertyType || noeAddr.buildingType || "");
+  const noeAddr = (() => { const addrs = (orderData as any)?.addresses; return Array.isArray(addrs) ? (addrs.find((a: any) => a.isPrimary) || addrs[0] || {}) : {}; })();
+  const [propType, setPropType] = useState(() => {
+    const fromOrder = (orderData as any)?.propertyType;
+    const fromAddr = noeAddr.buildingType;
+    return fromOrder || fromAddr || "";
+  });
   const [propSubType, setPropSubType] = useState("");
-  const [accessDetails, setAccessDetails] = useState<Record<string, boolean>>({});
+  const [accessDetails, setAccessDetails] = useState<Record<string, boolean>>(() => {
+    const addr = noeAddr;
+    if (addr.buildingParking || addr.buildingAccess) return { ...(addr.buildingParking || {}), ...(addr.buildingAccess || {}) };
+    const pt = (orderData as any)?.propertyType || addr.buildingType || "";
+    if (pt) { const defs: Record<string, boolean> = {}; (ACCESS_DEFAULTS[pt] || []).forEach((k: string) => { defs[k] = true; }); return defs; }
+    return {};
+  });
   const [showAccess, setShowAccess] = useState(false);
   // Unit info — for multi-unit buildings
   const isMultiUnit = ["house", "largehouse", "estate", "townhouse", "lowrise", "highrise", "storefront", "commercial"].includes(propType);
