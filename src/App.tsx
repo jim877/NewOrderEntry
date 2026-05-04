@@ -3529,8 +3529,44 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     { id: "puffback", label: "Puffback", icon: "\u{1F4A8}", color: "bg-slate-500", light: "bg-slate-50", border: "border-slate-400", details: ["Oil", "Soot", "Odor", "Oily Film"] },
     { id: "debris", label: "Debris", icon: "\u{1FAA8}", color: "bg-stone-500", light: "bg-stone-50", border: "border-stone-300", details: ["Structural", "Contents", "Other"] },
   ];
-  const [damageTypes, setDamageTypes] = useState<Record<string, number>>({});
-  const [damageDetails, setDamageDetails] = useState<Record<string, Record<string, number>>>({});
+  const [damageTypes, setDamageTypes] = useState<Record<string, number>>(() => {
+    if (!orderData) return {};
+    const dt: Record<string, number> = {};
+    // Read from orderTypes (e.g. ["Fire", "Water"])
+    (orderData.orderTypes || []).forEach((t: string) => {
+      const code = t.toLowerCase();
+      if (code === "fire") dt.fire = 1;
+      else if (code === "water") dt.water = 1;
+      else if (code === "mold") dt.mold = 1;
+      else if (code === "puffback") dt.puffback = 1;
+    });
+    // Read severity levels from lossSeverity
+    const sev = orderData.lossSeverity as any;
+    if (sev?.touched) {
+      if (sev.fire?.enabled) { const max = Math.max(...Object.values(sev.fire.values as Record<string, number>), 0); if (max > 0) dt.fire = max; }
+      if (sev.water?.enabled) { const max = Math.max(...Object.values(sev.water.values as Record<string, number>), 0); if (max > 0) dt.water = max; }
+      if (sev.puffback?.enabled) { const max = Math.max(...Object.values(sev.puffback.values as Record<string, number>), 0); if (max > 0) dt.puffback = max; }
+    }
+    // Read from severityCodes (e.g. ["F1", "W2"])
+    (orderData.severityCodes || []).forEach((c: string) => {
+      const match = c.match(/^([FWMPD])(\d)$/);
+      if (match) {
+        const map: Record<string, string> = { F: "fire", W: "water", M: "mold", P: "puffback", D: "debris" };
+        const key = map[match[1]];
+        if (key) dt[key] = Math.max(dt[key] || 0, Number(match[2]));
+      }
+    });
+    return dt;
+  });
+  const [damageDetails, setDamageDetails] = useState<Record<string, Record<string, number>>>(() => {
+    if (!orderData?.lossSeverity) return {};
+    const sev = orderData.lossSeverity as any;
+    const dd: Record<string, Record<string, number>> = {};
+    if (sev.fire?.enabled && sev.fire.values) dd.fire = { ...sev.fire.values };
+    if (sev.water?.enabled && sev.water.values) dd.water = { ...sev.water.values };
+    if (sev.puffback?.enabled && sev.puffback.values) dd.puffback = { ...sev.puffback.values };
+    return dd;
+  });
   const [expandedDamage, setExpandedDamage] = useState<string | null>(null);
   const [uniformSeverity, setUniformSeverity] = useState(true); // same severity for all rooms
   const toggleDamage = (id: string) => {
@@ -3688,7 +3724,12 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
   ];
   const [depthLevel, setDepthLevel] = useState(2);
   const SERVICES = ["Appliance", "Art", "Consulting", "Contents", "Furniture", "Hand Clean", "Pack-out", "Rugs", "Storage Only", "Textiles", "TLI", "Expert Stain Removal"];
-  const [selectedServices, setSelectedServices] = useState<Record<string, boolean>>({});
+  const [selectedServices, setSelectedServices] = useState<Record<string, boolean>>(() => {
+    if (!orderData?.serviceOfferings?.length) return {};
+    const s: Record<string, boolean> = {};
+    (orderData.serviceOfferings as string[]).forEach(svc => { s[svc] = true; });
+    return s;
+  });
 
   // Step labels
   const stepLabels = ["Building", "Space", "Severity", "Rooms"];
@@ -4715,6 +4756,15 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                 noLights: (interviewAnswers.conditions as string[]).includes("No Electricity"),
                 boardedUp: (interviewAnswers.conditions as string[]).includes("Boarded Up"),
               } : {}),
+              // Sync lossSeverity back in NOE format
+              lossSeverity: {
+                touched: activeDamage.length > 0,
+                fire: { enabled: (damageTypes.fire || 0) > 0, values: damageDetails.fire || {} },
+                water: { enabled: (damageTypes.water || 0) > 0, values: damageDetails.water || {} },
+                puffback: { enabled: (damageTypes.puffback || 0) > 0, values: damageDetails.puffback || {} },
+              },
+              // Handling codes at order level
+              handlingCodes: [...new Set(Object.values(roomHandlingCodes).flat())],
             });
             // Write scope data to localStorage for Photo Scope — both keys
             try {
