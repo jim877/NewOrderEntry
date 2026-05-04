@@ -14585,7 +14585,7 @@ export default function App(){
             // Family composition (age-aware)
             if (babies > 0) { rushItems.push("Strollers, diaper bags, and car seats"); rushItems.push("Crib bedding, baby blankets, and sleep sacks"); }
             if (kids > 0) { rushItems.push("Favorite comfort toys or stuffed animals"); }
-            if (elderly > 0) { rushItems.push("Medications, medical devices, and mobility aids"); reminders.push("We will be extra careful with fragile or sentimental items for elderly family members."); }
+            if (elderly > 0) { reminders.push("We will be extra careful with fragile or sentimental items for elderly family members. Please set aside any medications, medical devices, or mobility aids that are needed immediately."); }
             if (petCount > 0) rushItems.push(`Pet beds, leashes, and carrying crates${petNames ? ` (${petNames})` : ""}`);
 
             // Considerations-driven items
@@ -15556,7 +15556,7 @@ export default function App(){
                 if (orderSit === "hotel" || orderSit === "temp") rItems.push("Suitcases and overnight bags");
                 if (babies > 0) rItems.push("Strollers, diaper bags, crib bedding");
                 if (kids > 0) rItems.push("Favorite comfort toys");
-                if (elderly > 0) rItems.push("Medications and mobility aids");
+                // Note: medications/medical devices are not group items — customer should set these aside
                 if (pets.length > 0) rItems.push("Pet beds, leashes, and crates");
                 const stItems: string[] = [];
                 if (orderSit === "home") { stItems.push("Temporary window shades, throw rugs, daily bedding"); }
