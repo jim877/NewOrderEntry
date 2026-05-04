@@ -3506,6 +3506,13 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     commercial: ["Parking Garage", "Elevator"],
   };
   const noeAddr = (() => { const addrs = (orderData as any)?.addresses; return Array.isArray(addrs) ? (addrs.find((a: any) => a.isPrimary) || addrs[0] || {}) : {}; })();
+  // Debug: log what V2 receives from NOE
+  if (typeof console !== "undefined") {
+    const d = orderData as any;
+    const addrs = d?.addresses;
+    const a0 = Array.isArray(addrs) ? addrs[0] : null;
+    console.log("[V2 init] orderData exists:", !!orderData, "addresses:", Array.isArray(addrs) ? addrs.length : "not array", "addr[0].buildingType:", a0?.buildingType, "addr[0].beds:", a0?.beds, "addr[0].apt:", a0?.apt, "noeAddr:", JSON.stringify(noeAddr).slice(0, 200));
+  }
   const [propType, setPropType] = useState(() => {
     const fromOrder = (orderData as any)?.propertyType;
     const fromAddr = noeAddr.buildingType;
@@ -11797,6 +11804,7 @@ export default function App(){
             presetCount={testPresets.length}
         />
 
+        {/* V2 Scope Wizard — renders above all content, outside entry mode blocks */}
         {showScopeWizardMain && (
           <ScopeWizardV2
             onClose={() => setShowScopeWizardMain(false)}
