@@ -3505,7 +3505,8 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     storefront: ["Street"],
     commercial: ["Parking Garage", "Elevator"],
   };
-  const [propType, setPropType] = useState(orderData?.propertyType || "");
+  const noeAddr = (orderData?.addresses as any)?.[0] || {};
+  const [propType, setPropType] = useState(orderData?.propertyType || noeAddr.buildingType || "");
   const [propSubType, setPropSubType] = useState("");
   const [accessDetails, setAccessDetails] = useState<Record<string, boolean>>({});
   const [showAccess, setShowAccess] = useState(false);
@@ -3528,10 +3529,10 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
   const [buildingFloorLevel, setBuildingFloorLevel] = useState<number | "">("");
 
   // Step 2: Size
-  const [floors, setFloors] = useState<number | "">(orderData?.propertyFloors || "");
-  const [beds, setBeds] = useState<number | "">(orderData?.propertyBedrooms || "");
+  const [floors, setFloors] = useState<number | "">(orderData?.propertyFloors || noeAddr.buildingFloors || "");
+  const [beds, setBeds] = useState<number | "">(orderData?.propertyBedrooms || (noeAddr.beds ? Number(noeAddr.beds) : ""));
   const [baths, setBaths] = useState<number | "">(orderData?.propertyBathrooms || "");
-  const [sqft, setSqft] = useState("");
+  const [sqft, setSqft] = useState(noeAddr.sqft || "");
   const [hasBasement, setHasBasement] = useState(orderData?.propertyHasBasement || false);
   const [hasAttic, setHasAttic] = useState(orderData?.propertyHasAttic || false);
 
@@ -5976,6 +5977,42 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
                 <div className="rounded-lg border border-orange-300 bg-orange-50 p-3">
                   <div className="text-sm font-bold text-orange-800 mb-2">Confirm Coverage</div>
                   <Input data-audit-key="rentCoverageLimit" className={auditOn && highlightMissing?.rentCoverageLimit ? "audit-missing" : ""} value={rentCoverageLimit || ""} onChange={e=>onRentCoverageChange(e.target.value)} placeholder="Coverage amount ($)" />
+                </div>
+              )}
+              {/* Building details — feeds V2 scope wizard */}
+              {index === 0 && (
+                <div className="space-y-3 pt-2 border-t border-slate-100">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Building Info</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Building Type">
+                      <select value={(addr as any).buildingType || ""} onChange={e => updateAddr(addr.id, { buildingType: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400 bg-white">
+                        <option value="">Select...</option>
+                        <option value="trailer">Trailer</option>
+                        <option value="house">House</option>
+                        <option value="largehouse">Large House</option>
+                        <option value="estate">Estate</option>
+                        <option value="townhouse">Townhome</option>
+                        <option value="lowrise">Low-Rise</option>
+                        <option value="highrise">High-Rise</option>
+                        <option value="storefront">Storefront</option>
+                        <option value="commercial">Commercial</option>
+                      </select>
+                    </Field>
+                    <Field label="Unit / Suite">
+                      <Input value={addr.apt || ""} onChange={e => updateAddr(addr.id, { apt: e.target.value })} placeholder="e.g. 4B, Suite 200" />
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Field label="Floors">
+                      <Input inputMode="numeric" value={(addr as any).buildingFloors || ""} onChange={e => updateAddr(addr.id, { buildingFloors: e.target.value ? Number(e.target.value) : "" })} placeholder="e.g. 2" />
+                    </Field>
+                    <Field label="Bedrooms">
+                      <Input inputMode="numeric" value={addr.beds || ""} onChange={e => updateAddr(addr.id, { beds: e.target.value })} placeholder="e.g. 3" />
+                    </Field>
+                    <Field label="Sq Ft">
+                      <Input inputMode="numeric" value={addr.sqft || ""} onChange={e => updateAddr(addr.id, { sqft: e.target.value })} placeholder="e.g. 2400" />
+                    </Field>
+                  </div>
                 </div>
               )}
             </div>
