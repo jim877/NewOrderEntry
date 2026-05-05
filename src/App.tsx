@@ -14031,6 +14031,19 @@ export default function App(){
                           }} className="text-slate-400 hover:text-rose-500 text-xs">×</button>
                         </div>
                       ))}
+                      {/* Add another pet of an existing type */}
+                      {pets.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {[...new Set(pets.map(p => p.type))].map(type => (
+                            <button key={type} type="button" onClick={() => {
+                              const next = [...(data.household || []), { id: safeUid(), category: "pet", type, name: "" }];
+                              update("household", next);
+                              const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                              update("householdAnimals", petStr);
+                            }} className="rounded-full border border-dashed border-teal-300 px-2 py-0.5 text-[9px] font-bold text-teal-600 hover:bg-teal-50">+ {type}</button>
+                          ))}
+                        </div>
+                      )}
                       {showCoaching && answered && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
                         <span className="font-bold">Pets:</span> Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.
                       </div>}
