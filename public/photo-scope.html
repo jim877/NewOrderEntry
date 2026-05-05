@@ -550,7 +550,7 @@
     .add-room-mode-toggle.on{background:var(--accent-light);border-color:var(--accent-border);color:var(--accent-dark)}
     /* Loss-type severity cards */
     .loss-card{border:2px solid var(--border-strong);border-radius:16px;background:var(--surface);margin-bottom:10px;overflow:hidden;transition:border-color .12s,box-shadow .12s;box-shadow:var(--shadow)}
-    .loss-card.active{border-color:var(--accent);border-width:2px;box-shadow:0 0 0 3px rgba(var(--accent-rgb),.2);background:var(--accent-light)}
+    .loss-card.active{border-color:var(--border-strong);box-shadow:none;background:var(--surface)}
     .loss-card-hdr{display:flex;align-items:center;padding:10px 12px;gap:10px}
     .loss-card-icon{font-size:17px;flex-shrink:0;width:22px}
     .loss-card-label{font-size:14px;font-weight:700;flex:1}
@@ -616,6 +616,32 @@
 
   <!-- ORDERS -->
   <div id="scr-orders" class="screen active">
+    <!-- NOE order summary — shown when loaded from NOE -->
+    <div id="noe-order-summary" style="display:none">
+      <div style="padding:48px 24px 24px;text-align:center">
+        <img src="assets/photoscope-logo.png" alt="PhotoScope" style="width:72px;height:72px;border-radius:16px;margin:0 auto 12px;display:block;box-shadow:0 4px 12px rgba(0,0,0,0.1)" />
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:20px">Photo Scope</div>
+        <div style="background:white;border:1px solid #e2e8f0;border-radius:16px;padding:20px;margin-bottom:16px;text-align:left">
+          <div id="noe-summary-name" style="font-size:18px;font-weight:800;color:#1e293b;margin-bottom:4px"></div>
+          <div id="noe-summary-customer" style="font-size:13px;color:#64748b;margin-bottom:2px"></div>
+          <div id="noe-summary-address" style="font-size:13px;color:#64748b;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span id="noe-summary-loss" style="display:none;background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700"></span>
+            <span id="noe-summary-services" style="display:none;background:#f0fdf4;color:#166534;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700"></span>
+            <span id="noe-summary-rooms" style="display:none;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700"></span>
+          </div>
+        </div>
+        <button id="btn-noe-start-scope" class="btn btn-amber btn-lg btn-full">Start Scope →</button>
+        <div style="margin-top:12px">
+          <div class="guide-toggle-row" style="margin:0">
+            <span>Guided mode</span>
+            <button class="guide-toggle-btn off" id="guide-toggle">OFF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Default orders screen — hidden when NOE is loaded -->
+    <div id="default-orders-screen">
     <div class="orders-hero">
       <div class="orders-logo">
         <img src="assets/photoscope-logo.png" alt="PhotoScope" />
@@ -626,14 +652,14 @@
       <div class="spacer16"></div>
       <div class="guide-toggle-row guide-toggle-prominent">
         <span>Guided mode</span>
-        <button class="guide-toggle-btn off" id="guide-toggle">OFF</button>
+        <button class="guide-toggle-btn off" id="guide-toggle-default">OFF</button>
       </div>
       <div class="pad16"><button class="btn btn-lg btn-full" id="btn-new-order" style="background:#93c5fd;color:#1e3a5f;border:none;box-shadow:0 2px 8px rgba(37,99,235,0.15)">New Order →</button></div>
-      <div style="padding:0 16px 8px;text-align:center;display:none" id="noe-import-wrap"><button id="btn-add-from-noe" style="width:100%;background:#d1fae5;color:#065f46;font-weight:700;padding:12px;border-radius:12px;border:none;font-size:14px;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.1)">Add from NOE →</button></div>
       <div id="guide-welcome-slot"></div>
       <div class="sec-label">Recent Orders</div>
       <div id="orders-list"></div>
       <div style="height:24px"></div>
+    </div>
     </div>
   </div>
 
@@ -644,7 +670,7 @@
       <div class="nav-title" style="font-size:13px;color:var(--text-muted);font-weight:500">New Order</div>
     </div>
     <div class="wizard-progress" id="wiz-prog"></div>
-    <div class="wizard-step-label">STEP 1 OF 3 · Address</div>
+    <div class="wizard-step-label">STEP 1 OF 3 · ADDRESS</div>
     <div class="wizard-body" id="wiz1-body">
       <div class="wizard-title">Project Address</div>
       <label class="input-label">Address</label>
@@ -670,7 +696,7 @@
       <div class="nav-title" style="font-size:13px;color:var(--text-muted);font-weight:500">New Order</div>
     </div>
     <div class="order-progress" id="order-progress-wiz2"></div>
-    <div class="wizard-step-label">STEP 1 OF 4 · Services</div>
+    <div class="wizard-step-label">STEP 2 OF 3 · SERVICES & INTERVIEW</div>
     <div class="wizard-body" id="wiz2-body">
       <div class="wizard-title">Service Offerings</div>
       <div class="wizard-sub">What services apply?</div>
@@ -693,7 +719,7 @@
       <div class="nav-title" style="font-size:13px;color:var(--text-muted);font-weight:500">New Order</div>
     </div>
     <div class="order-progress" id="order-progress-wiz3"></div>
-    <div class="wizard-step-label">STEP 2 OF 4 · Severity</div>
+    <div class="wizard-step-label">STEP 3 OF 3 · SEVERITY</div>
     <div class="wiz-uniform-row" id="wiz3-uniform-row" style="flex-shrink:0;padding:14px 16px;margin:0;background:var(--surface);border-bottom:1px solid var(--border)">
       <div class="wiz-uniform-label">Same severity throughout the home?</div>
       <div class="wiz-uniform-sub">If yes, rooms inherit order-level severity.</div>
@@ -709,7 +735,7 @@
       <div style="padding:0 16px 4px" id="sev-loss-cards"></div>
     </div>
     <div style="position:absolute;bottom:0;left:0;right:0;padding:16px 20px 20px;background:var(--bg);border-top:1px solid var(--border)">
-      <button class="btn btn-amber btn-lg btn-full" id="btn-wiz3-done">📷 Start Walkthrough</button>
+      <button class="btn btn-amber btn-lg btn-full" id="btn-wiz3-done">Start Walkthrough</button>
     </div>
   </div>
 
@@ -741,8 +767,8 @@
     <div id="order-scope-footer" style="padding:10px 16px 16px;border-top:1px solid var(--border);flex-shrink:0">
       <button class="btn btn-white btn-md btn-full" id="btn-order-pickup" style="margin-bottom:10px">Pickup Utility</button>
       <button class="btn btn-white btn-md btn-full" id="btn-order-interview" style="margin-bottom:10px">Interview</button>
-      <button class="btn btn-white btn-md btn-full" id="btn-order-add-noe" style="margin-bottom:10px;display:none;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;border:none">Add from NOE</button>
-      <button class="btn btn-amber btn-lg btn-full" id="btn-scope-done">✓ Complete Scope</button>
+      <button class="btn btn-white btn-md btn-full" id="btn-order-add-noe" style="margin-bottom:10px;display:none">Add from NOE</button>
+      <button class="btn btn-amber btn-lg btn-full" id="btn-scope-done">Complete Scope</button>
     </div>
   </div>
 
@@ -762,15 +788,15 @@
       </div>
       <div class="room-toolbar-wrap">
         <div class="room-toolbar">
-          <button class="toolbar-btn" id="btn-room-sev" title="View and edit room severity">📊 Sev</button>
-          <button class="toolbar-btn" id="btn-room-interview" title="Open interview">📝 Interview</button>
-          <button class="toolbar-btn" id="btn-room-pickup" title="Open pickup utility">📦 Pickup</button>
-          <button class="toolbar-btn" id="btn-search-toggle">🔍 Search</button>
-          <button class="toolbar-btn" id="btn-filter-toggle">⚡ Filter</button>
-          <button class="toolbar-btn" id="btn-review-swipe" title="Swipe through photos">👁 Review</button>
-          <button class="toolbar-btn" id="btn-select-toggle">☑ Select</button>
-          <button class="toolbar-btn" id="btn-origin-toggle">🎯 Origin</button>
-          <button class="toolbar-btn" id="btn-room-edit" title="Edit or delete room">⋮</button>
+          <button class="toolbar-btn" id="btn-room-sev" title="View and edit room severity">Severity</button>
+          <button class="toolbar-btn" id="btn-room-interview" title="Open interview">Interview</button>
+          <button class="toolbar-btn" id="btn-room-pickup" title="Open pickup utility">Pickup</button>
+          <button class="toolbar-btn" id="btn-search-toggle">Search</button>
+          <button class="toolbar-btn" id="btn-filter-toggle">Filter</button>
+          <button class="toolbar-btn" id="btn-review-swipe" title="Swipe through photos">Review</button>
+          <button class="toolbar-btn" id="btn-select-toggle">Select</button>
+          <button class="toolbar-btn" id="btn-origin-toggle">Origin</button>
+          <button class="toolbar-btn" id="btn-room-edit" title="Edit or delete room">More</button>
         </div>
       </div>
     </div>
@@ -1320,7 +1346,7 @@ const SUB_MAP={
 };
 const LOSS_TYPES=[
   {code:'fire',  label:'Fire',     icon:'🔥', details:['Heat','Soot','Odor','Ext. Powder','Rem. Debris','FF Damage']},
-  {code:'water', label:'Water',    icon:'💧', details:['Humidity','Musty Odor','Mold Growth','Sprinkler']},
+  {code:'water', label:'Water',    icon:'💧', details:['Wet','Humidity','Musty Odor','Sprinkler']},
   {code:'mold',  label:'Mold',     icon:'🟢', details:['Spores','Visible Mold','Mildew']},
   {code:'pb',    label:'Puffback', icon:'💨', details:['Soot','Odor','Residue']},
   {code:'debris',label:'Debris',   icon:'🪨', details:['Structural','Contents','Other']},
@@ -1329,7 +1355,8 @@ function emptySev(){const s={};LOSS_TYPES.forEach(lt=>{s[lt.code]={sev:0,details
 function hasAnySeverity(sev){if(!sev)return false;return Object.values(sev).some(v=>v&&(v.sev>0||(v.details&&Object.values(v.details).some(d=>d>0))));}
 function mergeSev(base,ov){if(!ov)return base;Object.keys(ov).forEach(k=>{if(!base[k])base[k]={sev:0,details:{}};if(ov[k].sev!==undefined)base[k].sev=ov[k].sev;if(ov[k].details)Object.assign(base[k].details,ov[k].details);});return base;}
 function effectiveSev(room,fi){const b=JSON.parse(JSON.stringify(curOrder.severity||emptySev()));const fl=curOrder.floors[fi!==undefined?fi:curFloorIdx];if(fl&&fl.severity)mergeSev(b,fl.severity);if(room&&room.severity)mergeSev(b,room.severity);return b;}
-function sevSummary(sevObj){const parts=LOSS_TYPES.filter(lt=>sevObj[lt.code]&&sevObj[lt.code].sev>0).map(lt=>lt.icon+sevObj[lt.code].sev);return parts.length?parts.join(' '):null;}
+const SEV_CODE_MAP={fire:'F',water:'W',mold:'M',pb:'PB',debris:'D'};
+function sevSummary(sevObj){const parts=LOSS_TYPES.filter(lt=>sevObj[lt.code]&&sevObj[lt.code].sev>0).map(lt=>(SEV_CODE_MAP[lt.code]||lt.code.toUpperCase())+sevObj[lt.code].sev);return parts.length?parts.join(' '):null;}
 const PROPERTY_TYPES=['House','Apartment','Business','Row House','Garden Apt','Trailer'];
 const OFFERINGS=['Appliance','Art','Consulting','Contents','Furniture','Hand Clean','Pack-out','Rugs','Storage Only','Textiles','TLI','Expert Stain Removal','Inhome'];
 const OFFERING_SUBSERVICES={
@@ -1709,10 +1736,10 @@ function renderInterviewUIs(){
   const p=getInterviewProgress(state);
   const missing=getInterviewMissingCritical(state);
   const blocker=latestInterviewBlocker(state);
-  const txt='📝 Interview '+p.answered+'/'+p.required;
+  const txt='Interview '+p.answered+'/'+p.required;
   if(orderBtn){
     orderBtn.textContent=txt+(missing.length&&blocker&&blocker.reason?' · blocker':'');
-    orderBtn.className='btn '+(missing.length&&!blocker?'btn-white':'btn-amber')+' btn-md btn-full';
+    orderBtn.className='btn btn-white btn-md btn-full';
   }
   if(roomBtn)roomBtn.textContent=txt;
   renderPickupButtons();
@@ -1731,8 +1758,8 @@ function renderPickupButtons(){
   const pending=hasPendingMaterialPickupChanges(curOrder);
   const orderBtn=$('btn-order-pickup');
   if(orderBtn){
-    orderBtn.textContent='📦 Pickup '+summary.done+'/'+summary.total+(pending?' · pending change':'');
-    orderBtn.className='btn '+(pending?'btn-white':'btn-amber')+' btn-md btn-full';
+    orderBtn.textContent='Pickup '+summary.done+'/'+summary.total+(pending?' · pending change':'');
+    orderBtn.className='btn btn-white btn-md btn-full';
   }
   const roomBtn=$('btn-room-pickup');
   if(roomBtn&&curRoom){
@@ -2500,7 +2527,7 @@ function renderOrder(){
     addBtn.type='button';addBtn.className='floor-section-add';addBtn.textContent='Add Room';
     addBtn.addEventListener('click',(e)=>{e.stopPropagation();curFloorIdx=fi;openAddRoomSheet();});
     const sevBtn=document.createElement('button');
-    sevBtn.type='button';sevBtn.className='floor-section-sev';sevBtn.textContent='Sev';
+    sevBtn.type='button';sevBtn.className='floor-section-sev';sevBtn.textContent='Severity';sevBtn.title='Set severity levels for this floor';
     sevBtn.addEventListener('click',(e)=>{
       e.stopPropagation();
       curFloorIdx=fi;
@@ -2509,7 +2536,7 @@ function renderOrder(){
       openFloorSevSheet();
     });
     const instrBtn=document.createElement('button');
-    instrBtn.type='button';instrBtn.className='floor-section-instr';instrBtn.textContent='Instr';
+    instrBtn.type='button';instrBtn.className='floor-section-instr';instrBtn.textContent='Instructions';instrBtn.title='Set default instructions for this floor';
     instrBtn.addEventListener('click',(e)=>{
       e.stopPropagation();
       curFloorIdx=fi;
@@ -2519,15 +2546,13 @@ function renderOrder(){
     const arrowEl=document.createElement('span');
     arrowEl.className='floor-section-arrow';arrowEl.textContent='⌄';
 
-    // Counts label — show room+photo count when collapsed, room count when expanded
+    // Counts label — only show when collapsed with photos
     const countsEl=document.createElement('span');
     countsEl.className='floor-section-counts';
-    if(f.notAffected){
-      countsEl.textContent='';  // tag rendered inside header body
-    } else if(isCollapsed){
-      countsEl.textContent=rc_count+' room'+(rc_count===1?'':'s')+(pc>0?' · '+pc+' 📷':'');
+    if(isCollapsed && pc>0){
+      countsEl.textContent=rc_count+' room'+(rc_count===1?'':'s')+' · '+pc+' photos';
     } else {
-      countsEl.textContent=rc_count+' room'+(rc_count===1?'':'s');
+      countsEl.textContent='';
     }
 
     const notAffTag=f.notAffected?'<span class="floor-na-tag">Not Affected</span>':'';
@@ -2668,10 +2693,8 @@ $('floor-check-yes').addEventListener('click',()=>{
   openFloorSevSheet();
 });
 function openInstructionScopeChoice(fi){
-  pendingInstrScopeFloorIdx=fi;
-  const floor=curOrder?.floors?.[fi];
-  $('instr-scope-title').textContent=floor?`How do you want to enter instructions for ${floor.name}?`:'How do you want to enter instructions?';
-  openSheet('sheet-instr-scope-choice');
+  // Skip the scope choice modal — go directly to floor instructions
+  openFloorInstrSheet(fi,'floor');
 }
 $('instr-scope-home').addEventListener('click',()=>{
   if(pendingInstrScopeFloorIdx===null||pendingInstrScopeFloorIdx===undefined)return;
@@ -4357,10 +4380,11 @@ function doSavePhoto(){
   return p;
 }
 
-// --- NOE BRIDGE: Sync all photos to localStorage for SDS document ---
+// --- NOE BRIDGE: Sync all data to localStorage for NOE/SDS ---
 function syncPhotosToNoe(){
   if(!curOrder)return;
   try{
+    // Photos
     const allPhotos=[];
     let coverPhotoId=null;
     (curOrder.floors||[]).forEach((floor,fi)=>{
@@ -4382,7 +4406,6 @@ function syncPhotosToNoe(){
         });
       });
     });
-    // First photo per room becomes room cover if none explicitly set
     const roomCovers={};
     allPhotos.forEach(p=>{
       if(!roomCovers[p.room])roomCovers[p.room]=p.id;
@@ -4396,7 +4419,76 @@ function syncPhotosToNoe(){
       updatedAt:new Date().toISOString()
     };
     localStorage.setItem('noe-scope-photos',JSON.stringify(payload));
-  }catch(e){console.warn('Photo sync error:',e);}
+
+    // Rooms + floors — sync to NOE sdsRooms and sdsProjectFloors
+    const sdsRooms=[];
+    const sdsProjectFloors=[];
+    (curOrder.floors||[]).forEach(floor=>{
+      sdsProjectFloors.push(floor.name||'Floor');
+      (floor.rooms||[]).forEach(room=>{
+        sdsRooms.push({
+          id:room.id||('room-'+room.name),
+          name:room.displayName||room.name||'Room',
+          floorLabel:floor.name||'Floor',
+          affected:room.affected,
+          severitySelections:room.severitySelections||[],
+          roomSeverityCodes:room.roomSeverityCodes||[],
+          tasks:room.tasks||[],
+          photos:(room.photos||[]).length,
+          hasCleaning:room.hasCleaning,
+          packOut:room.packOut,
+          leaveOnsite:room.leaveOnsite
+        });
+      });
+    });
+
+    // Severity — convert Photo Scope format to NOE severityCodes
+    const severityCodes=[];
+    const sev=curOrder.severity||{};
+    const sevGroupMap={fire:'Fire',water:'Water',mold:'Mold',pb:'Puffback',debris:'Debris'};
+    Object.keys(sev).forEach(key=>{
+      if(sev[key]&&sev[key].sev>0){
+        const group=sevGroupMap[key];
+        if(group)severityCodes.push(group+'-'+sev[key].sev);
+      }
+    });
+
+    // Interview — convert Photo Scope answers to NOE format
+    const iv=curOrder.interview?curOrder.interview.answers:{};
+    const interview={};
+    if(iv.conditions&&iv.conditions.length)interview.conditions=iv.conditions;
+    if(iv.repairs&&iv.repairs.length)interview.repairs=iv.repairs;
+    if(iv.living)interview.living=iv.living;
+    if(iv.delivery)interview.delivery=iv.delivery;
+    if(iv.packout&&iv.packout.length)interview.packout=iv.packout;
+    if(iv.loadList&&iv.loadList.length)interview.loadList=iv.loadList;
+    if(iv.considerations&&iv.considerations.length)interview.considerations=iv.considerations;
+    if(iv.suggestedGroups&&iv.suggestedGroups.length)interview.suggestedGroups=iv.suggestedGroups;
+    if(iv.medicalIssues===true||iv.medicalIssues===false)interview.medicalIssues=iv.medicalIssues;
+    if(iv.soapAllergies===true||iv.soapAllergies===false)interview.soapAllergies=iv.soapAllergies;
+    if(iv.selfCleaning===true||iv.selfCleaning===false)interview.selfCleaning=iv.selfCleaning;
+    if(iv.useDryCleaner)interview.useDryCleaner=iv.useDryCleaner;
+    if(iv.dryLaundry)interview.dryLaundry=iv.dryLaundry;
+    if(iv.needStorage===true||iv.needStorage===false)interview.needStorage=iv.needStorage;
+    if(iv.petsInHome&&iv.petsInHome.length)interview.petsInHome=iv.petsInHome;
+    if(iv.interests&&iv.interests.length)interview.interests=iv.interests;
+    if(iv.upcomingEvents&&iv.upcomingEvents.length)interview.upcomingEvents=iv.upcomingEvents;
+
+    // Services/offerings
+    const offerings=curOrder.offerings||[];
+
+    // Write everything to a single bridge key
+    localStorage.setItem('noe-scope-sync',JSON.stringify({
+      sdsRooms:sdsRooms,
+      sdsProjectFloors:sdsProjectFloors,
+      severityCodes:severityCodes,
+      interview:interview,
+      offerings:offerings,
+      suggestedGroups:iv.suggestedGroups||[],
+      considerations:iv.considerations||[],
+      updatedAt:new Date().toISOString()
+    }));
+  }catch(e){console.warn('Scope sync error:',e);}
 }
 
 // Save → reset tags → back to room grid
@@ -5001,6 +5093,15 @@ window.addEventListener('load',()=>{
       if(window.go) window.go('scr-camera');
     },1000);
   }
+  /* Auto-start from Scope Wizard V2 — skip landing, go straight to order */
+  if(new URLSearchParams(location.search).get('autostart')==='1'){
+    setTimeout(()=>{
+      if(window.orders && window.orders.length>0){
+        window.curOrder=window.orders[0];
+        if(window.go) window.go('scr-order');
+      }
+    },500);
+  }
 });
 </script>
 <script>
@@ -5012,46 +5113,56 @@ if('serviceWorker' in navigator && !/localhost|127\.0\.0\.1/i.test(location.host
 }
 </script>
 <script>
-// NOE Order Context Bridge — reads order data from parent NOE app
+// NOE Order Context Bridge — auto-loads the NOE order into Photo Scope
 (function(){
   try {
-    const raw = localStorage.getItem('noe-photo-scope-context');
+    var raw = localStorage.getItem('noe-photo-scope-context');
     if (!raw) return;
-    const ctx = JSON.parse(raw);
+    var ctx = JSON.parse(raw);
     if (!ctx || !ctx.orderName) return;
 
-    // Add order banner at top of the app
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;padding:6px 16px;font-family:var(--font);display:flex;align-items:center;gap:12px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer';
-    banner.title = 'Click to load this order into Photo Scope';
-    banner.innerHTML = `
-      <span style="font-weight:800;font-size:13px">${ctx.orderName}</span>
-      <span style="opacity:0.7">|</span>
-      <span>${ctx.customerName || ''}</span>
-      ${ctx.address ? `<span style="opacity:0.7">|</span><span style="opacity:0.8">${ctx.address}</span>` : ''}
-      ${ctx.lossType ? `<span style="opacity:0.7">|</span><span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:99px;font-weight:700">${ctx.lossType}</span>` : ''}
-      <span style="margin-left:auto;background:rgba(255,255,255,0.25);padding:3px 12px;border-radius:99px;font-weight:700;font-size:11px">Load Order →</span>
-    `;
+    // Show NOE summary on orders screen, hide default content
+    var summaryPanel = document.getElementById('noe-order-summary');
+    var defaultScreen = document.getElementById('default-orders-screen');
+    if (summaryPanel && defaultScreen) {
+      summaryPanel.style.display = 'block';
+      defaultScreen.style.display = 'none';
+      var nameEl = document.getElementById('noe-summary-name');
+      var custEl = document.getElementById('noe-summary-customer');
+      var addrEl = document.getElementById('noe-summary-address');
+      var lossEl = document.getElementById('noe-summary-loss');
+      var servEl = document.getElementById('noe-summary-services');
+      var roomsEl = document.getElementById('noe-summary-rooms');
+      if (nameEl) nameEl.textContent = ctx.orderName;
+      if (custEl) custEl.textContent = ctx.customerName || '';
+      if (addrEl) addrEl.textContent = ctx.address || '';
+      if (lossEl && ctx.lossType) { lossEl.textContent = ctx.lossType; lossEl.style.display = 'inline-block'; }
+      if (servEl && ctx.services && ctx.services.length) { servEl.textContent = ctx.services.length + ' services'; servEl.style.display = 'inline-block'; }
+      if (roomsEl && ctx.rooms && ctx.rooms.length) { roomsEl.textContent = ctx.rooms.length + ' rooms'; roomsEl.style.display = 'inline-block'; }
+    }
 
-    banner.addEventListener('click', function() {
-      // Pre-fill the wizard address field
-      var addrInput = document.getElementById('inp-address');
-      if (addrInput) addrInput.value = ctx.address || ctx.orderName || '';
+    // "Start Scope" button — creates order and navigates
+    var btnStart = document.getElementById('btn-noe-start-scope');
+    if (btnStart) {
+      btnStart.addEventListener('click', function() {
+        startNoeOrder();
+      });
+    }
 
-      // Navigate to wizard step 1 (this resets wizard state)
+    function startNoeOrder() {
+      // Use the wizard flow: click New Order, then pre-fill from NOE context
       var newOrderBtn = document.getElementById('btn-new-order');
       if (newOrderBtn) newOrderBtn.click();
 
-      // After the wizard resets, pre-fill from NOE context
       setTimeout(function() {
         // Address
         var addrField = document.getElementById('inp-address');
         if (addrField) addrField.value = ctx.address || ctx.orderName || '';
 
-        // Service offerings — lists now match between NOE and Photo Scope
+        // Services
         if (ctx.services && ctx.services.length) window._wizOfferings = ctx.services.slice();
 
-        // Severity codes — convert NOE "Fire-3" format to Photo Scope {fire:{sev:3,details:{}}}
+        // Severity
         var sevCodes = ctx.severityCodes || [];
         if (sevCodes.length) {
           var sevMap = { 'Fire': 'fire', 'Water': 'water', 'Mold': 'mold', 'Puffback': 'pb', 'Debris': 'debris' };
@@ -5068,12 +5179,10 @@ if('serviceWorker' in navigator && !/localhost|127\.0\.0\.1/i.test(location.host
           window._wizSev = sev;
         }
 
-        // Rooms — store for later use when creating floors
-        if (ctx.rooms && ctx.rooms.length) {
-          window._noeRooms = ctx.rooms;
-        }
+        // Rooms
+        if (ctx.rooms && ctx.rooms.length) window._noeRooms = ctx.rooms;
 
-        // Interview answers — pre-fill from NOE context
+        // Interview
         var iv = ctx.interview;
         if (iv && typeof iv === 'object') {
           if (!window._wizInterview) window._wizInterview = typeof normalizeInterviewState === 'function' ? normalizeInterviewState(null) : { answers: {} };
@@ -5096,105 +5205,10 @@ if('serviceWorker' in navigator && !/localhost|127\.0\.0\.1/i.test(location.host
           if (Array.isArray(iv.interests) && iv.interests.length) ans.interests = iv.interests;
           if (Array.isArray(iv.upcomingEvents) && iv.upcomingEvents.length) ans.upcomingEvents = iv.upcomingEvents;
         }
-      }, 50);
-    });
-
-    document.body.prepend(banner);
-    document.body.style.paddingTop = '32px';
-
-    // Show the "Add from NOE" button on the orders screen
-    var noeWrap = document.getElementById('noe-import-wrap');
-    if (noeWrap) noeWrap.style.display = 'block';
-
-    // Helper: apply NOE context to an existing order
-    function applyNoeToOrder(order) {
-      if (!order || !ctx) return;
-      // Services
-      if (ctx.services && ctx.services.length) {
-        var psOfferings = order.offerings || [];
-        ctx.services.forEach(function(s) { if (psOfferings.indexOf(s) < 0) psOfferings.push(s); });
-        order.offerings = psOfferings;
-      }
-      // Severity
-      if (ctx.severityCodes && ctx.severityCodes.length) {
-        var sevMap = { 'Fire': 'fire', 'Water': 'water', 'Mold': 'mold', 'Puffback': 'pb', 'Debris': 'debris' };
-        if (!order.severity) order.severity = typeof emptySev === 'function' ? emptySev() : {};
-        ctx.severityCodes.forEach(function(code) {
-          var parts = String(code || '').split('-');
-          var group = sevMap[parts[0]];
-          var level = parseInt(parts[1]) || 0;
-          if (group && level > 0) {
-            if (!order.severity[group]) order.severity[group] = { sev: 0, details: {} };
-            order.severity[group].sev = Math.max(order.severity[group].sev, level);
-          }
-        });
-      }
-      // Rooms from NOE
-      if (ctx.rooms && ctx.rooms.length && order.floors) {
-        var existingRooms = [];
-        order.floors.forEach(function(f) { f.rooms.forEach(function(r) { existingRooms.push(r.name); }); });
-        var targetFloor = order.floors[0];
-        ctx.rooms.forEach(function(roomName) {
-          if (existingRooms.indexOf(roomName) < 0 && targetFloor) {
-            targetFloor.rooms.push({ name: roomName, displayName: roomName, photos: [], severity: null, severitySelections: [], tasks: [], affected: null, hasCleaning: null, packOut: null, leaveOnsite: null });
-          }
-        });
-      }
-      // Interview
-      var iv = ctx.interview;
-      if (iv && typeof iv === 'object') {
-        if (!order.interview) order.interview = typeof normalizeInterviewState === 'function' ? normalizeInterviewState(null) : { answers: {} };
-        var ans = order.interview.answers || {};
-        if (Array.isArray(iv.conditions) && iv.conditions.length) ans.conditions = iv.conditions;
-        if (Array.isArray(iv.repairs) && iv.repairs.length) ans.repairs = iv.repairs;
-        if (iv.living) ans.living = iv.living;
-        if (iv.delivery) ans.delivery = iv.delivery;
-        if (Array.isArray(iv.packout) && iv.packout.length) ans.packout = iv.packout;
-        if (Array.isArray(iv.loadList) && iv.loadList.length) ans.loadList = iv.loadList;
-        if (Array.isArray(iv.considerations) && iv.considerations.length) ans.considerations = iv.considerations;
-        if (Array.isArray(iv.suggestedGroups) && iv.suggestedGroups.length) ans.suggestedGroups = iv.suggestedGroups;
-        if (iv.medicalIssues === true || iv.medicalIssues === false) ans.medicalIssues = iv.medicalIssues;
-        if (iv.soapAllergies === true || iv.soapAllergies === false) ans.soapAllergies = iv.soapAllergies;
-        if (iv.selfCleaning === true || iv.selfCleaning === false) ans.selfCleaning = iv.selfCleaning;
-        if (iv.useDryCleaner) ans.useDryCleaner = iv.useDryCleaner;
-        if (iv.dryLaundry) ans.dryLaundry = iv.dryLaundry;
-        if (iv.needStorage === true || iv.needStorage === false) ans.needStorage = iv.needStorage;
-        if (Array.isArray(iv.petsInHome) && iv.petsInHome.length) ans.petsInHome = iv.petsInHome;
-        if (Array.isArray(iv.interests) && iv.interests.length) ans.interests = iv.interests;
-        if (Array.isArray(iv.upcomingEvents) && iv.upcomingEvents.length) ans.upcomingEvents = iv.upcomingEvents;
-        order.interview.answers = ans;
-      }
-      // Considerations / observations
-      if (ctx.considerations && ctx.considerations.length) order.considerations = ctx.considerations;
-      if (ctx.observations && ctx.observations.length) order.observations = ctx.observations;
-      if (ctx.handlingCodes && ctx.handlingCodes.length) order.handlingCodes = ctx.handlingCodes;
-      if (ctx.suggestedGroups && ctx.suggestedGroups.length) order.suggestedGroups = ctx.suggestedGroups;
+      }, 100);
     }
 
-    // "Add from NOE" on orders screen — creates new order with NOE data
-    var btnAddNoe = document.getElementById('btn-add-from-noe');
-    if (btnAddNoe) {
-      btnAddNoe.addEventListener('click', function() {
-        // Click "New Order" to start the wizard
-        banner.click();
-      });
-    }
-
-    // "Add from NOE" on order screen — merges into current order
-    var btnOrderNoe = document.getElementById('btn-order-add-noe');
-    if (btnOrderNoe) {
-      btnOrderNoe.style.display = 'block';
-      btnOrderNoe.addEventListener('click', function() {
-        if (typeof curOrder !== 'undefined' && curOrder) {
-          applyNoeToOrder(curOrder);
-          if (typeof renderOrder === 'function') renderOrder();
-          if (typeof renderInterviewUIs === 'function') renderInterviewUIs();
-          if (typeof showToast === 'function') showToast('NOE data applied to order');
-        }
-      });
-    }
-
-  } catch(e) {}
+  } catch(e) { console.warn('NOE auto-load error:', e); }
 })();
 </script>
 </body>

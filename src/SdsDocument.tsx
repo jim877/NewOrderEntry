@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { normalizeScopeBridgeState, nextStepLabel } from "./scopeBridgeUtils";
 
 const MAX_SEVERITY = 3;
@@ -299,6 +299,26 @@ const SdsPageMarketingWidget = ({ brand = BRAND }) => (
   </div>
 );
 
+const SdsMarketingStrip = ({ variant = 0, brand = BRAND }) => {
+  const strips = [
+    { bg: "bg-sky-50", border: "border-sky-100", text: "text-sky-800", sub: "text-sky-600", headline: "24/7 Claim Support", detail: `Questions? Call us anytime at ${brand.phone}` },
+    { bg: "bg-emerald-50", border: "border-emerald-100", text: "text-emerald-800", sub: "text-emerald-600", headline: "Every Item Barcoded & Tracked", detail: "Photo inventory, barcode tracking, and detailed reporting for every piece" },
+    { bg: "bg-amber-50", border: "border-amber-100", text: "text-amber-800", sub: "text-amber-600", headline: "Climate-Controlled Storage", detail: "Your belongings are safe in our secure, climate-controlled facility" },
+    { bg: "bg-violet-50", border: "border-violet-100", text: "text-violet-800", sub: "text-violet-600", headline: "Specialized Cleaning Experts", detail: "From designer labels to family heirlooms — handled with care" },
+    { bg: "bg-teal-50", border: "border-teal-100", text: "text-teal-800", sub: "text-teal-600", headline: "Flexible Delivery Scheduling", detail: "Rush, short-term, or long-term — we deliver on your timeline" },
+  ];
+  const s = strips[variant % strips.length];
+  return (
+    <div className={`rounded-xl ${s.bg} border ${s.border} px-4 py-2.5 flex items-center justify-between`}>
+      <div>
+        <div className={`text-xs font-bold ${s.text}`}>{s.headline}</div>
+        <div className={`text-[10px] ${s.sub}`}>{s.detail}</div>
+      </div>
+      <div className="shrink-0 text-[9px] font-bold text-slate-400 uppercase tracking-wider">{brand.name}</div>
+    </div>
+  );
+};
+
 const SdsPageBlock = ({ children, brand = BRAND, showHeader = true, showMarketingWidget = true }) => (
   <div className="print-page space-y-5">
     <div className="h-[3px] w-full rounded-full bg-[linear-gradient(90deg,#06b6d4_0%,#0ea5e9_45%,#22c55e_100%)]" aria-hidden />
@@ -589,95 +609,78 @@ const SdsProjectSummarySection = ({
   );
 };
 
-const SdsRestoreStoryPage = ({ brand = BRAND, media = BRAND_CARES_MEDIA, serviceHighlights = SERVICE_HIGHLIGHTS }) => (
-  <SdsPageBlock brand={brand} showHeader={false}>
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="grid min-h-[240px] grid-cols-[170px_1fr] gap-5 items-end">
-          <div className="relative h-full min-h-[200px] overflow-hidden rounded-xl bg-white">
-            <SdsStableImage
-              src={media.fieldTech}
-              alt="Renewal Cares field specialist"
-              className="absolute bottom-0 left-0 h-full w-full object-cover object-left-bottom"
-              loading="lazy"
-            />
-          </div>
-          <div className="self-center pr-2">
-            <div className="text-[42px] font-bold leading-[1.02] text-slate-900">Restore. Renew. Restart.</div>
-            <p className="mt-3 text-[20px] leading-relaxed text-slate-600">
-              We help families recover after fire, water, and mold losses by handling pickup,
-              inventory, cleaning, storage, and delivery of soft goods and belongings.
-            </p>
-          </div>
+// Marketing widgets — original card format distributed between sections
+const SdsMarketingRestoreStory = ({ brand = BRAND, media = BRAND_CARES_MEDIA, serviceHighlights = SERVICE_HIGHLIGHTS }) => (
+  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="grid min-h-[240px] grid-cols-[170px_1fr] gap-5 items-end">
+        <div className="relative h-full min-h-[200px] overflow-hidden rounded-xl bg-white">
+          <SdsStableImage src={media.fieldTech} alt="Renewal Cares field specialist" className="absolute bottom-0 left-0 h-full w-full object-cover object-left-bottom" loading="lazy" />
         </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {serviceHighlights.map((item) => (
-          <div key={item} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[15px] font-semibold text-slate-700">
-            {item}
-          </div>
-        ))}
-      </div>
-    </div>
-  </SdsPageBlock>
-);
-
-const SdsBrochurePage = ({ brand = BRAND, media = BRAND_CARES_MEDIA }) => (
-  <SdsPageBlock brand={brand} showHeader={false}>
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-start">
-        <div className="self-start rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="grid min-h-[210px] grid-cols-[108px_1fr] gap-4 items-end">
-            <div className="relative h-full min-h-[168px] overflow-hidden rounded-xl bg-white">
-              <SdsStableImage
-                src={media.careSpecialist}
-                alt="Renewal Cares support specialist"
-                className="absolute bottom-0 left-0 h-full w-full object-contain object-left-bottom"
-                loading="lazy"
-              />
-            </div>
-            <div className="self-center pr-1">
-              <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Contact</div>
-              <div className="mt-1 text-[30px] font-bold leading-tight text-slate-800">{brand.phone}</div>
-              <div className="mt-1 text-lg text-slate-600">{brand.email}</div>
-              <div className="text-lg text-slate-600">{brand.website}</div>
-              <p className="mt-3 text-sm text-slate-500">
-                Fast response, transparent communication, and claim-ready documentation.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center">
-            <SdsBrandMark brand={brand} large loading="lazy" />
-            <div className="mt-2 text-3xl font-semibold text-slate-700">Your trusted restoration partner</div>
-            <div className="mt-1 text-xl text-slate-500">Serving Greater NYC and beyond</div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-2">
-            <SdsBrandMediaCard
-              src={media.homeBanner}
-              alt="Renewal Cares home banner"
-              className="h-28 border-none rounded-xl bg-white"
-              imageClass="h-full w-full object-contain object-center"
-              fallbackSrc={brand.logoSrc}
-              tertiaryFallbackSrc={BRAND_LOGO_TERTIARY_FALLBACK}
-              loading="lazy"
-            />
-            <div className="mt-1 text-center text-sm font-medium text-slate-500">
-              Compassion-driven service from first call to final delivery.
-            </div>
-          </div>
+        <div className="self-center pr-2">
+          <div className="text-[42px] font-bold leading-[1.02] text-slate-900">Restore. Renew. Restart.</div>
+          <p className="mt-3 text-[20px] leading-relaxed text-slate-600">We help families recover after fire, water, and mold losses by handling pickup, inventory, cleaning, storage, and delivery of soft goods and belongings.</p>
         </div>
       </div>
     </div>
-  </SdsPageBlock>
+    <div className="grid gap-3 sm:grid-cols-2">
+      {serviceHighlights.map((item) => (
+        <div key={item} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[15px] font-semibold text-slate-700">{item}</div>
+      ))}
+    </div>
+  </div>
 );
 
-export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", policyNumber = "", nationalCarrier = "", primaryLossType = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsPhotos = [], sdsCoverPhoto = null, scopeBridge = {}, documentType = "approval", orderNarrative = [], orderNarrativeProse = [], rushGuideTimeline = null }) {
+const SdsMarketingServiceHighlights = ({ serviceHighlights = SERVICE_HIGHLIGHTS }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="grid gap-3 sm:grid-cols-2">
+      {serviceHighlights.map((item) => (
+        <div key={item} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[15px] font-semibold text-slate-700">{item}</div>
+      ))}
+    </div>
+  </div>
+);
+
+const SdsMarketingContact = ({ brand = BRAND, media = BRAND_CARES_MEDIA }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="grid min-h-[210px] grid-cols-[108px_1fr] gap-4 items-end">
+      <div className="relative h-full min-h-[168px] overflow-hidden rounded-xl bg-white">
+        <SdsStableImage src={media.careSpecialist} alt="Renewal Cares support specialist" className="absolute bottom-0 left-0 h-full w-full object-contain object-left-bottom" loading="lazy" />
+      </div>
+      <div className="self-center pr-1">
+        <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Contact</div>
+        <div className="mt-1 text-[30px] font-bold leading-tight text-slate-800">{brand.phone}</div>
+        <div className="mt-1 text-lg text-slate-600">{brand.email}</div>
+        <div className="text-lg text-slate-600">{brand.website}</div>
+        <p className="mt-3 text-sm font-bold text-slate-500">Fast response, transparent communication, and claim-ready documentation.</p>
+      </div>
+    </div>
+  </div>
+);
+
+const SdsMarketingBrandCard = ({ brand = BRAND }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
+    <SdsBrandMark brand={brand} loading="lazy" />
+    <div className="mt-1 text-lg font-semibold text-slate-700">Your trusted restoration partner</div>
+    <div className="text-sm text-slate-500">Serving Greater NYC and beyond</div>
+  </div>
+);
+
+const SdsMarketingBanner = ({ brand = BRAND, media = BRAND_CARES_MEDIA }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-2">
+    <SdsBrandMediaCard src={media.homeBanner} alt="Renewal Cares home banner" className="h-28 border-none rounded-xl bg-white" imageClass="h-full w-full object-contain object-center" fallbackSrc={brand.logoSrc} tertiaryFallbackSrc={BRAND_LOGO_TERTIARY_FALLBACK} loading="lazy" />
+    <div className="mt-1 text-center text-sm font-medium text-slate-500">Compassion-driven service from first call to final delivery.</div>
+  </div>
+);
+
+export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", policyNumber = "", nationalCarrier = "", primaryLossType = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsPhotos = [], sdsCoverPhoto = null, scopeBridge = {}, documentType = "approval", orderNarrative = [], orderNarrativeProse = [], rushGuideTimeline = null, onPhotoNoteChange = null as ((photoId: string, note: string) => void) | null, onNarrativeChange = null as ((prose: string[]) => void) | null }) {
   const docSeverity = lossSeverity || {};
   const printRootRef = useRef(null);
   const responseCopy = getSdsResponseCopy(documentType);
+  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
+  const [editingPhotoNote, setEditingPhotoNote] = useState("");
+  const [editingNarrative, setEditingNarrative] = useState(false);
+  const [narrativeDraft, setNarrativeDraft] = useState<string[]>([]);
 
   const orderSeverityBySection = useMemo(() => {
     const map = { fire: 0, water: 0 };
@@ -717,105 +720,45 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
   const highSeverityFieldsForSection = (section, state) =>
     section.fields.filter((field) => Number(state.values?.[field] ?? 0) > 1);
 
-  const handlePrint = async () => {
-    const printNode = printRootRef.current;
-    if (!printNode) {
-      window.focus();
-      window.print();
-      return;
+  const handlePrint = () => {
+    // Inject a print stylesheet that hides everything except the SDS
+    let printStyle = document.getElementById("sds-print-style") as HTMLStyleElement;
+    if (!printStyle) {
+      printStyle = document.createElement("style");
+      printStyle.id = "sds-print-style";
+      document.head.appendChild(printStyle);
     }
-
-    const popup = window.open("", "_blank", "noopener,noreferrer,width=1100,height=850");
-    if (!popup) {
-      window.focus();
-      window.print();
-      return;
-    }
-
-    const headMarkup = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
-      .map((el) => el.outerHTML)
-      .join("\n");
-    const baseHref = document.baseURI || window.location.href;
-    const contentNode = printNode.children?.[1];
-    const sourceForPrint = contentNode instanceof HTMLElement ? contentNode : printNode;
-    const printableClone = sourceForPrint.cloneNode(true);
-    Array.from(printableClone.querySelectorAll("img")).forEach((img) => {
-      const src = img.getAttribute("src");
-      if (!src) return;
-      img.setAttribute("src", toAbsoluteAssetUrl(src));
-    });
-    const printMarkup = printableClone.outerHTML;
-
-    popup.document.open();
-    popup.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>SDS Document</title>
-          <base href="${baseHref}" />
-          ${headMarkup}
-          <style>
-            @page { size: letter portrait; margin: 0.65in; }
-            html, body { background: #fff; margin: 0; padding: 0; }
-            .sds-popup-doc > .p-6 { padding: 0 !important; background: #fff !important; }
-            .print-hidden { display: none !important; }
-            .print-container { box-shadow: none !important; border: none !important; }
-            .print-page { page-break-after: always; break-after: page; }
-            .print-page:last-child { page-break-after: auto; break-after: auto; }
-            .print-avoid { break-inside: avoid; }
-            .print-scroll { max-height: none !important; overflow: visible !important; }
-            .print-hide-low-severity { display: none !important; }
-            .print-hide-empty-severity-card { display: none !important; }
-            .print-hide-no-high-severity { display: none !important; }
-            @media print {
-              body * {
-                visibility: visible !important;
-                animation: none !important;
-                transition: none !important;
-              }
-              .sds-popup-doc, .sds-popup-doc * {
-                visibility: visible !important;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="sds-popup-doc">
-            ${printMarkup}
-          </div>
-        </body>
-      </html>
-    `);
-    popup.document.close();
-
-    const waitForAssets = async () => {
-      const imagePromises = Array.from(popup.document.images || []).map((img) => {
-        if (img.complete) return Promise.resolve();
-        return new Promise((resolve) => {
-          img.addEventListener("load", resolve, { once: true });
-          img.addEventListener("error", resolve, { once: true });
-        });
-      });
-      const stylePromises = Array.from(popup.document.querySelectorAll("link[rel='stylesheet']")).map((link) => {
-        if (link.sheet) return Promise.resolve();
-        return new Promise((resolve) => {
-          link.addEventListener("load", resolve, { once: true });
-          link.addEventListener("error", resolve, { once: true });
-        });
-      });
-      await Promise.race([
-        Promise.all([...imagePromises, ...stylePromises]),
-        new Promise((resolve) => setTimeout(resolve, 1200)),
-      ]);
-    };
-
-    await waitForAssets();
-    popup.document.documentElement.scrollTop = 0;
-    popup.document.body.scrollTop = 0;
-    popup.focus();
-    popup.print();
-    setTimeout(() => popup.close(), 500);
+    printStyle.textContent = `
+      @media print {
+        @page { size: letter portrait; margin: 0.5in; }
+        /* Hide everything */
+        body > #root { visibility: hidden !important; height: 0 !important; overflow: hidden !important; }
+        /* Show only the SDS print root */
+        .sds-print-root {
+          visibility: visible !important;
+          position: fixed !important;
+          top: 0 !important; left: 0 !important; right: 0 !important;
+          z-index: 999999 !important;
+          max-height: none !important;
+          overflow: visible !important;
+          box-shadow: none !important;
+          border: none !important;
+          border-radius: 0 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          background: white !important;
+        }
+        .sds-print-root * { visibility: visible !important; }
+        .sds-print-root .print-hidden { display: none !important; }
+        .print-page { page-break-after: always; break-after: page; }
+        .print-page:last-child { page-break-after: auto; break-after: auto; }
+        .print-avoid { break-inside: avoid; }
+        .print-hide-low-severity { display: none !important; }
+        .print-hide-empty-severity-card { display: none !important; }
+        .print-hide-no-high-severity { display: none !important; }
+      }
+    `;
+    window.print();
   };
 
   const visibleSections = useMemo(() => {
@@ -1144,7 +1087,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
 
   const SdsIconSelectionsWidget = () => {
     const mergedServices = Array.from(new Set([...(sdsServices || []), ...(selectedServices || [])]));
-    const considerationIconItems = (sdsConsiderations || []).filter((item) => !!SDS_ICON_MAP[item]);
+    const considerationIconItems = (sdsConsiderations || []).filter((item) => !!SDS_ICON_MAP[item] && item !== "Pets");
     const observationIconItems = (sdsObservations || []).filter((item) => !!SDS_ICON_MAP[item]);
     const serviceIconItems = mergedServices.filter((item) => !!SDS_ICON_MAP[item]);
     const hasAny = considerationIconItems.length || observationIconItems.length || serviceIconItems.length;
@@ -1697,6 +1640,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
               responseInstruction={responseCopy.instruction}
             />
           </SdsPageBlock>
+          <SdsMarketingServiceHighlights />
           <SdsPageBlock brand={BRAND}>
             <SdsWidgetSection title="Loss Severity" className={`mx-auto w-full max-w-[22rem] ${hasAnyHighSeverityRows ? "" : "print-hide-no-high-severity"}`}>
               <div className="mb-2 pt-1 pb-2 border-b border-slate-200/60">
@@ -1759,6 +1703,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
             </SdsWidgetSection>
           </SdsPageBlock>
 
+          <SdsMarketingRestoreStory />
           {(rooms || []).length > 0 && (
             <SdsPageBlock brand={BRAND}>
               <SdsWidgetSection
@@ -1773,6 +1718,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
               </SdsWidgetSection>
             </SdsPageBlock>
           )}
+          <SdsMarketingContact />
           {hasSdsIconSelections && (
             <SdsPageBlock brand={BRAND}>
               <SdsWidgetSection title="Considerations" subtitle="Key factors, observations, and services for this project.">
@@ -1780,6 +1726,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
               </SdsWidgetSection>
             </SdsPageBlock>
           )}
+          <SdsMarketingBrandCard />
           {(sdsPhotos || []).length > 0 && (() => {
             const allPhotos = sdsPhotos || [];
             const coverPhoto = allPhotos.find(p => p.id === sdsCoverPhoto);
@@ -1802,51 +1749,80 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
 
             return (
               <SdsPageBlock brand={BRAND}>
-                <SdsWidgetSection title="Scope Photo Documentation" subtitle="Photos captured during on-site inspection.">
+                <SdsWidgetSection title="Scope Photo Documentation" subtitle="Cover photo for each room with notes.">
                   <div className="space-y-4">
                     {coverPhoto && (
-                      <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                      <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setEditingPhotoId(coverPhoto.id); setEditingPhotoNote(coverPhoto.note || ""); }}>
                         <img src={coverPhoto.src} alt="Cover photo" className="w-full max-h-80 object-contain" />
                         <div className="px-3 py-2 bg-slate-50">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Cover Photo</div>
-                          {coverPhoto.note && <div className="text-xs text-slate-600 mt-1">{coverPhoto.note}</div>}
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Order Cover Photo</div>
+                          {coverPhoto.note ? <div className="text-xs text-slate-600 mt-1">{coverPhoto.note}</div> : <div className="text-[10px] text-slate-300 italic">Click to add note</div>}
                         </div>
+                        {editingPhotoId === coverPhoto.id && (
+                          <div className="px-3 py-2 bg-white border-t border-slate-200" onClick={e => e.stopPropagation()}>
+                            <textarea value={editingPhotoNote} onChange={e => setEditingPhotoNote(e.target.value)} rows={2} placeholder="Add a note..." className="w-full rounded border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-sky-400 resize-none" autoFocus />
+                            <div className="flex gap-2 mt-1.5 justify-end">
+                              <button type="button" onClick={() => setEditingPhotoId(null)} className="px-3 py-1 rounded text-[10px] font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
+                              <button type="button" onClick={() => { onPhotoNoteChange?.(coverPhoto.id, editingPhotoNote); setEditingPhotoId(null); }} className="px-3 py-1 rounded bg-sky-500 text-[10px] font-bold text-white hover:bg-sky-600">Save</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
-                    {roomEntries.map(([room, photos]) => {
-                      const roomCover = photos[0];
-                      return (
-                        <div key={room}>
-                          <div className="text-xs font-bold text-slate-700 mb-2">{room}</div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {photos.map((photo, idx) => (
-                              <div key={photo.id} className={`rounded-lg border overflow-hidden ${idx === 0 ? 'border-sky-300 ring-1 ring-sky-100' : 'border-slate-200'} bg-slate-50`}>
-                                <img src={photo.src} alt={photo.note || room} className="w-full h-36 object-contain" />
-                                <div className="px-2 py-1.5 bg-slate-50">
-                                  {idx === 0 && <div className="text-[9px] font-bold text-sky-600 uppercase">Room Cover</div>}
-                                  {photo.reason && <div className="text-[10px] font-semibold text-slate-600">{photo.reason}{photo.subReason ? ` — ${photo.subReason}` : ''}</div>}
-                                  {photo.note && <div className="text-[10px] text-slate-500">{photo.note}</div>}
+                    <div className="grid grid-cols-2 gap-3">
+                      {roomEntries.map(([room, photos]) => {
+                        const roomCover = photos[0];
+                        if (!roomCover) return null;
+                        return (
+                          <div key={room} className="rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow bg-slate-50" onClick={() => { setEditingPhotoId(roomCover.id); setEditingPhotoNote(roomCover.note || ""); }}>
+                            <img src={roomCover.src} alt={room} className="w-full h-32 object-contain" />
+                            <div className="px-2 py-1.5">
+                              <div className="text-xs font-bold text-slate-700">{room}</div>
+                              {roomCover.reason && <div className="text-[10px] text-slate-500">{roomCover.reason}{roomCover.subReason ? ` — ${roomCover.subReason}` : ''}</div>}
+                              {roomCover.note ? <div className="text-[10px] text-slate-500 mt-0.5">{roomCover.note}</div> : <div className="text-[10px] text-slate-300 italic">Click to add note</div>}
+                              <div className="text-[9px] text-slate-400 mt-0.5">{photos.length} photo{photos.length !== 1 ? 's' : ''} total</div>
+                            </div>
+                            {editingPhotoId === roomCover.id && (
+                              <div className="px-2 py-2 bg-white border-t border-slate-200" onClick={e => e.stopPropagation()}>
+                                <textarea value={editingPhotoNote} onChange={e => setEditingPhotoNote(e.target.value)} rows={2} placeholder="Add a note..." className="w-full rounded border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-sky-400 resize-none" autoFocus />
+                                <div className="flex gap-2 mt-1.5 justify-end">
+                                  <button type="button" onClick={() => setEditingPhotoId(null)} className="px-3 py-1 rounded text-[10px] font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
+                                  <button type="button" onClick={() => { onPhotoNoteChange?.(roomCover.id, editingPhotoNote); setEditingPhotoId(null); }} className="px-3 py-1 rounded bg-sky-500 text-[10px] font-bold text-white hover:bg-sky-600">Save</button>
                                 </div>
                               </div>
-                            ))}
+                            )}
                           </div>
-                        </div>
-                      );
-                    })}
-                    <div className="text-center text-[10px] text-slate-400 pt-2 border-t border-slate-100">
-                      {allPhotos.length} photo{allPhotos.length !== 1 ? 's' : ''} across {roomEntries.length} room{roomEntries.length !== 1 ? 's' : ''}
+                        );
+                      })}
                     </div>
                   </div>
                 </SdsWidgetSection>
               </SdsPageBlock>
             );
           })()}
+          <SdsMarketingBanner />
           {(orderNarrativeProse || []).length > 0 && (
             <SdsPageBlock brand={BRAND}>
               <SdsWidgetSection title="Project Narrative" subtitle="A summary of the scope and key details for this project.">
-                <div className="space-y-2 text-sm leading-relaxed text-slate-700">
-                  {(orderNarrativeProse || []).map((line, i) => <p key={i}>{line}</p>)}
-                </div>
+                {editingNarrative ? (
+                  <div>
+                    <textarea
+                      value={narrativeDraft.join("\n\n")}
+                      onChange={e => setNarrativeDraft(e.target.value.split("\n\n"))}
+                      rows={Math.max(6, (narrativeDraft.length || 1) * 2)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed text-slate-700 outline-none focus:border-sky-400 resize-y"
+                    />
+                    <div className="flex gap-2 mt-2 justify-end">
+                      <button type="button" onClick={() => setEditingNarrative(false)} className="px-3 py-1.5 rounded text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
+                      <button type="button" onClick={() => { onNarrativeChange?.(narrativeDraft); setEditingNarrative(false); }} className="px-3 py-1.5 rounded bg-sky-500 text-xs font-bold text-white hover:bg-sky-600">Save</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2 text-sm leading-relaxed text-slate-700 cursor-pointer hover:bg-slate-50 rounded-lg p-2 -m-2 transition-colors" onClick={() => { setNarrativeDraft([...(orderNarrativeProse || [])]); setEditingNarrative(true); }} title="Click to edit narrative">
+                    {(orderNarrativeProse || []).map((line, i) => <p key={i}>{line}</p>)}
+                    <div className="text-[10px] text-slate-300 italic mt-1">Click to edit</div>
+                  </div>
+                )}
               </SdsWidgetSection>
               {rushGuideTimeline && rushGuideTimeline.length > 0 && (
                 <SdsWidgetSection title="Recommended Delivery Timeline" subtitle="Our suggested delivery schedule based on your repair timeline and family needs.">
@@ -1908,8 +1884,16 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
               )}
             </SdsPageBlock>
           )}
-          <SdsRestoreStoryPage brand={BRAND} media={BRAND_CARES_MEDIA} serviceHighlights={SERVICE_HIGHLIGHTS} />
-          <SdsBrochurePage brand={BRAND} media={BRAND_CARES_MEDIA} />
+          {/* Closing marketing widget — always last */}
+          <SdsPageBlock brand={BRAND} showHeader={false}>
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+              <SdsMarketingContact />
+              <div className="grid gap-4 lg:grid-cols-2">
+                <SdsMarketingBrandCard />
+                <SdsMarketingBanner />
+              </div>
+            </div>
+          </SdsPageBlock>
         </div>
       </div>
     </div>
