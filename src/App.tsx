@@ -13765,7 +13765,7 @@ export default function App(){
                 })()}
 
                 {/* Rush Planning Section — collapsible, auto-expands when recommended */}
-                <div className={`rounded-xl border overflow-hidden ${rushPlanningRecommended ? "border-teal-200" : "border-slate-200"}`}>
+                <div className={`rounded-xl border-2 overflow-hidden transition-all ${rushPlanningVisible ? "border-teal-400 shadow-md shadow-teal-100" : rushPlanningRecommended ? "border-teal-200" : "border-slate-200"}`}>
                   <button type="button" onClick={() => setInterviewExpanded(p => ({...p, rushPlanning: !rushPlanningVisible}))} className={`w-full flex items-center justify-between px-3 py-2 text-left ${rushPlanningRecommended ? "bg-teal-50 hover:bg-teal-100" : "bg-slate-50 hover:bg-slate-100"}`}>
                     <div className="flex items-center gap-2">
                       <span className={`text-sm font-bold ${rushPlanningRecommended ? "text-teal-700" : "text-slate-500"}`}>Rush Planning</span>
