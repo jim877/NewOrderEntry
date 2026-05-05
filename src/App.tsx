@@ -14603,8 +14603,9 @@ export default function App(){
           const explicitReturn = data.estimatedReturnDate ? new Date(data.estimatedReturnDate) : null;
           const repairReturn = repairInfo ? rushAddDays(now, repairInfo.days) : null;
           const storageReturn = data.storageMonths ? rushAddDays(now, parseInt(data.storageMonths) * 30) : null;
-          const estimatedReturn = explicitReturn || repairReturn || storageReturn;
+          const estimatedReturn = explicitReturn || (repairReturn && storageReturn ? (repairReturn > storageReturn ? repairReturn : storageReturn) : repairReturn || storageReturn);
           const seasons = estimatedReturn ? rushGetSeasons(now, estimatedReturn) : [];
+          const storageRepairMismatch = repairReturn && storageReturn && Math.abs(repairReturn.getTime() - storageReturn.getTime()) > 30 * 24 * 60 * 60 * 1000;
 
           // Smart address resolution from living timeline
           const livingTimeline = data.livingTimeline || [];
@@ -14990,6 +14991,7 @@ export default function App(){
                         <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{totalPeople} People{petCount > 0 ? `, ${petCount} Pet${petCount > 1 ? "s" : ""}` : ""}</span>
                         {isLongTerm && <span className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">Long-Term Order</span>}
                         {estimatedReturn && <span className="rounded-full bg-teal-100 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">Return: {rushFormatDate(estimatedReturn)}</span>}
+                        {storageRepairMismatch && <span className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">Storage/Repair Mismatch</span>}
                         {seasonChanges.length > 0 && <span className="rounded-full bg-violet-100 border border-violet-200 px-3 py-1 text-xs font-bold text-violet-700">{seasonChanges.length} Season Change{seasonChanges.length > 1 ? "s" : ""}</span>}
                       </div>
                       {/* Editable return date */}
@@ -15692,7 +15694,12 @@ export default function App(){
                 const orderSit = livingMap[data.livingStatus] || "";
                 if (!repairInfo && !orderSit) return null;
                 const now = new Date();
-                const returnDate = repairInfo ? rushAddDays(now, repairInfo.days) : null;
+                // Sync storage duration with repair timeline — use the longer of the two
+                const storageDays = data.storageMonths ? Number(data.storageMonths) * 30 : 0;
+                const repairDays = repairInfo ? repairInfo.days : 0;
+                const effectiveDays = Math.max(repairDays, storageDays);
+                const returnDate = effectiveDays > 0 ? rushAddDays(now, effectiveDays) : null;
+                const storageRepairConflict = storageDays > 0 && repairDays > 0 && Math.abs(storageDays - repairDays) > 30;
                 const allAddr = data.addresses || [];
                 const primAddr = allAddr.find((a: any) => a.isPrimary) || allAddr[0] || {};
                 const primAddrStr = [primAddr.street, primAddr.city, primAddr.state, primAddr.zip].filter(Boolean).join(", ");
@@ -15738,7 +15745,7 @@ export default function App(){
                   else if (evt.type === "sports") { eItems.push("Uniforms, cleats, gear"); }
                   if (eItems.length > 0) timeline.push({ group: evt.name || "Event", timeframe: rushFormatDate(ed), desc: eItems.join("; "), items: eItems, address: "" });
                 });
-                if (repairInfo) timeline.push({ group: "Final Delivery", timeframe: `${repairInfo.days} days (${rushFormatDate(returnDate!)})`, desc: "All remaining items after repairs complete", address: primAddrStr });
+                if (returnDate) timeline.push({ group: "Final Delivery", timeframe: `${effectiveDays} days (${rushFormatDate(returnDate)})`, desc: "All remaining items after repairs complete", address: primAddrStr, warning: storageRepairConflict ? `Storage (${data.storageMonths} mo) and repair estimate (${repairDays} days) differ — please reconcile` : undefined });
                 return timeline;
               })()}
               onClose={() => setShowSdsPreview(false)}
