@@ -338,7 +338,7 @@ const stripEventSystemLines = (text = "") =>
 const buildEventSystemEntries = (data, conditionSummary) => {
   const entries = [];
   if (conditionSummary) entries.push({ label: "Conditions", value: conditionSummary });
-  if ((data.loadList || []).length) entries.push({ label: "Bring", value: (data.loadList || []).join(", ") });
+  if ((data.loadList || []).length) entries.push({ label: "Bring", value: (data.loadList || []).join(", ") + ((data as any).loadListNote ? ` — ${(data as any).loadListNote}` : "") });
   if ((data.serviceOfferings || []).length) entries.push({ label: "Service Offerings", value: (data.serviceOfferings || []).join(", ") });
   if ((data.quickInstructionNotes || []).length) entries.push({ label: "Quick Notes", value: (data.quickInstructionNotes || []).join(", ") });
   if ((data.quickScopeNotes || []).length) entries.push({ label: "Scope Notes", value: (data.quickScopeNotes || []).join(", ") });
@@ -1950,8 +1950,9 @@ const DEFAULT_FORM={
   pickupTime: "",
   assignedTech: "",
 
-  quickScopeNotes: [], 
-  loadList: [], 
+  quickScopeNotes: [],
+  loadList: [],
+  loadListNote: "", 
 
   postPickup:{
     totalLoss:{taken:false,left:false,listed:false}, notWorthCleaning:{taken:false,left:false,listed:false},
@@ -5216,7 +5217,7 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
 const Header = ({ activeSection, visitedSections, completedSections, onJump, onJumpSub, title, version, entryMode, setEntryMode, showInlineHelp, setShowInlineHelp, showCoaching, setShowCoaching, compactMode, setCompactMode, onShowSds, onReset, currentUser, setCurrentUser, setShowSampleDataModal, onOpenPresets, presetCount, onOpenFieldConfig, onShowScopeWizard, interviewPanelOpen, actionItemsOpen }) => {
     const steps = [
         { id: 'sec1', label: 'Order', subsections: [{ id: "order", label: "Order" }, { id: "source", label: "Source" }] },
-        { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }] },
+        { id: 'sec2', label: 'Customer', subsections: [{ id: "customer", label: "Customer Details" }, { id: "interview", label: "Interview" }] },
         { id: 'sec3', label: 'Address', subsections: [{ id: "address", label: "Addresses" }] },
         { id: 'sec4', label: 'Billing', subsections: [{ id: "companies", label: "Companies and Contacts" }, { id: "billing", label: "Billing" }, { id: "finance", label: "Finance" }, { id: "insurance", label: "Insurance" }] },
         { id: 'sec5', label: 'Schedule', subsections: [{ id: "schedule", label: "Schedule" }, { id: "bridge", label: "Scope Update and Blockers" }] },
@@ -12483,6 +12484,14 @@ export default function App(){
                           <button onClick={() => handleToggleSection('sec2')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
                           <button onClick={() => goToNextSection('sec2')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec2')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
                         </div>
+                        {/* Interview link */}
+                        <button type="button" onClick={() => setInterviewPanelOpen(true)} className={`w-full rounded-xl border-2 px-4 py-3 text-left flex items-center justify-between transition-all ${interviewPanelOpen ? "border-violet-400 bg-violet-50" : "border-violet-200 bg-violet-50/30 hover:border-violet-300"}`}>
+                          <div>
+                            <div className="text-sm font-bold text-violet-700">Customer Interview</div>
+                            <div className="text-[11px] text-violet-500 mt-0.5">Living situation, delivery, packout, medical, pets, interests</div>
+                          </div>
+                          <span className="text-violet-400 text-lg">›</span>
+                        </button>
                       </div>
                     </Section>
 
@@ -13953,6 +13962,7 @@ export default function App(){
                           <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
+                      <Input value={(data as any).loadListNote || ""} onChange={e => update("loadListNote", e.target.value)} placeholder="Additional notes about what to bring..." className="!text-xs" />
                       {answered && <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="text-xs font-bold text-sky-600 hover:text-sky-700">Done</button>}
                     </div>}
                   </div>;
