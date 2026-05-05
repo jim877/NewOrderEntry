@@ -5967,7 +5967,14 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
         {/* Property Details — collapsible */}
         <div className="rounded-xl border border-slate-200 bg-white">
           <button type="button" onClick={() => setCoordsOpen(v => !v)} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 rounded-xl">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Property Details</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Property Details</span>
+              {(() => {
+                const fields = [addr.lat, addr.lng, (addr as any).buildingType, addr.beds, addr.sqft, (addr as any).buildingFloors, addr.apt];
+                const filled = fields.filter(f => f && String(f).trim()).length;
+                return filled > 0 ? <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filled >= 5 ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"}`}>{filled}/{fields.length}</span> : null;
+              })()}
+            </div>
             <span className={`text-slate-400 text-xs transition-transform ${coordsOpen ? "rotate-90" : ""}`}>›</span>
           </button>
           {coordsOpen && (
