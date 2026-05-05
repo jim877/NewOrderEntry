@@ -13767,10 +13767,10 @@ export default function App(){
                   const summary = data.repairsSummary || "";
                   const log = (data.interviewLog || {}).repairs;
                   const expanded = interviewExpanded.repairs !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("What repairs are being done?")}</div>
-                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                      {answered && !expanded && <span className="text-[10px] text-sky-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -13842,7 +13842,7 @@ export default function App(){
                   };
                   const DURATION_OPTIONS = ["A few days", "1-2 weeks", "1 month", "2-3 months", "6+ months", "Until repairs done"];
 
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Where will the customer live during repairs?")}</div>
                       {answered && !expanded && <div className="flex items-center gap-1 ml-2">
@@ -13906,7 +13906,7 @@ export default function App(){
                 {/* Delivery */}
                 {isFieldVisible("processType") && matchesInterviewSearch("final delivery", "Return Home ASAP Temp Address New Home Store Until Repaired") && (() => {
                   const answered = !!data.processType; const log = (data.interviewLog || {}).delivery; const expanded = !answered || interviewExpanded.delivery;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, delivery: !p.delivery}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Where should we make final delivery?")}</div>
                       {answered && !expanded && <span className="text-[10px] text-emerald-600 ml-2">{data.processType}</span>}
@@ -13925,10 +13925,10 @@ export default function App(){
                 {/* Packout */}
                 {isFieldVisible("packoutSummary") && matchesInterviewSearch("picking up", "Rugs Window Treatments Clothing Bedding Furniture Art Electronics Hardware Appliances") && (() => {
                   const answered = (data.packoutSummary || []).length > 0; const summary = (data.packoutSummary || []).join(", "); const log = (data.interviewLog || {}).packout; const expanded = interviewExpanded.packout !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("What are we picking up?")}</div>
-                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                      {answered && !expanded && <span className="text-[10px] text-sky-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -13950,10 +13950,10 @@ export default function App(){
                 {/* Load List */}
                 {isFieldVisible("loadList") && matchesInterviewSearch("need to bring", "Tall Ladder Extra Manpower Floor Protection Dollies Wardrobe Boxes TV Boxes Blankets Plastic Bags") && (() => {
                   const answered = (data.loadList || []).length > 0; const summary = (data.loadList || []).join(", "); const log = (data.interviewLog || {}).loadList; const expanded = interviewExpanded.loadList !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("What do we need to bring?")}</div>
-                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                      {answered && !expanded && <span className="text-[10px] text-sky-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -13971,10 +13971,10 @@ export default function App(){
                 {/* Considerations */}
                 {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity") && (() => {
                   const answered = (data.sdsConsiderations || []).length > 0; const summary = (data.sdsConsiderations || []).join(", "); const log = (data.interviewLog || {}).considerations; const expanded = interviewExpanded.considerations !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Special considerations")}</div>
-                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                      {answered && !expanded && <span className="text-[10px] text-sky-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -14012,10 +14012,10 @@ export default function App(){
                   const log = (data.interviewLog || {}).pets;
                   const expanded = interviewExpanded.pets !== false;
                   const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"];
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: !p.pets}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Pets in home?")}</div>
-                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                      {answered && !expanded && <span className="text-[10px] text-sky-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -14098,10 +14098,10 @@ export default function App(){
                   const needsFollowUp = (q.key === "storage" && data.storageNeeded === "Y") || (q.key === "medical" && data.familyMedicalIssues === "Y") || (q.key === "allergies" && data.soapFragAllergies === "Y") || (q.key === "selfClean" && data.selfCleaning === "Y");
                   const expanded = !answered || interviewExpanded[q.key] || (needsFollowUp && interviewExpanded[q.key] !== false);
                   return (
-                    <div key={q.key} className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <div key={q.key} className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                       <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: !p[q.key]})); if (answered && !log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                         <div className={`${expanded ? 'text-xs' : 'text-[11px]'} font-bold text-sky-600`}>{highlightSearch(q.title)}</div>
-                        {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{q.summary()}</span>}
+                        {answered && !expanded && <span className="text-[10px] text-sky-600 truncate ml-2">{q.summary()}</span>}
                       </button>
                       {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                       {expanded && <div className="px-3 pb-3">
@@ -14147,10 +14147,10 @@ export default function App(){
                   const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ");
                   const log = (data.interviewLog || {}).interests;
                   const expanded = interviewExpanded.interests !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !expanded}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-xs' : 'text-[11px]'} font-bold text-sky-600`}>{highlightSearch("Activities & interests")}</div>
-                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                      {answered && !expanded && <span className="text-[10px] text-sky-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -14172,10 +14172,10 @@ export default function App(){
                   const summary = (data.upcomingEvents || []).map(e => e.name || "Event").join(", ");
                   const log = (data.interviewLog || {}).events;
                   const expanded = interviewExpanded.events !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-xs' : 'text-[11px]'} font-bold text-sky-600`}>{highlightSearch("Upcoming trips & events")}</div>
-                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                      {answered && !expanded && <span className="text-[10px] text-sky-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -14198,10 +14198,10 @@ export default function App(){
                   const answered = false;
                   const summary = "";
                   const log = null; const expanded = true;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, preferences: !p.preferences}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-sm' : 'text-xs'} font-bold text-sky-600`}>{highlightSearch("Customer preferences")}</div>
-                      {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
+                      {answered && !expanded && <span className="text-[10px] text-sky-600 truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
