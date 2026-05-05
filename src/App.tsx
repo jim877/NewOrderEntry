@@ -2166,7 +2166,7 @@ const getNextHalfHourLabel = () => {
   return `${hr}:${mm} ${ampm}`;
 };
 
-const DatePicker = ({ value, onChange, closeSignal }) => {
+const DatePicker = ({ value, onChange, closeSignal, allowPast = false }) => {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
   const [view, setView] = useState(() => {
@@ -2215,7 +2215,7 @@ const DatePicker = ({ value, onChange, closeSignal }) => {
   const pick = (d) => {
     if (!d) return;
     const iso = new Date(year, month, d).toISOString().slice(0, 10);
-    if (iso < todayIso) return;
+    if (!allowPast && iso < todayIso) return;
     onChange(iso);
     setOpen(false);
   };
@@ -2229,7 +2229,8 @@ const DatePicker = ({ value, onChange, closeSignal }) => {
         onBlur={() => {
           const normalized = normalizeDateInput(value);
           const today = getNowDateIso();
-          if (!normalized || normalized < today) { onChange(today); return; }
+          if (!allowPast && (!normalized || normalized < today)) { onChange(today); return; }
+          if (allowPast && !normalized) return;
           if (normalized !== value) onChange(normalized);
         }}
         onKeyDown={(e) => {
@@ -2283,7 +2284,7 @@ const DatePicker = ({ value, onChange, closeSignal }) => {
               const dateIso = d ? new Date(year, month, d).toISOString().slice(0, 10) : "";
               const isSelected = d ? normalizeDateInput(value) === dateIso : false;
               const isToday = d ? dateIso === todayIso : false;
-              const isPast = d ? dateIso < todayIso : false;
+              const isPast = d && !allowPast ? dateIso < todayIso : false;
               const dayOfWeek = d ? new Date(year, month, d).getDay() : -1;
               const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
               return (
@@ -12489,7 +12490,28 @@ export default function App(){
                     >
                       <div className="space-y-4">
                         {data.addresses.map((a,i)=><AddressItem key={a.id} addr={a} total={data.addresses.length} updateAddr={updateAddr} onRemove={removeAddr} index={i} highlightMissing={data.highlightMissing} auditOn={auditOn} onVerify={verifyAddressDemo} ToggleMulti={ToggleMulti} rentOrOwn={data.rentOrOwn} rentCoverageLimit={data.rentCoverageLimit} onRentOrOwnChange={(v)=>update("rentOrOwn", v)} onRentCoverageChange={(v)=>update("rentCoverageLimit", v)} forceShowCoords={i===0 ? showPrimaryCoords : false} autoOpenForTypePrompt={pendingAddressTypePromptId === a.id} autoFocusTypePrompt={pendingAddressTypePromptId === a.id} onTypePromptFocused={handleAddressTypePromptFocused} />)}
-                        <div className="pt-2"><button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button></div>
+                        <div className="pt-2 space-y-2">
+                          <button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button>
+                          <div className="flex flex-wrap gap-1.5 justify-center">
+                            {["Hotel", "Temporary", "Rental", "Relative", "New Home", "Storage"].map(purpose => (
+                              <button key={purpose} type="button" onClick={() => {
+                                const id = safeUid();
+                                setData(p => ({
+                                  ...p,
+                                  addresses: [...p.addresses, initAddress({
+                                    id,
+                                    isPrimary: false,
+                                    isLossSite: false,
+                                    type: purpose,
+                                    placeholder: createPlaceholderFlag("address", `${purpose} — address needed`),
+                                    name: `${purpose} Address`,
+                                  })]
+                                }));
+                                setToast?.(`${purpose} address placeholder added`);
+                              }} className="rounded-full border border-dashed border-slate-300 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-400 hover:text-sky-600 hover:bg-sky-50">+ {purpose}</button>
+                            ))}
+                          </div>
+                        </div>
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <button onClick={() => handleToggleSection('sec3')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
                           <button onClick={() => goToNextSection('sec3')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec3')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
@@ -12940,7 +12962,7 @@ export default function App(){
                               <div className="grid grid-cols-3 gap-4">
                                 <Field label="Claim #" noeField="claimNumber"><Input value={data.claimNumber} onChange={e=>update("claimNumber",e.target.value)} placeholder="e.g. CLM-1001" /></Field>
                                 <Field label="Policy #"><Input value={data.policyNumber} onChange={e=>update("policyNumber",e.target.value)} placeholder="Policy number" /></Field>
-                                <Field label="Date of Loss" noeField="dateOfLoss"><DatePicker value={data.dateOfLoss} onChange={(v)=>update("dateOfLoss", v)} /></Field>
+                                <Field label="Date of Loss" noeField="dateOfLoss"><DatePicker value={data.dateOfLoss} onChange={(v)=>update("dateOfLoss", v)} allowPast={true} /></Field>
                               </div>
                               <div className="grid grid-cols-2 gap-4">
                                 <Field label="Contents Limit ($)" noeField="contentsCoverageLimit"><Input value={data.contentsCoverageLimit} onChange={e=>update("contentsCoverageLimit",e.target.value)} placeholder="Policy coverage limit" /></Field>
