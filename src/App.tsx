@@ -14094,7 +14094,12 @@ export default function App(){
                           </div>}
                         </>}
                         {q.key === "dryCleaner" && <ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => { update("useDryCleaner", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), dryCleaner: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
-                        {q.key === "laundry" && <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => { updateHowDry(v); executeInterviewActions(v, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), laundry: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
+                        {q.key === "laundry" && <>
+                          <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => { updateHowDry(v); executeInterviewActions(v, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), laundry: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.howDryLaundry && <div className="mt-2">
+                            <Input value={data.howDryNote || ""} onChange={e => update("howDryNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
+                          </div>}
+                        </>}
                         {q.key === "storage" && <>
                           <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => { update("storageNeeded", v); if (v === "Y") executeInterviewActions("Storage Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), storage: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
                           {data.storageNeeded === "Y" && <div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-600">Months?</span><Input className="w-16 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" /></div>}
@@ -14109,9 +14114,9 @@ export default function App(){
                   const answered = (data.rushInterests || []).length > 0;
                   const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ");
                   const log = (data.interviewLog || {}).interests;
-                  const expanded = !answered || interviewExpanded.interests;
+                  const expanded = interviewExpanded.interests !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !p.interests}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !expanded}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`${expanded ? 'text-xs' : 'text-[11px]'} font-bold text-sky-600`}>{highlightSearch("Activities & interests")}</div>
                       {answered && !expanded && <span className="text-[10px] text-emerald-600 truncate ml-2">{summary}</span>}
                     </button>
