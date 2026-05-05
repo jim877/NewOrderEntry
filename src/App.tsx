@@ -3406,8 +3406,8 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
   const INTERVIEW_SECTIONS = [
     { id: "conditions", title: "Current conditions?", type: "multi" as const, critical: true, options: ["Still Wet", "Visible Mold", "Structural Damage", "No Electricity", "No Heat", "Boarded Up"] },
     { id: "repairs", title: "What repairs are being done?", type: "multi" as const, critical: true, options: ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural", "Complete Rebuild"] },
-    { id: "living", title: "Where will customer live?", type: "single" as const, critical: true, options: ["Staying in home", "Hotel", "Temp", "Moving", "Relative", "Rental"] },
-    { id: "delivery", title: "Final delivery?", type: "single" as const, critical: true, options: ["Deliver ASAP", "Deliver to Temp", "Deliver to New Home", "Long-Term Storage"] },
+    { id: "living", title: "Where will customer live?", type: "single" as const, critical: true, options: ["Their Home", "Hotel", "Temp", "Moving", "Relative", "Rental"] },
+    { id: "delivery", title: "Final delivery?", type: "single" as const, critical: true, options: ["Return to Home ASAP", "To Temp Address", "To New Home", "Return to Home After Repairs"] },
     { id: "packout", title: "What are we picking up?", type: "multi" as const, critical: true, options: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Appliances"] },
     { id: "medicalIssues", title: "Medical issues?", type: "boolean" as const, critical: true },
     { id: "soapAllergies", title: "Soap/fragrance allergies?", type: "boolean" as const, critical: true },
@@ -13789,7 +13789,7 @@ export default function App(){
                     { id: "Relative", desc: "Family member's home" },
                     { id: "Hotel", desc: "Hotel or motel" },
                     { id: "Rental", desc: "Temporary rental" },
-                    { id: "Staying in home", desc: "Living on-site" },
+                    { id: "Staying in home", label: "Their Home", desc: "Living on-site" },
                     { id: "Moving", desc: "Relocating permanently" },
                   ];
                   const addStay = (type: string) => {
@@ -13852,7 +13852,7 @@ export default function App(){
                         ))}
                         {timeline.length > 0 && !timeline.some(s => s.type === "Staying in home" || s.type === "Moving") && (
                           <div className="rounded-lg border border-dashed border-teal-300 bg-teal-50/30 px-3 py-1.5 text-[10px] text-teal-700">
-                            Tip: Add "Staying in home" as the last step when they return after repairs.
+                            Tip: Add "Their Home" as the last step when they return after repairs.
                           </div>
                         )}
                       </div>}
@@ -13862,7 +13862,7 @@ export default function App(){
                         <div className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">{timeline.length > 0 ? "Add next stay" : "Where first?"}</div>
                         <div className="flex flex-wrap gap-1.5">
                           {STAY_TYPES.map(t => (
-                            <button key={t.id} type="button" onClick={() => addStay(t.id)} className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all" title={t.desc}>{t.id}</button>
+                            <button key={t.id} type="button" onClick={() => addStay(t.id)} className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all" title={t.desc}>{(t as any).label || t.id}</button>
                           ))}
                         </div>
                       </div>
@@ -13883,7 +13883,7 @@ export default function App(){
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
-                        {[{ label: "Return to Home ASAP", value: "Deliver ASAP" }, { label: "To Temp Address", value: "Deliver to Temp" }, { label: "To New Home", value: "Deliver to New Home" }, { label: "Store Until Home Repaired", value: "Long-Term Storage" }].map(s => (
+                        {[{ label: "Return to Home ASAP", value: "Deliver ASAP" }, { label: "To Temp Address", value: "Deliver to Temp" }, { label: "To New Home", value: "Deliver to New Home" }, { label: "Return to Home After Repairs", value: "Long-Term Storage" }].map(s => (
                           <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => { const isAdding = data.processType !== s.value; update("processType", isAdding ? s.value : ""); if (isAdding) executeInterviewActions(s.value, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
