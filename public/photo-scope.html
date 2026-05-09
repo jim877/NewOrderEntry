@@ -1388,12 +1388,15 @@ const INTERVIEW_SECTIONS=[
 const INTERVIEW_CRITICAL_IDS=INTERVIEW_SECTIONS.filter(s=>s.critical).map(s=>s.id);
 
 let orders=[],curOrder=null,curFloorIdx=0,curRoom=null;
+// Expose on window for parent iframe access
+window.orders=orders;Object.defineProperty(window,'curOrder',{get(){return curOrder;},set(v){curOrder=v;}});
 let capturedUrl='',selPrimary=null,selSubs=new Set();
 let camStream=null,bulkMode=false,bulkSel=new Set(),filterSel=new Set();
 let recognition=null,speakActive=false;
 let bulkReasonPick=null,editingPhoto=null,lastTags={};
 let editingPhotoViewOnly=false;
 let nextOrderId=1,nextPhotoId=1,wizFloorCount=1,wizHasBasement=false,wizHasAttic=false,wizPropertyType='House';
+Object.defineProperty(window,'nextOrderId',{get(){return nextOrderId;},set(v){nextOrderId=v;}});
 let editFloorUniform=false;  // "same for all rooms?" toggle in floor-sev sheet
 let floorSevOpenRoom=false;  // open Add Room sheet after saving floor severity (floor-check flow)
 let checkFloorIdx=null;      // floor being evaluated in floor-check flow
@@ -5093,14 +5096,71 @@ window.addEventListener('load',()=>{
       if(window.go) window.go('scr-camera');
     },1000);
   }
-  /* Auto-start from Scope Wizard V2 — skip landing, go straight to order */
+  /* Auto-start from Scope Wizard V2 — create order directly and go to scr-order */
   if(new URLSearchParams(location.search).get('autostart')==='1'){
-    setTimeout(()=>{
-      if(window.orders && window.orders.length>0){
-        window.curOrder=window.orders[0];
-        if(window.go) window.go('scr-order');
+    // Skip if polling fallback already created the order
+    if(orders.length>0&&orders[orders.length-1]._noeSource){go('scr-order');return;}
+    try {
+      var raw=localStorage.getItem('noe-photo-scope-context');
+      if(raw){
+        var ctx=JSON.parse(raw);
+        if(ctx){
+          // Build severity
+          var sev=emptySev();
+          var sevLabelMap={F:'fire',W:'water',M:'mold',P:'pb',D:'debris'};
+          (ctx.severityCodes||[]).forEach(function(code){
+            var letter=String(code).charAt(0);
+            var level=parseInt(String(code).charAt(1))||0;
+            var group=sevLabelMap[letter];
+            if(group&&sev[group]&&level>0)sev[group].sev=Math.max(sev[group].sev,level);
+          });
+          // Build floors+rooms
+          var floors=[];
+          if(ctx.autoAddRooms!==false&&ctx.scopeWizardFloors&&ctx.scopeWizardFloors.length){
+            ctx.scopeWizardFloors.forEach(function(f){
+              var floorRooms=(f.rooms||[]).filter(function(r){return r.affected;}).map(function(r){
+                return{name:r.name,photos:[],severity:null,notAffected:false,instructionDefaults:[],handlingCodes:r.handlingCodes||[],depth:r.depth||1,notes:r.notes||'',isOrigin:r.isOrigin||false};
+              });
+              if(floorRooms.length>0)floors.push({name:f.name,rooms:floorRooms,severity:null,notAffected:false,uniformSeverity:false,instructionDefaults:[]});
+            });
+          } else if(ctx.autoAddRooms!==false&&ctx.rooms&&ctx.rooms.length){
+            floors.push({name:'Floor 1',rooms:ctx.rooms.map(function(name){return{name:name,photos:[],severity:null,notAffected:false,instructionDefaults:[],handlingCodes:[],depth:1,notes:'',isOrigin:false};}),severity:null,notAffected:false,uniformSeverity:false,instructionDefaults:[]});
+          }
+          if(floors.length===0)floors.push({name:'Floor 1',rooms:[],severity:null,notAffected:false,uniformSeverity:false,instructionDefaults:[]});
+          // Build interview
+          var interview=normalizeInterviewState(null);
+          var iv=ctx.interview;
+          if(iv&&typeof iv==='object'){
+            var ans=interview.answers;
+            if(Array.isArray(iv.conditions)&&iv.conditions.length)ans.conditions=iv.conditions;
+            if(Array.isArray(iv.repairs)&&iv.repairs.length)ans.repairs=iv.repairs;
+            if(iv.living)ans.living=iv.living;
+            if(iv.delivery)ans.delivery=iv.delivery;
+            if(Array.isArray(iv.packout)&&iv.packout.length)ans.packout=iv.packout;
+            if(Array.isArray(iv.loadList)&&iv.loadList.length)ans.loadList=iv.loadList;
+            if(Array.isArray(iv.considerations)&&iv.considerations.length)ans.considerations=iv.considerations;
+            if(Array.isArray(iv.suggestedGroups)&&iv.suggestedGroups.length)ans.suggestedGroups=iv.suggestedGroups;
+            if(iv.medicalIssues===true||iv.medicalIssues===false)ans.medicalIssues=iv.medicalIssues;
+            if(iv.soapAllergies===true||iv.soapAllergies===false)ans.soapAllergies=iv.soapAllergies;
+            if(iv.selfCleaning===true||iv.selfCleaning===false)ans.selfCleaning=iv.selfCleaning;
+            if(iv.useDryCleaner)ans.useDryCleaner=iv.useDryCleaner;
+            if(iv.dryLaundry)ans.dryLaundry=iv.dryLaundry;
+            if(iv.needStorage===true||iv.needStorage===false)ans.needStorage=iv.needStorage;
+            if(Array.isArray(iv.petsInHome)&&iv.petsInHome.length)ans.petsInHome=iv.petsInHome;
+            if(Array.isArray(iv.interests)&&iv.interests.length)ans.interests=iv.interests;
+            if(Array.isArray(iv.upcomingEvents)&&iv.upcomingEvents.length)ans.upcomingEvents=iv.upcomingEvents;
+          }
+          // Hide the NOE summary panel if visible (prevents flash)
+          var sp=document.getElementById('noe-order-summary');
+          if(sp)sp.style.display='none';
+          // Create order
+          var order={id:nextOrderId++,address:ctx.orderName||ctx.address||ctx.customerName||'NOE Order',propertyType:'House',date:new Date().toLocaleDateString(),offerings:(ctx.services||[]).slice(),severity:sev,uniformSeverity:false,floors:floors,coverPhoto:null,coverPhotoNote:null,generalPhotos:[],offeringSubs:{},instructionDefaults:[],interview:interview,pickup:createPickupState(),_noeSource:true};
+          orders.push(order);
+          curOrder=order;
+          go('scr-order');
+        }
       }
-    },500);
+    }catch(e){console.warn('NOE autostart error:',e);}
   }
 });
 </script>
@@ -5113,103 +5173,108 @@ if('serviceWorker' in navigator && !/localhost|127\.0\.0\.1/i.test(location.host
 }
 </script>
 <script>
-// NOE Order Context Bridge — auto-loads the NOE order into Photo Scope
+// NOE autostart fallback — runs after DOM is ready, ensures we skip to scr-order
 (function(){
-  try {
-    var raw = localStorage.getItem('noe-photo-scope-context');
-    if (!raw) return;
-    var ctx = JSON.parse(raw);
-    if (!ctx || !ctx.orderName) return;
-
-    // Show NOE summary on orders screen, hide default content
-    var summaryPanel = document.getElementById('noe-order-summary');
-    var defaultScreen = document.getElementById('default-orders-screen');
-    if (summaryPanel && defaultScreen) {
-      summaryPanel.style.display = 'block';
-      defaultScreen.style.display = 'none';
-      var nameEl = document.getElementById('noe-summary-name');
-      var custEl = document.getElementById('noe-summary-customer');
-      var addrEl = document.getElementById('noe-summary-address');
-      var lossEl = document.getElementById('noe-summary-loss');
-      var servEl = document.getElementById('noe-summary-services');
-      var roomsEl = document.getElementById('noe-summary-rooms');
-      if (nameEl) nameEl.textContent = ctx.orderName;
-      if (custEl) custEl.textContent = ctx.customerName || '';
-      if (addrEl) addrEl.textContent = ctx.address || '';
-      if (lossEl && ctx.lossType) { lossEl.textContent = ctx.lossType; lossEl.style.display = 'inline-block'; }
-      if (servEl && ctx.services && ctx.services.length) { servEl.textContent = ctx.services.length + ' services'; servEl.style.display = 'inline-block'; }
-      if (roomsEl && ctx.rooms && ctx.rooms.length) { roomsEl.textContent = ctx.rooms.length + ' rooms'; roomsEl.style.display = 'inline-block'; }
+  if(new URLSearchParams(location.search).get('autostart')!=='1') return;
+  var raw=localStorage.getItem('noe-photo-scope-context')||( window.__noeContext ? JSON.stringify(window.__noeContext) : null);
+  if(!raw) return;
+  var attempts=0;
+  var timer=setInterval(function(){
+    attempts++;
+    if(attempts>40){clearInterval(timer);return;} // give up after 4s
+    // Wait until go() and orders are available
+    if(typeof go!=='function'||typeof emptySev!=='function'||typeof orders==='undefined') return;
+    // If we already created the NOE order, stop
+    if(orders.length>0&&orders[orders.length-1]._noeSource){
+      // Make sure we're on scr-order
+      var active=document.querySelector('.screen.active');
+      if(active&&active.id!=='scr-order') go('scr-order');
+      clearInterval(timer);
+      return;
     }
-
-    // "Start Scope" button — creates order and navigates
-    var btnStart = document.getElementById('btn-noe-start-scope');
-    if (btnStart) {
-      btnStart.addEventListener('click', function() {
-        startNoeOrder();
-      });
-    }
-
-    function startNoeOrder() {
-      // Use the wizard flow: click New Order, then pre-fill from NOE context
-      var newOrderBtn = document.getElementById('btn-new-order');
-      if (newOrderBtn) newOrderBtn.click();
-
-      setTimeout(function() {
-        // Address
-        var addrField = document.getElementById('inp-address');
-        if (addrField) addrField.value = ctx.address || ctx.orderName || '';
-
-        // Services
-        if (ctx.services && ctx.services.length) window._wizOfferings = ctx.services.slice();
-
-        // Severity
-        var sevCodes = ctx.severityCodes || [];
-        if (sevCodes.length) {
-          var sevMap = { 'Fire': 'fire', 'Water': 'water', 'Mold': 'mold', 'Puffback': 'pb', 'Debris': 'debris' };
-          var sev = window._wizSev || (typeof emptySev === 'function' ? emptySev() : {});
-          sevCodes.forEach(function(code) {
-            var parts = String(code || '').split('-');
-            var group = sevMap[parts[0]];
-            var level = parseInt(parts[1]) || 0;
-            if (group && level > 0) {
-              if (!sev[group]) sev[group] = { sev: 0, details: {} };
-              sev[group].sev = Math.max(sev[group].sev, level);
-            }
-          });
-          window._wizSev = sev;
-        }
-
-        // Rooms
-        if (ctx.rooms && ctx.rooms.length) window._noeRooms = ctx.rooms;
-
-        // Interview
-        var iv = ctx.interview;
-        if (iv && typeof iv === 'object') {
-          if (!window._wizInterview) window._wizInterview = typeof normalizeInterviewState === 'function' ? normalizeInterviewState(null) : { answers: {} };
-          var ans = window._wizInterview.answers;
-          if (Array.isArray(iv.conditions) && iv.conditions.length) ans.conditions = iv.conditions;
-          if (Array.isArray(iv.repairs) && iv.repairs.length) ans.repairs = iv.repairs;
-          if (iv.living) ans.living = iv.living;
-          if (iv.delivery) ans.delivery = iv.delivery;
-          if (Array.isArray(iv.packout) && iv.packout.length) ans.packout = iv.packout;
-          if (Array.isArray(iv.loadList) && iv.loadList.length) ans.loadList = iv.loadList;
-          if (Array.isArray(iv.considerations) && iv.considerations.length) ans.considerations = iv.considerations;
-          if (Array.isArray(iv.suggestedGroups) && iv.suggestedGroups.length) ans.suggestedGroups = iv.suggestedGroups;
-          if (iv.medicalIssues === true || iv.medicalIssues === false) ans.medicalIssues = iv.medicalIssues;
-          if (iv.soapAllergies === true || iv.soapAllergies === false) ans.soapAllergies = iv.soapAllergies;
-          if (iv.selfCleaning === true || iv.selfCleaning === false) ans.selfCleaning = iv.selfCleaning;
-          if (iv.useDryCleaner) ans.useDryCleaner = iv.useDryCleaner;
-          if (iv.dryLaundry) ans.dryLaundry = iv.dryLaundry;
-          if (iv.needStorage === true || iv.needStorage === false) ans.needStorage = iv.needStorage;
-          if (Array.isArray(iv.petsInHome) && iv.petsInHome.length) ans.petsInHome = iv.petsInHome;
-          if (Array.isArray(iv.interests) && iv.interests.length) ans.interests = iv.interests;
-          if (Array.isArray(iv.upcomingEvents) && iv.upcomingEvents.length) ans.upcomingEvents = iv.upcomingEvents;
-        }
-      }, 100);
-    }
-
-  } catch(e) { console.warn('NOE auto-load error:', e); }
+    // Build and navigate
+    try{
+      var ctx=JSON.parse(raw);
+      if(!ctx){clearInterval(timer);return;}
+      var sev=emptySev();
+      var sevLabelMap={F:'fire',W:'water',M:'mold',P:'pb',D:'debris'};
+      (ctx.severityCodes||[]).forEach(function(c){var l=String(c).charAt(0),n=parseInt(String(c).charAt(1))||0,g=sevLabelMap[l];if(g&&sev[g]&&n>0)sev[g].sev=Math.max(sev[g].sev,n);});
+      var floors=[];
+      if(ctx.autoAddRooms!==false&&ctx.scopeWizardFloors&&ctx.scopeWizardFloors.length){
+        ctx.scopeWizardFloors.forEach(function(f){
+          var fr=(f.rooms||[]).filter(function(r){return r.affected;}).map(function(r){return{name:r.name,photos:[],severity:null,notAffected:false,instructionDefaults:[],handlingCodes:r.handlingCodes||[],depth:r.depth||1,notes:r.notes||'',isOrigin:r.isOrigin||false};});
+          if(fr.length>0)floors.push({name:f.name,rooms:fr,severity:null,notAffected:false,uniformSeverity:false,instructionDefaults:[]});
+        });
+      }else if(ctx.autoAddRooms!==false&&ctx.rooms&&ctx.rooms.length){
+        floors.push({name:'Floor 1',rooms:ctx.rooms.map(function(nm){return{name:nm,photos:[],severity:null,notAffected:false,instructionDefaults:[],handlingCodes:[],depth:1,notes:'',isOrigin:false};}),severity:null,notAffected:false,uniformSeverity:false,instructionDefaults:[]});
+      }
+      if(!floors.length)floors.push({name:'Floor 1',rooms:[],severity:null,notAffected:false,uniformSeverity:false,instructionDefaults:[]});
+      var interview=normalizeInterviewState(null);
+      var iv=ctx.interview;
+      if(iv&&typeof iv==='object'){
+        var ans=interview.answers;
+        ['conditions','repairs','packout','loadList','considerations','suggestedGroups','petsInHome','interests','upcomingEvents'].forEach(function(k){if(Array.isArray(iv[k])&&iv[k].length)ans[k]=iv[k];});
+        if(iv.living)ans.living=iv.living;if(iv.delivery)ans.delivery=iv.delivery;
+        ['medicalIssues','soapAllergies','selfCleaning','needStorage'].forEach(function(k){if(iv[k]===true||iv[k]===false)ans[k]=iv[k];});
+        if(iv.useDryCleaner)ans.useDryCleaner=iv.useDryCleaner;if(iv.dryLaundry)ans.dryLaundry=iv.dryLaundry;
+      }
+      var sp=document.getElementById('noe-order-summary');if(sp)sp.style.display='none';
+      var order={id:nextOrderId++,address:ctx.orderName||ctx.address||ctx.customerName||'NOE Order',propertyType:'House',date:new Date().toLocaleDateString(),offerings:(ctx.services||[]).slice(),severity:sev,uniformSeverity:false,floors:floors,coverPhoto:null,coverPhotoNote:null,generalPhotos:[],offeringSubs:{},instructionDefaults:[],interview:interview,pickup:createPickupState(),_noeSource:true};
+      orders.push(order);curOrder=order;
+      go('scr-order');
+      clearInterval(timer);
+    }catch(e){console.warn('NOE autostart poll error:',e);clearInterval(timer);}
+  },100);
 })();
+</script>
+<script>
+// NOE postMessage bridge — parent V2 sends order data after iframe loads
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'noe-autostart' || !e.data.context) return;
+  // If order already created by polling/load handler, just ensure we're on scr-order
+  if (typeof orders !== 'undefined' && orders.length > 0 && orders[orders.length - 1]._noeSource) {
+    if (typeof go === 'function') go('scr-order');
+    return;
+  }
+  // Wait for app to be ready then create order
+  var ctx = e.data.context;
+  var attempts = 0;
+  var timer = setInterval(function() {
+    attempts++;
+    if (attempts > 50) { clearInterval(timer); return; }
+    if (typeof go !== 'function' || typeof emptySev !== 'function' || typeof orders === 'undefined') return;
+    if (orders.length > 0 && orders[orders.length - 1]._noeSource) { go('scr-order'); clearInterval(timer); return; }
+    try {
+      var sev = emptySev();
+      var sevLabelMap = {F:'fire',W:'water',M:'mold',P:'pb',D:'debris'};
+      (ctx.severityCodes||[]).forEach(function(c){var l=String(c).charAt(0),n=parseInt(String(c).charAt(1))||0,g=sevLabelMap[l];if(g&&sev[g]&&n>0)sev[g].sev=Math.max(sev[g].sev,n);});
+      var floors = [];
+      if (ctx.autoAddRooms !== false && ctx.scopeWizardFloors && ctx.scopeWizardFloors.length) {
+        ctx.scopeWizardFloors.forEach(function(f) {
+          var fr = (f.rooms||[]).filter(function(r){return r.affected;}).map(function(r){return{name:r.name,photos:[],severity:null,notAffected:false,instructionDefaults:[],handlingCodes:r.handlingCodes||[],depth:r.depth||1,notes:r.notes||'',isOrigin:r.isOrigin||false};});
+          if (fr.length > 0) floors.push({name:f.name,rooms:fr,severity:null,notAffected:false,uniformSeverity:false,instructionDefaults:[]});
+        });
+      } else if (ctx.autoAddRooms !== false && ctx.rooms && ctx.rooms.length) {
+        floors.push({name:'Floor 1',rooms:ctx.rooms.map(function(nm){return{name:nm,photos:[],severity:null,notAffected:false,instructionDefaults:[],handlingCodes:[],depth:1,notes:'',isOrigin:false};}),severity:null,notAffected:false,uniformSeverity:false,instructionDefaults:[]});
+      }
+      if (!floors.length) floors.push({name:'Floor 1',rooms:[],severity:null,notAffected:false,uniformSeverity:false,instructionDefaults:[]});
+      var interview = normalizeInterviewState(null);
+      var iv = ctx.interview;
+      if (iv && typeof iv === 'object') {
+        var ans = interview.answers;
+        ['conditions','repairs','packout','loadList','considerations','suggestedGroups','petsInHome','interests','upcomingEvents'].forEach(function(k){if(Array.isArray(iv[k])&&iv[k].length)ans[k]=iv[k];});
+        if(iv.living)ans.living=iv.living;if(iv.delivery)ans.delivery=iv.delivery;
+        ['medicalIssues','soapAllergies','selfCleaning','needStorage'].forEach(function(k){if(iv[k]===true||iv[k]===false)ans[k]=iv[k];});
+        if(iv.useDryCleaner)ans.useDryCleaner=iv.useDryCleaner;if(iv.dryLaundry)ans.dryLaundry=iv.dryLaundry;
+      }
+      var sp = document.getElementById('noe-order-summary'); if(sp) sp.style.display = 'none';
+      var order = {id:nextOrderId++,address:ctx.orderName||ctx.address||ctx.customerName||'NOE Order',propertyType:'House',date:new Date().toLocaleDateString(),offerings:(ctx.services||[]).slice(),severity:sev,uniformSeverity:false,floors:floors,coverPhoto:null,coverPhotoNote:null,generalPhotos:[],offeringSubs:{},instructionDefaults:[],interview:interview,pickup:createPickupState(),_noeSource:true};
+      orders.push(order); curOrder = order;
+      go('scr-order');
+      clearInterval(timer);
+    } catch(ex) { console.warn('NOE postMessage error:', ex); clearInterval(timer); }
+  }, 100);
+});
 </script>
 </body>
 </html>

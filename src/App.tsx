@@ -3397,29 +3397,98 @@ const AI_TIME_SAVING_TIPS = [
   "Use keyboard shortcuts: Press Tab or Enter to move forward, and Shift + Tab or Shift + Enter to move backward through fields. Keyboard navigation can speed up data entry and reduce reliance on the mouse."
 ];
 
-// --- SCOPE WIZARD V2 — Guided question-by-question flow ---
-const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => void; orderData?: typeof DEFAULT_FORM; onOrderUpdate?: (updates: Partial<typeof DEFAULT_FORM>) => void }) => {
+// --- SCOPE WIZARD — Guided scoping flow ---
+const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds }: { onClose: () => void; orderData?: typeof DEFAULT_FORM; onOrderUpdate?: (updates: Partial<typeof DEFAULT_FORM>) => void; onShowOrder?: () => void; onShowSds?: () => void }) => {
+  const [activeTab, setActiveTab] = useState<"order" | "interview" | "scope" | "report">("scope");
   const [step, setStep] = useState(1);
   const totalSteps = 4;
   const [roomPass, setRoomPass] = useState<1 | 2 | 3>(1);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const [autoAddRooms, setAutoAddRooms] = useState(true);
+  const [expandedContext, setExpandedContext] = useState(false);
+  const [walkthroughRoom, setWalkthroughRoom] = useState<{ fi: number; ri: number } | null>(null);
+  const [roomPhotos, setRoomPhotos] = useState<Record<string, { src: string; note: string; reason: string; ts: number }[]>>({});
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const camStreamRef = useRef<MediaStream | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+
+  const startCamera = useCallback(async () => {
+    setCameraError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 } }, audio: false });
+      camStreamRef.current = stream;
+      setCameraActive(true);
+      // Defer srcObject assignment until video element is mounted
+      requestAnimationFrame(() => {
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}); }
+      });
+    } catch {
+      setCameraError("Camera unavailable. Use the file picker instead.");
+      setCameraActive(false);
+    }
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    if (camStreamRef.current) { camStreamRef.current.getTracks().forEach(t => t.stop()); camStreamRef.current = null; }
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraActive(false);
+  }, []);
+
+  const captureFromCamera = useCallback(() => {
+    const vid = videoRef.current;
+    if (!vid || !vid.videoWidth) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = vid.videoWidth;
+    canvas.height = vid.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(vid, 0, 0);
+    return canvas.toDataURL("image/jpeg", 0.85);
+  }, []);
+
+  // Step guidance toasts
+  const STEP_TOASTS: Record<string, string> = {
+    "1": "Select the building type and access details for the property.",
+    "2": "Set the property size — floors, bedrooms, and square footage.",
+    "3": "Confirm your rooms. Add, delete, rename, or drag to the correct floor.",
+    "4-1": "Select damage types and set severity levels. First type added becomes primary.",
+    "4-2": "Mark which rooms were affected. Tap a floor header to set floor-level severity.",
+    "4-3": "Select rooms to apply handling codes, instructions, and notes.",
+  };
+  const [toastMsg, setToastMsg] = useState(STEP_TOASTS["1"] || "");
+  const [toastVisible, setToastVisible] = useState(true);
+  const [dismissedToasts, setDismissedToasts] = useState<Set<string>>(new Set());
+  const toastKey = step === 4 ? `4-${roomPass}` : `${step}`;
+  useEffect(() => {
+    if (dismissedToasts.has(toastKey)) { setToastVisible(false); return; }
+    const msg = STEP_TOASTS[toastKey];
+    if (msg) { setToastMsg(msg); setToastVisible(true); const t = setTimeout(() => setToastVisible(false), 6000); return () => clearTimeout(t); }
+  }, [step, roomPass]);
 
   // Interview system
   const INTERVIEW_SECTIONS = [
+    // --- Critical (9) ---
     { id: "conditions", title: "Current conditions?", type: "multi" as const, critical: true, options: ["Still Wet", "Visible Mold", "Structural Damage", "No Electricity", "No Heat", "Boarded Up"] },
-    { id: "repairs", title: "What repairs are being done?", type: "multi" as const, critical: true, options: ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural", "Complete Rebuild"] },
-    { id: "living", title: "Where will customer live?", type: "single" as const, critical: true, options: ["Their Home", "Hotel", "Temp", "Moving", "Relative", "Rental"] },
-    { id: "delivery", title: "Final delivery?", type: "single" as const, critical: true, options: ["Return to Home ASAP", "To Temp Address", "To New Home", "Return to Home After Repairs"] },
-    { id: "packout", title: "What are we picking up?", type: "multi" as const, critical: true, options: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Appliances"] },
+    { id: "repairs", title: "What repairs are being done?", type: "multi" as const, critical: true, options: ["Cleaning Exposed", "Cleaning Everywhere", "Clean & Paint", "Plaster/Wall Repairs", "Refinish Floors", "Replace Floors", "Cosmetic (Cabinets/Tile)", "Major Structural/Electrical", "Gut/Rebuild"] },
+    { id: "living", title: "Where will customer live during repairs?", type: "multi" as const, critical: true, options: ["Their Home", "Hotel", "Temp", "Moving", "Neighbor", "Relative", "Rental", "Other Home"] },
+    { id: "delivery", title: "Where should we make final delivery?", type: "single" as const, critical: true, options: ["Primary", "Hotel", "Temporary", "Business", "New Home", "TBD"] },
+    { id: "packout", title: "What are we picking up?", type: "multi" as const, critical: true, options: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"] },
     { id: "medicalIssues", title: "Medical issues?", type: "boolean" as const, critical: true },
     { id: "soapAllergies", title: "Soap/fragrance allergies?", type: "boolean" as const, critical: true },
     { id: "dryLaundry", title: "How do they dry laundry?", type: "single" as const, critical: true, options: ["Air-Dry", "Low Heat", "Dryer"] },
     { id: "needStorage", title: "Need storage?", type: "boolean" as const, critical: true },
-    { id: "loadList", title: "What do we need to bring?", type: "multi" as const, critical: false, options: ["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes"] },
-    { id: "considerations", title: "Special considerations", type: "multi" as const, critical: false, options: ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory", "Premium Brands"] },
-    { id: "petsInHome", title: "Pets in home?", type: "multi" as const, critical: false, options: ["Dog", "Cat", "Bird", "Fish", "Other"] },
+    // --- Operational ---
+    { id: "suggestedGroups", title: "Suggested groups", type: "multi" as const, critical: false, options: ["RD", "RFD", "STD", "STFD", "LTD", "LTFD", "Inhome", "TLI", "Test", "Dispose", "Storage Only"] },
+    { id: "loadList", title: "What do we need to bring?", type: "multi" as const, critical: false, options: ["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"] },
+    { id: "considerations", title: "Special considerations", type: "multi" as const, critical: false, options: ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory", "Skin Sensitivity", "Premium Brands"] },
+    { id: "petsInHome", title: "Pets in home?", type: "multi" as const, critical: false, options: ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"] },
     { id: "selfCleaning", title: "Self-clean anything?", type: "boolean" as const, critical: false },
     { id: "useDryCleaner", title: "Use a dry cleaner?", type: "single" as const, critical: false, options: ["Yes", "No", "Rarely"] },
+    // --- Customer profiling ---
+    { id: "interests", title: "Activities & interests", type: "multi" as const, critical: false, options: ["School & Kids Sports", "Summer & Swim", "Winter & Snow", "Halloween", "Thanksgiving", "Christmas / Hanukkah", "Easter / Passover", "Religious Services", "Graduation", "Gym & Fitness", "Work from Home"] },
+    { id: "upcomingEvents", title: "Upcoming trips & events", type: "multi" as const, critical: false, options: ["Warm Weather Vacation", "Cold Weather Trip", "Wedding / Formal Event", "Business Trip", "Sports Tournament"] },
   ];
   const [interviewAnswers, setInterviewAnswers] = useState<Record<string, string | string[] | boolean | null>>(() => {
     if (!orderData) return {};
@@ -3465,12 +3534,61 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     return a;
   });
   const [showInterview, setShowInterview] = useState(false);
+
+  // Sync interview answers to NOE in real-time
+  const syncInterviewToNOE = useCallback((answers: Record<string, any>) => {
+    if (!onOrderUpdate) return;
+    const updates: Record<string, any> = {};
+    // Map interview keys → NOE fields
+    if (answers.living !== undefined) updates.livingStatus = answers.living;
+    if (answers.delivery !== undefined) updates.processType = answers.delivery;
+    if (answers.deliveryAddress !== undefined) updates.deliveryAddress = answers.deliveryAddress;
+    if (answers.livingAddresses !== undefined) updates.livingAddresses = answers.livingAddresses;
+    if (answers.repairs !== undefined) updates.repairsSummary = Array.isArray(answers.repairs) ? answers.repairs.join(", ") : "";
+    if (answers.medicalIssues !== undefined) { updates.familyMedicalIssues = answers.medicalIssues === true ? "Y" : answers.medicalIssues === false ? "N" : ""; }
+    if (answers.medicalIssues_note !== undefined) updates.familyMedicalNote = answers.medicalIssues_note;
+    if (answers.soapAllergies !== undefined) { updates.soapFragAllergies = answers.soapAllergies === true ? "Y" : answers.soapAllergies === false ? "N" : ""; }
+    if (answers.soapAllergies_note !== undefined) updates.soapFragNote = answers.soapAllergies_note;
+    if (answers.selfCleaning !== undefined) { updates.selfCleaning = answers.selfCleaning === true ? "Y" : answers.selfCleaning === false ? "N" : ""; }
+    if (answers.selfCleaning_note !== undefined) updates.selfCleaningNote = answers.selfCleaning_note;
+    if (answers.needStorage !== undefined) { updates.storageNeeded = answers.needStorage === true ? "Y" : answers.needStorage === false ? "N" : ""; }
+    if (answers.useDryCleaner !== undefined) updates.useDryCleaner = answers.useDryCleaner;
+    if (answers.dryLaundry !== undefined) updates.howDryLaundry = answers.dryLaundry;
+    if (answers.loadList !== undefined) updates.loadList = answers.loadList;
+    if (answers.packout !== undefined) updates.packoutSummary = answers.packout;
+    if (answers.considerations !== undefined) updates.sdsConsiderations = answers.considerations;
+    if (answers.suggestedGroups !== undefined) updates.suggestedGroups = answers.suggestedGroups;
+    if (answers.interests !== undefined) updates.customerInterests = answers.interests;
+    if (answers.upcomingEvents !== undefined) updates.customerUpcomingEvents = answers.upcomingEvents;
+    if (Array.isArray(answers.conditions)) {
+      updates.damageWasWet = answers.conditions.includes("Still Wet") ? "Y" : "N";
+      updates.damageMoldMildew = answers.conditions.includes("Visible Mold") ? "Y" : "N";
+      updates.noHeat = answers.conditions.includes("No Heat") ? "Y" : "N";
+      updates.noLights = answers.conditions.includes("No Electricity") ? "Y" : "N";
+      updates.boardedUp = answers.conditions.includes("Boarded Up") ? "Y" : "N";
+    }
+    if (Array.isArray(answers.petsInHome)) {
+      // Will be picked up by the NOE pet display
+      updates.interviewPets = answers.petsInHome;
+    }
+    onOrderUpdate(updates);
+  }, [onOrderUpdate]);
+
+  // Wrap setInterviewAnswers to also sync to NOE
+  const updateInterview = useCallback((updater: (prev: Record<string, any>) => Record<string, any>) => {
+    setInterviewAnswers(prev => {
+      const next = updater(prev);
+      syncInterviewToNOE(next);
+      return next;
+    });
+  }, [syncInterviewToNOE]);
+
   const interviewAnswered = INTERVIEW_SECTIONS.filter(s => s.critical).filter(s => {
     const a = interviewAnswers[s.id];
     return a !== undefined && a !== null && (Array.isArray(a) ? a.length > 0 : a !== "");
   }).length;
   const interviewTotal = INTERVIEW_SECTIONS.filter(s => s.critical).length;
-  const [wizSelectedRooms2, setWizSelectedRooms2] = useState<Set<string>>(new Set());
+  const [wizSelectedRooms, setWizSelectedRooms] = useState<Set<string>>(new Set());
   const [bulkEditing, setBulkEditing] = useState(false);
 
   // Step 1: Property type
@@ -3508,13 +3626,6 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     commercial: ["Parking Garage", "Elevator"],
   };
   const noeAddr = (() => { const addrs = (orderData as any)?.addresses; return Array.isArray(addrs) ? (addrs.find((a: any) => a.isPrimary) || addrs[0] || {}) : {}; })();
-  // Debug: log what V2 receives from NOE
-  if (typeof console !== "undefined") {
-    const d = orderData as any;
-    const addrs = d?.addresses;
-    const a0 = Array.isArray(addrs) ? addrs[0] : null;
-    console.log("[V2 init] orderData exists:", !!orderData, "addresses:", Array.isArray(addrs) ? addrs.length : "not array", "addr[0].buildingType:", a0?.buildingType, "addr[0].beds:", a0?.beds, "addr[0].apt:", a0?.apt, "noeAddr:", JSON.stringify(noeAddr).slice(0, 200));
-  }
   const [propType, setPropType] = useState(() => {
     const fromOrder = (orderData as any)?.propertyType;
     const fromAddr = noeAddr.buildingType;
@@ -3611,7 +3722,13 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     if (sev.puffback?.values) dd.puffback = { ...sev.puffback.values };
     return dd;
   });
-  const [expandedDamage, setExpandedDamage] = useState<string | null>(null);
+  const [expandedDamage, setExpandedDamage] = useState<string | null>(() => {
+    // Auto-expand first active damage type if pre-populated from order
+    if (!orderData) return null;
+    const d = orderData as any;
+    if (d.primaryLossType) return d.primaryLossType.toLowerCase().includes("fire") ? "fire" : d.primaryLossType.toLowerCase().includes("water") ? "water" : d.primaryLossType.toLowerCase().includes("mold") ? "mold" : d.primaryLossType.toLowerCase().includes("puffback") ? "puffback" : null;
+    return null;
+  });
   const [uniformSeverity, setUniformSeverity] = useState(true); // same severity for all rooms
   const toggleDamage = (id: string) => {
     const wasActive = (damageTypes[id] || 0) > 0;
@@ -3645,27 +3762,27 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
   const [originRoom, setOriginRoom] = useState<string>("");
   const [editingFloorSev, setEditingFloorSev] = useState<number | null>(null);
   const [floorSevOverrides, setFloorSevOverrides] = useState<Record<number, Record<string, number>>>({}); // fi → {fire: 2, water: 1}
-  const [dragRoomV2, setDragRoomV2] = useState<{fi: number; ri: number} | null>(null);
-  const LINKED_ROOMS_V2: Record<string, string> = { "Master": "Master Bath", "Master Bath": "Master" };
-  const handleDropV2 = (targetFi: number) => {
-    if (!dragRoomV2 || dragRoomV2.fi === targetFi) { setDragRoomV2(null); return; }
+  const [dragRoom, setDragRoom] = useState<{fi: number; ri: number} | null>(null);
+  const LINKED_ROOMS: Record<string, string> = { "Master": "Master Bath", "Master Bath": "Master" };
+  const handleDrop = (targetFi: number) => {
+    if (!dragRoom || dragRoom.fi === targetFi) { setDragRoom(null); return; }
     setHomeRooms(prev => {
       const next = prev.map(f => ({ ...f, rooms: [...f.rooms] }));
-      const room = next[dragRoomV2.fi].rooms[dragRoomV2.ri];
-      const linkedName = LINKED_ROOMS_V2[room.name];
-      const linkedRi = linkedName ? next[dragRoomV2.fi].rooms.findIndex(r => r.name === linkedName) : -1;
+      const room = next[dragRoom.fi].rooms[dragRoom.ri];
+      const linkedName = LINKED_ROOMS[room.name];
+      const linkedRi = linkedName ? next[dragRoom.fi].rooms.findIndex(r => r.name === linkedName) : -1;
       if (linkedRi >= 0) {
-        const linked = next[dragRoomV2.fi].rooms[linkedRi];
-        next[dragRoomV2.fi].rooms.splice(linkedRi, 1);
+        const linked = next[dragRoom.fi].rooms[linkedRi];
+        next[dragRoom.fi].rooms.splice(linkedRi, 1);
         next[targetFi].rooms.push(linked);
       }
-      const adjRi = next[dragRoomV2.fi].rooms.findIndex(r => r === room);
-      if (adjRi >= 0) { next[dragRoomV2.fi].rooms.splice(adjRi, 1); next[targetFi].rooms.push(room); }
+      const adjRi = next[dragRoom.fi].rooms.findIndex(r => r === room);
+      if (adjRi >= 0) { next[dragRoom.fi].rooms.splice(adjRi, 1); next[targetFi].rooms.push(room); }
       return next;
     });
-    setDragRoomV2(null);
+    setDragRoom(null);
   };
-  const addRoomV2 = (fi: number, name: string) => {
+  const addRoom = (fi: number, name: string) => {
     setHomeRooms(prev => {
       const next = [...prev];
       const existing = new Set(next.flatMap(f => f.rooms.map(r => r.name)));
@@ -3680,11 +3797,11 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     });
   };
   const [editingRoom, setEditingRoom] = useState<{fi: number; ri: number} | null>(null);
-  const [renamingRoomV2, setRenamingRoomV2] = useState<{fi: number; ri: number} | null>(null);
-  const [renameTextV2, setRenameTextV2] = useState("");
-  const [addingToFloorV2, setAddingToFloorV2] = useState<number | null>(null);
-  const [addSearchV2, setAddSearchV2] = useState("");
-  const ROOM_LIST_V2 = ["Master", "Bedroom", "Guest Room", "Nursery", "Master Bath", "Bathroom", "Half Bath", "Hall Bath", "Living", "Family", "Great Room", "Den", "Office", "Study", "Kitchen", "Kitchenette", "Dining", "Pantry", "Bar", "Hallway", "Foyer", "Entry", "Closet", "Walk-in Closet", "Storage", "Laundry", "Utility", "Garage", "Porch", "Patio", "Rec", "Playroom", "Game", "Gym", "Media", "Theater", "Attic"];
+  const [renamingRoom, setRenamingRoom] = useState<{fi: number; ri: number} | null>(null);
+  const [renameText, setRenameText] = useState("");
+  const [addingToFloor, setAddingToFloor] = useState<number | null>(null);
+  const [addSearch, setAddSearch] = useState("");
+  const ROOM_LIST = ["Master", "Bedroom", "Guest Room", "Nursery", "Master Bath", "Bathroom", "Half Bath", "Hall Bath", "Living", "Family", "Great Room", "Den", "Office", "Study", "Kitchen", "Kitchenette", "Dining", "Pantry", "Bar", "Hallway", "Foyer", "Entry", "Closet", "Walk-in Closet", "Storage", "Laundry", "Utility", "Garage", "Porch", "Patio", "Rec", "Playroom", "Game", "Gym", "Media", "Theater", "Attic"];
   // Photo Scope reason codes — what are we doing with this room's contents
   const REASON_CODES = [
     { code: "BEF", label: "Before", desc: "Before photos only", primary: true },
@@ -3704,7 +3821,7 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
   const [roomReasonCodes, setRoomReasonCodes] = useState<Record<string, string[]>>({});
   const [roomDepartments, setRoomDepartments] = useState<Record<string, string[]>>({});
 
-  const HANDLING_CODES_V2 = [
+  const HANDLING_CODES_SCOPE = [
     { code: "Box", desc: "Return items in boxes" },
     { code: "Damp", desc: "Tag within 5 days" },
     { code: "DC", desc: "Dry clean all items" },
@@ -3778,26 +3895,31 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
     return s;
   });
 
-  // Step labels
-  const stepLabels = ["Building", "Space", "Severity", "Rooms"];
+  // Step labels — reordered: Building → Space → Rooms → Severity
+  const stepLabels = ["Building", "Size", "Rooms", "Severity"];
   const stepQuestions = [
     "Building type",
     propType === "trailer" ? "Trailer size" : isHouseType ? "Home size" : "Unit size",
-    "What type of damage occurred?",
-    roomPass === 1 ? "Confirm rooms" : roomPass === 2 ? "Which areas were affected?" : "Set instructions",
+    "Confirm rooms",
+    roomPass === 1 ? "What type of damage occurred?" : roomPass === 2 ? "Which areas were affected?" : "Set instructions",
   ];
 
-  // Auto-generate rooms and default all to affected when entering step 4
+  // Auto-generate rooms when entering step 3 (Rooms)
   const advanceStep = () => {
-    if (step === 3) {
+    if (step === 2) {
       if (homeRooms.length === 0) generateRooms();
-      // Default all rooms to affected — user deselects what's not impacted
+    }
+    if (step === 3) {
+      // When advancing from Rooms to Severity, default all rooms to affected
       setTimeout(() => markAll(true), 0);
+      // Auto-expand the first active damage type so user sees existing severity
+      const firstActive = Object.entries(damageTypes).find(([, v]) => v > 0);
+      if (firstActive) setExpandedDamage(firstActive[0]);
     }
     if (step < totalSteps) setStep(step + 1);
   };
 
-  const canAdvance = step === 1 ? !!propType : step === 2 ? floors !== "" : step === 3 ? activeDamage.length > 0 : true;
+  const canAdvance = step === 1 ? !!propType : step === 2 ? floors !== "" : step === 3 ? true : step === 4 && roomPass === 1 ? activeDamage.length > 0 : true;
 
   return (
     <div className="fixed inset-0 z-[300] bg-slate-900/60 flex items-center justify-center p-4" style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -3833,6 +3955,244 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
         <button onClick={onClose} className="w-[34px] h-[34px] rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 text-lg font-bold">×</button>
       </div>
 
+      {/* ═══ ORDER TAB — mobile-optimized editable form ═══ */}
+      {activeTab === "order" && (() => {
+        const d = (orderData || {}) as any;
+        const cust = d.customers?.[0] || {};
+        const addr = d.addresses?.[0] || {};
+        const upd = (key: string, val: any) => onOrderUpdate?.({ [key]: val } as any);
+        const updCust = (field: string, val: string) => {
+          const custs = [...(d.customers || [{ first: "", last: "", phone: "", email: "" }])];
+          custs[0] = { ...custs[0], [field]: val };
+          onOrderUpdate?.({ customers: custs } as any);
+        };
+        const updAddr = (field: string, val: string) => {
+          const addrs = [...(d.addresses || [{}])];
+          addrs[0] = { ...addrs[0], [field]: val };
+          onOrderUpdate?.({ addresses: addrs } as any);
+        };
+        const MobileField = ({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) => (
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</div>
+            <input value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder || label} className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-[14px] text-slate-800 outline-none focus:border-blue-400 bg-white" />
+          </div>
+        );
+        return (
+        <div className="flex-1 overflow-auto bg-[#f5f7fb]" style={{ WebkitOverflowScrolling: "touch" }}>
+          <div className="px-4 pt-4 pb-20 space-y-3">
+            {/* Status bar */}
+            <div className="flex items-center justify-between">
+              <div className="text-[18px] font-bold text-slate-900">Order</div>
+              <div className="flex gap-1.5">
+                {d.primaryLossType && <span className="rounded-full bg-orange-100 text-orange-700 px-2.5 py-0.5 text-[11px] font-bold">{d.primaryLossType}</span>}
+                {d.orderStatus && <span className="rounded-full bg-blue-100 text-blue-700 px-2.5 py-0.5 text-[11px] font-bold">{d.orderStatus}</span>}
+              </div>
+            </div>
+
+            {/* Event Instructions — top priority for field team */}
+            {d.eventInstructions && (
+            <div className="rounded-[14px] border border-sky-200 bg-sky-50 p-4 space-y-1.5">
+              <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider">Event Instructions</div>
+              <div className="text-[13px] text-sky-800 whitespace-pre-wrap leading-relaxed">{d.eventInstructions}</div>
+            </div>
+            )}
+
+            {/* Order section */}
+            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-3">
+              <div className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Order Info</div>
+              <MobileField label="Order Name" value={d.orderName} onChange={v => upd("orderName", v)} />
+              <div className="grid grid-cols-2 gap-3">
+                <MobileField label="Claim #" value={d.claimNumber} onChange={v => upd("claimNumber", v)} />
+                <MobileField label="Policy #" value={d.policyNumber} onChange={v => upd("policyNumber", v)} />
+              </div>
+            </div>
+
+            {/* Customer section */}
+            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-3">
+              <div className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Customer</div>
+              <div className="grid grid-cols-2 gap-3">
+                <MobileField label="First Name" value={cust.first} onChange={v => updCust("first", v)} />
+                <MobileField label="Last Name" value={cust.last} onChange={v => updCust("last", v)} />
+              </div>
+              <MobileField label="Phone" value={cust.phone} onChange={v => updCust("phone", v)} />
+              <MobileField label="Email" value={cust.email} onChange={v => updCust("email", v)} />
+            </div>
+
+            {/* Address section */}
+            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-3">
+              <div className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Address</div>
+              <MobileField label="Street" value={addr.street} onChange={v => updAddr("street", v)} />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1"><MobileField label="City" value={addr.city} onChange={v => updAddr("city", v)} /></div>
+                <MobileField label="State" value={addr.state} onChange={v => updAddr("state", v)} />
+                <MobileField label="Zip" value={addr.zip} onChange={v => updAddr("zip", v)} />
+              </div>
+            </div>
+
+            {/* Services */}
+            {(d.serviceOfferings || []).length > 0 && (
+            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-2">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Services</div>
+              <div className="flex flex-wrap gap-1.5">{(d.serviceOfferings || []).map((s: string) => <span key={s} className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{s}</span>)}</div>
+            </div>
+            )}
+
+            {/* Open desktop order — fallback */}
+            <button onClick={() => { if (onShowOrder) onShowOrder(); }} className="w-full rounded-[12px] border border-slate-200 bg-white py-3 text-[13px] font-bold text-slate-500 hover:bg-slate-50 flex items-center justify-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+              Open Desktop View
+            </button>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ═══ INTERVIEW TAB ═══ */}
+      {activeTab === "interview" && (
+        <div className="flex-1 overflow-auto bg-white" style={{ WebkitOverflowScrolling: "touch" }}>
+          <div className="px-5 pt-4 pb-2">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[17px] font-bold text-slate-900">Interview</span>
+              <span className="rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-[11px] font-bold">{interviewAnswered}/{interviewTotal}</span>
+            </div>
+            <div className="text-[12px] text-slate-400">Ask the customer these questions during or before the initial visit.</div>
+          </div>
+          <div className="pb-20">
+            {INTERVIEW_SECTIONS.map(section => {
+              const answer = interviewAnswers[section.id];
+              const noteKey = `${section.id}_note`;
+              const noteVal = (interviewAnswers[noteKey] as string) || "";
+              const hasAnswer = answer !== undefined && answer !== null && answer !== "" && (!Array.isArray(answer) || answer.length > 0);
+              return (
+                <div key={section.id} className="px-5 py-4 border-b border-slate-100">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className={`text-[12px] font-extrabold uppercase tracking-[1px] ${section.critical ? "text-violet-600" : "text-slate-400"}`}>{section.title}</span>
+                    {section.critical && !hasAnswer && <span className="text-[10px] font-bold text-orange-500">Required</span>}
+                    {hasAnswer && <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>}
+                  </div>
+                  {section.type === "boolean" && (
+                    <div className="space-y-2.5">
+                      <div className="flex gap-2.5">
+                        {["Yes", "No"].map(opt => (
+                          <button key={opt} onClick={() => updateInterview(p => ({ ...p, [section.id]: opt === "Yes" }))} className={`flex-1 rounded-full border py-2.5 text-[13px] font-bold transition-all ${answer === (opt === "Yes") ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600"}`}>{opt}</button>
+                        ))}
+                      </div>
+                      {answer === true && <input value={noteVal} onChange={e => updateInterview(p => ({ ...p, [noteKey]: e.target.value }))} placeholder="Details..." className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-[13px] outline-none focus:border-violet-400" />}
+                    </div>
+                  )}
+                  {section.type === "single" && section.options && (
+                    <div className="space-y-2.5">
+                      <div className="flex flex-wrap gap-2">
+                        {section.options.map(opt => (
+                          <button key={opt} onClick={() => updateInterview(p => ({ ...p, [section.id]: p[section.id] === opt ? "" : opt }))} className={`rounded-full border px-4 py-2 text-[13px] font-semibold transition-all ${answer === opt ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600"}`}>{opt}</button>
+                        ))}
+                      </div>
+                      {answer && <input value={noteVal} onChange={e => updateInterview(p => ({ ...p, [noteKey]: e.target.value }))} placeholder="Details..." className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-[13px] outline-none focus:border-violet-400" />}
+                    </div>
+                  )}
+                  {section.type === "multi" && section.options && (
+                    <div className="flex flex-wrap gap-2">
+                      {section.options.map(opt => {
+                        const selected = Array.isArray(answer) && answer.includes(opt);
+                        return (
+                          <button key={opt} onClick={() => updateInterview(p => {
+                            const curr = Array.isArray(p[section.id]) ? (p[section.id] as string[]) : [];
+                            return { ...p, [section.id]: selected ? curr.filter(o => o !== opt) : [...curr, opt] };
+                          })} className={`rounded-full border px-4 py-2 text-[13px] font-semibold transition-all ${selected ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600"}`}>{opt}</button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ REPORT TAB — summary + open SDS ═══ */}
+      {activeTab === "report" && (() => {
+        const totalPhotos = Object.values(roomPhotos).reduce((s, arr) => s + arr.length, 0);
+        const affRooms = homeRooms.flatMap((f, fi) => f.rooms.map((r, ri) => ({ ...r, fi, ri, floor: f.name }))).filter(r => r.affected);
+        return (
+        <div className="flex-1 overflow-auto bg-[#f5f7fb]" style={{ WebkitOverflowScrolling: "touch" }}>
+          <div className="px-4 pt-4 pb-20 space-y-3">
+            <div className="text-[18px] font-bold text-slate-900">Report</div>
+            {/* Summary stats */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-[12px] bg-white border border-slate-200 p-3 text-center">
+                <div className="text-[20px] font-bold text-blue-600">{affRooms.length}</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase">Rooms</div>
+              </div>
+              <div className="rounded-[12px] bg-white border border-slate-200 p-3 text-center">
+                <div className="text-[20px] font-bold text-green-600">{totalPhotos}</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase">Photos</div>
+              </div>
+              <div className="rounded-[12px] bg-white border border-slate-200 p-3 text-center">
+                <div className="text-[20px] font-bold text-violet-600">{interviewAnswered}/{interviewTotal}</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase">Interview</div>
+              </div>
+            </div>
+            {/* Open SDS button */}
+            <button onClick={() => { if (onShowSds) onShowSds(); }} className="w-full rounded-[14px] bg-blue-600 py-4 text-[15px] font-bold text-white hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+              Open SDS Document
+            </button>
+            {/* Damage types */}
+            {activeDamage.length > 0 && (
+            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-2">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Damage Types</div>
+              <div className="flex flex-wrap gap-2">
+                {activeDamage.map(([code, level], i) => {
+                  const dt = DAMAGE_TYPES.find(d => d.id === code);
+                  return dt ? <span key={code} className={`rounded-full ${dt.color} px-3 py-1 text-[12px] font-bold text-white`}>{i === 0 ? "Primary: " : ""}{dt.icon} {dt.label} {level}</span> : null;
+                })}
+              </div>
+            </div>
+            )}
+            {/* Room summary */}
+            {affRooms.length > 0 && (
+            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-2">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Affected Rooms</div>
+              {affRooms.map(r => {
+                const rKey = `${r.fi}-${r.ri}`;
+                const photos = roomPhotos[rKey] || [];
+                const depth = DEPTH_LEVELS.find(l => l.id === (roomDepthOverrides[rKey] ?? depthLevel))?.short || "";
+                return (
+                  <div key={rKey} className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
+                    <div>
+                      <span className="text-[13px] font-semibold text-slate-800">{r.name}</span>
+                      <span className="text-[11px] text-slate-400 ml-1.5">{r.floor}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {depth && <span className="rounded-full bg-blue-100 text-blue-700 px-1.5 py-0.5 text-[9px] font-bold">{depth}</span>}
+                      {photos.length > 0 && <span className="rounded-full bg-green-100 text-green-700 px-1.5 py-0.5 text-[9px] font-bold">{photos.length} photos</span>}
+                      {r.isOrigin && <span className="rounded-full bg-red-100 text-red-600 px-1.5 py-0.5 text-[9px] font-bold">Origin</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            )}
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <button onClick={() => { if (onShowSds) onShowSds(); }} className="flex-1 rounded-[12px] border border-slate-200 bg-white py-3 text-[13px] font-bold text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m0 0a48.077 48.077 0 018.5 0" /></svg>
+                Print / Save
+              </button>
+              <button onClick={() => { if (onShowSds) onShowSds(); }} className="flex-1 rounded-[12px] border border-slate-200 bg-white py-3 text-[13px] font-bold text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                Email
+              </button>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ═══ SCOPE TAB — existing wizard content ═══ */}
+      <div style={{ display: activeTab === "scope" ? "contents" : "none" }}>
+
       {/* Progress bar — tap to jump to completed steps */}
       <div className="flex-shrink-0 px-4 pt-2 pb-1 bg-white">
         <div className="flex gap-1">
@@ -3848,6 +4208,42 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
         </div>
       </div>
 
+      {/* Event context — collapsible overview of what's known */}
+      {orderData && (orderData as any).orderName && (() => {
+        const d = orderData as any;
+        const custName = [d.customers?.[0]?.first, d.customers?.[0]?.last].filter(Boolean).join(" ");
+        const addr = d.addresses?.[0];
+        const addrLine = addr ? [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(", ") : "";
+        const lossType = d.primaryLossType || "";
+        const services = (d.serviceOfferings || []).slice(0, 5);
+        const instructions = (d.eventInstructions || "").trim();
+        const hasContext = custName || addrLine || lossType || services.length || instructions;
+        if (!hasContext) return null;
+        return (
+          <button onClick={() => setExpandedContext(!expandedContext)} className="flex-shrink-0 w-full text-left border-b border-slate-200 bg-white px-4 py-2 hover:bg-slate-50 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <svg className="w-4 h-4 text-sky-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                <span className="text-[12px] font-bold text-slate-700 truncate">{d.orderName}{custName ? ` - ${custName}` : ""}</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {lossType && <span className="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 text-[9px] font-bold">{lossType}</span>}
+                <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${expandedContext ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+              </div>
+            </div>
+            {expandedContext && (
+              <div className="mt-2 space-y-1.5 text-[11px]" onClick={e => e.stopPropagation()}>
+                {addrLine && <div className="text-slate-600">{addrLine}</div>}
+                {services.length > 0 && <div className="flex flex-wrap gap-1">{services.map((s: string) => <span key={s} className="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[9px] font-bold">{s}</span>)}</div>}
+                {instructions && (
+                  <div className="rounded-[8px] bg-sky-50 border border-sky-200 px-2.5 py-2 text-[11px] text-sky-800 whitespace-pre-wrap max-h-24 overflow-auto">{instructions}</div>
+                )}
+              </div>
+            )}
+          </button>
+        );
+      })()}
+
       {/* Content */}
       <div className="flex-1 overflow-auto bg-[#f5f7fb]" style={{ WebkitOverflowScrolling: "touch" }}>
         <div className="px-4 pt-4 pb-28">
@@ -3855,6 +4251,15 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
           <div className="mb-4">
             <div className="text-[18px] font-bold text-slate-900 leading-tight">{stepQuestions[step - 1]}</div>
           </div>
+
+          {/* Guidance toast */}
+          {toastVisible && toastMsg && !dismissedToasts.has(toastKey) && (
+            <div className="flex items-start gap-2.5 rounded-[12px] bg-blue-50 border border-blue-200 px-3.5 py-2.5 mb-3 animate-in fade-in slide-in-from-top-2" onClick={() => { setToastVisible(false); setDismissedToasts(p => new Set(p).add(toastKey)); }}>
+              <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <span className="text-[12px] text-blue-700 leading-relaxed flex-1">{toastMsg}</span>
+              <span className="text-[10px] text-blue-400 font-bold shrink-0 mt-0.5">TAP TO DISMISS</span>
+            </div>
+          )}
 
           {/* Step 1: Property Type */}
           {step === 1 && (() => {
@@ -4018,113 +4423,25 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                 </div>
                 );
               })()}
+              {/* Auto-add rooms toggle */}
+              <div className="flex items-center justify-between rounded-[12px] border border-slate-200 bg-white px-4 py-2.5">
+                <div>
+                  <div className="text-[13px] font-semibold text-slate-700">Auto-add rooms to walkthrough</div>
+                  <div className="text-[11px] text-slate-400">Pre-create rooms in Photo Scope</div>
+                </div>
+                <button onClick={() => setAutoAddRooms(!autoAddRooms)} className={`relative w-11 h-6 rounded-full transition-colors ${autoAddRooms ? "bg-blue-500" : "bg-slate-300"}`}>
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${autoAddRooms ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Step 3: Damage with expandable sub-categories */}
+          {/* Step 3: Rooms — add, delete, rename, drag */}
           {step === 3 && (
             <div className="space-y-3">
-              {/* Uniform severity toggle */}
-              {activeDamage.length > 0 && (
-                <div className="flex items-center justify-between rounded-[14px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                  <span className="text-[13px] font-semibold text-slate-700">Same severity throughout?</span>
-                  <div className="flex gap-1.5">
-                    <button onClick={() => setUniformSeverity(true)} className={`rounded-[8px] border-2 px-3.5 py-1.5 text-[12px] font-bold transition-all ${uniformSeverity ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>Yes</button>
-                    <button onClick={() => setUniformSeverity(false)} className={`rounded-[8px] border-2 px-3.5 py-1.5 text-[12px] font-bold transition-all ${!uniformSeverity ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>No</button>
-                  </div>
-                </div>
-              )}
-              {DAMAGE_TYPES.map(dt => {
-                const level = damageTypes[dt.id] || 0;
-                const isActive = level > 0;
-                const isExpanded = expandedDamage === dt.id;
-                const details = damageDetails[dt.id] || {};
-                return (
-                  <div key={dt.id} className={`rounded-[16px] border-2 overflow-hidden transition-all ${isActive ? dt.border : "border-slate-200"} bg-white`}>
-                    <button onClick={() => toggleDamage(dt.id)} className={`w-full flex items-center justify-between px-4 py-3 text-left ${isActive ? dt.light : ""}`}>
-                      <div className={`text-[16px] font-bold ${isActive ? "text-slate-900" : "text-slate-600"}`}><span className="mr-1.5">{dt.icon}</span>{dt.label}</div>
-                      {isActive && <span className={`rounded-full ${dt.color} px-2.5 py-0.5 text-[12px] font-bold text-white`}>{dt.label[0]}{level}</span>}
-                      {!isActive && <span className="text-[13px] text-slate-400">Tap to add</span>}
-                    </button>
-                    {isActive && (
-                      <div className="px-4 py-3 border-t border-slate-100 space-y-3">
-                        <div>
-                          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Severity</div>
-                          <div className="flex gap-2">
-                            {[1, 2, 3].map(n => (
-                              <button key={n} onClick={() => setDamageLevel(dt.id, n)} className={`flex-1 h-10 rounded-[10px] border-2 text-[15px] font-bold transition-all ${level === n ? `${dt.color} text-white border-transparent` : "border-slate-200 text-slate-500"}`}>{n}</button>
-                            ))}
-                          </div>
-                        </div>
-                        {/* Sub-categories — expandable */}
-                        <button onClick={() => setExpandedDamage(isExpanded ? null : dt.id)} className="w-full flex items-center justify-between text-left">
-                          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px]">Details</span>
-                          <div className="flex items-center gap-1.5">
-                            {!isExpanded && Object.entries(details).filter(([,v]) => v > 0).length > 0 && (
-                              <span className="text-[11px] text-slate-500">{Object.entries(details).filter(([,v]) => v > 0).map(([k,v]) => `${k} ${v}`).join(", ")}</span>
-                            )}
-                            <span className="text-slate-400 text-[11px]">{isExpanded ? "▾" : "▸"}</span>
-                          </div>
-                        </button>
-                        {isExpanded && (
-                          <div className="space-y-2">
-                            {dt.details.map(detail => {
-                              const dVal = details[detail] || 0;
-                              return (
-                                <div key={detail} className="flex items-center justify-between">
-                                  <span className="text-[13px] font-medium text-slate-700">{detail}</span>
-                                  <div className="flex gap-1.5">
-                                    {[0, 1, 2, 3].map(n => (
-                                      <button key={n} onClick={() => {
-                                        setDamageDetails(p => ({ ...p, [dt.id]: { ...(p[dt.id] || {}), [detail]: n } }));
-                                        const updated = { ...(damageDetails[dt.id] || {}), [detail]: n };
-                                        const maxVal = Math.max(...Object.values(updated), 0);
-                                        if (maxVal > level) setDamageLevel(dt.id, maxVal);
-                                      }} className={`w-9 h-8 rounded-[8px] border-2 text-[12px] font-bold transition-all ${dVal === n ? (n > 0 ? `${dt.color} text-white border-transparent` : "border-slate-400 bg-slate-100 text-slate-600") : "border-slate-200 text-slate-500"}`}>{n}</button>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Step 4: Rooms — tabbed view with 3 passes */}
-          {step === 4 && (
-            <div className="space-y-3">
-              {/* Pass indicator — 3 passes */}
-              <div className="flex rounded-[10px] bg-slate-100 p-1">
-                {([
-                  { id: 1 as const, label: "Rooms" },
-                  { id: 2 as const, label: "Impact" },
-                  { id: 3 as const, label: "Instructions" },
-                ]).map(pass => (
-                  <button key={pass.id} onClick={() => setRoomPass(pass.id)} className={`flex-1 rounded-[8px] py-2 text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 ${roomPass === pass.id ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${roomPass > pass.id ? "bg-blue-600 text-white" : roomPass === pass.id ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-400"}`}>{roomPass > pass.id ? "✓" : pass.id}</span>
-                    {pass.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Interview button */}
-              <button onClick={() => setShowInterview(true)} className={`w-full flex items-center justify-between rounded-[12px] border px-4 py-2.5 transition-all ${interviewAnswered === interviewTotal ? "border-green-300 bg-green-50" : interviewAnswered > 0 ? "border-blue-200 bg-blue-50/30" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-                <span className="text-[13px] font-bold text-slate-700">Interview</span>
-                <span className={`text-[12px] font-bold ${interviewAnswered === interviewTotal ? "text-green-600" : interviewAnswered > 0 ? "text-blue-600" : "text-slate-400"}`}>{interviewAnswered}/{interviewTotal} critical</span>
-              </button>
-
-              {/* Pass 1: Rooms — add, delete, rename, drag only */}
-              {roomPass === 1 && (
-                <>
-                  <div className="text-[12px] text-slate-500 px-1">{totalRoomCount} rooms across {homeRooms.length} floors. Tap name to rename, drag to move.</div>
+              <div className="text-[12px] text-slate-500 px-1">{totalRoomCount} rooms across {homeRooms.length} floors. Tap name to rename, drag to move.</div>
                   {homeRooms.map((floor, fi) => (
-                    <div key={fi} className={`rounded-[14px] border overflow-hidden shadow-sm transition-all ${dragRoomV2 && dragRoomV2.fi !== fi ? "border-blue-300 bg-blue-50/20" : "border-slate-200 bg-white"}`} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }} onDrop={e => { e.preventDefault(); handleDropV2(fi); }}>
+                    <div key={fi} className={`rounded-[14px] border overflow-hidden shadow-sm transition-all ${dragRoom && dragRoom.fi !== fi ? "border-blue-300 bg-blue-50/20" : "border-slate-200 bg-white"}`} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }} onDrop={e => { e.preventDefault(); handleDrop(fi); }}>
                       <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
                         <span className="text-[13px] font-bold text-slate-800">{floor.name}</span>
                         <div className="flex items-center gap-2">
@@ -4134,51 +4451,51 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                       </div>
                       <div className="divide-y divide-slate-100">
                         {floor.rooms.map((room, ri) => (
-                          renamingRoomV2?.fi === fi && renamingRoomV2?.ri === ri ? (
+                          renamingRoom?.fi === fi && renamingRoom?.ri === ri ? (
                             <div key={ri} className="px-4 py-2 flex items-center gap-2 bg-blue-50">
-                              <input value={renameTextV2} onChange={e => setRenameTextV2(e.target.value)} onKeyDown={e => {
-                                if (e.key === "Enter" && renameTextV2.trim()) { setHomeRooms(prev => { const next = [...prev]; const rooms = [...next[fi].rooms]; rooms[ri] = { ...rooms[ri], name: renameTextV2.trim() }; next[fi] = { ...next[fi], rooms }; return next; }); setRenamingRoomV2(null); }
-                                if (e.key === "Escape") setRenamingRoomV2(null);
+                              <input value={renameText} onChange={e => setRenameText(e.target.value)} onKeyDown={e => {
+                                if (e.key === "Enter" && renameText.trim()) { setHomeRooms(prev => { const next = [...prev]; const rooms = [...next[fi].rooms]; rooms[ri] = { ...rooms[ri], name: renameText.trim() }; next[fi] = { ...next[fi], rooms }; return next; }); setRenamingRoom(null); }
+                                if (e.key === "Escape") setRenamingRoom(null);
                               }} autoFocus className="flex-1 rounded-[8px] border-2 border-blue-400 px-3 py-1.5 text-[13px] font-bold text-slate-800 outline-none bg-white" />
-                              <button onClick={() => { if (renameTextV2.trim()) { setHomeRooms(prev => { const next = [...prev]; const rooms = [...next[fi].rooms]; rooms[ri] = { ...rooms[ri], name: renameTextV2.trim() }; next[fi] = { ...next[fi], rooms }; return next; }); setRenamingRoomV2(null); }}} className="h-8 w-8 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center">✓</button>
-                              <button onClick={() => setRenamingRoomV2(null)} className="h-8 w-8 rounded-lg text-slate-500 text-sm font-bold flex items-center justify-center hover:bg-slate-100">×</button>
+                              <button onClick={() => { if (renameText.trim()) { setHomeRooms(prev => { const next = [...prev]; const rooms = [...next[fi].rooms]; rooms[ri] = { ...rooms[ri], name: renameText.trim() }; next[fi] = { ...next[fi], rooms }; return next; }); setRenamingRoom(null); }}} className="h-8 w-8 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center">✓</button>
+                              <button onClick={() => setRenamingRoom(null)} className="h-8 w-8 rounded-lg text-slate-500 text-sm font-bold flex items-center justify-center hover:bg-slate-100">×</button>
                             </div>
                           ) : (
-                            <div key={ri} draggable onDragStart={() => setDragRoomV2({fi, ri})} onDragEnd={() => setDragRoomV2(null)} onMouseDown={() => setDragRoomV2({fi, ri})} onMouseUp={() => setDragRoomV2(null)} className={`px-3 py-2.5 flex items-center gap-2.5 cursor-grab active:cursor-grabbing transition-all ${dragRoomV2?.fi === fi && dragRoomV2?.ri === ri ? "outline outline-2 outline-orange-400 rounded-lg bg-orange-50/30" : ""}`}>
-                              <span onClick={() => { setRenamingRoomV2({fi, ri}); setRenameTextV2(room.name); }} className="flex-1 text-[14px] font-semibold text-slate-800 cursor-text">{room.name}</span>
+                            <div key={ri} draggable onDragStart={() => setDragRoom({fi, ri})} onDragEnd={() => setDragRoom(null)} onMouseDown={() => setDragRoom({fi, ri})} onMouseUp={() => setDragRoom(null)} className={`px-3 py-2.5 flex items-center gap-2.5 cursor-grab active:cursor-grabbing transition-all ${dragRoom?.fi === fi && dragRoom?.ri === ri ? "outline outline-2 outline-orange-400 rounded-lg bg-orange-50/30" : ""}`}>
+                              <span onClick={() => { setRenamingRoom({fi, ri}); setRenameText(room.name); }} className="flex-1 text-[14px] font-semibold text-slate-800 cursor-text">{room.name}</span>
                               <button onClick={() => setHomeRooms(prev => { const next = [...prev]; next[fi] = { ...next[fi], rooms: next[fi].rooms.filter((_, i) => i !== ri) }; return next; })} className="h-7 w-7 rounded-full flex items-center justify-center text-sm font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0">×</button>
                             </div>
                           )
                         ))}
                         {/* Add room — inline search */}
-                        {addingToFloorV2 === fi ? (
+                        {addingToFloor === fi ? (
                           <div className="px-3 py-3 bg-slate-50/80">
                             <div className="flex gap-2 items-center mb-2">
-                              <input value={addSearchV2} onChange={e => setAddSearchV2(e.target.value)} onKeyDown={e => {
-                                if (e.key === "Enter" && addSearchV2.trim()) {
-                                  const match = ROOM_LIST_V2.find(r => r.toLowerCase().startsWith(addSearchV2.toLowerCase()));
-                                  addRoomV2(fi, match || addSearchV2.trim());
-                                  setAddSearchV2("");
+                              <input value={addSearch} onChange={e => setAddSearch(e.target.value)} onKeyDown={e => {
+                                if (e.key === "Enter" && addSearch.trim()) {
+                                  const match = ROOM_LIST.find(r => r.toLowerCase().startsWith(addSearch.toLowerCase()));
+                                  addRoom(fi, match || addSearch.trim());
+                                  setAddSearch("");
                                 }
-                                if (e.key === "Escape") { setAddingToFloorV2(null); setAddSearchV2(""); }
+                                if (e.key === "Escape") { setAddingToFloor(null); setAddSearch(""); }
                               }} autoFocus placeholder="Type room name..." className="flex-1 rounded-[10px] border-2 border-slate-200 px-3 py-2 text-[13px] font-medium text-slate-800 outline-none focus:border-blue-400 bg-white" />
-                              <button onClick={() => { setAddingToFloorV2(null); setAddSearchV2(""); }} className="text-[13px] font-bold text-slate-500">Done</button>
+                              <button onClick={() => { setAddingToFloor(null); setAddSearch(""); }} className="text-[13px] font-bold text-slate-500">Done</button>
                             </div>
                             <div className="flex flex-wrap gap-1.5 max-h-28 overflow-auto">
                               {(() => {
                                 const existing = new Set(homeRooms.flatMap(f => f.rooms.map(r => r.name)));
                                 const repeatable = new Set(["Bedroom", "Bathroom", "Half Bath", "Closet", "Walk-in Closet", "Hallway", "Storage"]);
-                                return (addSearchV2.trim() ? ROOM_LIST_V2.filter(r => r.toLowerCase().includes(addSearchV2.toLowerCase())) : ROOM_LIST_V2.slice(0, 14)).filter(r => !existing.has(r) || repeatable.has(r));
+                                return (addSearch.trim() ? ROOM_LIST.filter(r => r.toLowerCase().includes(addSearch.toLowerCase())) : ROOM_LIST.slice(0, 14)).filter(r => !existing.has(r) || repeatable.has(r));
                               })().map(r => (
-                                <button key={r} onClick={() => { addRoomV2(fi, r); setAddSearchV2(""); }} className="rounded-full bg-white border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700">{r}</button>
+                                <button key={r} onClick={() => { addRoom(fi, r); setAddSearch(""); }} className="rounded-full bg-white border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700">{r}</button>
                               ))}
-                              {addSearchV2.trim() && !ROOM_LIST_V2.some(r => r.toLowerCase() === addSearchV2.toLowerCase()) && (
-                                <button onClick={() => { addRoomV2(fi, addSearchV2.trim()); setAddSearchV2(""); }} className="rounded-full bg-blue-50 border border-blue-300 px-3 py-1 text-[11px] font-bold text-blue-700">+ "{addSearchV2.trim()}"</button>
+                              {addSearch.trim() && !ROOM_LIST.some(r => r.toLowerCase() === addSearch.toLowerCase()) && (
+                                <button onClick={() => { addRoom(fi, addSearch.trim()); setAddSearch(""); }} className="rounded-full bg-blue-50 border border-blue-300 px-3 py-1 text-[11px] font-bold text-blue-700">+ "{addSearch.trim()}"</button>
                               )}
                             </div>
                           </div>
                         ) : (
-                          <button onClick={() => setAddingToFloorV2(fi)} className="w-full px-4 py-2 text-left text-[12px] font-bold text-blue-500 hover:bg-slate-50">+ Add room</button>
+                          <button onClick={() => setAddingToFloor(fi)} className="w-full px-4 py-2 text-left text-[12px] font-bold text-blue-500 hover:bg-slate-50">+ Add room</button>
                         )}
                       </div>
                     </div>
@@ -4189,7 +4506,110 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                     {!homeRooms.some(f => /attic/i.test(f.name)) && <button onClick={() => { const aff = activeDamage.length > 0; setHomeRooms(prev => [...prev, { name: "Attic", rooms: [{ name: "Attic", affected: aff }] }]); }} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Attic</button>}
                     <button onClick={() => setHomeRooms(prev => [...prev, { name: `Floor ${prev.length + 1}`, rooms: [] }])} className="rounded-full border-2 border-dashed border-slate-300 px-4 py-2 text-[12px] font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700">+ Floor</button>
                   </div>
-                </>
+            </div>
+          )}
+
+          {/* Step 4: Severity — 3 passes: Damage types, Impact, Instructions */}
+          {step === 4 && (
+            <div className="space-y-3">
+              {/* Pass indicator */}
+              <div className="flex rounded-[10px] bg-slate-100 p-1">
+                {([
+                  { id: 1 as const, label: "Severity" },
+                  { id: 2 as const, label: "Impact" },
+                  { id: 3 as const, label: "Instructions" },
+                ]).map(pass => (
+                  <button key={pass.id} onClick={() => setRoomPass(pass.id)} className={`flex-1 rounded-[8px] py-2 text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 ${roomPass === pass.id ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${roomPass > pass.id ? "bg-blue-600 text-white" : roomPass === pass.id ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-400"}`}>{roomPass > pass.id ? "✓" : pass.id}</span>
+                    {pass.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Interview accessible from footer bar */}
+
+              {/* Pass 1: Severity — damage types with expandable details */}
+              {roomPass === 1 && (
+                <div className="space-y-3">
+                  {/* Uniform severity toggle */}
+                  {activeDamage.length > 0 && (
+                    <div className="flex items-center justify-between rounded-[14px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                      <span className="text-[13px] font-semibold text-slate-700">Same severity throughout?</span>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => setUniformSeverity(true)} className={`rounded-[8px] border-2 px-3.5 py-1.5 text-[12px] font-bold transition-all ${uniformSeverity ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>Yes</button>
+                        <button onClick={() => setUniformSeverity(false)} className={`rounded-[8px] border-2 px-3.5 py-1.5 text-[12px] font-bold transition-all ${!uniformSeverity ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>No</button>
+                      </div>
+                    </div>
+                  )}
+                  {DAMAGE_TYPES.map(dt => {
+                    const level = damageTypes[dt.id] || 0;
+                    const isActive = level > 0;
+                    const isExpanded = expandedDamage === dt.id;
+                    const details = damageDetails[dt.id] || {};
+                    const isPrimary = activeDamage.length > 0 && activeDamage[0][0] === dt.id;
+                    const isSecondary = isActive && !isPrimary;
+                    return (
+                      <div key={dt.id} className={`rounded-[16px] border-2 overflow-hidden transition-all ${isActive ? dt.border : "border-slate-200"} bg-white`}>
+                        <button onClick={() => toggleDamage(dt.id)} className={`w-full flex items-center justify-between px-4 py-3 text-left ${isActive ? dt.light : ""}`}>
+                          <div className="flex items-center gap-2">
+                            <div className={`text-[16px] font-bold ${isActive ? "text-slate-900" : "text-slate-600"}`}><span className="mr-1.5">{dt.icon}</span>{dt.label}</div>
+                            {isPrimary && <span className="rounded-full bg-slate-800 text-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide">Primary</span>}
+                            {isSecondary && (
+                              <button onClick={(e) => { e.stopPropagation(); setDamageTypes(p => { const reordered: Record<string, number> = { [dt.id]: p[dt.id] || 1 }; Object.entries(p).forEach(([k, v]) => { if (k !== dt.id) reordered[k] = v; }); return reordered; }); }} className="rounded-full bg-slate-200 text-slate-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide hover:bg-slate-800 hover:text-white transition-colors" title="Tap to make primary">Secondary</button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isActive && <span className={`rounded-full ${dt.color} px-2.5 py-0.5 text-[12px] font-bold text-white`}>{dt.label[0]}{level}</span>}
+                            {!isActive && <span className="text-[13px] text-slate-400">Tap to add</span>}
+                          </div>
+                        </button>
+                        {isActive && (
+                          <div className="px-4 py-3 border-t border-slate-100 space-y-3">
+                            <div>
+                              <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Severity</div>
+                              <div className="flex gap-2">
+                                {[1, 2, 3].map(n => (
+                                  <button key={n} onClick={() => setDamageLevel(dt.id, n)} className={`flex-1 h-10 rounded-[10px] border-2 text-[15px] font-bold transition-all ${level === n ? `${dt.color} text-white border-transparent` : "border-slate-200 text-slate-500"}`}>{n}</button>
+                                ))}
+                              </div>
+                            </div>
+                            <button onClick={() => setExpandedDamage(isExpanded ? null : dt.id)} className="w-full flex items-center justify-between text-left">
+                              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px]">Details</span>
+                              <div className="flex items-center gap-1.5">
+                                {!isExpanded && Object.entries(details).filter(([,v]) => v > 0).length > 0 && (
+                                  <span className="text-[11px] text-slate-500">{Object.entries(details).filter(([,v]) => v > 0).map(([k,v]) => `${k} ${v}`).join(", ")}</span>
+                                )}
+                                <span className="text-slate-400 text-[11px]">{isExpanded ? "▾" : "▸"}</span>
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <div className="space-y-2">
+                                {dt.details.map(detail => {
+                                  const dVal = details[detail] || 0;
+                                  return (
+                                    <div key={detail} className="flex items-center justify-between">
+                                      <span className="text-[13px] font-medium text-slate-700">{detail}</span>
+                                      <div className="flex gap-1.5">
+                                        {[0, 1, 2, 3].map(n => (
+                                          <button key={n} onClick={() => {
+                                            setDamageDetails(p => ({ ...p, [dt.id]: { ...(p[dt.id] || {}), [detail]: n } }));
+                                            const updated = { ...(damageDetails[dt.id] || {}), [detail]: n };
+                                            const maxVal = Math.max(...Object.values(updated), 0);
+                                            if (maxVal > level) setDamageLevel(dt.id, maxVal);
+                                          }} className={`w-9 h-8 rounded-[8px] border-2 text-[12px] font-bold transition-all ${dVal === n ? (n > 0 ? `${dt.color} text-white border-transparent` : "border-slate-400 bg-slate-100 text-slate-600") : "border-slate-200 text-slate-500"}`}>{n}</button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
 
               {/* Pass 2: Impact — mark affected, severity badges, floor severity edit */}
@@ -4282,7 +4702,7 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
 
               {/* Pass 3: Instructions — multi-select + bulk apply */}
               {roomPass === 3 && (() => {
-                const [selectedKeys, setSelectedKeys] = [wizSelectedRooms2, setWizSelectedRooms2];
+                const [selectedKeys, setSelectedKeys] = [wizSelectedRooms, setWizSelectedRooms];
                 const rKey2 = (fi: number, ri: number) => `${fi}-${ri}`;
                 const isSelected2 = (fi: number, ri: number) => selectedKeys.has(rKey2(fi, ri));
                 const toggleSel = (fi: number, ri: number) => setSelectedKeys(p => { const n = new Set(p); n.has(rKey2(fi, ri)) ? n.delete(rKey2(fi, ri)) : n.add(rKey2(fi, ri)); return n; });
@@ -4360,20 +4780,46 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                             const depthLabel = DEPTH_LEVELS.find(l => l.id === roomDepth)?.short || "—";
                             const overrides = roomSevOverrides[rKey] || {};
                             const sel = isSelected2(fi, ri);
+                            const hasNotes = !!(roomNotes[rKey]?.trim());
+                            const hasReasons = (roomReasonCodes[rKey]?.length || 0) > 0;
+                            const hasCodes = (roomHandlingCodes[rKey]?.length || 0) > 0;
+                            const hasQuality = !!(roomQualityCodes[rKey]);
+                            const isOriginRoom = originRoom === rKey;
+                            const photoCount = (room as any).photoCount || 0;
+                            const instructionCount = (hasNotes ? 1 : 0) + (hasReasons ? 1 : 0) + (hasCodes ? 1 : 0) + (hasQuality ? 1 : 0);
                             return (
-                              <div key={ri} className={`px-3 py-2.5 flex items-center gap-2.5 ${sel ? "bg-blue-50/60" : "hover:bg-slate-50"}`}>
-                                <button onClick={() => toggleSel(fi, ri)} className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${sel ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300"}`}>
+                              <div key={ri} onClick={() => setEditingRoom({fi, ri})} className={`px-3 py-3 flex items-start gap-2.5 cursor-pointer active:bg-blue-50 ${sel ? "bg-blue-50/60" : "hover:bg-slate-50"}`}>
+                                <button onClick={(e) => { e.stopPropagation(); toggleSel(fi, ri); }} className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 ${sel ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300"}`}>
                                   {sel && <span className="text-[10px] font-bold">✓</span>}
                                 </button>
-                                <button onClick={() => setEditingRoom({fi, ri})} className="flex-1 text-left text-[14px] font-semibold text-slate-800">{room.name}</button>
-                                <span className="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] font-bold">{depthLabel}</span>
-                                {activeDamage.map(([code, level]) => {
-                                  const dt = DAMAGE_TYPES.find(d => d.id === code);
-                                  if (!dt) return null;
-                                  const roomLevel = overrides[code] ?? floorSevOverrides[fi]?.[code] ?? level;
-                                  return <span key={code} className={`rounded-full ${dt.color} px-1.5 py-0.5 text-[10px] font-bold text-white`}>{dt.label[0]}{roomLevel}</span>;
-                                })}
-                                {(roomHandlingCodes[rKey]?.length || 0) > 0 && <span className="rounded-full bg-blue-100 text-blue-700 px-1.5 py-0.5 text-[9px] font-bold">{roomHandlingCodes[rKey].length}</span>}
+                                <div className="flex-1 text-left min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[14px] font-semibold text-slate-800 truncate">{room.name}</span>
+                                    {isOriginRoom && <span className="rounded-full bg-red-100 text-red-600 px-1.5 py-0.5 text-[9px] font-bold shrink-0">Origin</span>}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                    <span className="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] font-bold">{depthLabel}</span>
+                                    {activeDamage.map(([code, level]) => {
+                                      const dt = DAMAGE_TYPES.find(d => d.id === code);
+                                      if (!dt) return null;
+                                      const roomLevel = overrides[code] ?? floorSevOverrides[fi]?.[code] ?? level;
+                                      return <span key={code} className={`rounded-full ${dt.color} px-1.5 py-0.5 text-[10px] font-bold text-white`}>{dt.label[0]}{roomLevel}</span>;
+                                    })}
+                                    {hasCodes && <span className="rounded-full bg-blue-100 text-blue-700 px-1.5 py-0.5 text-[9px] font-bold">{roomHandlingCodes[rKey].length} codes</span>}
+                                    {hasQuality && <span className="rounded-full bg-purple-100 text-purple-700 px-1.5 py-0.5 text-[9px] font-bold">{roomQualityCodes[rKey]}</span>}
+                                  </div>
+                                </div>
+                                {/* Status icons — photos + instructions */}
+                                <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                                  <div className={`flex items-center gap-0.5 rounded-full px-2 py-1 text-[10px] font-bold ${photoCount > 0 ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"}`}>
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+                                    {photoCount > 0 && <span>{photoCount}</span>}
+                                  </div>
+                                  <div className={`flex items-center gap-0.5 rounded-full px-2 py-1 text-[10px] font-bold ${instructionCount > 0 ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-400"}`}>
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    {instructionCount > 0 && <span>{instructionCount}</span>}
+                                  </div>
+                                </div>
                               </div>
                             );
                           })}
@@ -4389,68 +4835,118 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
         </div>
       </div>
 
-      {/* Interview bottom sheet */}
-      {showInterview && (
+      {/* Interview bottom sheet — replaced by Interview tab, kept for backward compat */}
+      {false && showInterview && (
         <>
-          <div className="absolute inset-0 bg-black/30 z-20" onClick={() => setShowInterview(false)} />
-          <div className="absolute bottom-0 left-0 right-0 z-30 bg-white rounded-t-[22px] shadow-2xl" style={{ maxHeight: "85%", boxShadow: "0 -8px 30px rgba(0,0,0,.15)" }}>
+          <div className="fixed inset-0 bg-black/30 z-[100]" onClick={() => setShowInterview(false)} />
+          <div className="fixed bottom-0 left-1/2 z-[101] bg-white rounded-t-[22px] shadow-2xl w-[393px] max-w-full" style={{ maxHeight: "85vh", boxShadow: "0 -8px 30px rgba(0,0,0,.15)", transform: "translateX(-50%)" }}>
             <div className="flex flex-col items-center pt-2 pb-1"><div className="w-10 h-1 rounded-full bg-slate-300" /></div>
-            <div className="px-4 pb-2 flex items-center justify-between">
+            <div className="px-5 pb-3 flex items-center justify-between">
               <div>
-                <span className="text-[15px] font-bold text-slate-800">Interview</span>
-                <span className="text-[12px] text-slate-500 ml-2">{interviewAnswered}/{interviewTotal} critical</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[17px] font-bold text-slate-900">Interview</span>
+                  <span className="rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-[11px] font-bold">{interviewAnswered}/{interviewTotal}</span>
+                </div>
+                <div className="text-[12px] text-slate-400 mt-0.5">Ask the customer these questions during or before the initial visit.</div>
               </div>
-              <button onClick={() => setShowInterview(false)} className="rounded-[10px] border border-slate-200 px-3 py-1.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50">Done</button>
+              <button onClick={() => setShowInterview(false)} className="rounded-full bg-violet-600 px-4 py-2 text-[13px] font-bold text-white hover:bg-violet-700">Done</button>
             </div>
-            <div className="overflow-auto border-t border-slate-100" style={{ maxHeight: "calc(85vh - 60px)" }}>
+            <div className="overflow-auto pb-8" style={{ maxHeight: "calc(85vh - 70px)" }}>
               {INTERVIEW_SECTIONS.map(section => {
                 const answer = interviewAnswers[section.id];
                 const noteKey = `${section.id}_note`;
                 const noteVal = (interviewAnswers[noteKey] as string) || "";
                 const hasAnswer = answer !== undefined && answer !== null && answer !== "" && (!Array.isArray(answer) || answer.length > 0);
                 return (
-                  <div key={section.id} className="px-4 py-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-[13px] font-semibold ${section.critical ? "text-slate-800" : "text-slate-600"}`}>{section.title}</span>
-                      {section.critical && <span className="text-[9px] font-bold text-red-400">REQUIRED</span>}
+                  <div key={section.id} className="px-5 py-4 border-b border-slate-100">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className={`text-[12px] font-extrabold uppercase tracking-[1px] ${section.critical ? "text-violet-600" : "text-slate-400"}`}>{section.title}</span>
+                      {section.critical && !hasAnswer && <span className="text-[10px] font-bold text-orange-500">Required</span>}
+                      {hasAnswer && <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>}
                     </div>
                     {section.type === "boolean" && (
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
+                      <div className="space-y-2.5">
+                        <div className="flex gap-2.5">
                           {["Yes", "No"].map(opt => (
-                            <button key={opt} onClick={() => setInterviewAnswers(p => ({ ...p, [section.id]: opt === "Yes" }))} className={`flex-1 rounded-[10px] border-2 py-2.5 text-[13px] font-bold transition-all ${answer === (opt === "Yes") ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{opt}</button>
+                            <button key={opt} onClick={() => updateInterview(p => ({ ...p, [section.id]: opt === "Yes" }))} className={`flex-1 rounded-full border py-2.5 text-[13px] font-bold transition-all ${answer === (opt === "Yes") ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{opt}</button>
                           ))}
                         </div>
                         {answer === true && (
-                          <input value={noteVal} onChange={e => setInterviewAnswers(p => ({ ...p, [noteKey]: e.target.value }))} placeholder="Details (optional)..." className="w-full rounded-[8px] border border-slate-200 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-blue-400" />
+                          <input value={noteVal} onChange={e => updateInterview(p => ({ ...p, [noteKey]: e.target.value }))} placeholder="Details (optional)..." className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-[13px] text-slate-700 outline-none focus:border-violet-400" />
                         )}
                       </div>
                     )}
                     {section.type === "single" && section.options && (
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1.5">
+                      <div className="space-y-2.5">
+                        <div className="flex flex-wrap gap-2">
                           {section.options.map(opt => (
-                            <button key={opt} onClick={() => setInterviewAnswers(p => ({ ...p, [section.id]: p[section.id] === opt ? "" : opt }))} className={`rounded-[10px] border-2 px-3.5 py-2 text-[12px] font-bold transition-all ${answer === opt ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{opt}</button>
+                            <button key={opt} onClick={() => updateInterview(p => ({ ...p, [section.id]: p[section.id] === opt ? "" : opt }))} className={`rounded-full border px-4 py-2 text-[13px] font-semibold transition-all ${answer === opt ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{opt}</button>
                           ))}
                         </div>
                         {answer && (
-                          <input value={noteVal} onChange={e => setInterviewAnswers(p => ({ ...p, [noteKey]: e.target.value }))} placeholder="Details (optional)..." className="w-full rounded-[8px] border border-slate-200 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-blue-400" />
+                          <input value={noteVal} onChange={e => updateInterview(p => ({ ...p, [noteKey]: e.target.value }))} placeholder="Details (optional)..." className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-[13px] text-slate-700 outline-none focus:border-violet-400" />
                         )}
                       </div>
                     )}
                     {section.type === "multi" && section.options && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {section.options.map(opt => {
-                          const selected = Array.isArray(answer) && answer.includes(opt);
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          {section.options.map(opt => {
+                            const selected = Array.isArray(answer) && answer.includes(opt);
+                            return (
+                              <button key={opt} onClick={() => updateInterview(p => {
+                                const curr = Array.isArray(p[section.id]) ? (p[section.id] as string[]) : [];
+                                return { ...p, [section.id]: selected ? curr.filter(o => o !== opt) : [...curr, opt] };
+                              })} className={`rounded-full border px-4 py-2 text-[13px] font-semibold transition-all ${selected ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{opt}</button>
+                            );
+                          })}
+                        </div>
+                        {/* Living section: address inputs for each selected non-home option */}
+                        {section.id === "living" && Array.isArray(answer) && answer.length > 0 && (() => {
+                          const addrs = (interviewAnswers.livingAddresses || {}) as Record<string, string>;
+                          const needsAddress = answer.filter((a: string) => a !== "Their Home");
+                          if (!needsAddress.length) return null;
                           return (
-                            <button key={opt} onClick={() => setInterviewAnswers(p => {
-                              const curr = Array.isArray(p[section.id]) ? (p[section.id] as string[]) : [];
-                              return { ...p, [section.id]: selected ? curr.filter(o => o !== opt) : [...curr, opt] };
-                            })} className={`rounded-[10px] border-2 px-3.5 py-2 text-[12px] font-bold transition-all ${selected ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{opt}</button>
+                            <div className="space-y-2 pt-1">
+                              {needsAddress.map((loc: string) => (
+                                <div key={loc} className="flex items-center gap-2">
+                                  <span className="text-[11px] font-bold text-violet-500 w-16 shrink-0 text-right">{loc}</span>
+                                  <input
+                                    value={addrs[loc] || ""}
+                                    onChange={e => updateInterview(p => ({ ...p, livingAddresses: { ...((p.livingAddresses || {}) as Record<string, string>), [loc]: e.target.value } }))}
+                                    placeholder={`${loc} address...`}
+                                    className="flex-1 rounded-[10px] border border-slate-200 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-violet-400"
+                                  />
+                                </div>
+                              ))}
+                            </div>
                           );
-                        })}
+                        })()}
                       </div>
                     )}
+                    {/* Delivery section: final delivery address selector */}
+                    {section.id === "delivery" && answer && (() => {
+                      const livingSelections = Array.isArray(interviewAnswers.living) ? (interviewAnswers.living as string[]) : [];
+                      const addrs = (interviewAnswers.livingAddresses || {}) as Record<string, string>;
+                      const deliveryAddr = (interviewAnswers.deliveryAddress || "Primary") as string;
+                      // Build address options: Primary + any living selections that have addresses
+                      const addrOptions = ["Primary", ...livingSelections.filter((l: string) => l !== "Their Home" && addrs[l])];
+                      return (
+                        <div className="mt-3 rounded-[12px] border border-violet-200 bg-violet-50/50 px-3.5 py-3 space-y-2">
+                          <div className="text-[11px] font-bold text-violet-600 uppercase tracking-[.5px]">Final Delivery Address</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {addrOptions.map(opt => (
+                              <button key={opt} onClick={() => updateInterview(p => ({ ...p, deliveryAddress: opt }))} className={`rounded-full border px-3 py-1.5 text-[12px] font-bold transition-all ${deliveryAddr === opt ? "border-violet-500 bg-violet-600 text-white" : "border-violet-200 text-violet-600 hover:border-violet-400"}`}>
+                                {opt === "Primary" ? "Primary Address" : `${opt} Address`}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="text-[10px] text-violet-400">
+                            {deliveryAddr === "Primary" ? "Delivering back to the primary/loss address" : `Delivering to the ${deliveryAddr.toLowerCase()} address`}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -4460,48 +4956,53 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
       )}
 
       {/* Bulk edit bottom sheet */}
-      {bulkEditing && wizSelectedRooms2.size > 0 && (() => {
-        const selKeys = Array.from(wizSelectedRooms2);
+      {bulkEditing && wizSelectedRooms.size > 0 && (() => {
+        const selKeys = Array.from(wizSelectedRooms);
         const selRoomNames = selKeys.map(k => { const [fi, ri] = k.split("-").map(Number); return homeRooms[fi]?.rooms[ri]?.name || ""; }).filter(Boolean);
         const applyToAll = (fn: (rKey: string) => void) => selKeys.forEach(fn);
+        // Track what's been applied in this bulk session — use first selected room as reference
+        const refKey = selKeys[0];
+        const refDepth = roomDepthOverrides[refKey] ?? depthLevel;
+        const refHandling = roomHandlingCodes[refKey] || [];
         return (
         <>
-          <div className="absolute inset-0 bg-black/30 z-20" onClick={() => setBulkEditing(false)} />
-          <div className="absolute bottom-0 left-0 right-0 z-30 bg-white rounded-t-[22px] shadow-2xl" style={{ maxHeight: "75%", boxShadow: "0 -8px 30px rgba(0,0,0,.15)" }}>
-            <div className="flex flex-col items-center pt-2 pb-1"><div className="w-10 h-1 rounded-full bg-slate-300" /></div>
-            <div className="px-4 pb-2 flex items-center justify-between">
+          <div className="fixed inset-0 bg-black/30 z-[100]" onClick={() => setBulkEditing(false)} />
+          <div className="fixed bottom-0 left-1/2 z-[101] bg-white rounded-t-[22px] shadow-2xl w-[393px] max-w-full" style={{ maxHeight: "85vh", boxShadow: "0 -8px 30px rgba(0,0,0,.15)", transform: "translateX(-50%)" }}>
+            <div className="flex flex-col items-center pt-2.5 pb-1"><div className="w-10 h-1 rounded-full bg-slate-300" /></div>
+            <div className="px-5 pb-3 flex items-center justify-between">
               <div>
-                <div className="text-[15px] font-bold text-slate-800">{selRoomNames.length} rooms</div>
-                {selRoomNames.length <= 4 && <div className="text-[11px] text-slate-500 mt-0.5">{selRoomNames.join(", ")}</div>}
+                <div className="text-[17px] font-bold text-slate-800">{selRoomNames.length} rooms</div>
+                {selRoomNames.length <= 4 && <div className="text-[12px] text-slate-500 mt-0.5">{selRoomNames.join(", ")}</div>}
               </div>
-              <button onClick={() => setBulkEditing(false)} className="rounded-[10px] border border-slate-200 px-3 py-1.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50">Done</button>
+              <button onClick={() => setBulkEditing(false)} className="rounded-[12px] border border-slate-200 px-4 py-2 text-[14px] font-bold text-slate-600 hover:bg-slate-50 active:bg-slate-100">Done</button>
             </div>
-            <div className="overflow-auto border-t border-slate-100" style={{ maxHeight: "calc(75vh - 60px)" }}>
+            <div className="overflow-auto border-t border-slate-100 pb-6" style={{ maxHeight: "calc(85vh - 70px)" }}>
               {/* Cleaning Instructions */}
-              <div className="px-4 py-3 border-b border-slate-100">
-                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Cleaning Instructions</div>
-                <div className="flex gap-1.5">
+              <div className="px-5 py-4 border-b border-slate-100">
+                <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-3">Cleaning Instructions</div>
+                <div className="flex gap-2">
                   {DEPTH_LEVELS.map(lvl => (
-                    <button key={lvl.id} onClick={() => applyToAll(rKey => setRoomDepthOverrides(p => ({ ...p, [rKey]: lvl.id })))} className={`flex-1 rounded-[8px] border-2 py-1.5 text-center transition-all ${depthLevel === lvl.id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}>
-                      <div className={`text-[10px] font-bold ${depthLevel >= lvl.id ? "text-blue-700" : "text-slate-500"}`}>{lvl.id}</div>
-                      <div className={`text-[7px] font-semibold ${depthLevel >= lvl.id ? "text-blue-500" : "text-slate-400"}`}>{lvl.short}</div>
+                    <button key={lvl.id} onClick={() => applyToAll(rKey => setRoomDepthOverrides(p => ({ ...p, [rKey]: lvl.id })))} className={`flex-1 rounded-[10px] border-2 py-2.5 text-center transition-all active:scale-95 ${refDepth === lvl.id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}>
+                      <div className={`text-[13px] font-bold ${refDepth === lvl.id ? "text-blue-700" : "text-slate-500"}`}>{lvl.id}</div>
+                      <div className={`text-[9px] font-semibold ${refDepth === lvl.id ? "text-blue-500" : "text-slate-400"}`}>{lvl.short}</div>
                     </button>
                   ))}
                 </div>
               </div>
               {/* Severity */}
               {activeDamage.length > 0 && (
-                <div className="px-4 py-3 border-b border-slate-100 space-y-2.5">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px]">Severity</div>
+                <div className="px-5 py-4 border-b border-slate-100 space-y-3">
+                  <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[.7px]">Severity</div>
                   {activeDamage.map(([code, level]) => {
                     const dt = DAMAGE_TYPES.find(d => d.id === code);
                     if (!dt) return null;
+                    const refSev = roomSevOverrides[refKey]?.[code] ?? level;
                     return (
                       <div key={code} className="flex items-center justify-between">
-                        <span className="text-[13px] font-semibold text-slate-700">{dt.icon} {dt.label}</span>
-                        <div className="flex gap-1.5">
+                        <span className="text-[14px] font-semibold text-slate-700">{dt.icon} {dt.label}</span>
+                        <div className="flex gap-2">
                           {[0, 1, 2, 3].map(n => (
-                            <button key={n} onClick={() => applyToAll(rKey => setRoomSevOverrides(p => ({ ...p, [rKey]: { ...(p[rKey] || {}), [code]: n } })))} className={`w-10 h-9 rounded-[8px] border-2 text-[13px] font-bold transition-all ${level === n ? (n > 0 ? `${dt.color} text-white border-transparent` : "border-slate-400 bg-slate-100 text-slate-600") : "border-slate-200 text-slate-500"}`}>{n}</button>
+                            <button key={n} onClick={() => applyToAll(rKey => setRoomSevOverrides(p => ({ ...p, [rKey]: { ...(p[rKey] || {}), [code]: n } })))} className={`w-11 h-10 rounded-[10px] border-2 text-[14px] font-bold transition-all active:scale-95 ${refSev === n ? (n > 0 ? `${dt.color} text-white border-transparent` : "border-slate-400 bg-slate-100 text-slate-600") : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{n}</button>
                           ))}
                         </div>
                       </div>
@@ -4510,42 +5011,44 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                 </div>
               )}
               {/* Handling codes */}
-              <div className="px-4 py-3 border-b border-slate-100">
-                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Handling Codes</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {HANDLING_CODES_V2.map(hc => (
+              <div className="px-5 py-4 border-b border-slate-100">
+                <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-3">Handling Codes</div>
+                <div className="flex flex-wrap gap-2">
+                  {HANDLING_CODES_SCOPE.map(hc => {
+                    const isActive = refHandling.includes(hc.code);
+                    return (
                     <button key={hc.code} onClick={() => applyToAll(rKey => setRoomHandlingCodes(p => {
                       const curr = p[rKey] || [];
-                      return { ...p, [rKey]: curr.includes(hc.code) ? curr : [...curr, hc.code] };
-                    }))} title={hc.desc} className="rounded-full border-2 px-3 py-1.5 text-[12px] font-bold transition-all border-slate-200 text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700">{hc.code}</button>
-                  ))}
+                      return { ...p, [rKey]: curr.includes(hc.code) ? curr.filter(c => c !== hc.code) : [...curr, hc.code] };
+                    }))} title={hc.desc} className={`rounded-full border-2 px-4 py-2 text-[13px] font-bold transition-all active:scale-95 ${isActive ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"}`}>{hc.code}</button>
+                  );})}
                 </div>
               </div>
               {/* Services */}
-              <div className="px-4 py-3 border-b border-slate-100">
-                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Services</div>
-                <div className="flex flex-wrap gap-1.5">
+              <div className="px-5 py-4 border-b border-slate-100">
+                <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-3">Services</div>
+                <div className="flex flex-wrap gap-2">
                   {SERVICES.map(s => (
-                    <button key={s} onClick={() => setSelectedServices(p => ({ ...p, [s]: !p[s] }))} className={`rounded-full border-2 px-3 py-1.5 text-[12px] font-semibold transition-all ${selectedServices[s] ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{s}</button>
+                    <button key={s} onClick={() => setSelectedServices(p => ({ ...p, [s]: !p[s] }))} className={`rounded-full border-2 px-4 py-2 text-[13px] font-semibold transition-all active:scale-95 ${selectedServices[s] ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{s}</button>
                   ))}
                 </div>
               </div>
               {/* Room instructions text — appears on SDS cover photo */}
-              <div className="px-4 py-3">
-                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-2">Room Instructions</div>
-                <textarea value={(() => { const first = selKeys[0]; return roomNotes[first] || ""; })()} onChange={e => applyToAll(rKey => setRoomNotes(p => ({ ...p, [rKey]: e.target.value })))} rows={3} placeholder="Instructions for these rooms — will appear on SDS cover photo..." className="w-full rounded-[10px] border-2 border-slate-200 px-3 py-2.5 text-[13px] outline-none focus:border-blue-400 resize-none bg-white" />
+              <div className="px-5 py-4">
+                <div className="text-[12px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-3">Room Instructions</div>
+                <textarea value={(() => { const first = selKeys[0]; return roomNotes[first] || ""; })()} onChange={e => applyToAll(rKey => setRoomNotes(p => ({ ...p, [rKey]: e.target.value })))} rows={3} placeholder="Instructions for these rooms — will appear on SDS cover photo..." className="w-full rounded-[12px] border-2 border-slate-200 px-4 py-3 text-[14px] outline-none focus:border-blue-400 resize-none bg-white" />
                 {/* Summary preview */}
                 {(() => {
-                  const depth = DEPTH_LEVELS.find(l => l.id === depthLevel)?.short || "";
-                  const sevCodes = activeDamage.map(([code, level]) => `${DAMAGE_TYPES.find(d => d.id === code)?.label[0]}${level}`).join(" ");
-                  const hCodes = (() => { const first = selKeys[0]; return (roomHandlingCodes[first] || []).join(", "); })();
+                  const depth = DEPTH_LEVELS.find(l => l.id === refDepth)?.short || "";
+                  const sevCodes = activeDamage.map(([code, level]) => { const o = roomSevOverrides[refKey]?.[code] ?? level; return `${DAMAGE_TYPES.find(d => d.id === code)?.label[0]}${o}`; }).join(" ");
+                  const hCodes = refHandling.join(", ");
                   const svcs = Object.entries(selectedServices).filter(([,v]) => v).map(([k]) => k).join(", ");
                   const note = roomNotes[selKeys[0]] || "";
                   const hasSummary = depth || sevCodes || hCodes || svcs || note;
                   return hasSummary ? (
-                    <div className="mt-2 rounded-[10px] bg-slate-50 border border-slate-200 px-3 py-2">
-                      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-1">SDS Preview</div>
-                      <div className="text-[12px] text-slate-700 space-y-0.5">
+                    <div className="mt-3 rounded-[12px] bg-slate-50 border border-slate-200 px-4 py-3">
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-[.7px] mb-1">SDS Preview</div>
+                      <div className="text-[13px] text-slate-700 space-y-0.5">
                         {depth && <div><span className="font-bold">Cleaning:</span> {depth}</div>}
                         {sevCodes && <div><span className="font-bold">Severity:</span> {sevCodes}</div>}
                         {hCodes && <div><span className="font-bold">Handling:</span> {hCodes}</div>}
@@ -4578,8 +5081,8 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
 
         return (
         <>
-          <div className="absolute inset-0 bg-black/30 z-20" onClick={() => setEditingRoom(null)} />
-          <div className="absolute bottom-0 left-0 right-0 z-30 bg-white rounded-t-[22px] shadow-2xl" style={{ maxHeight: "80%", boxShadow: "0 -8px 30px rgba(0,0,0,.15)" }}>
+          <div className="fixed inset-0 bg-black/30 z-[100]" onClick={() => setEditingRoom(null)} />
+          <div className="fixed bottom-0 left-1/2 z-[101] bg-white rounded-t-[22px] shadow-2xl w-[393px] max-w-full" style={{ maxHeight: "85vh", boxShadow: "0 -8px 30px rgba(0,0,0,.15)", transform: "translateX(-50%)" }}>
             <div className="flex flex-col items-center pt-2 pb-1"><div className="w-10 h-1 rounded-full bg-slate-300" /></div>
             {/* Header — room name + status chips + done */}
             <div className="px-4 pb-3 flex items-center gap-2">
@@ -4597,7 +5100,7 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
             </div>
 
             {/* Scrollable sections */}
-            <div className="overflow-auto border-t border-slate-100" style={{ maxHeight: "calc(80vh - 80px)" }}>
+            <div className="overflow-auto border-t border-slate-100 pb-6" style={{ maxHeight: "calc(85vh - 80px)" }}>
               {room.affected && (<>
                 {/* Cleaning + Severity — always visible */}
                 <div className="px-4 py-3 border-b border-slate-100 space-y-3">
@@ -4690,7 +5193,7 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                     <button onClick={() => setOriginRoom(originRoom === rKey ? "" : rKey)} className={`rounded-full border-2 px-3 py-1 text-[11px] font-bold transition-all ${originRoom === rKey ? "border-red-500 bg-red-50 text-red-700" : "border-slate-200 text-slate-500"}`}>{originRoom === rKey ? "Origin ✓" : "Origin"}</button>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {HANDLING_CODES_V2.map(hc => (
+                    {HANDLING_CODES_SCOPE.map(hc => (
                       <button key={hc.code} onClick={() => setRoomHandlingCodes(p => {
                         const curr = p[rKey] || [];
                         return { ...p, [rKey]: curr.includes(hc.code) ? curr.filter(c => c !== hc.code) : [...curr, hc.code] };
@@ -4699,7 +5202,7 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
                   </div>
                   {codes.length > 0 && (
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                      {codes.map(c => { const m = HANDLING_CODES_V2.find(h => h.code === c); return m ? <span key={c} className="text-[10px] text-blue-600"><span className="font-bold">{c}</span> {m.desc}</span> : null; })}
+                      {codes.map(c => { const m = HANDLING_CODES_SCOPE.find(h => h.code === c); return m ? <span key={c} className="text-[10px] text-blue-600"><span className="font-bold">{c}</span> {m.desc}</span> : null; })}
                     </div>
                   )}
                 </div>
@@ -4715,17 +5218,19 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
         );
       })()}
 
-      {/* Footer */}
-      <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 bg-white/95 backdrop-blur-sm flex justify-between gap-3">
+      {/* Scope tab footer — step navigation (only when scope tab active) */}
+      {activeTab === "scope" && !showWalkthrough && (
+      <div className="flex-shrink-0 border-t border-slate-200 bg-white/95 backdrop-blur-sm">
+        <div className="px-4 py-2 flex items-center justify-between gap-2">
         {step > 1 || (step === 4 && roomPass > 1) ? (
-          <button onClick={() => { if (step === 4 && roomPass > 1) { setRoomPass((roomPass - 1) as 1 | 2 | 3); } else setStep(step - 1); }} className="rounded-[14px] border border-slate-200 bg-white px-5 py-3.5 text-[14px] font-bold text-slate-600 hover:bg-slate-50 shadow-sm">Back</button>
+          <button onClick={() => { if (step === 4 && roomPass > 1) { setRoomPass((roomPass - 1) as 1 | 2 | 3); } else setStep(step - 1); }} className="rounded-[12px] border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-50 shadow-sm">Back</button>
         ) : <div />}
         {step < totalSteps ? (
-          <button onClick={advanceStep} disabled={!canAdvance} className="rounded-[14px] bg-blue-600 px-6 py-3.5 text-[16px] font-bold text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 shadow-sm transition-all" style={{ boxShadow: "0 8px 18px rgba(37,99,235,.22)" }}>
+          <button onClick={advanceStep} disabled={!canAdvance} className="rounded-[14px] bg-blue-600 px-5 py-2.5 text-[14px] font-bold text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 shadow-sm transition-all">
             Next
           </button>
         ) : roomPass < 3 ? (
-          <button onClick={() => setRoomPass((roomPass + 1) as 2 | 3)} className="rounded-[14px] bg-blue-600 px-6 py-3.5 text-[16px] font-bold text-white hover:bg-blue-700 shadow-sm transition-all" style={{ boxShadow: "0 8px 18px rgba(37,99,235,.22)" }}>
+          <button onClick={() => setRoomPass((roomPass + 1) as 2 | 3)} className="rounded-[14px] bg-blue-600 px-5 py-2.5 text-[14px] font-bold text-white hover:bg-blue-700 shadow-sm transition-all">
             Next
           </button>
         ) : (
@@ -4800,6 +5305,8 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
               ...(interviewAnswers.packout ? { packoutSummary: interviewAnswers.packout as string[] } : {}),
               ...(interviewAnswers.considerations ? { sdsConsiderations: interviewAnswers.considerations as string[] } : {}),
               ...(interviewAnswers.suggestedGroups ? { suggestedGroups: interviewAnswers.suggestedGroups as string[] } : {}),
+              ...(interviewAnswers.interests ? { customerInterests: interviewAnswers.interests as string[] } : {}),
+              ...(interviewAnswers.upcomingEvents ? { customerUpcomingEvents: interviewAnswers.upcomingEvents as string[] } : {}),
               // Condition flags
               ...(Array.isArray(interviewAnswers.conditions) ? {
                 damageWasWet: (interviewAnswers.conditions as string[]).includes("Still Wet"),
@@ -4818,83 +5325,302 @@ const ScopeWizardV2 = ({ onClose, orderData, onOrderUpdate }: { onClose: () => v
               // Handling codes at order level
               handlingCodes: [...new Set(Object.values(roomHandlingCodes).flat())],
             });
-            // Write scope data to localStorage for Photo Scope — both keys
-            try {
-              const scopeFloors = homeRooms.map((f, fi) => ({
-                name: f.name,
-                rooms: f.rooms.map((r, ri) => {
-                  const rk = `${fi}-${ri}`;
-                  return {
-                    name: r.name,
-                    affected: r.affected,
-                    severity: roomSevOverrides[rk] || {},
-                    reasonCodes: roomReasonCodes[rk] || [],
-                    departments: roomDepartments[rk] || [],
-                    handlingCodes: roomHandlingCodes[rk] || [],
-                    qualityCode: roomQualityCodes[rk] || "",
-                    depth: roomDepthOverrides[rk] ?? depthLevel,
-                    notes: roomNotes[rk] || "",
-                    isOrigin: originRoom === rk,
-                  };
-                }),
-              }));
-              // Full scope data
-              localStorage.setItem("noe-scope-wizard-data", JSON.stringify({
-                buildingType: propType, workScope, unitNumber, unitFloorLevel, accessDetails,
-                damageTypes, damageDetails, uniformSeverity,
-                floors: scopeFloors,
-                services: Object.entries(selectedServices).filter(([, v]) => v).map(([k]) => k),
-                depthLevel, timestamp: Date.now(),
-              }));
-              // Photo Scope compatible format — rooms as flat list + severity codes
-              const affectedRoomNames = homeRooms.flatMap(f => f.rooms.filter(r => r.affected).map(r => r.name));
-              const sevCodes = activeDamage.map(([code, level]) => {
-                const dt = DAMAGE_TYPES.find(d => d.id === code);
-                return dt ? `${dt.label[0]}${level}` : "";
-              }).filter(Boolean);
-              localStorage.setItem("noe-photo-scope-context", JSON.stringify({
-                orderName: orderData?.orderName || "",
-                customerName: "",
-                address: "",
-                lossType: activeDamage[0]?.[0] || "",
-                orderTypes: activeDamage.map(([code]) => DAMAGE_TYPES.find(d => d.id === code)?.label || code),
-                rooms: affectedRoomNames.length ? affectedRoomNames : ["Kitchen", "Living", "Bedroom", "Bathroom"],
-                severityCodes: sevCodes,
-                handlingCodes: Object.values(roomHandlingCodes).flat(),
-                services: Object.entries(selectedServices).filter(([, v]) => v).map(([k]) => k),
-                scopeWizardFloors: scopeFloors,
-                interview: interviewAnswers,
-                timestamp: Date.now(),
-              }));
-            } catch {}
-            setShowWalkthrough(true);
-          }} className="rounded-[14px] bg-blue-600 px-5 py-3.5 text-[16px] font-bold text-white hover:bg-blue-700 shadow-sm" style={{ boxShadow: "0 8px 18px rgba(37,99,235,.22)" }}>Start Walkthrough</button>
+            // Sync complete — close scope
+            onClose();
+          }} className="rounded-[14px] bg-green-600 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-green-700 shadow-sm">Save & Close</button>
         )}
+        </div>
       </div>
+      )}
 
-      {/* Photo Scope walkthrough — embedded after wizard */}
+      </div>{/* end scope tab wrapper */}
+
+      {/* ═══ BOTTOM TAB BAR ═══ */}
+      {!showWalkthrough && (
+      <div className="flex-shrink-0 border-t border-slate-200 bg-white">
+        <div className="flex">
+          {([
+            { id: "order" as const, label: "Order", icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" /></svg> },
+            { id: "interview" as const, label: "Interview", badge: `${interviewAnswered}/${interviewTotal}`, icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /></svg> },
+            { id: "scope" as const, label: "Scope", icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.04l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg> },
+            { id: "report" as const, label: "Report", icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg> },
+          ]).map(tab => {
+            const isActive = activeTab === tab.id;
+            const color = tab.id === "interview" ? (interviewAnswered === interviewTotal ? "text-green-600" : "text-violet-600") : isActive ? "text-blue-600" : "text-slate-400";
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors ${isActive ? "border-t-2 border-blue-600 -mt-[2px]" : ""}`}>
+                <div className={color}>{tab.icon}</div>
+                <span className={`text-[10px] font-bold ${color}`}>{tab.label}</span>
+                {tab.badge && <span className={`text-[8px] font-bold ${color}`}>{tab.badge}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      )}
+
+      {/* Persistent camera input — always mounted when walkthrough is active */}
       {showWalkthrough && (
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file || !walkthroughRoom) return;
+            const rKey = `${walkthroughRoom.fi}-${walkthroughRoom.ri}`;
+            const isAffected = homeRooms[walkthroughRoom.fi]?.rooms[walkthroughRoom.ri]?.affected;
+            const reader = new FileReader();
+            reader.onload = () => {
+              setRoomPhotos(p => ({ ...p, [rKey]: [...(p[rKey] || []), { src: reader.result as string, note: isAffected ? "" : "Not Affected", reason: isAffected ? "" : "Condition", ts: Date.now() }] }));
+            };
+            reader.readAsDataURL(file);
+            e.target.value = "";
+          }}
+        />
+      )}
+
+      {/* Photo Walkthrough — native, no iframe */}
+      {showWalkthrough && !walkthroughRoom && (() => {
+        const totalPhotos = Object.values(roomPhotos).reduce((s, arr) => s + arr.length, 0);
+        // Show all rooms (not just affected) so Photos works before Impact step
+        const displayFloors = homeRooms.map((f, fi) => ({ ...f, fi, displayRooms: f.rooms.map((r, ri) => ({ ...r, ri })) })).filter(f => f.displayRooms.length > 0);
+        return (
         <div className="absolute inset-0 z-50 bg-white flex flex-col rounded-[44px] overflow-hidden">
-          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 z-10">
-            <button onClick={() => setShowWalkthrough(false)} className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100">
+          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3">
+            <button onClick={() => { stopCamera(); setShowWalkthrough(false); }} className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100">
               <span className="text-sm">←</span>
             </button>
-            <span className="flex-1 text-[15px] font-bold text-slate-800">Photo Walkthrough</span>
-            <button onClick={() => { onOrderUpdate?.({}); onClose(); }} className="rounded-full px-3 py-1.5 text-xs font-bold bg-blue-600 text-white">Done</button>
+            <span className="flex-1 text-[15px] font-bold text-slate-800">Photos</span>
+            <span className="text-[12px] font-bold text-slate-400 mr-2">{totalPhotos} photos</span>
+            <button onClick={() => { stopCamera(); setShowWalkthrough(false); }} className="rounded-full px-3 py-1.5 text-xs font-bold bg-blue-600 text-white">Done</button>
           </div>
-          <iframe src="/photo-scope.html?autostart=1" className="flex-1 w-full border-0" title="Photo Scope" />
+          <div className="flex-1 overflow-auto p-4 space-y-3">
+            {homeRooms.length === 0 ? (
+              <div className="text-center py-10 space-y-3">
+                <div className="text-[14px] font-semibold text-slate-600">No rooms yet</div>
+                <div className="text-[12px] text-slate-400">Add rooms in the Rooms step first, or generate them now.</div>
+                <button onClick={() => { generateRooms(); }} className="rounded-full bg-blue-600 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-blue-700">Generate Rooms</button>
+              </div>
+            ) : (
+              <>
+              <div className="text-[12px] text-slate-500">Tap a room to take photos. Capture damage, contents, and conditions.</div>
+              {displayFloors.map(floor => (
+              <div key={floor.fi} className="rounded-[14px] border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                  <span className="text-[13px] font-bold text-slate-800">{floor.name}</span>
+                  <span className="text-[12px] font-bold text-slate-400">{floor.displayRooms.length} rooms</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {floor.displayRooms.map(({ name, ri, affected }) => {
+                    const rKey = `${floor.fi}-${ri}`;
+                    const photos = roomPhotos[rKey] || [];
+                    const roomDepth = roomDepthOverrides[rKey] ?? depthLevel;
+                    const depthLabel = DEPTH_LEVELS.find(l => l.id === roomDepth)?.short || "";
+                    const overrides = roomSevOverrides[rKey] || {};
+                    const isOrigin = originRoom === rKey;
+                    return (
+                      <button key={ri} onClick={() => { setWalkthroughRoom({ fi: floor.fi, ri }); setTimeout(() => startCamera(), 300); }} className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-slate-50 active:bg-blue-50 transition-colors">
+                        {/* Photo count circle */}
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${photos.length > 0 ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"}`}>
+                          {photos.length > 0 ? (
+                            <span className="text-[14px] font-bold">{photos.length}</span>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.04l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
+                          )}
+                        </div>
+                        {/* Room info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[14px] font-semibold ${affected ? "text-slate-800" : "text-slate-400"}`}>{name}</span>
+                            {isOrigin && <span className="rounded-full bg-red-100 text-red-600 px-1.5 py-0.5 text-[9px] font-bold">Origin</span>}
+                            {!affected && <span className="rounded-full bg-slate-100 text-slate-400 px-1.5 py-0.5 text-[9px] font-bold">Not Affected</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {affected && depthLabel && <span className="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[9px] font-bold">{depthLabel}</span>}
+                            {affected && activeDamage.map(([code, level]) => {
+                              const dt = DAMAGE_TYPES.find(d => d.id === code);
+                              if (!dt) return null;
+                              const roomLevel = overrides[code] ?? floorSevOverrides[floor.fi]?.[code] ?? level;
+                              return <span key={code} className={`rounded-full ${dt.color} px-1.5 py-0.5 text-[9px] font-bold text-white`}>{dt.label[0]}{roomLevel}</span>;
+                            })}
+                            {photos.length > 0 && <span className="text-[10px] text-green-600 font-bold">{photos.length} photo{photos.length !== 1 ? "s" : ""}</span>}
+                          </div>
+                        </div>
+                        <svg className="w-5 h-5 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+              </>
+            )}
+          </div>
         </div>
-      )}
+        );
+      })()}
+
+      {/* Room photo capture view */}
+      {showWalkthrough && walkthroughRoom && (() => {
+        const { fi, ri } = walkthroughRoom;
+        const room = homeRooms[fi]?.rooms[ri];
+        if (!room) return null;
+        const rKey = `${fi}-${ri}`;
+        const photos = roomPhotos[rKey] || [];
+        const PHOTO_REASONS = ["Before", "During", "After", "Damage", "Contents", "Label/Tag", "Equipment", "Condition", "General"];
+        // Find next/prev affected rooms for navigation
+        const allAffected: { fi: number; ri: number; name: string }[] = [];
+        homeRooms.forEach((f, fIdx) => f.rooms.forEach((r, rIdx) => { if (r.affected) allAffected.push({ fi: fIdx, ri: rIdx, name: r.name }); }));
+        const curIdx = allAffected.findIndex(a => a.fi === fi && a.ri === ri);
+        const prevRoom = curIdx > 0 ? allAffected[curIdx - 1] : null;
+        const nextRoom = curIdx < allAffected.length - 1 ? allAffected[curIdx + 1] : null;
+
+        const openCamera = () => cameraInputRef.current?.click();
+
+        const handleShutter = () => {
+          const dataUrl = captureFromCamera();
+          if (dataUrl) {
+            setRoomPhotos(p => ({ ...p, [rKey]: [...(p[rKey] || []), { src: dataUrl, note: room.affected ? "" : "Not Affected", reason: room.affected ? "" : "Condition", ts: Date.now() }] }));
+          }
+        };
+
+        const updatePhoto = (pi: number, field: "note" | "reason", value: string) => {
+          setRoomPhotos(p => {
+            const arr = [...(p[rKey] || [])];
+            arr[pi] = { ...arr[pi], [field]: value };
+            return { ...p, [rKey]: arr };
+          });
+        };
+
+        return (
+        <div className="absolute inset-0 z-50 bg-black flex flex-col rounded-[44px] overflow-hidden">
+
+          {/* Live camera viewfinder */}
+          {cameraActive && (
+            <div className="absolute inset-0 z-10 flex flex-col bg-black">
+              <video ref={(el) => { videoRef.current = el; if (el && camStreamRef.current && !el.srcObject) { el.srcObject = camStreamRef.current; el.play().catch(() => {}); } }} autoPlay playsInline muted className="flex-1 object-cover w-full" />
+              {/* Overlay controls */}
+              <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-14 pb-2 bg-gradient-to-b from-black/60 to-transparent">
+                <button onClick={() => stopCamera()} className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-sm font-bold">×</button>
+                <div className="text-white text-[13px] font-bold">{room.name} <span className="text-white/60">#{photos.length + 1}</span></div>
+                <span className="text-[11px] text-white/60 font-bold">{curIdx + 1}/{allAffected.length}</span>
+              </div>
+              {/* Shutter + room nav */}
+              <div className="absolute bottom-0 left-0 right-0 pb-10 pt-4 bg-gradient-to-t from-black/70 to-transparent flex flex-col items-center gap-3">
+                <button onClick={handleShutter} className="w-[72px] h-[72px] rounded-full border-[4px] border-white flex items-center justify-center active:scale-90 transition-transform">
+                  <div className="w-[58px] h-[58px] rounded-full bg-white" />
+                </button>
+                <div className="flex gap-3">
+                  {prevRoom && <button onClick={() => { stopCamera(); setWalkthroughRoom({ fi: prevRoom.fi, ri: prevRoom.ri }); }} className="rounded-full bg-white/20 backdrop-blur-sm px-4 py-1.5 text-[12px] font-bold text-white">← {prevRoom.name}</button>}
+                  {nextRoom && <button onClick={() => { stopCamera(); setWalkthroughRoom({ fi: nextRoom.fi, ri: nextRoom.ri }); }} className="rounded-full bg-white/20 backdrop-blur-sm px-4 py-1.5 text-[12px] font-bold text-white">{nextRoom.name} →</button>}
+                  {!nextRoom && <button onClick={() => { stopCamera(); setWalkthroughRoom(null); }} className="rounded-full bg-green-500/80 backdrop-blur-sm px-4 py-1.5 text-[12px] font-bold text-white">Done</button>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Header */}
+          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 z-0">
+            <button onClick={() => { stopCamera(); setWalkthroughRoom(null); }} className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100">
+              <span className="text-sm">←</span>
+            </button>
+            <div className="flex-1 min-w-0">
+              <span className="text-[15px] font-bold text-slate-800">{room.name}</span>
+              <span className="text-[12px] text-slate-400 ml-2">{photos.length} photo{photos.length !== 1 ? "s" : ""}</span>
+            </div>
+            <span className="text-[11px] text-slate-400 font-bold">{curIdx + 1}/{allAffected.length}</span>
+          </div>
+
+          <div className="flex-1 overflow-auto bg-white">
+            <div className="p-4 space-y-3">
+              {/* Scope instructions for this room */}
+              {roomNotes[rKey] && (
+                <div className="rounded-[10px] bg-amber-50 border border-amber-200 px-3 py-2">
+                  <div className="text-[10px] font-semibold text-amber-600 uppercase tracking-[.7px] mb-0.5">Scope Instructions</div>
+                  <div className="text-[12px] text-amber-800">{roomNotes[rKey]}</div>
+                </div>
+              )}
+
+              {/* Photo list — each photo with reason + note inline */}
+              {photos.map((photo, pi) => (
+                <div key={photo.ts} className="rounded-[14px] border border-slate-200 bg-white overflow-hidden shadow-sm">
+                  <div className="relative">
+                    <img src={photo.src} alt={`Photo ${pi + 1}`} className="w-full aspect-video object-cover" />
+                    <button onClick={() => setRoomPhotos(p => ({ ...p, [rKey]: (p[rKey] || []).filter((_, i) => i !== pi) }))} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white text-[13px] font-bold flex items-center justify-center hover:bg-red-600 transition-colors">×</button>
+                    <div className="absolute top-2 left-2 rounded-full bg-black/60 text-white px-2.5 py-0.5 text-[11px] font-bold">#{pi + 1}</div>
+                  </div>
+                  <div className="px-3 py-2.5 space-y-2">
+                    {room.affected ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {PHOTO_REASONS.map(r => (
+                          <button key={r} onClick={() => updatePhoto(pi, "reason", photo.reason === r ? "" : r)} className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${photo.reason === r ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{r}</button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="rounded-full bg-slate-100 text-slate-500 px-2.5 py-1 text-[11px] font-bold">Not Affected</span>
+                    )}
+                    <input value={photo.note} onChange={e => updatePhoto(pi, "note", e.target.value)} placeholder={room.affected ? "Add note..." : "Additional notes..."} className="w-full rounded-[8px] border border-slate-200 px-3 py-1.5 text-[12px] text-slate-700 outline-none focus:border-blue-400" />
+                  </div>
+                </div>
+              ))}
+
+              {/* Empty state — only when camera not active */}
+              {photos.length === 0 && !cameraActive && (
+                <div className="text-center py-8">
+                  <div className="text-[32px] mb-2">📷</div>
+                  <div className="text-[14px] font-semibold text-slate-600 mb-1">No photos yet</div>
+                  <div className="text-[12px] text-slate-400">Tap the camera button to start</div>
+                  {cameraError && <div className="text-[11px] text-orange-500 mt-2">{cameraError}</div>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer — camera + file fallback + navigation */}
+          {!cameraActive && (
+          <div className="flex-shrink-0 border-t border-slate-200 bg-white">
+            <div className="px-4 pt-3 pb-1 flex justify-center gap-3">
+              <button onClick={startCamera} className="flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-[14px] font-bold text-white hover:bg-blue-700 shadow-lg active:scale-95 transition-all" style={{ boxShadow: "0 6px 16px rgba(37,99,235,.3)" }}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.04l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
+                Camera
+              </button>
+              <button onClick={openCamera} className="flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-3 text-[13px] font-bold text-slate-600 hover:bg-slate-50 active:scale-95 transition-all">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                File
+              </button>
+            </div>
+            {/* Room navigation */}
+            <div className="px-4 py-2 flex justify-between gap-3">
+              {prevRoom ? (
+                <button onClick={() => { stopCamera(); setWalkthroughRoom({ fi: prevRoom.fi, ri: prevRoom.ri }); }} className="rounded-[12px] border border-slate-200 bg-white px-4 py-2 text-[12px] font-bold text-slate-600 hover:bg-slate-50">← {prevRoom.name}</button>
+              ) : <div />}
+              {nextRoom ? (
+                <button onClick={() => { stopCamera(); setWalkthroughRoom({ fi: nextRoom.fi, ri: nextRoom.ri }); }} className="rounded-[12px] bg-slate-100 px-4 py-2 text-[12px] font-bold text-slate-700 hover:bg-slate-200">
+                  {nextRoom.name} →
+                </button>
+              ) : (
+                <button onClick={() => { stopCamera(); setWalkthroughRoom(null); }} className="rounded-[12px] bg-green-600 px-4 py-2 text-[12px] font-bold text-white hover:bg-green-700">
+                  All Done
+                </button>
+              )}
+            </div>
+          </div>
+          )}
+        </div>
+        );
+      })()}
     </div>
     </div>
   );
 };
 
-// --- V1 REMOVED — using ScopeWizardV2 ---
+// --- Scope Wizard end ---
 
 // Stub for backward compatibility
 const InstructionDemo = ({ onClose }: { onClose: () => void; orderData?: any; onOrderUpdate?: any }) => {
-  return <ScopeWizardV2 onClose={onClose} />;
+  return <ScopeWizard onClose={onClose} />;
 };
 const StartScreen = ({ onSelect }) => {
   const [showGuidelines, setShowGuidelines] = useState(false);
@@ -7133,7 +7859,7 @@ export default function App(){
   const quickNudgeShownRef = useRef(false);
   const [modeButtonFlash, setModeButtonFlash] = useState(false);
   const [showSdsPreview, setShowSdsPreview] = useState(false);
-  const [showScopeWizardMain, setShowScopeWizardMain] = useState(false);
+  const [showScope, setShowScope] = useState(false);
   const orderNameInputRef = useRef(null);
   const scheduleDateRef = useRef(null);
   const scheduleTimeRef = useRef(null);
@@ -11623,7 +12349,7 @@ export default function App(){
     if (mode === "scope") {
       setData(prev => ({ ...prev, isLead: null, eventAssignee: prev.eventAssignee || prev.currentUser || "" }));
       setEntryMode("detailed");
-      setTimeout(() => setShowScopeWizardMain(true), 200);
+      setTimeout(() => setShowScope(true), 200);
       return;
     }
     if (mode === "detailed") {
@@ -11811,18 +12537,20 @@ export default function App(){
             setShowSampleDataModal={setShowSampleDataModal}
             onOpenPresets={() => setShowPresetModal(true)}
             onOpenFieldConfig={() => setShowFieldConfig(true)}
-            onShowScopeWizard={() => { console.log("[Scope button] setting showScopeWizardMain, data.addresses:", data.addresses?.length, "addr0.buildingType:", (data.addresses?.[0] as any)?.buildingType); setShowScopeWizardMain(true); }}
+            onShowScopeWizard={() => setShowScope(true)}
             interviewPanelOpen={interviewPanelOpen}
             actionItemsOpen={actionItemsOpen}
             presetCount={testPresets.length}
         />
 
         {/* V2 Scope Wizard — renders above all content, outside entry mode blocks */}
-        {showScopeWizardMain && (
-          <ScopeWizardV2
-            onClose={() => setShowScopeWizardMain(false)}
+        {showScope && (
+          <ScopeWizard
+            onClose={() => setShowScope(false)}
             orderData={data as any}
             onOrderUpdate={(updates) => { Object.entries(updates).forEach(([k, v]) => update(k, v)); }}
+            onShowOrder={() => { setShowScope(false); setEntryMode('detailed'); }}
+            onShowSds={() => { setShowScope(false); setEntryMode('detailed'); setTimeout(() => setShowSdsPreview(true), 200); }}
           />
         )}
 
@@ -13847,6 +14575,14 @@ export default function App(){
                     update("livingTimeline", next);
                     update("livingStatus", next[0]?.type || "");
                   };
+                  const moveStay = (fromIdx: number, toIdx: number) => {
+                    if (toIdx < 0 || toIdx >= timeline.length) return;
+                    const next = [...timeline];
+                    const [moved] = next.splice(fromIdx, 1);
+                    next.splice(toIdx, 0, moved);
+                    update("livingTimeline", next);
+                    update("livingStatus", next[0]?.type || "");
+                  };
                   const DURATION_OPTIONS = ["A few days", "1-2 weeks", "1 month", "2-3 months", "6+ months", "Until repairs done"];
 
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
@@ -13862,35 +14598,40 @@ export default function App(){
                     {expanded && <div className="px-3 pb-3 space-y-3">
                       {showCoaching && <div className="text-[10px] text-slate-400">Build the sequence of where the customer will stay during repairs. Each stay becomes a delivery point on the timeline.</div>}
 
-                      {/* Current timeline sequence */}
+                      {/* Current timeline sequence — draggable */}
                       {timeline.length > 0 && <div className="space-y-2">
                         {timeline.map((stay, idx) => (
-                          <div key={stay.id} className="rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="w-5 h-5 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center">{idx + 1}</span>
-                                <span className="text-xs font-bold text-slate-700">{stay.type}</span>
+                          <div key={stay.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            {/* Header row with drag handles */}
+                            <div className="flex items-center gap-1.5 px-2 py-2 bg-slate-50/80 border-b border-slate-100">
+                              {/* Reorder buttons */}
+                              <div className="flex flex-col gap-0.5 shrink-0">
+                                <button type="button" onClick={() => moveStay(idx, idx - 1)} disabled={idx === 0} className="w-5 h-3.5 flex items-center justify-center rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 disabled:opacity-20 disabled:hover:text-slate-400 disabled:hover:bg-transparent">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+                                </button>
+                                <button type="button" onClick={() => moveStay(idx, idx + 1)} disabled={idx === timeline.length - 1} className="w-5 h-3.5 flex items-center justify-center rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 disabled:opacity-20 disabled:hover:text-slate-400 disabled:hover:bg-transparent">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                </button>
                               </div>
-                              <button type="button" onClick={() => removeStay(stay.id)} className="text-slate-400 hover:text-rose-500 text-xs">×</button>
+                              <span className="w-5 h-5 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
+                              <span className="text-xs font-bold text-slate-700 flex-1">{stay.type}</span>
+                              {idx === timeline.length - 1 && <span className="rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-[8px] font-bold uppercase">Final</span>}
+                              <button type="button" onClick={() => removeStay(stay.id)} className="w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 text-xs font-bold shrink-0">×</button>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <div className="text-[9px] font-bold text-slate-400 mb-0.5">How long?</div>
-                                <select value={stay.duration || ""} onChange={e => updateStay(stay.id, "duration", e.target.value)} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px] bg-white text-slate-700">
-                                  <option value="">Select...</option>
-                                  {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
+                            {/* Duration chips + address */}
+                            <div className="px-3 py-2.5 space-y-2">
+                              <div className="flex flex-wrap gap-1.5">
+                                {DURATION_OPTIONS.map(d => (
+                                  <button key={d} type="button" onClick={() => updateStay(stay.id, "duration", stay.duration === d ? "" : d)} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition-all ${stay.duration === d ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{d}</button>
+                                ))}
                               </div>
-                              <div>
-                                <div className="text-[9px] font-bold text-slate-400 mb-0.5">Address (optional)</div>
-                                <input value={stay.address || ""} onChange={e => updateStay(stay.id, "address", e.target.value)} placeholder="Enter address..." className="w-full rounded border border-slate-200 px-2 py-1 text-[10px] outline-none" />
-                              </div>
+                              <input value={stay.address || ""} onChange={e => updateStay(stay.id, "address", e.target.value)} placeholder="Address (optional)..." className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] outline-none focus:border-sky-400" />
                             </div>
                           </div>
                         ))}
                         {timeline.length > 0 && !timeline.some(s => s.type === "Staying in home" || s.type === "Moving") && (
                           <div className="rounded-lg border border-dashed border-teal-300 bg-teal-50/30 px-3 py-1.5 text-[10px] text-teal-700">
-                            Tip: Add "Their Home" as the last step when they return after repairs.
+                            Tip: Add "Their Home" as the last step to mark return after repairs.
                           </div>
                         )}
                       </div>}
@@ -16000,6 +16741,13 @@ export default function App(){
                 onClick={() => { setPreviewOpen(false); validateGenerateScope(); }}
               >
                 Save {recordWord}
+              </button>
+              <button
+                className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow hover:bg-violet-700 flex items-center gap-1.5"
+                onClick={() => { setPreviewOpen(false); validateGenerateScope(); setTimeout(() => setShowScope(true), 300); }}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.04l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
+                Save & Scope
               </button>
             </div>
           </div>
