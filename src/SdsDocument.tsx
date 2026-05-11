@@ -319,15 +319,25 @@ const SdsMarketingStrip = ({ variant = 0, brand = BRAND }) => {
   );
 };
 
-const SdsPageBlock = ({ children, brand = BRAND, showHeader = true, showMarketingWidget = true }) => (
-  <div className="print-page space-y-5">
+let sdsPageCounter = 0;
+const SdsPageBlock = ({ children, brand = BRAND, showHeader = true, showMarketingWidget = true, pageLabel }: { children: React.ReactNode; brand?: typeof BRAND; showHeader?: boolean; showMarketingWidget?: boolean; pageLabel?: string }) => {
+  sdsPageCounter++;
+  const label = pageLabel || `Page ${sdsPageCounter}`;
+  return (
+  <div className="print-page space-y-5 relative" style={{ marginBottom: "24px", paddingBottom: "8px", borderBottom: "2px dashed #e2e8f0" }}>
+    <div className="print-hidden flex items-center justify-center gap-2 py-1">
+      <div className="h-px flex-1 bg-slate-200" />
+      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">{label}</span>
+      <div className="h-px flex-1 bg-slate-200" />
+    </div>
     <div className="h-[3px] w-full rounded-full bg-[linear-gradient(90deg,#06b6d4_0%,#0ea5e9_45%,#22c55e_100%)]" aria-hidden />
     {showHeader ? <SdsBrandHeader brand={brand} /> : null}
     {children}
     {showMarketingWidget ? <SdsPageMarketingWidget brand={brand} /> : null}
     <SdsBrandFooter brand={brand} />
   </div>
-);
+  );
+};
 
 const SdsSummaryField = ({ label, value }) => (
   <div className="rounded-xl border border-sky-100 bg-white px-3 py-2">
@@ -674,6 +684,7 @@ const SdsMarketingBanner = ({ brand = BRAND, media = BRAND_CARES_MEDIA }) => (
 );
 
 export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [], orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", policyNumber = "", nationalCarrier = "", primaryLossType = "", address = "", selectedServices = [], noeServiceOfferings = [], customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], sdsPhotos = [], sdsCoverPhoto = null, scopeBridge = {}, documentType = "approval", orderNarrative = [], orderNarrativeProse = [], rushGuideTimeline = null, onPhotoNoteChange = null as ((photoId: string, note: string) => void) | null, onNarrativeChange = null as ((prose: string[]) => void) | null }) {
+  sdsPageCounter = 0; // Reset page counter each render
   const docSeverity = lossSeverity || {};
   const printRootRef = useRef(null);
   const responseCopy = getSdsResponseCopy(documentType);
@@ -799,7 +810,8 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
   const normalizeSeverity = (s) => String(s ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 
   const hasPerilKeyword = (values, keyword) => {
-    return (values || []).some((value) =>
+    const arr = Array.isArray(values) ? values : typeof values === "object" && values ? Object.keys(values) : [];
+    return arr.some((value) =>
       String(value || "").toLowerCase().includes(keyword)
     );
   };
@@ -904,9 +916,10 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
       .sort((a, b) => severityRank(b) - severityRank(a));
   };
 
+  const toArray = (v) => Array.isArray(v) ? v : typeof v === "object" && v ? Object.keys(v) : [];
   const roomPerilsFromData = (room) => {
     const picks = new Set();
-    (room?.severitySelections || []).forEach((value) => {
+    toArray(room?.severitySelections).forEach((value) => {
       const normalized = String(value || "").toLowerCase();
       if (normalized.includes("fire")) picks.add("fire");
       if (normalized.includes("water")) picks.add("water");
@@ -1306,14 +1319,24 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
     </div>
   );
 
-  const PageBlock = ({ children, showHeader = true, showMarketingWidget = true }) => (
-    <div className="print-page space-y-5">
+  let innerPageCounter = 0;
+  const PageBlock = ({ children, showHeader = true, showMarketingWidget = true, pageLabel }: { children: React.ReactNode; showHeader?: boolean; showMarketingWidget?: boolean; pageLabel?: string }) => {
+    innerPageCounter++;
+    const label = pageLabel || `Page ${innerPageCounter}`;
+    return (
+    <div className="print-page space-y-5" style={{ marginBottom: "24px", paddingBottom: "8px", borderBottom: "2px dashed #e2e8f0" }}>
+      <div className="print-hidden flex items-center justify-center gap-2 py-1">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">{label}</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
       {showHeader ? <BrandHeader /> : null}
       {children}
       {showMarketingWidget ? <PageMarketingWidget /> : null}
       <BrandFooter />
     </div>
-  );
+    );
+  };
 
   const SummaryField = ({ label, value }) => (
     <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
@@ -1617,7 +1640,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
         </div>
 
         <div className="p-6 bg-slate-50 space-y-8">
-          <SdsPageBlock brand={BRAND}>
+          <SdsPageBlock brand={BRAND} pageLabel="Page 1 — Project Summary">
             <SdsProjectSummarySection
               orderName={orderName}
               primaryCustomerName={primaryCustomerName}
@@ -1641,7 +1664,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
             />
           </SdsPageBlock>
           <SdsMarketingServiceHighlights />
-          <SdsPageBlock brand={BRAND}>
+          <SdsPageBlock brand={BRAND} pageLabel="Page 2 — Loss Severity">
             <SdsWidgetSection title="Loss Severity" className={`mx-auto w-full max-w-[22rem] ${hasAnyHighSeverityRows ? "" : "print-hide-no-high-severity"}`}>
               <div className="mb-2 pt-1 pb-2 border-b border-slate-200/60">
                 <div className="px-1 text-center text-[11px] font-bold text-slate-600">
@@ -1705,7 +1728,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
 
           <SdsMarketingRestoreStory />
           {(rooms || []).length > 0 && (
-            <SdsPageBlock brand={BRAND}>
+            <SdsPageBlock brand={BRAND} pageLabel="Page 3 — Home Visualization">
               <SdsWidgetSection
                 title="Home Loss Visualization"
                 subtitle={
@@ -1720,7 +1743,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
           )}
           <SdsMarketingContact />
           {hasSdsIconSelections && (
-            <SdsPageBlock brand={BRAND}>
+            <SdsPageBlock brand={BRAND} pageLabel="Page 4 — Considerations">
               <SdsWidgetSection title="Considerations" subtitle="Key factors, observations, and services for this project.">
                 {SdsIconSelectionsWidget()}
               </SdsWidgetSection>
@@ -1731,24 +1754,42 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
             const allPhotos = sdsPhotos || [];
             const coverPhoto = allPhotos.find(p => p.id === sdsCoverPhoto);
 
-            // Group by room, first photo per room is room cover
-            const byRoom = {};
+            // Group by floor → room, ordered: Attic → top floors → lower floors → Basement
+            const byFloorRoom: Record<string, Record<string, any[]>> = {};
             const noRoom = [];
             allPhotos.forEach(photo => {
               if (photo.id === sdsCoverPhoto) return;
               const room = (photo.room || "").trim();
+              const floor = (photo.floor || "").trim() || "Other";
               if (room) {
-                if (!byRoom[room]) byRoom[room] = [];
-                byRoom[room].push(photo);
+                if (!byFloorRoom[floor]) byFloorRoom[floor] = {};
+                if (!byFloorRoom[floor][room]) byFloorRoom[floor][room] = [];
+                byFloorRoom[floor][room].push(photo);
               } else {
                 noRoom.push(photo);
               }
             });
-            const roomEntries = Object.entries(byRoom).sort(([a], [b]) => a.localeCompare(b));
-            if (noRoom.length) roomEntries.push(["General", noRoom]);
+            // Sort floors: Attic first, then numbered floors descending, Basement last
+            const floorOrder = (name: string) => {
+              const n = name.toLowerCase();
+              if (n.includes("attic")) return -100;
+              if (n.includes("basement")) return 100;
+              const num = parseInt(n.replace(/[^0-9]/g, ""));
+              return isNaN(num) ? 0 : -num; // higher floor numbers first (3rd → 2nd → 1st)
+            };
+            const sortedFloors = Object.keys(byFloorRoom).sort((a, b) => floorOrder(a) - floorOrder(b));
+            // Build flat room entries with floor markers
+            const roomEntries: [string, any[], string?][] = [];
+            sortedFloors.forEach(floor => {
+              const rooms = Object.entries(byFloorRoom[floor]).sort(([a], [b]) => a.localeCompare(b));
+              rooms.forEach(([room, photos], i) => {
+                roomEntries.push([room, photos, i === 0 ? floor : undefined]);
+              });
+            });
+            if (noRoom.length) roomEntries.push(["General", noRoom, undefined]);
 
             return (
-              <SdsPageBlock brand={BRAND}>
+              <SdsPageBlock brand={BRAND} pageLabel="Photos — Scope Documentation">
                 <SdsWidgetSection title="Scope Photo Documentation" subtitle="Cover photo for each room with notes.">
                   <div className="space-y-4">
                     {coverPhoto && (
@@ -1769,17 +1810,21 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                         )}
                       </div>
                     )}
-                    <div className="grid grid-cols-2 gap-3">
-                      {roomEntries.map(([room, photos]) => {
+                    <div className="space-y-3">
+                      {roomEntries.map(([room, photos, floorLabel]) => {
                         const roomCover = photos[0];
                         if (!roomCover) return null;
                         return (
-                          <div key={room} className="rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow bg-slate-50" onClick={() => { setEditingPhotoId(roomCover.id); setEditingPhotoNote(roomCover.note || ""); }}>
+                          <div key={room}>
+                          {floorLabel && <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 pb-1 mb-2 mt-2">{floorLabel}</div>}
+                          <div className="rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow bg-slate-50" onClick={() => { setEditingPhotoId(roomCover.id); setEditingPhotoNote(roomCover.note || ""); }}>
                             <img src={roomCover.src} alt={room} className="w-full h-32 object-contain" />
                             <div className="px-2 py-1.5">
                               <div className="text-xs font-bold text-slate-700">{room}</div>
                               {roomCover.reason && <div className="text-[10px] text-slate-500">{roomCover.reason}{roomCover.subReason ? ` — ${roomCover.subReason}` : ''}</div>}
                               {roomCover.note ? <div className="text-[10px] text-slate-500 mt-0.5">{roomCover.note}</div> : <div className="text-[10px] text-slate-300 italic">Click to add note</div>}
+                              {/* Room instructions from scope */}
+                              {(() => { const matchRoom = (rooms || []).find((r: any) => r.name === room); return matchRoom?.notes ? <div className="text-[10px] text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 border border-amber-200">{matchRoom.notes}</div> : null; })()}
                               <div className="text-[9px] text-slate-400 mt-0.5">{photos.length} photo{photos.length !== 1 ? 's' : ''} total</div>
                             </div>
                             {editingPhotoId === roomCover.id && (
@@ -1792,6 +1837,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                               </div>
                             )}
                           </div>
+                          </div>
                         );
                       })}
                     </div>
@@ -1802,7 +1848,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
           })()}
           <SdsMarketingBanner />
           {(orderNarrativeProse || []).length > 0 && (
-            <SdsPageBlock brand={BRAND}>
+            <SdsPageBlock brand={BRAND} pageLabel="Narrative — Project Summary">
               <SdsWidgetSection title="Project Narrative" subtitle="A summary of the scope and key details for this project.">
                 {editingNarrative ? (
                   <div>
@@ -1885,7 +1931,7 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
             </SdsPageBlock>
           )}
           {/* Closing marketing widget — always last */}
-          <SdsPageBlock brand={BRAND} showHeader={false}>
+          <SdsPageBlock brand={BRAND} showHeader={false} pageLabel="Contact & Marketing">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
               <SdsMarketingContact />
               <div className="grid gap-4 lg:grid-cols-2">
