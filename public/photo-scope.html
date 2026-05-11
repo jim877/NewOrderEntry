@@ -1,3 +1,4 @@
+<!-- DEPRECATED: This file is retained for reference only. All features have been ported to ScopeWizard in src/App.tsx (2026-05-10). -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1394,6 +1395,7 @@ let recognition=null,speakActive=false;
 let bulkReasonPick=null,editingPhoto=null,lastTags={};
 let editingPhotoViewOnly=false;
 let nextOrderId=1,nextPhotoId=1,wizFloorCount=1,wizHasBasement=false,wizHasAttic=false,wizPropertyType='House';
+Object.defineProperty(window,'nextOrderId',{get(){return nextOrderId;},set(v){nextOrderId=v;}});
 let editFloorUniform=false;  // "same for all rooms?" toggle in floor-sev sheet
 let floorSevOpenRoom=false;  // open Add Room sheet after saving floor severity (floor-check flow)
 let checkFloorIdx=null;      // floor being evaluated in floor-check flow
@@ -5039,177 +5041,12 @@ updateIsland();
 })();
 </script>
 <script>
-/* Test navigation helper */
-window.addEventListener('load',()=>{
-  if(location.hash==='#testroom'){
-    setTimeout(()=>{
-      if(orders.length>0){
-        curOrder=orders[0];
-        curFloor=orders[0].floors[0];
-        curRoom=orders[0].floors[0].rooms[0];
-        go('scr-room');
-      }
-    },1000);
-  }
-  if(location.hash==='#testroomcamera'){
-    // Create a minimal test order with a room
-    setTimeout(()=>{
-      console.log('[TEST] #testroomcamera hash detected, orders=', window.orders);
-      if(!window.orders){
-        console.error('[TEST] orders array not found');
-        return;
-      }
-      if(window.orders.length===0){
-        console.log('[TEST] Creating test order');
-        const testOrder={
-          id:Date.now(),
-          address:'Test Address',
-          propertyType:'House',
-          scopeComplete:false,
-          instructionDefaults:[],
-          interview:createInterviewState(),
-          pickup:createPickupState(),
-          floors:[{
-            id:1,
-            name:'Floor 1',
-            floorPlan:null,
-            rooms:[{
-              id:1,
-              displayName:'Test Room',
-              isOrigin:true,
-              tags:[],
-              photos:[],
-              sev:window.emptySev?window.emptySev():{}
-            }]
-          }]
-        };
-        window.orders.push(testOrder);
-        if(window.saveOrders) window.saveOrders();
-      }
-      window.curOrder=window.orders[0];
-      window.curFloorIdx=0;
-      window.curRoom=window.orders[0].floors[0].rooms[0];
-      console.log('[TEST] Navigating to camera, curOrder=', window.curOrder, 'curRoom=', window.curRoom);
-      if(window.go) window.go('scr-camera');
-    },1000);
-  }
-  /* Auto-start from Scope Wizard V2 — skip landing, go straight to order */
-  if(new URLSearchParams(location.search).get('autostart')==='1'){
-    setTimeout(()=>{
-      if(window.orders && window.orders.length>0){
-        window.curOrder=window.orders[0];
-        if(window.go) window.go('scr-order');
-      }
-    },500);
-  }
-});
-</script>
-<script>
 /* Only register service worker in production — skip on localhost to avoid cached/stale content and green update indicator during development */
 if('serviceWorker' in navigator && !/localhost|127\.0\.0\.1/i.test(location.hostname)){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   });
 }
-</script>
-<script>
-// NOE Order Context Bridge — auto-loads the NOE order into Photo Scope
-(function(){
-  try {
-    var raw = localStorage.getItem('noe-photo-scope-context');
-    if (!raw) return;
-    var ctx = JSON.parse(raw);
-    if (!ctx || !ctx.orderName) return;
-
-    // Show NOE summary on orders screen, hide default content
-    var summaryPanel = document.getElementById('noe-order-summary');
-    var defaultScreen = document.getElementById('default-orders-screen');
-    if (summaryPanel && defaultScreen) {
-      summaryPanel.style.display = 'block';
-      defaultScreen.style.display = 'none';
-      var nameEl = document.getElementById('noe-summary-name');
-      var custEl = document.getElementById('noe-summary-customer');
-      var addrEl = document.getElementById('noe-summary-address');
-      var lossEl = document.getElementById('noe-summary-loss');
-      var servEl = document.getElementById('noe-summary-services');
-      var roomsEl = document.getElementById('noe-summary-rooms');
-      if (nameEl) nameEl.textContent = ctx.orderName;
-      if (custEl) custEl.textContent = ctx.customerName || '';
-      if (addrEl) addrEl.textContent = ctx.address || '';
-      if (lossEl && ctx.lossType) { lossEl.textContent = ctx.lossType; lossEl.style.display = 'inline-block'; }
-      if (servEl && ctx.services && ctx.services.length) { servEl.textContent = ctx.services.length + ' services'; servEl.style.display = 'inline-block'; }
-      if (roomsEl && ctx.rooms && ctx.rooms.length) { roomsEl.textContent = ctx.rooms.length + ' rooms'; roomsEl.style.display = 'inline-block'; }
-    }
-
-    // "Start Scope" button — creates order and navigates
-    var btnStart = document.getElementById('btn-noe-start-scope');
-    if (btnStart) {
-      btnStart.addEventListener('click', function() {
-        startNoeOrder();
-      });
-    }
-
-    function startNoeOrder() {
-      // Use the wizard flow: click New Order, then pre-fill from NOE context
-      var newOrderBtn = document.getElementById('btn-new-order');
-      if (newOrderBtn) newOrderBtn.click();
-
-      setTimeout(function() {
-        // Address
-        var addrField = document.getElementById('inp-address');
-        if (addrField) addrField.value = ctx.address || ctx.orderName || '';
-
-        // Services
-        if (ctx.services && ctx.services.length) window._wizOfferings = ctx.services.slice();
-
-        // Severity
-        var sevCodes = ctx.severityCodes || [];
-        if (sevCodes.length) {
-          var sevMap = { 'Fire': 'fire', 'Water': 'water', 'Mold': 'mold', 'Puffback': 'pb', 'Debris': 'debris' };
-          var sev = window._wizSev || (typeof emptySev === 'function' ? emptySev() : {});
-          sevCodes.forEach(function(code) {
-            var parts = String(code || '').split('-');
-            var group = sevMap[parts[0]];
-            var level = parseInt(parts[1]) || 0;
-            if (group && level > 0) {
-              if (!sev[group]) sev[group] = { sev: 0, details: {} };
-              sev[group].sev = Math.max(sev[group].sev, level);
-            }
-          });
-          window._wizSev = sev;
-        }
-
-        // Rooms
-        if (ctx.rooms && ctx.rooms.length) window._noeRooms = ctx.rooms;
-
-        // Interview
-        var iv = ctx.interview;
-        if (iv && typeof iv === 'object') {
-          if (!window._wizInterview) window._wizInterview = typeof normalizeInterviewState === 'function' ? normalizeInterviewState(null) : { answers: {} };
-          var ans = window._wizInterview.answers;
-          if (Array.isArray(iv.conditions) && iv.conditions.length) ans.conditions = iv.conditions;
-          if (Array.isArray(iv.repairs) && iv.repairs.length) ans.repairs = iv.repairs;
-          if (iv.living) ans.living = iv.living;
-          if (iv.delivery) ans.delivery = iv.delivery;
-          if (Array.isArray(iv.packout) && iv.packout.length) ans.packout = iv.packout;
-          if (Array.isArray(iv.loadList) && iv.loadList.length) ans.loadList = iv.loadList;
-          if (Array.isArray(iv.considerations) && iv.considerations.length) ans.considerations = iv.considerations;
-          if (Array.isArray(iv.suggestedGroups) && iv.suggestedGroups.length) ans.suggestedGroups = iv.suggestedGroups;
-          if (iv.medicalIssues === true || iv.medicalIssues === false) ans.medicalIssues = iv.medicalIssues;
-          if (iv.soapAllergies === true || iv.soapAllergies === false) ans.soapAllergies = iv.soapAllergies;
-          if (iv.selfCleaning === true || iv.selfCleaning === false) ans.selfCleaning = iv.selfCleaning;
-          if (iv.useDryCleaner) ans.useDryCleaner = iv.useDryCleaner;
-          if (iv.dryLaundry) ans.dryLaundry = iv.dryLaundry;
-          if (iv.needStorage === true || iv.needStorage === false) ans.needStorage = iv.needStorage;
-          if (Array.isArray(iv.petsInHome) && iv.petsInHome.length) ans.petsInHome = iv.petsInHome;
-          if (Array.isArray(iv.interests) && iv.interests.length) ans.interests = iv.interests;
-          if (Array.isArray(iv.upcomingEvents) && iv.upcomingEvents.length) ans.upcomingEvents = iv.upcomingEvents;
-        }
-      }, 100);
-    }
-
-  } catch(e) { console.warn('NOE auto-load error:', e); }
-})();
 </script>
 </body>
 </html>
