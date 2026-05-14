@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import SameDayScope from './SameDayScope';
 import SdsDocument from './SdsDocument';
-import { CreditCard, FileText, Globe, Lock, LockOpen, Shield, SquarePen, Tag, UserRound } from 'lucide-react';
+import { CreditCard, Globe, Lock, LockOpen, Shield, SquarePen, Tag, UserRound } from 'lucide-react';
 import {
   buildScopeBridgeSnippet,
   createScopeBridgeState,
@@ -175,7 +175,7 @@ const STYLES = `
 function safeUid(){ 
   try {
     if(typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  } catch(e) {}
+  } catch { /* fallback */ }
   return "id-" + Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
@@ -204,13 +204,6 @@ const isHeaderToggleIgnoredTarget = (target) => {
   return !!target.closest('button, input, select, textarea, a, [role="button"], [data-header-toggle-ignore="true"]');
 };
 
-const normalizeBridgeIssueKey = (value = "") =>
-  (value || "")
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 
 const normalizePlaceholderKeyPart = (value = "") =>
   (value || "")
@@ -253,6 +246,18 @@ const getRepInitials = (name = "") => {
   return getInitials(base);
 };
 
+const useCurrentLocation = (onResult: (coords: { lat: number; lng: number }) => void, onError?: (msg: string) => void) => {
+  if (!navigator.geolocation) { onError?.("Geolocation not supported"); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => onResult({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    err => onError?.(err.message || "Location unavailable"),
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+};
+
+const getStaticMapUrl = (lat: string | number, lng: string | number) =>
+  `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=300x120&scale=2&markers=color:red|${lat},${lng}&key=YOUR_API_KEY`;
+
 const formatPhoneNumber = (value) => {
   if (!value) return value;
   const phoneNumber = value.replace(/[^\d]/g, '');
@@ -284,7 +289,7 @@ const formatShortTimestamp = (date = new Date()) => {
       hour: 'numeric',
       minute: '2-digit',
     });
-  } catch (e) {
+  } catch {
     return date.toISOString();
   }
 };
@@ -328,7 +333,7 @@ const addHours = (timeStr = "", hours = 1) => {
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const EVENT_SYSTEM_PREFIXES = ["Conditions:", "Bring:", "Service Offerings:", "Quick Notes:", "Scope Notes:", "Estimate Required:"];
+const EVENT_SYSTEM_PREFIXES = ["Conditions:", "Bring:", "Service Offerings:", "Services:", "Picking Up:", "Quick Notes:", "Scope Notes:", "Estimate Required:"];
 const stripEventSystemLines = (text = "") =>
   text
     .split("\n")
@@ -339,7 +344,15 @@ const buildEventSystemEntries = (data, conditionSummary) => {
   const entries = [];
   if (conditionSummary) entries.push({ label: "Conditions", value: conditionSummary });
   if ((data.loadList || []).length) entries.push({ label: "Bring", value: (data.loadList || []).join(", ") + ((data as any).loadListNote ? ` — ${(data as any).loadListNote}` : "") });
-  if ((data.serviceOfferings || []).length) entries.push({ label: "Service Offerings", value: (data.serviceOfferings || []).join(", ") });
+  if ((data.serviceOfferings || []).length) {
+    const subs = data.serviceSubCategories || [];
+    const serviceDetails = (data.serviceOfferings || []).map(s => {
+      const subItems = subs.filter(x => x.startsWith(`${s}: `)).map(x => x.replace(`${s}: `, ""));
+      return subItems.length > 0 ? `${s} (${subItems.join(", ")})` : s;
+    });
+    entries.push({ label: "Services", value: serviceDetails.join(", ") });
+  }
+  if ((data.packoutSummary || []).length) entries.push({ label: "Picking Up", value: (data.packoutSummary || []).join(", ") });
   if ((data.quickInstructionNotes || []).length) entries.push({ label: "Quick Notes", value: (data.quickInstructionNotes || []).join(", ") });
   if ((data.quickScopeNotes || []).length) entries.push({ label: "Scope Notes", value: (data.quickScopeNotes || []).join(", ") });
   if (data.estimateRequested) {
@@ -365,9 +378,7 @@ const composeEventInstructions = (base, data, conditionSummary) => {
   return cleaned ? `${cleaned}\n${system}` : system;
 };
 
-const isValidEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-};
+
 
 const getOptionText = (opt) => {
   if (typeof opt === "string") return opt;
@@ -430,10 +441,15 @@ const ORDER_STATUSES=["New","Intake Complete","Pickup Complete","Tagging Complet
 const MEETING_TYPES = ["Scope", "Pickup", "In-Home", "Meeting"];
 const DEFAULT_COMPANIES=["Allstate", "Allstate Insurance Co.", "State Farm", "Chubb", "Servpro of Anytown", "Metro Claims", "Pure Insurance", "DKI FastDry", "United Claims", "Croziers Moving", "Contractor Connection", "Not Yet Known", "Not Provided", "Company 1", "Company 2"];
 const DEFAULT_CONTACTS=["Alex Morgan", "Jamie Lee", "Pat Adjuster", "Ronzel Simmons", "Zack Barsack", "Sim Fern", "Steven Earthman", "Casey Assignment", "Contact 1", "Contact 2"];
-const WELCOME_CAMPAIGNS=["Brochure", "Rush Guide", "Vcard"];
-const VENDOR_TYPES=["Art","Contents","Moving","Mitigation","Contractor","Consultant","Agent","Broker","Decorator","Building Management","Superintendent","Other"];
 const SALES_REPS=["Dave Fenyo, Sales Rep","Jim Fenyo","Josh Cintron, Sales Rep"];
-const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Textiles","TLI","Expert Stain Removal"];
+const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Taxidermy","Textiles","TLI","Expert Stain Removal"];
+const SERVICE_SUB_CATEGORIES: Record<string, string[]> = {
+  "Art": ["Fine", "Decorative", "Personal"],
+  "Appliance": ["Installed", "Uninstalled"],
+  "Consulting": ["Estimates", "Expert Opinion", "TLI"],
+  "Furniture": ["Upholstered", "Hard"],
+  "Textiles": ["Clothing", "Blinds", "Hand Cleaning", "Household", "Rugs", "Window Treatments"],
+};
 const SUGGESTED_GROUPS = ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"];
 const LIVING_STATUS_ADDRESS_TYPES = ["Moving", "Hotel", "Temp", "Neighbor", "Relative", "Rental", "Other Home"];
 const SUGGESTED_GROUP_HELP = {
@@ -532,8 +548,10 @@ const SERVICE_OFFERING_HELP = {
   Appliance: "Large items requiring specialized handling (refrigerators, ranges, etc.).",
   Art: "Items valued for artistic/aesthetic merit.",
   Consulting: "Expert opinions and guidance.",
-  Contents: "Hard and soft goods.",
+  Contents: "Hard furniture and all possessions.",
   Furniture: "Upholstered furniture pieces.",
+  "Hand Clean": "Delicate shoes, bags, belts etc.",
+  Taxidermy: "Preserved animals, birds, etc.",
   "Pack-out": "Moving and relocation services.",
   Rugs: "Area rugs and carpets.",
   "Storage Only": "Items stored without cleaning.",
@@ -1084,13 +1102,12 @@ const COMPATIBLE_SECONDARY_LOSS: Record<string, string[]> = {
   "Other": ["Fire", "Water", "Mold", "Oil", "Puffback", "Dust/Debris"],
 };
 
-const PHONE_TYPES = ["Mobile", "Home", "Office"];
 const ESTIMATE_TYPES = ["Ballpark", "Tag and Hold", "Itemized (costs)", "TLI", "Cash-out"];
 const PRICING_PLATFORMS = ["Xactimate", "Cotality", "Textile Solutions"];
 const TECHS = ["Mike S.", "Sarah J.", "Tom B.", "Unassigned"];
 const LEAD_SOURCES = ["Referral", "Marketing", "Internal"];
 const CONTACT_METHODS = ["Call", "Email", "Form Submission", "Meeting", "Text", "TPA Assignment"];
-const REFERRAL_SOURCES = ["Referring Co", "Referrer"];
+
 const MARKETING_SOURCES = ["Website", "Google Business Page", "AI Recommendation", "Social Media", "Other"];
 const INTERNAL_TYPES = ["Met on Site", "Previous Customer", "Friend of Company", "Neighbor", "Building Staff"];
 const CUSTOMER_QUICK_NOTES = ["Elderly", "Hearing Impaired", "Spanish Only", "Do not call", "Email only", "Sales rep only"];
@@ -1269,21 +1286,6 @@ const LEAD_SOURCE_HELP = {
   Internal: "Company-initiated efforts."
 };
 
-const COMPANY_LOGO_TEXT = {
-  "Allstate": "A",
-  "State Farm": "SF",
-  "Chubb": "C",
-  "Pure Insurance": "P"
-};
-
-const CONTACT_METHOD_HELP = {
-  Call: "How opportunity was discovered.",
-  Email: "How opportunity was discovered.",
-  "Form Submission": "Online form/website submission.",
-  Meeting: "How opportunity was discovered.",
-  Text: "How opportunity was discovered.",
-  "TPA Assignment": "Assignment from Third Party Administrator."
-};
 
 const COMPANY_TYPES = [
   "Insurance",
@@ -1702,6 +1704,7 @@ const DEFAULT_FIELD_CONFIG = {
   useDryCleaner:             { label: "Use Dry Cleaner?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
   howDryLaundry:             { label: "How Dry Laundry?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
   storageNeeded:             { label: "Storage Needed?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
+  finalDeliveryQualifier:    { label: "Final Delivery Date",      section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
   suggestedGroups:           { label: "Suggested Groups",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
 
   // --- Codes (post-inspection) ---
@@ -1845,10 +1848,25 @@ const RUSH_SEASONS = {
 };
 
 const rushAddDays = (date, days) => { const r = new Date(date); r.setDate(r.getDate() + days); return r; };
+const parseLocalDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const d = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+const formatDateInputValue = (value) => {
+  const d = parseLocalDate(value);
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 const rushFormatDate = (d) => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 const rushGetSeasons = (start, end) => {
   const found = new Set();
-  let cur = new Date(start);
+  const cur = new Date(start);
   while (cur <= end) { const m = cur.getMonth(); Object.values(RUSH_SEASONS).forEach(s => { if (s.months.includes(m)) found.add(s); }); cur.setMonth(cur.getMonth() + 1); }
   return Array.from(found);
 };
@@ -1897,6 +1915,7 @@ const DEFAULT_FORM={
   independentAdjuster:"", tpaCompany:"", tpaContact:"", 
   salesRep: "",
   serviceOfferings: [],
+  serviceSubCategories: [],
   groupAddressLinks: {},
   lossSeverity: initLossSeverity(),
   interviewLog: {},
@@ -2077,15 +2096,6 @@ const buildNarrativeProse = (narrative = [], data = {}) => {
   return p;
 };
 
-const CoachingTip = ({ tipKey, dismissed, onDismiss, children, className }) => {
-  if (dismissed.has(tipKey)) return null;
-  return (
-    <div className={`rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 ${className || ""}`}>
-      <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDismiss(tipKey); }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
-      {children}
-    </div>
-  );
-};
 
 const Field = ({label,children,subtle,missing, className, action, smart, id, noeField}) => (
   <div id={id} className={`flex flex-col gap-1.5 ${className||""}`} data-noe-field={noeField || undefined} data-noe-label={label || undefined}>
@@ -2102,18 +2112,18 @@ const Field = ({label,children,subtle,missing, className, action, smart, id, noe
 );
 
 const Input = React.forwardRef((props, ref) => (
-  <input ref={ref} {...props} className={`w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 hover:border-slate-300 ${props.className||""}`} />
+  <input ref={ref} {...props} className={`w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20 hover:border-slate-300 placeholder:text-slate-400/70 ${props.className||""}`} />
 ));
 const Select = React.forwardRef(({children, ...props}, ref) => (
   <select
     ref={ref}
     {...props}
-    className={`w-full min-h-[42px] appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 hover:border-slate-300 ${props.className||""}`}
+    className={`w-full min-h-[42px] appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20 hover:border-slate-300 ${props.className||""}`}
   >
     {children}
   </select>
 ));
-const Textarea = (props) => <textarea {...props} className={`w-full min-h-[80px] resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 hover:border-slate-300 ${props.className||""}`} />;
+const Textarea = (props) => <textarea {...props} className={`w-full min-h-[80px] resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20 hover:border-slate-300 placeholder:text-slate-400/70 ${props.className||""}`} />;
 const AutoGrowTextarea = ({ value, onChange, className, ...props }) => {
   const ref = useRef(null);
   useEffect(() => {
@@ -2126,7 +2136,7 @@ const AutoGrowTextarea = ({ value, onChange, className, ...props }) => {
       ref={ref}
       value={value}
       onChange={onChange}
-      className={`w-full min-h-[120px] resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 hover:border-slate-300 ${className||""}`}
+      className={`w-full min-h-[120px] resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20 hover:border-slate-300 placeholder:text-slate-400/70 ${className||""}`}
       {...props}
     />
   );
@@ -2587,7 +2597,7 @@ const ToggleGroup = ({ options, value, onChange, noeField }) => (
        const title = typeof opt === "string" ? undefined : opt.title;
        const isActive = value === label;
        return (<button key={label} type="button" title={title} aria-pressed={isActive} data-noe-option={label} data-noe-selected={isActive} onClick={() => onChange(isActive ? "" : label)} className={isActive ? `${pillBase} ${pillActive}` : `${pillBase} ${pillInactive}`}>
-         {isActive && <span className="block h-1.5 w-1.5 rounded-full bg-sky-500 mr-2"></span>}
+         <span className={`inline-block w-3 h-3 rounded-full border-2 mr-1.5 shrink-0 ${isActive ? "border-sky-500 bg-sky-500 shadow-[inset_0_0_0_2px_white]" : "border-slate-300"}`} />
          {label}
        </button>)
     })}
@@ -2683,268 +2693,11 @@ const LinkedAssignmentPanel = ({
   );
 };
 
-const CompanyRecord = ({ company, contact, contacts, roles = [], className, editable, onChangeContact, onChangeCompany, onChangeContacts, roleOptions, onToggleRole, onFindCompany, rep, inactive, getRolesForContact, getRoleOptionsForContact, onToggleRoleForContact, contactOptions, onAddContact, getSalesRepForContact, getTitleForContact }) => {
-  if (!editable && !company && !contact) return null;
-  const contactList = (() => {
-    const raw = contacts && contacts.length
-      ? contacts
-      : (contact ? [{ name: contact, inactive: false }] : []);
-    const seen = new Set();
-    return raw.filter(c => {
-      const key = normalizeContact(c?.name || "");
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  })();
-  const [addContactOpen, setAddContactOpen] = useState(false);
-  const [addContactValue, setAddContactValue] = useState("");
-  const [addContactCloseArmed, setAddContactCloseArmed] = useState(false);
-  useEffect(() => {
-    if (!addContactOpen) return;
-    const handleKey = (e) => {
-      if (e.key === "Enter" && addContactCloseArmed) {
-        e.preventDefault();
-        setAddContactOpen(false);
-        setAddContactCloseArmed(false);
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [addContactOpen, addContactCloseArmed, addContactValue]);
-  return (
-    <div className={`rounded-xl ${editable ? "border border-slate-200" : "border border-transparent"} bg-white px-4 py-3 ${className || ""}`}>
-      <div className="flex items-start justify-between gap-2">
-        {editable ? (
-          <div className="grid gap-2 w-full">
-            <label className="text-[10px] font-bold text-slate-400 uppercase">Contacts</label>
-            <div className="grid gap-2">
-              {(contactList.length ? contactList : [{ name: "", inactive: false }]).map((c, idx) => (
-                <div key={`${idx}-${c.name}`} className="rounded-lg border border-slate-200 p-2">
-                  <div className="flex items-center gap-2">
-                    {(() => {
-                      const parts = splitName(c.name || "");
-                      return (
-                        <>
-                          <Input
-                            value={parts.first}
-                            onChange={e => {
-                              const next = [...(contactList.length ? contactList : [{ name: "", inactive: false }])];
-                              const last = splitName(next[idx]?.name || "").last;
-                              next[idx] = { ...(next[idx] || {}), name: [e.target.value, last].filter(Boolean).join(" ") };
-                              onChangeContacts?.(next);
-                            }}
-                            placeholder="First name"
-                          />
-                          <Input
-                            value={parts.last}
-                            onChange={e => {
-                              const next = [...(contactList.length ? contactList : [{ name: "", inactive: false }])];
-                              const first = splitName(next[idx]?.name || "").first;
-                              next[idx] = { ...(next[idx] || {}), name: [first, e.target.value].filter(Boolean).join(" ") };
-                              onChangeContacts?.(next);
-                            }}
-                            placeholder="Last name"
-                          />
-                        </>
-                      );
-                    })()}
-                    <button
-                      onClick={() => {
-                        const next = [...(contactList.length ? contactList : [{ name: "", inactive: false }])].filter((_, i) => i !== idx);
-                        onChangeContacts?.(next);
-                      }}
-                      className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-rose-300 hover:text-rose-600"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  {getRoleOptionsForContact && onToggleRoleForContact && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {getRoleOptionsForContact(company, c.name).map(r => (
-                        <button
-                          key={`${r.id}-${idx}`}
-                          onClick={() => onToggleRoleForContact(company, c.name, r.id)}
-                          className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${r.active ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700'}`}
-                        >
-                          <span className="mr-1 inline-flex"><RoleIcon role={r} className="h-3 w-3" /></span>{r.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-              <button
-                onClick={() => {
-                  const next = [...(contactList.length ? contactList : [])];
-                  next.push({ name: "", inactive: false });
-                  onChangeContacts?.(next);
-                }}
-                className="w-fit rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-              >
-                + Add contact
-              </button>
-            </div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase">Company</label>
-            <Input value={company || ""} onChange={e=>onChangeCompany?.(e.target.value)} placeholder="Company name" />
-            {contact && !company && (
-              <div className="text-[10px] font-semibold text-orange-600">Company required for contact.</div>
-            )}
-            {onFindCompany && (
-              <button
-                onClick={onFindCompany}
-                className="w-fit rounded-full border border-slate-200 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-              >
-                Find on Google (demo)
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2 w-full text-sm text-slate-700">
-            {contactList.length > 0 ? (
-              contactList.map((c, idx) => (
-                <div key={`${c.name}-${idx}`} className="w-full rounded-lg border border-slate-200 bg-slate-50/40 px-3 py-2">
-                  <div className="flex w-full items-center justify-between gap-3">
-                    <div className="flex flex-col">
-                      <div className="font-semibold text-slate-800">{c.name || "Unnamed contact"}</div>
-                      {getTitleForContact && getTitleForContact(c.name) && (
-                        <div className="text-[10px] font-semibold text-slate-400">{getTitleForContact(c.name)}</div>
-                      )}
-                    </div>
-                    {getSalesRepForContact && getSalesRepForContact(c.name) && (
-                      <div className="flex flex-col items-center gap-1 text-[9px] font-bold text-slate-400">
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-sky-700 text-[10px] font-bold">
-                          {getRepInitials(getSalesRepForContact(c.name))}
-                        </span>
-                        <span>Rep</span>
-                      </div>
-                    )}
-                  </div>
-                  {getRolesForContact && (
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {getRolesForContact(company, c.name).map(r => (
-                        onToggleRoleForContact ? (
-                          <button
-                            key={`${r.title}-${idx}`}
-                            onClick={() => onToggleRoleForContact(company, c.name, r.id || r.title?.toLowerCase())}
-                            className="rounded-full"
-                            title="Click to toggle role"
-                          >
-                            <RoleBadge role={r} />
-                          </button>
-                        ) : (
-                          <RoleBadge key={`${r.title}-${idx}`} role={r} />
-                        )
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="text-xs text-slate-400 italic">No contacts yet</div>
-            )}
-            {onAddContact && (
-              <div className="mt-1">
-                {!addContactOpen ? (
-                  <button
-                    onClick={() => { setAddContactOpen(true); setAddContactCloseArmed(false); }}
-                    className="w-fit rounded-full border border-dashed border-slate-300 px-3 py-1 text-[11px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  >
-                    + Add contact
-                  </button>
-                ) : (
-                  <div
-                    className="rounded-lg border border-slate-200 bg-white p-2"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && addContactCloseArmed && !addContactValue) {
-                        e.preventDefault();
-                        setAddContactOpen(false);
-                        setAddContactCloseArmed(false);
-                      }
-                    }}
-                  >
-                    <SearchSelect
-                      value={addContactValue}
-                      onChange={(v) => {
-                        onAddContact(v);
-                        setAddContactValue("");
-                        setAddContactCloseArmed(true);
-                      }}
-                      onQueryChange={(v) => { setAddContactValue(v); if (v) setAddContactCloseArmed(false); }}
-                      onEmptyEnter={() => {
-                        if (addContactCloseArmed) {
-                          setAddContactOpen(false);
-                          setAddContactCloseArmed(false);
-                        }
-                      }}
-                      options={contactOptions || []}
-                      placeholder="Type contact name..."
-                      clearOnCommit
-                    />
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400">Not in list? Just type and press Enter.</span>
-                      <button
-                        onClick={() => { setAddContactOpen(false); setAddContactCloseArmed(false); }}
-                        className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        {null}
-      </div>
-      {!editable && roles.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {roles.map(r => <RoleBadge key={r.title} role={r} />)}
-        </div>
-      )}
-      {roleOptions && roleOptions.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {roleOptions.map(r => (
-            <button
-              key={r.id}
-              onClick={() => onToggleRole?.(r.id)}
-              className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${r.active ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700'}`}
-            >
-              <span className="mr-1 inline-flex"><RoleIcon role={r} className="h-3 w-3" /></span>{r.label}
-            </button>
-          ))}
-        </div>
-      )}
-      {inactive && (
-        <div className="mt-2 text-[10px] font-bold text-amber-600">Inactive</div>
-      )}
-    </div>
-  );
-};
-
-class ScopeBoundary extends React.Component<{onBack: () => void; children: React.ReactNode}, {error: Error | null}> {
-  state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) { return { error }; }
-  render() {
-    if (this.state.error) return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-8">
-        <div className="max-w-lg rounded-2xl border border-rose-200 bg-white p-6 shadow-lg space-y-4">
-          <div className="text-xl font-bold text-rose-700">Scope failed to load</div>
-          <pre className="text-xs text-rose-600 bg-rose-50 rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap">{this.state.error.message}{"\n"}{this.state.error.stack}</pre>
-          <button onClick={() => { this.setState({ error: null }); this.props.onBack(); }} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-white hover:bg-sky-600">← Back to Order</button>
-        </div>
-      </div>
-    );
-    return this.props.children;
-  }
-}
-
 const ToggleMulti = ({ label, checked, onChange, className, colorClass, title, showDot = true, noeField }) => {
     const activeClass = colorClass || pillActive;
     return (
         <button type="button" onClick={onChange} title={title} aria-pressed={checked} data-noe-option={label} data-noe-selected={checked} data-noe-field={noeField || undefined} className={(checked ? `${pillBase} ${activeClass}` : `${pillBase} ${pillInactive}`) + " " + (className||"")}>
-            {checked && showDot && <span className="block h-1.5 w-1.5 rounded-full bg-sky-500 mr-2"></span>}
+            {showDot && <span className={`inline-block w-3 h-3 rounded-sm border-2 mr-1.5 shrink-0 text-[8px] leading-[10px] text-center ${checked ? "border-sky-500 bg-sky-500 text-white" : "border-slate-300"}`}>{checked ? "✓" : ""}</span>}
             {label}
         </button>
     );
@@ -3229,7 +2982,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Assign roles for this contact</div>
                    <div className="flex flex-wrap gap-2">
                      <ToggleMulti
-                       label="Referrer ✓"
+                       label="Referrer"
                        checked={true}
                        onChange={() => {
                          if (window.confirm(`Remove ${referrerDisplayValue} as referrer? This will also clear any linked roles.`)) {
@@ -3380,39 +3133,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
   );
 });
 
-const QuickScopeFields = memo(({ data, update, toggleMulti }) => (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="mb-3 text-sm font-bold uppercase text-slate-500 tracking-wider">Quick Scope Notes</h3>
-        <div className="flex flex-wrap gap-2">
-            {["Everything Impacted", "Save what you can", "Determine Impact", "Only specific items"].map(n => (
-                <ToggleMulti key={n} label={n} checked={(data.quickScopeNotes||[]).includes(n)} onChange={()=>update("quickScopeNotes", toggleMulti(data.quickScopeNotes||[], n))} />
-            ))}
-        </div>
-    </div>
-));
 
-const LoadListFields = memo(({ data, update, toggleMulti }) => (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-         <h3 className="mb-3 text-sm font-bold uppercase text-slate-500 tracking-wider">To Bring (Load List)</h3>
-         <div className="flex flex-wrap gap-2">
-             {LOAD_ITEMS.map(item => (
-               <ToggleMulti
-                 key={item}
-                 label={item}
-                 checked={(data.loadList||[]).includes(item)}
-                 onChange={() => update("loadList", toggleMulti(data.loadList||[], item))}
-                 className={
-                   item === "Heater" && data.noHeat ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" :
-                   item === "Lights" && (data.noLights || data.boardedUp) ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" :
-                   item === "Tyvek" && (data.orderTypes||[]).includes('Mold') ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" :
-                   item === "Plastic Bags" && (data.damageWasWet === "Y" || (data.orderTypes||[]).includes('Mold')) ? "animate-orange-highlight !border-orange-500 !bg-orange-50 !text-orange-700" :
-                   ""
-                 }
-               />
-             ))}
-         </div>
-    </div>
-));
 
 const AI_USAGE_GUIDELINES = [
   "Choose the right entry mode: Use Detailed Entry when you have a lot of information (e.g., multiple contacts, insurance details, scheduling) to capture. Use Quick Entry for basic details, location, and scheduling when the information is minimal.",
@@ -3439,7 +3160,8 @@ const AI_TIME_SAVING_TIPS = [
 const PICKUP_DEPARTMENTS: Record<string, string[]> = { "Textile": ["Rugs", "Clothing", "Bedding", "Draperies", "Linens"], "Hard Goods": ["Furniture", "Art", "Electronics", "Appliances", "Hardware"] };
 
 const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds, showCoaching: parentShowCoaching = true, onToggleCoaching }: { onClose: () => void; orderData?: typeof DEFAULT_FORM; onOrderUpdate?: (updates: Partial<typeof DEFAULT_FORM>) => void; onShowOrder?: () => void; onShowSds?: () => void; showCoaching?: boolean; onToggleCoaching?: () => void }) => {
-  const [activeTab, setActiveTab] = useState<"order" | "interview" | "scope" | "report">("scope");
+  const [activeTab, setActiveTab] = useState<"order" | "interview" | "scope" | "photos" | "report">("scope");
+  const [expandedService, setExpandedService] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const totalSteps = 4;
   const [roomPass, setRoomPass] = useState<1 | 2 | 3>(1);
@@ -3447,6 +3169,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [autoAddRooms, setAutoAddRooms] = useState(true);
   const [expandedContext, setExpandedContext] = useState(false);
   const [walkthroughRoom, setWalkthroughRoom] = useState<{ fi: number; ri: number } | null>(null);
+  const [roomSwitching, setRoomSwitching] = useState(false);
   const [lastCapturedIdx, setLastCapturedIdx] = useState<number | null>(null);
   const [roomPhotos, setRoomPhotos] = useState<Record<string, { src: string; note: string; reason: string; ts: number; tag?: string }[]>>(() => {
     return (orderData as any)?.scopePhotos || {};
@@ -3455,9 +3178,11 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [pendingPhotoDelete, setPendingPhotoDelete] = useState<{ rKey: string; index: number; photo: any; timer: ReturnType<typeof setTimeout> } | null>(null);
   const [walkthroughExitWarning, setWalkthroughExitWarning] = useState<{ missing: { room: string; fi: number; ri: number; issues: string[] }[] } | null>(null);
   const [photoCoverPrompt, setPhotoCoverPrompt] = useState<{ rKey: string; index: number } | null>(null);
+  const [coverCameraOpen, setCoverCameraOpen] = useState(false);
   const [voiceTarget, setVoiceTarget] = useState<{ rKey: string; index: number } | null>(null);
   const voiceRecRef = useRef<any>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scopeContentRef = useRef<HTMLDivElement>(null);
   // Scroll content to top when step or tab changes
@@ -3465,8 +3190,16 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const camStreamRef = useRef<MediaStream | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const stopVoiceRecording = useCallback(() => {
+    const rec = voiceRecRef.current;
+    if (rec) {
+      try { rec.onend = null; rec.onerror = null; rec.stop(); } catch { /* ignore */ }
+      voiceRecRef.current = null;
+    }
+    setVoiceTarget(null);
+  }, []);
 
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (fallbackInput?: HTMLInputElement | null) => {
     setCameraError("");
     try {
       let stream: MediaStream;
@@ -3495,11 +3228,11 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
           setCameraError("Camera stream not rendering. Choose a photo from files instead.");
         }
       }, 3000);
-    } catch {
-      setCameraError("Camera unavailable. Use the file picker instead.");
-      setCameraActive(false);
-      cameraInputRef.current?.click();
-    }
+	    } catch {
+	      setCameraError("Camera unavailable in this browser. Choose a photo instead.");
+	      setCameraActive(false);
+	      (fallbackInput || cameraInputRef.current)?.click();
+	    }
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -3507,6 +3240,13 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraActive(false);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      stopVoiceRecording();
+    };
+  }, [stopCamera, stopVoiceRecording]);
 
   const compressImage = useCallback((src: string, maxWidth = 1200): Promise<string> => {
     return new Promise(resolve => {
@@ -3539,6 +3279,29 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     return canvas.toDataURL("image/jpeg", 0.85);
   }, []);
 
+  const saveCoverPhotoFile = useCallback((file: File | undefined | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const compressed = await compressImage(reader.result as string);
+      setOrderCoverPhoto(compressed);
+      setCoverCameraOpen(false);
+      stopCamera();
+      setToastMsg("Cover photo saved");
+    };
+    reader.readAsDataURL(file);
+  }, [compressImage, stopCamera]);
+
+	  const openCoverCamera = useCallback(() => {
+	    setCameraError("");
+	    if (!navigator.mediaDevices?.getUserMedia) {
+	      coverInputRef.current?.click();
+	      return;
+	    }
+	    setCoverCameraOpen(true);
+	    startCamera(coverInputRef.current);
+	  }, [startCamera]);
+
   // Step guidance toasts
   const STEP_TOASTS: Record<string, string> = {
     "1": "Select the building type and access details for the property.",
@@ -3558,27 +3321,27 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
 
   // Interview system
   const INTERVIEW_SECTIONS = [
-    // --- Critical (9) ---
-    { id: "conditions", title: "Current conditions?", type: "multi" as const, critical: true, options: ["Still Wet", "Visible Mold", "Structural Damage", "No Electricity", "No Heat", "Boarded Up"] },
-    { id: "repairs", title: "What repairs are being done?", type: "multi" as const, critical: true, options: ["Cleaning Exposed", "Cleaning Everywhere", "Clean & Paint", "Plaster/Wall Repairs", "Refinish Floors", "Replace Floors", "Cosmetic (Cabinets/Tile)", "Major Structural/Electrical", "Gut/Rebuild"] },
-    { id: "packoutScope", title: "Has packout been discussed?", type: "single" as const, critical: true, options: ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout"] },
-    { id: "living", title: "Where will customer live during repairs?", type: "multi" as const, critical: true, options: ["Their Home", "Hotel", "Temp", "Moving", "Neighbor", "Relative", "Rental", "Other Home"] },
-    { id: "delivery", title: "Where should we make final delivery?", type: "single" as const, critical: true, options: ["Primary", "Hotel", "Temporary", "Business", "New Home", "TBD"] },
-    { id: "packout", title: "What are we picking up?", type: "multi" as const, critical: true, options: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"] },
-    { id: "medicalIssues", title: "Medical issues?", type: "boolean" as const, critical: true },
-    { id: "soapAllergies", title: "Soap/fragrance allergies?", type: "boolean" as const, critical: true },
-    { id: "dryLaundry", title: "How do they dry laundry?", type: "single" as const, critical: true, options: ["Air-Dry", "Low Heat", "Dryer"] },
-    { id: "needStorage", title: "Need storage?", type: "boolean" as const, critical: true },
-    // --- Operational ---
-    { id: "suggestedGroups", title: "Suggested groups", type: "multi" as const, critical: false, options: ["RD", "RFD", "STD", "STFD", "LTD", "LTFD", "Inhome", "TLI", "Test", "Dispose", "Storage Only"] },
-    { id: "loadList", title: "What do we need to bring?", type: "multi" as const, critical: false, options: ["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"] },
-    { id: "considerations", title: "Special considerations", type: "multi" as const, critical: false, options: ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory", "Skin Sensitivity", "Premium Brands"] },
-    { id: "petsInHome", title: "Pets in home?", type: "multi" as const, critical: false, options: ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"] },
-    { id: "selfCleaning", title: "Self-clean anything?", type: "boolean" as const, critical: false },
-    { id: "useDryCleaner", title: "Use a dry cleaner?", type: "single" as const, critical: false, options: ["Yes", "No", "Rarely"] },
-    // --- Customer profiling ---
-    { id: "interests", title: "Activities & interests", type: "multi" as const, critical: false, options: ["School & Kids Sports", "Summer & Swim", "Winter & Snow", "Halloween", "Thanksgiving", "Christmas / Hanukkah", "Easter / Passover", "Religious Services", "Graduation", "Gym & Fitness", "Work from Home"] },
-    { id: "upcomingEvents", title: "Upcoming trips & events", type: "multi" as const, critical: false, options: ["Warm Weather Vacation", "Cold Weather Trip", "Wedding / Formal Event", "Business Trip", "Sports Tournament"] },
+    // --- General questions ---
+    { id: "conditions", title: "Current conditions?", type: "multi" as const, critical: true, timeline: false, options: ["Still Wet", "Visible Mold", "Structural Damage", "No Electricity", "No Heat", "Boarded Up"] },
+    { id: "packout", title: "What are we picking up?", type: "multi" as const, critical: true, timeline: false, options: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"] },
+    { id: "medicalIssues", title: "Medical issues?", type: "boolean" as const, critical: true, timeline: false },
+    { id: "soapAllergies", title: "Soap/fragrance allergies?", type: "boolean" as const, critical: true, timeline: false },
+    { id: "dryLaundry", title: "How do they dry laundry?", type: "single" as const, critical: true, timeline: false, options: ["Air-Dry", "Low Heat", "Dryer"] },
+    { id: "selfCleaning", title: "Self-clean anything?", type: "boolean" as const, critical: false, timeline: false },
+    { id: "useDryCleaner", title: "Use a dry cleaner?", type: "single" as const, critical: false, timeline: false, options: ["Yes", "No", "Rarely"] },
+    { id: "considerations", title: "Special considerations", type: "multi" as const, critical: false, timeline: false, options: ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory", "Skin Sensitivity", "Premium Brands"] },
+    { id: "petsInHome", title: "Pets in home?", type: "multi" as const, critical: false, timeline: false, options: ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"] },
+    { id: "loadList", title: "What do we need to bring?", type: "multi" as const, critical: false, timeline: false, options: ["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"] },
+    // --- Timeline / Rush Guide questions (green group) ---
+    { id: "suggestedGroups", title: "Suggested groups", type: "multi" as const, critical: false, timeline: true, options: ["RD", "RFD", "STD", "STFD", "LTD", "LTFD", "Inhome", "TLI", "Test", "Dispose", "Storage Only"] },
+    { id: "repairs", title: "What repairs are being done?", type: "multi" as const, critical: true, timeline: true, options: ["Cleaning Exposed", "Cleaning Everywhere", "Clean & Paint", "Plaster/Wall Repairs", "Refinish Floors", "Replace Floors", "Cosmetic (Cabinets/Tile)", "Major Structural/Electrical", "Gut/Rebuild"] },
+    { id: "packoutScope", title: "Has packout been discussed?", type: "single" as const, critical: true, timeline: true, options: ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout"] },
+    { id: "living", title: "Where will customer live during repairs?", type: "multi" as const, critical: true, timeline: true, options: ["Their Home", "Hotel", "Temp", "Moving", "Neighbor", "Relative", "Rental", "Other Home"] },
+    { id: "delivery", title: "Where should we make final delivery?", type: "single" as const, critical: true, timeline: true, options: ["Primary", "Hotel", "Temporary", "Business", "New Home", "TBD"] },
+    { id: "finalDeliveryDate", title: "Expected final delivery?", type: "single" as const, critical: true, timeline: true, options: ["Firm Date", "Must Be Before", "Deliver When Ready"] },
+    { id: "needStorage", title: "Need storage?", type: "boolean" as const, critical: true, timeline: true },
+    { id: "interests", title: "Activities & interests", type: "multi" as const, critical: false, timeline: true, options: ["School & Kids Sports", "Summer & Swim", "Winter & Snow", "Halloween", "Thanksgiving", "Christmas / Hanukkah", "Easter / Passover", "Religious Services", "Graduation", "Gym & Fitness", "Work from Home"] },
+    { id: "upcomingEvents", title: "Upcoming trips & events", type: "multi" as const, critical: false, timeline: true, options: ["Warm Weather Vacation", "Cold Weather Trip", "Wedding / Formal Event", "Business Trip", "Sports Tournament"] },
   ];
   const [interviewAnswers, setInterviewAnswers] = useState<Record<string, string | string[] | boolean | null>>(() => {
     if (!orderData) return {};
@@ -3609,6 +3372,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     if (d.packoutSummary?.length) a.packout = d.packoutSummary;
     if (d.sdsConsiderations?.length) a.considerations = d.sdsConsiderations;
     if (d.suggestedGroups?.length) a.suggestedGroups = d.suggestedGroups;
+    if (d.finalDeliveryQualifier) a.finalDeliveryDate = d.finalDeliveryQualifier;
     // Conditions from boolean flags
     const conditions: string[] = [];
     if (d.damageWasWet === true || d.damageWasWet === "Y") conditions.push("Still Wet");
@@ -3623,7 +3387,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     if (pets.length) a.petsInHome = pets;
     return a;
   });
-  const [showInterview, setShowInterview] = useState(false);
+
 
   // Sync interview answers to NOE in real-time
   const syncInterviewToNOE = useCallback((answers: Record<string, any>) => {
@@ -3648,6 +3412,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     if (answers.packout !== undefined) updates.packoutSummary = answers.packout;
     if (answers.considerations !== undefined) updates.sdsConsiderations = answers.considerations;
     if (answers.suggestedGroups !== undefined) updates.suggestedGroups = answers.suggestedGroups;
+    if (answers.finalDeliveryDate !== undefined) updates.finalDeliveryQualifier = answers.finalDeliveryDate;
     if (answers.interests !== undefined) updates.customerInterests = answers.interests;
     if (answers.upcomingEvents !== undefined) updates.customerUpcomingEvents = answers.upcomingEvents;
     if (Array.isArray(answers.conditions)) {
@@ -3687,11 +3452,11 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     });
   }, [syncInterviewToNOE]);
 
-  const interviewAnswered = INTERVIEW_SECTIONS.filter(s => s.critical).filter(s => {
+  const interviewAnswered = INTERVIEW_SECTIONS.filter(s => {
     const a = interviewAnswers[s.id];
     return a !== undefined && a !== null && (Array.isArray(a) ? a.length > 0 : a !== "");
   }).length;
-  const interviewTotal = INTERVIEW_SECTIONS.filter(s => s.critical).length;
+  const interviewTotal = INTERVIEW_SECTIONS.length;
   const [wizSelectedRooms, setWizSelectedRooms] = useState<Set<string>>(new Set());
   const [bulkEditing, setBulkEditing] = useState(false);
 
@@ -3743,7 +3508,6 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     if (pt) { const defs: Record<string, boolean> = {}; (ACCESS_DEFAULTS[pt] || []).forEach((k: string) => { defs[k] = true; }); return defs; }
     return {};
   });
-  const [showAccess, setShowAccess] = useState(false);
   // Unit info — for multi-unit buildings
   const isMultiUnit = ["house", "largehouse", "estate", "townhouse", "lowrise", "highrise", "storefront", "commercial"].includes(propType);
   const isHouseType = ["house", "largehouse", "estate"].includes(propType);
@@ -3905,7 +3669,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
       const photos = roomPhotos[rKey] || [];
       const issues: string[] = [];
       if (photos.length === 0) issues.push("No photos");
-      else if (!photos.some(p => p.reason)) issues.push("No tagged photos");
+      else if (!photos.some(p => p.reason) && !photos.some(p => p.tag === "cover" || p.tag === "roomCover")) issues.push("No tagged photos");
       if (issues.length > 0) missing.push({ room: r.name, fi, ri, issues });
     }));
     if (missing.length > 0) {
@@ -4051,7 +3815,32 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     }
     if (hasBasement) result.unshift({ name: "Basement", rooms: [{ name: "Rec", affected: false }, { name: "Laundry", affected: false }, { name: "Storage", affected: false }] });
     if (hasAttic) result.push({ name: "Attic", rooms: [{ name: "Attic", affected: false }] });
-    setHomeRooms(result);
+    // Preserve rooms that have photos or instructions
+    const hasData = (fi: number, ri: number) => {
+      const rKey = `${fi}-${ri}`;
+      return (roomPhotos[rKey] || []).length > 0 || !!(roomNotes || {})[rKey];
+    };
+    if (homeRooms.length > 0 && homeRooms.some((f, fi) => f.rooms.some((_, ri) => hasData(fi, ri)))) {
+      // Merge: keep rooms with data, replace empty ones
+      const preserved: FloorEntry[] = [];
+      homeRooms.forEach((f, fi) => {
+        const keptRooms = f.rooms.filter((_, ri) => hasData(fi, ri));
+        if (keptRooms.length > 0) preserved.push({ ...f, rooms: keptRooms });
+      });
+      // Add new generated rooms that don't conflict
+      result.forEach(f => {
+        const existing = preserved.find(p => p.name === f.name);
+        if (existing) {
+          const newRooms = f.rooms.filter(r => !existing.rooms.some(er => er.name === r.name));
+          existing.rooms.push(...newRooms);
+        } else {
+          preserved.push(f);
+        }
+      });
+      setHomeRooms(preserved);
+    } else {
+      setHomeRooms(result);
+    }
   };
 
   const markAll = (affected: boolean) => setHomeRooms(prev => prev.map(f => ({ ...f, rooms: f.rooms.map(r => ({ ...r, affected })) })));
@@ -4160,13 +3949,13 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
         };
         const MobileField = ({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) => (
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</div>
-            <input value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder || label} className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-[14px] text-slate-800 outline-none focus:border-blue-400 bg-white" />
+            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</div>
+            <input value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder || label} className="w-full rounded-[8px] border border-slate-200 px-2.5 py-1.5 text-[13px] text-slate-800 outline-none focus:border-blue-400 bg-white" />
           </div>
         );
         return (
         <div className="flex-1 overflow-auto bg-[#f5f7fb]" style={{ WebkitOverflowScrolling: "touch" }}>
-          <div className="px-4 pt-4 pb-20 space-y-3">
+          <div className="px-3 pt-3 pb-20 space-y-2">
             {/* Status bar */}
             <div className="flex items-center justify-between">
               <div className="text-[18px] font-bold text-slate-900">Order</div>
@@ -4179,14 +3968,22 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
             {/* Event Instructions — top priority for field team */}
             {d.eventInstructions && (
             <div className="rounded-[14px] border border-sky-200 bg-sky-50 p-4 space-y-1.5">
-              <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider">Event Instructions</div>
-              <div className="text-[13px] text-sky-800 whitespace-pre-wrap leading-relaxed">{d.eventInstructions}</div>
+              <div className="text-[11px] font-extrabold text-sky-600 uppercase tracking-wider">Event Instructions</div>
+              <div className="text-[13px] text-sky-800 leading-relaxed space-y-0.5">
+                {(d.eventInstructions || "").split("\n").filter(Boolean).map((line: string, i: number) => {
+                  const colonIdx = line.indexOf(":");
+                  if (colonIdx > 0 && colonIdx < 25) {
+                    return <div key={i}><span className="font-bold">{line.slice(0, colonIdx + 1)}</span>{line.slice(colonIdx + 1)}</div>;
+                  }
+                  return <div key={i}>{line}</div>;
+                })}
+              </div>
             </div>
             )}
 
             {/* Order section */}
-            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-3">
-              <div className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Order Info</div>
+            <div className="rounded-[12px] border border-slate-200 bg-white p-3 space-y-2">
+              <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Order Info</div>
               <MobileField label="Order Name" value={d.orderName} onChange={v => upd("orderName", v)} />
               <div className="grid grid-cols-2 gap-3">
                 <MobileField label="Claim #" value={d.claimNumber} onChange={v => upd("claimNumber", v)} />
@@ -4195,8 +3992,8 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
             </div>
 
             {/* Customer section */}
-            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-3">
-              <div className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Customer</div>
+            <div className="rounded-[12px] border border-slate-200 bg-white p-3 space-y-2">
+              <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Customer</div>
               <div className="grid grid-cols-2 gap-3">
                 <MobileField label="First Name" value={cust.first} onChange={v => updCust("first", v)} />
                 <MobileField label="Last Name" value={cust.last} onChange={v => updCust("last", v)} />
@@ -4206,23 +4003,137 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
             </div>
 
             {/* Address section */}
-            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-3">
-              <div className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Address</div>
-              <MobileField label="Street" value={addr.street} onChange={v => updAddr("street", v)} />
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-1"><MobileField label="City" value={addr.city} onChange={v => updAddr("city", v)} /></div>
+            <div className="rounded-[12px] border border-slate-200 bg-white p-3 space-y-2">
+              <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Address</div>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="col-span-3"><MobileField label="Street" value={addr.street} onChange={v => updAddr("street", v)} /></div>
+                <MobileField label="Apt/Unit" value={addr.apt} onChange={v => updAddr("apt", v)} />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <MobileField label="City" value={addr.city} onChange={v => updAddr("city", v)} />
                 <MobileField label="State" value={addr.state} onChange={v => updAddr("state", v)} />
                 <MobileField label="Zip" value={addr.zip} onChange={v => updAddr("zip", v)} />
               </div>
             </div>
 
-            {/* Services */}
-            {(d.serviceOfferings || []).length > 0 && (
-            <div className="rounded-[14px] border border-slate-200 bg-white p-4 space-y-2">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Services</div>
-              <div className="flex flex-wrap gap-1.5">{(d.serviceOfferings || []).map((s: string) => <span key={s} className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{s}</span>)}</div>
+            {/* Loss Type */}
+            <div className="rounded-[12px] border border-slate-200 bg-white p-3 space-y-2">
+              <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Loss Type</div>
+              <div className="flex flex-wrap gap-1.5">
+                {LOSS_TYPES.map(t => (
+                  <button key={t} onClick={() => upd("primaryLossType", d.primaryLossType === t ? "" : t)} className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${d.primaryLossType === t ? "border-orange-400 bg-orange-50 text-orange-700" : "border-slate-200 text-slate-500"}`}>{t}</button>
+                ))}
+              </div>
+              <MobileField label="Date of Loss" value={d.dateOfLoss} onChange={v => upd("dateOfLoss", v)} placeholder="YYYY-MM-DD" />
             </div>
-            )}
+
+            {/* Lead Source */}
+            <div className="rounded-[12px] border border-slate-200 bg-white p-3 space-y-2">
+              <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Lead Source</div>
+              <div className="flex flex-wrap gap-1.5">
+                {LEAD_SOURCES.map(s => (
+                  <button key={s} onClick={() => upd("leadSourceCategory", d.leadSourceCategory === s ? "" : s)} className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${d.leadSourceCategory === s ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>{s}</button>
+                ))}
+              </div>
+              {d.leadSourceCategory === "Referral" && (
+                <div className="space-y-2">
+                  <MobileField label="Referring Company" value={d.referringCompany} onChange={v => upd("referringCompany", v)} />
+                  <MobileField label="Referrer" value={d.referrer} onChange={v => upd("referrer", v)} />
+                </div>
+              )}
+            </div>
+
+            {/* Schedule */}
+            <div className="rounded-[12px] border border-slate-200 bg-white p-3 space-y-2">
+              <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Schedule</div>
+              <div className="grid grid-cols-2 gap-2">
+                <MobileField label="Date" value={d.pickupDate} onChange={v => upd("pickupDate", v)} placeholder="YYYY-MM-DD" />
+                <MobileField label="Time" value={d.pickupTime} onChange={v => upd("pickupTime", v)} placeholder="HH:MM" />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {["Scope", "Pickup", "In-Home"].map(t => (
+                  <button key={t} onClick={() => upd("scheduleType", d.scheduleType === t ? "" : t)} className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${d.scheduleType === t ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>{t}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Services — tap to toggle, expand for sub-options */}
+            <div className="rounded-[12px] border border-slate-200 bg-white p-3 space-y-1.5">
+              <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Services</div>
+              <div className="flex flex-wrap gap-1.5">
+                {SERVICE_OFFERINGS.map((s: string) => {
+                  const isOn = (d.serviceOfferings || []).includes(s);
+                  const hasSubs = !!SERVICE_SUB_CATEGORIES[s];
+                  const subs = ((d as any).serviceSubCategories || []).filter((x: string) => x.startsWith(`${s}: `)).map((x: string) => x.replace(`${s}: `, ""));
+                  const subLabel = subs.length > 0 ? ` (${subs.join(", ")})` : "";
+                  return (
+                    <button key={s} onClick={() => {
+                      if (!isOn) {
+                        upd("serviceOfferings", [...(d.serviceOfferings || []), s]);
+                        if (hasSubs) setExpandedService(s);
+                      } else if (hasSubs && expandedService !== s) {
+                        setExpandedService(s);
+                      } else {
+                        upd("serviceOfferings", (d.serviceOfferings || []).filter((x: string) => x !== s));
+                        // Clear sub-categories for this service
+                        const cleaned = ((d as any).serviceSubCategories || []).filter((x: string) => !x.startsWith(`${s}: `));
+                        onOrderUpdate?.({ serviceSubCategories: cleaned } as any);
+                        if (expandedService === s) setExpandedService(null);
+                      }
+                    }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-all ${isOn ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>
+                      {s}{subLabel}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Expanded sub-options for selected service */}
+              {expandedService && SERVICE_SUB_CATEGORIES[expandedService] && (d.serviceOfferings || []).includes(expandedService) && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-[9px] font-bold text-blue-600 uppercase tracking-wider">{expandedService} Options</div>
+                    <button onClick={() => setExpandedService(null)} className="text-[9px] font-bold text-slate-400 hover:text-slate-600">Done</button>
+                  </div>
+                  <div className="flex flex-wrap gap-1">{SERVICE_SUB_CATEGORIES[expandedService].map(sub => {
+                    const subKey = `${expandedService}: ${sub}`;
+                    const selected = ((d as any).serviceSubCategories || []).includes(subKey);
+                    return <button key={sub} onClick={() => { const current = (d as any).serviceSubCategories || []; onOrderUpdate?.({ serviceSubCategories: selected ? current.filter((x: string) => x !== subKey) : [...current, subKey] } as any); }} className={`rounded-full border px-2 py-0.5 text-[9px] font-bold transition-all ${selected ? "border-blue-500 bg-blue-100 text-blue-700" : "border-slate-200 text-slate-500 hover:border-blue-300"}`}>{sub}</button>;
+                  })}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Who's paying */}
+            <div className="rounded-[12px] border border-slate-200 bg-white p-3 space-y-2">
+              <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Billing</div>
+              <div className="flex flex-wrap gap-1.5">
+                {["Insurance", "Self-pay", "Referrer", "Other"].map(v => (
+                  <button key={v} onClick={() => { const patch: any = { payorQuick: d.payorQuick === v ? "" : v }; if (v === "Insurance") { patch.involvesInsurance = "Yes"; patch.insuranceClaim = "Yes"; } upd("payorQuick", patch.payorQuick); if (patch.involvesInsurance) { onOrderUpdate?.({ involvesInsurance: "Yes", insuranceClaim: "Yes" } as any); } }} className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${d.payorQuick === v ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>{v}</button>
+                ))}
+              </div>
+              {d.payorQuick === "Insurance" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <MobileField label="Insurance Co." value={d.insuranceCompany} onChange={v => upd("insuranceCompany", v)} />
+                  <MobileField label="Adjuster" value={d.insuranceAdjuster} onChange={v => upd("insuranceAdjuster", v)} />
+                </div>
+              )}
+            </div>
+
+            {/* Event Instructions */}
+            <div className="rounded-[12px] border border-slate-200 bg-white p-3 space-y-2">
+              <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Event Instructions</div>
+              {(d.serviceOfferings || []).length > 0 && (
+                <div className="text-[10px] text-sky-600 font-semibold">Services: {(d.serviceOfferings || []).map(s => {
+                  const subs = ((d as any).serviceSubCategories || []).filter((x: string) => x.startsWith(`${s}: `)).map((x: string) => x.replace(`${s}: `, ""));
+                  return subs.length > 0 ? `${s} (${subs.join(", ")})` : s;
+                }).join(", ")}</div>
+              )}
+              <textarea value={d.eventInstructions || ""} onChange={e => upd("eventInstructions", e.target.value)} placeholder="Instructions for field team..." rows={3} className="w-full rounded-[8px] border border-slate-200 px-2.5 py-1.5 text-[13px] text-slate-800 outline-none focus:border-blue-400 bg-white resize-none" />
+            </div>
+
+            {/* Save */}
+            <button onClick={(e) => { syncScopeToNoe(); const btn = e.currentTarget; btn.textContent = "Saved!"; btn.classList.add("!bg-green-600"); setTimeout(() => { btn.textContent = "Save Order"; btn.classList.remove("!bg-green-600"); }, 1500); }} className="w-full rounded-[12px] bg-blue-600 py-3 text-[13px] font-bold text-white hover:bg-blue-700 flex items-center justify-center gap-1.5 shadow-sm transition-colors">
+              Save Order
+            </button>
 
             {/* Open desktop order — fallback */}
             <button onClick={() => { if (onShowOrder) onShowOrder(); }} className="w-full rounded-[12px] border border-slate-200 bg-white py-3 text-[13px] font-bold text-slate-500 hover:bg-slate-50 flex items-center justify-center gap-1.5">
@@ -4242,20 +4153,33 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
               <span className="text-[17px] font-bold text-slate-900">Interview</span>
               <span className="rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-[11px] font-bold">{interviewAnswered}/{interviewTotal}</span>
             </div>
-            <div className="text-[12px] text-slate-400">Ask the customer these questions during or before the initial visit.</div>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="text-[12px] text-slate-400 flex-1">Ask the customer these questions during or before the initial visit.</div>
+              <button onClick={() => { const el = document.getElementById("interview-timeline-header"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-full bg-green-100 border border-green-300 px-3 py-1 text-[10px] font-bold text-green-700 hover:bg-green-200 shrink-0">Timeline</button>
+            </div>
           </div>
           <div className="pb-20">
-            {INTERVIEW_SECTIONS.map(section => {
+            {INTERVIEW_SECTIONS.map((section, qIdx) => {
               const answer = interviewAnswers[section.id];
               const noteKey = `${section.id}_note`;
               const noteVal = (interviewAnswers[noteKey] as string) || "";
               const hasAnswer = answer !== undefined && answer !== null && answer !== "" && (!Array.isArray(answer) || answer.length > 0);
+              const isFirstTimeline = (section as any).timeline && (qIdx === 0 || !(INTERVIEW_SECTIONS[qIdx - 1] as any).timeline);
               return (
-                <div key={section.id} className="px-5 py-4 border-b border-slate-100">
+                <React.Fragment key={section.id}>
+                {isFirstTimeline && (
+                  <div id="interview-timeline-header" className="px-5 pt-4 pb-2 bg-green-50 border-t-2 border-green-300">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-green-700 uppercase tracking-wider">Delivery Timeline</span>
+                      <span className="text-[9px] text-green-500">These questions inform the Rush Guide</span>
+                    </div>
+                  </div>
+                )}
+                <div id={`app-interview-q-${qIdx + 1}`} className={`px-5 py-4 border-b border-slate-100 ${(section as any).timeline ? "bg-green-50/30 border-l-4 border-l-green-400" : ""}`}>
                   <div className="mb-3 flex items-center gap-2">
-                    <span className={`text-[12px] font-extrabold uppercase tracking-[1px] ${section.critical ? "text-violet-600" : "text-slate-400"}`}>{section.title}</span>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${hasAnswer ? ((section as any).timeline ? "bg-green-500 text-white" : "bg-sky-500 text-white") : "bg-slate-200 text-slate-500"}`}>{hasAnswer ? "✓" : qIdx + 1}</span>
+                    <span className={`text-[13px] font-bold ${(section as any).timeline ? "text-green-700" : "text-sky-600"}`}>{section.title}</span>
                     {section.critical && !hasAnswer && <span className="text-[10px] font-bold text-orange-500">Required</span>}
-                    {hasAnswer && <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>}
                   </div>
                   {section.type === "boolean" && (
                     <div className="space-y-2.5">
@@ -4290,7 +4214,15 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                       })}
                     </div>
                   )}
+                  {/* Done button — scrolls to next question */}
+                  <div className="flex justify-end mt-2">
+                    <button onClick={() => {
+                      const nextEl = document.getElementById(`app-interview-q-${qIdx + 2}`);
+                      if (nextEl) nextEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }} className={`rounded-md px-3 py-1 text-xs font-bold ${hasAnswer ? "bg-sky-500 text-white hover:bg-sky-600" : "bg-slate-200 text-slate-500 hover:bg-slate-300"}`}>{hasAnswer ? "Next" : "Skip"}</button>
+                  </div>
                 </div>
+                </React.Fragment>
               );
             })}
           </div>
@@ -5296,7 +5228,18 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Instructions</div>
                   {/* Instruction type buttons */}
                   <div className="flex flex-wrap gap-1.5">
-                    {["Pickup", "Inhome", "Furniture", "TLI", "Test", "Dispose", "Storage"].map(iType => {
+                    {(() => {
+                      const so = (orderData as any)?.serviceOfferings || [];
+                      const SERVICE_TO_SCOPE: Record<string, string[]> = {
+                        "Pack-out": ["Pickup"], "Contents": ["Pickup"], "Rugs": ["Pickup"], "Textiles": ["Pickup"],
+                        "Furniture": ["Furniture", "Pickup"], "Art": ["Pickup"], "Appliance": ["Pickup"],
+                        "TLI": ["TLI"], "Storage Only": ["Storage"], "Consulting": ["Test"],
+                      };
+                      const relevant = new Set(["Inhome", "Dispose"]); // always show
+                      so.forEach(s => (SERVICE_TO_SCOPE[s] || []).forEach(t => relevant.add(t)));
+                      if (so.length === 0) ["Pickup", "Inhome", "Furniture", "TLI", "Test", "Dispose", "Storage"].forEach(t => relevant.add(t));
+                      return [...relevant];
+                    })().map(iType => {
                       const isActive = (note || "").toLowerCase().includes(iType.toLowerCase());
                       return <button key={iType} onClick={() => {
                         const current = note || "";
@@ -5342,9 +5285,17 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
           <button onClick={() => { if (step === 4 && roomPass > 1) { setRoomPass((roomPass - 1) as 1 | 2 | 3); } else setStep(step - 1); }} className="rounded-[12px] border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-50 shadow-sm">Back</button>
         ) : <div />}
         {step < totalSteps ? (
-          <button onClick={advanceStep} disabled={!canAdvance} className="rounded-[14px] bg-blue-600 px-5 py-2.5 text-[14px] font-bold text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 shadow-sm transition-all">
-            Next
-          </button>
+          <div className="flex items-center gap-2">
+            {step === 1 && (
+              <button onClick={openCoverCamera} className="rounded-[14px] border-2 border-blue-300 bg-blue-50 px-3 py-2.5 text-[12px] font-bold text-blue-600 hover:bg-blue-100 shadow-sm transition-all flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.04l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
+                {orderCoverPhoto ? "Retake Cover" : "Cover Photo"}
+              </button>
+            )}
+            <button onClick={advanceStep} disabled={!canAdvance} className="rounded-[14px] bg-blue-600 px-5 py-2.5 text-[14px] font-bold text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 shadow-sm transition-all">
+              Next
+            </button>
+          </div>
         ) : roomPass < 3 ? (
           <button onClick={() => setRoomPass((roomPass + 1) as 2 | 3)} className="rounded-[14px] bg-blue-600 px-5 py-2.5 text-[14px] font-bold text-white hover:bg-blue-700 shadow-sm transition-all">
             Next
@@ -5463,13 +5414,14 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
           {([
             { id: "order" as const, label: "Order", icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" /></svg> },
             { id: "interview" as const, label: "Interview", badge: `${interviewAnswered}/${interviewTotal}`, icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /></svg> },
-            { id: "scope" as const, label: "Scope", icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.04l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg> },
+            { id: "scope" as const, label: "Scope", icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg> },
+            { id: "photos" as const, label: "Photos", icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.04l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg> },
             { id: "report" as const, label: "Report", icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg> },
           ]).map(tab => {
             const isActive = activeTab === tab.id;
             const color = tab.id === "interview" ? (interviewAnswered === interviewTotal ? "text-green-600" : "text-violet-600") : isActive ? "text-blue-600" : "text-slate-400";
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors ${isActive ? "border-t-2 border-blue-600 -mt-[2px]" : ""}`}>
+              <button key={tab.id} onClick={() => { if (tab.id === "photos") { setActiveTab("scope"); setShowWalkthrough(true); const firstAffected = homeRooms.findIndex(f => f.rooms.some(r => r.affected)); if (firstAffected >= 0) { const ri = homeRooms[firstAffected].rooms.findIndex(r => r.affected); if (ri >= 0) setWalkthroughRoom({ fi: firstAffected, ri }); } setTimeout(() => startCamera(), 400); } else { setActiveTab(tab.id); } }} className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors ${isActive ? "border-t-2 border-blue-600 -mt-[2px]" : ""}`}>
                 <div className={color}>{tab.icon}</div>
                 <span className={`text-[10px] font-bold ${color}`}>{tab.label}</span>
                 {tab.badge && <span className={`text-[8px] font-bold ${color}`}>{tab.badge}</span>}
@@ -5510,11 +5462,80 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
             </div>
           </div>
         </div>
-      )}
+	      )}
 
-      {/* Persistent camera input — always mounted when walkthrough is active */}
-      {showWalkthrough && (
-        <input
+	      <input
+	        ref={coverInputRef}
+	        type="file"
+	        accept="image/*"
+	        capture="environment"
+	        className="hidden"
+	        onChange={(e) => {
+	          saveCoverPhotoFile(e.target.files?.[0]);
+	          e.target.value = "";
+	        }}
+	      />
+
+	      {coverCameraOpen && (
+	        <div className="absolute inset-0 z-50 bg-black flex flex-col rounded-[44px] overflow-hidden">
+	          <div className="absolute inset-0 bg-black">
+	            {cameraActive ? (
+	              <video
+	                ref={(el) => {
+	                  videoRef.current = el;
+	                  if (el && camStreamRef.current) {
+	                    el.srcObject = camStreamRef.current;
+	                    el.play().catch(() => {});
+	                  }
+	                }}
+	                autoPlay
+	                playsInline
+	                muted
+	                className="absolute inset-0 h-full w-full object-cover"
+	              />
+	            ) : (
+	              <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white/70">
+	                Opening camera...
+	              </div>
+	            )}
+	          </div>
+	          <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 pt-14 pb-3 bg-gradient-to-b from-black/70 to-transparent">
+	            <button onClick={() => { setCoverCameraOpen(false); stopCamera(); }} className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-lg font-bold">×</button>
+	            <div className="text-white text-[14px] font-bold">Order Cover Photo</div>
+	            <button onClick={() => coverInputRef.current?.click()} className="rounded-full bg-white/20 px-3 py-1.5 text-[11px] font-bold text-white/90">Choose</button>
+	          </div>
+		          {cameraError && (
+		            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black px-6 text-center">
+		              <div className="mb-3 text-[15px] font-bold text-white">{cameraError}</div>
+		              <div className="mb-5 max-w-[300px] text-[12px] font-semibold leading-relaxed text-white/55">Browser camera access can be blocked by desktop responsive mode or permissions. Choosing a photo will still save it as the cover.</div>
+		              <button onClick={() => coverInputRef.current?.click()} className="rounded-xl bg-blue-600 px-6 py-3 text-[14px] font-bold text-white hover:bg-blue-700">Choose Photo</button>
+		            </div>
+		          )}
+	          <div className="absolute bottom-0 left-0 right-0 z-20 pb-8 pt-5 bg-gradient-to-t from-black/80 via-black/50 to-transparent flex flex-col items-center gap-3">
+	            <button
+	              onClick={() => {
+	                const dataUrl = captureFromCamera();
+	                if (!dataUrl) {
+	                  coverInputRef.current?.click();
+	                  return;
+	                }
+	                setOrderCoverPhoto(dataUrl);
+	                setCoverCameraOpen(false);
+	                stopCamera();
+	                setToastMsg("Cover photo saved");
+	              }}
+	              className="w-[72px] h-[72px] rounded-full border-[4px] border-white flex items-center justify-center active:scale-90 transition-transform"
+	            >
+	              <div className="w-[58px] h-[58px] rounded-full bg-white" />
+	            </button>
+		            <div className="text-[11px] font-semibold text-white/70">{cameraActive ? "Tap shutter to save cover photo" : "Waiting for camera access"}</div>
+	          </div>
+	        </div>
+	      )}
+
+	      {/* Persistent camera input — always mounted when walkthrough is active */}
+	      {showWalkthrough && (
+	        <input
           ref={cameraInputRef}
           type="file"
           accept="image/*"
@@ -5554,10 +5575,26 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
           </div>
           <div className="flex-1 overflow-auto p-4 space-y-3">
             {homeRooms.length === 0 ? (
-              <div className="text-center py-10 space-y-3">
+              <div className="text-center py-10 space-y-4">
                 <div className="text-[14px] font-semibold text-slate-600">No rooms yet</div>
-                <div className="text-[12px] text-slate-400">Add rooms in the Rooms step first, or generate them now.</div>
-                <button onClick={() => { generateRooms(); }} className="rounded-full bg-blue-600 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-blue-700">Generate Rooms</button>
+                <div className="text-[12px] text-slate-400 max-w-xs mx-auto">Generate default rooms, or add one room at a time and start taking photos.</div>
+                <div className="flex flex-col items-center gap-2">
+                  <button onClick={() => { generateRooms(); }} className="rounded-full bg-blue-600 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-blue-700 w-48">Generate Rooms</button>
+                  <div className="text-[11px] text-slate-400">or</div>
+                  <button onClick={() => {
+                    const floorName = "Floor 1";
+                    const roomName = prompt("Room name:", "Living") || "Room 1";
+                    if (!roomName.trim()) return;
+                    setHomeRooms([{ name: floorName, rooms: [{ name: roomName.trim(), affected: true }] }]);
+                  }} className="rounded-full border-2 border-blue-300 bg-blue-50 px-5 py-2.5 text-[13px] font-bold text-blue-600 hover:bg-blue-100 w-48">+ Add a Room</button>
+                  <button onClick={() => {
+                    setHomeRooms([{ name: "Floor 1", rooms: [{ name: "Room 1", affected: true }] }]);
+                    setTimeout(() => { setShowWalkthrough(true); setWalkthroughRoom({ fi: 0, ri: 0 }); setTimeout(() => startCamera(), 400); }, 100);
+                  }} className="rounded-full border-2 border-slate-200 bg-white px-5 py-2.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50 w-48 flex items-center justify-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.04l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
+                    Take a Photo
+                  </button>
+                </div>
               </div>
             ) : (
               <>
@@ -5647,6 +5684,9 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
         const nextRoom = curIdx < allAffected.length - 1 ? allAffected[curIdx + 1] : null;
 
         const openCamera = () => cameraInputRef.current?.click();
+        const switchToRoom = (newFi: number, newRi: number) => {
+          setRoomSwitching(true); stopCamera(); setWalkthroughRoom({ fi: newFi, ri: newRi }); setTimeout(() => { startCamera(); setRoomSwitching(false); }, 300);
+        };
         const handleShutter = () => {
           // If camera video isn't rendering, fall back to file picker
           if (!videoRef.current?.videoWidth) {
@@ -5684,6 +5724,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
           {cameraActive && (
             <div className="absolute inset-0 z-10 bg-black" style={{ position: "absolute" }}>
               <video ref={(el) => { videoRef.current = el; if (el && camStreamRef.current) { el.srcObject = camStreamRef.current; el.play().catch(() => {}); } }} autoPlay playsInline muted style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              {roomSwitching && <div className="absolute inset-0 z-40 bg-black" />}
               {/* Overlay controls */}
               <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-14 pb-2 bg-gradient-to-b from-black/60 to-transparent">
                 <button onClick={() => stopCamera()} className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-sm font-bold">×</button>
@@ -5702,9 +5743,11 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                   {/* Top info bar — room name, origin, cover badges */}
                   <div className="absolute top-0 left-0 right-0 px-4 pt-14 pb-3 bg-gradient-to-b from-black/70 to-transparent flex items-center gap-2">
                     <span className="text-white text-[14px] font-bold">{room.name}</span>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); const newName = prompt("Rename room:", room.name); if (newName?.trim()) setHomeRooms(prev => prev.map((f, fIdx) => fIdx === fi ? { ...f, rooms: f.rooms.map((r, rIdx) => rIdx === ri ? { ...r, name: newName.trim() } : r) } : f)); }} className="text-white/50 hover:text-white" title="Rename room">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" /></svg>
+                    </button>
                     {isOriginRoom && <span className="rounded-full bg-red-500 text-white px-2 py-0.5 text-[9px] font-bold">Origin</span>}
                     {isCover && <span className="rounded-full bg-blue-500 text-white px-2 py-0.5 text-[9px] font-bold">{capturedPhoto.tag === "cover" ? "Order Cover" : "Room Cover"}</span>}
-                    <span className="text-white/50 text-[11px] font-bold ml-auto">Photo #{lastCapturedIdx + 1}</span>
                   </div>
                   {/* Tag overlay — scrollable bottom panel */}
                   <div className="absolute left-0 right-0 bottom-0 px-3 pb-6 pt-2 bg-gradient-to-t from-black/90 via-black/70 to-transparent" style={{ maxHeight: "60%" }}>
@@ -5721,6 +5764,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                             });
                             setLastCapturedIdx(null);
                           }} className="rounded-full bg-white/20 px-3 py-1.5 text-white/80 text-xs font-bold hover:bg-red-500/50">Retake</button>
+                          <button onClick={() => { updatePhoto(lastCapturedIdx, "scopeInclude", !(capturedPhoto as any).scopeInclude); }} className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all ${(capturedPhoto as any).scopeInclude ? "bg-violet-500 text-white" : "bg-white/20 text-white/80 hover:bg-violet-500/50"}`}>{(capturedPhoto as any).scopeInclude ? "In Scope ✓" : "Add to Scope"}</button>
                           <button onClick={() => setLastCapturedIdx(null)} className="rounded-full bg-green-500 px-4 py-1.5 text-white text-xs font-bold">Done</button>
                         </div>
                       </div>
@@ -5737,6 +5781,20 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                             <div key={dept}>
                               <div className="text-[9px] font-bold text-white/50 uppercase tracking-wider mb-1">{dept}</div>
                               <div className="flex flex-wrap gap-1">
+                                {/* All button for this department */}
+                                {(() => {
+                                  const currentSub = (capturedPhoto as any).subReason || "";
+                                  const allOn = items.every(item => currentSub.includes(item));
+                                  return <button onClick={() => {
+                                    const parts = currentSub.split(", ").filter(Boolean);
+                                    const next = allOn ? parts.filter(p => !items.includes(p)) : [...new Set([...parts, ...items])];
+                                    setRoomPhotos(p => {
+                                      const arr = [...(p[rKey] || [])];
+                                      arr[lastCapturedIdx] = { ...arr[lastCapturedIdx], subReason: next.join(", ") };
+                                      return { ...p, [rKey]: arr };
+                                    });
+                                  }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold text-white transition-all ${allOn ? "border-yellow-400 bg-yellow-500/30" : "border-white/40 hover:bg-white/10"}`}>All</button>;
+                                })()}
                                 {items.map(item => {
                                   const currentSub = (capturedPhoto as any).subReason || "";
                                   const isSelected = currentSub.includes(item);
@@ -5791,13 +5849,14 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                           className="flex-1 rounded-lg bg-white/10 border border-white/20 px-2.5 py-1.5 text-[11px] text-white placeholder-white/40 outline-none focus:border-white/50"
                         />
                         <button onClick={() => {
-                          const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-                          if (!SR) return;
-                          if (voiceTarget?.rKey === rKey && voiceTarget?.index === lastCapturedIdx) {
-                            voiceRecRef.current?.stop(); voiceRecRef.current = null; setVoiceTarget(null);
-                          } else {
-                            const rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
-                            let base = capturedPhoto.note || "";
+	                          const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+	                          if (!SR) return;
+	                          if (voiceTarget?.rKey === rKey && voiceTarget?.index === lastCapturedIdx) {
+	                            stopVoiceRecording();
+	                          } else {
+	                            stopVoiceRecording();
+	                            const rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+                            const base = capturedPhoto.note || "";
                             rec.onresult = (e: any) => {
                               let text = base;
                               for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -5842,12 +5901,20 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                       return (
                         <button key={fIdx} onClick={() => {
                           const firstRoom = f.rooms.findIndex(r => autoAddRooms || r.affected);
-                          if (firstRoom >= 0 && !isCurrentFloor) { stopCamera(); setWalkthroughRoom({ fi: fIdx, ri: firstRoom }); setTimeout(() => startCamera(), 300); }
+                          if (firstRoom >= 0 && !isCurrentFloor) switchToRoom(fIdx, firstRoom);
                         }} className={`rounded-full px-3 py-0.5 text-[9px] font-bold transition-all ${isCurrentFloor ? "bg-blue-500 text-white" : "bg-white/15 text-white/60 hover:bg-white/25"}`}>
                           {f.name} {floorPhotos > 0 && <span className="text-green-300 ml-0.5">{floorPhotos}</span>}
                         </button>
                       );
                     })}
+                    <button onClick={() => {
+                      const newFloorName = `Floor ${homeRooms.length + 1}`;
+                      setHomeRooms(prev => [...prev, { name: newFloorName, rooms: [{ name: "Room 1", affected: true }] }]);
+                      setTimeout(() => {
+                        const newFi = homeRooms.length;
+                        stopCamera(); setWalkthroughRoom({ fi: newFi, ri: 0 }); setTimeout(() => startCamera(), 300);
+                      }, 100);
+                    }} className="rounded-full px-2 py-0.5 text-[9px] font-bold bg-blue-500/30 text-blue-300 hover:bg-blue-500/50 border border-dashed border-blue-300/50" title="Add floor">+</button>
                     <button onClick={() => { stopCamera(); setWalkthroughRoom(null); tryExitWalkthrough(); }} className="rounded-full px-3 py-0.5 text-[9px] font-bold bg-green-500/30 text-green-300 hover:bg-green-500/50">Done</button>
                   </div>
                   {/* Rooms on current floor */}
@@ -5859,12 +5926,26 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                         const isCurrent = rIdx === ri;
                         const count = (roomPhotos[rk] || []).length;
                         return (
-                          <button key={rk} onClick={() => { if (!isCurrent) { stopCamera(); setWalkthroughRoom({ fi, ri: rIdx }); setTimeout(() => startCamera(), 300); } }} className={`flex flex-col items-center rounded-lg px-2 py-1 min-w-[52px] transition-all ${isCurrent ? "bg-white/30 ring-1 ring-white" : "bg-white/10 hover:bg-white/20"}`}>
+                          <button key={rk} onClick={() => { if (!isCurrent) switchToRoom(fi, rIdx); }} className={`flex flex-col items-center rounded-lg px-2 py-1 min-w-[52px] transition-all ${isCurrent ? "bg-white/30 ring-1 ring-white" : "bg-white/10 hover:bg-white/20"}`}>
                             <span className={`text-[10px] font-bold leading-tight ${isCurrent ? "text-white" : "text-white/70"}`}>{r.name}</span>
                             <span className={`text-[8px] font-bold ${count > 0 ? "text-green-400" : "text-white/30"}`}>{count > 0 ? `${count}` : "—"}</span>
                           </button>
                         );
                       }).filter(Boolean)}
+                      {/* Add Room button */}
+                      <button onClick={() => {
+                        const floor = homeRooms[fi];
+                        if (!floor) return;
+                        const newRoom = { name: `Room ${floor.rooms.length + 1}`, affected: true };
+                        setHomeRooms(prev => prev.map((f, idx) => idx === fi ? { ...f, rooms: [...f.rooms, newRoom] } : f));
+                        setTimeout(() => {
+                          const newIdx = floor.rooms.length;
+                          stopCamera(); setWalkthroughRoom({ fi, ri: newIdx }); setTimeout(() => startCamera(), 300);
+                        }, 100);
+                      }} className="flex flex-col items-center rounded-lg px-2 py-1 min-w-[52px] bg-white/10 hover:bg-white/20 border border-dashed border-white/30">
+                        <span className="text-[10px] font-bold text-white/70">+</span>
+                        <span className="text-[8px] font-bold text-white/40">Add</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -5874,12 +5955,20 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
 
           {/* Header */}
           <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 z-0">
-            <button onClick={() => { stopCamera(); setWalkthroughRoom(null); }} className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100">
-              <span className="text-sm">←</span>
+            <button onClick={() => { stopCamera(); setWalkthroughRoom(null); }} className="flex items-center justify-center h-10 w-10 rounded-full border-2 border-slate-300 text-slate-500 hover:bg-slate-100 hover:border-slate-400">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 flex items-center gap-1.5">
               <span className="text-[15px] font-bold text-slate-800">{room.name}</span>
-              <span className="text-[12px] text-slate-400 ml-2">{photos.length} photo{photos.length !== 1 ? "s" : ""}</span>
+              <button type="button" onClick={() => {
+                const newName = prompt("Rename room:", room.name);
+                if (newName && newName.trim()) {
+                  setHomeRooms(prev => prev.map((f, fIdx) => fIdx === fi ? { ...f, rooms: f.rooms.map((r, rIdx) => rIdx === ri ? { ...r, name: newName.trim() } : r) } : f));
+                }
+              }} className="text-slate-300 hover:text-slate-500 text-[10px]" title="Rename room">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" /></svg>
+              </button>
+              <span className="text-[12px] text-slate-400 ml-1">{photos.length} photo{photos.length !== 1 ? "s" : ""}</span>
             </div>
             <span className="text-[11px] text-slate-400 font-bold">{curIdx + 1}/{allAffected.length}</span>
           </div>
@@ -5941,6 +6030,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                           </div>
                           <div className="text-[10px] font-bold text-blue-600 uppercase pt-1">Department</div>
                           <div className="flex flex-wrap gap-1">
+                            <button onClick={() => { const allDepts = Object.keys(PICKUP_DEPARTMENTS); const allOn = allDepts.every(d => selectedSubs.includes(d)); if (allOn) { allDepts.forEach(d => { if (selectedSubs.includes(d)) toggleSub(d); }); } else { allDepts.forEach(d => { if (!selectedSubs.includes(d)) toggleSub(d); }); } }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${Object.keys(PICKUP_DEPARTMENTS).every(d => selectedSubs.includes(d)) ? "border-blue-500 bg-blue-100 text-blue-700" : "border-slate-300 text-slate-600"}`}>All</button>
                             {Object.keys(PICKUP_DEPARTMENTS).map(d => {
                               const isOn = selectedSubs.includes(d);
                               return <button key={d} onClick={() => toggleSub(d)} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${isOn ? "border-blue-500 bg-blue-100 text-blue-700" : "border-slate-200 text-slate-500"}`}>{d}</button>;
@@ -5970,6 +6060,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                         <div className="rounded-[10px] border border-slate-200 bg-slate-50/50 p-2 space-y-1">
                           <div className="text-[9px] font-bold text-slate-500 uppercase">Details</div>
                           <div className="flex flex-wrap gap-1">
+                            <button onClick={() => { const allOn = subs.every(s => selectedSubs.includes(s)); const next = allOn ? selectedSubs.filter(s => !subs.includes(s)) : [...new Set([...selectedSubs, ...subs])]; updatePhoto(pi, "note", next.join(", ")); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-all ${subs.every(s => selectedSubs.includes(s)) ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-300 text-slate-600"}`}>All</button>
                             {subs.map(s => (
                               <button key={s} onClick={() => toggleSub(s)} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-all ${selectedSubs.includes(s) ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{s}</button>
                             ))}
@@ -5985,15 +6076,14 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                       <div className="flex items-center gap-1.5">
                         <input value={photo.note} onChange={e => updatePhoto(pi, "note", e.target.value)} placeholder={room.affected ? "Add note..." : "Additional notes..."} className="flex-1 rounded-[8px] border border-slate-200 px-3 py-1.5 text-[12px] text-slate-700 outline-none focus:border-blue-400" />
                         <button onClick={() => {
-                          const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-                          if (!SR) return;
-                          if (voiceTarget?.rKey === rKey && voiceTarget?.index === pi) {
-                            // Stop recording
-                            voiceRecRef.current?.stop(); voiceRecRef.current = null; setVoiceTarget(null);
-                          } else {
-                            // Start recording
-                            const rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
-                            let base = photo.note || "";
+	                          const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+	                          if (!SR) return;
+	                          if (voiceTarget?.rKey === rKey && voiceTarget?.index === pi) {
+	                            stopVoiceRecording();
+	                          } else {
+	                            stopVoiceRecording();
+	                            const rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+                            const base = photo.note || "";
                             rec.onresult = (e: any) => {
                               let text = base;
                               for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -6001,8 +6091,8 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                               }
                               updatePhoto(pi, "note", text);
                             };
-                            rec.onerror = () => { voiceRecRef.current = null; setVoiceTarget(null); };
-                            rec.onend = () => { if (voiceTarget) { try { rec.start(); } catch {} } };
+	                            rec.onerror = () => { voiceRecRef.current = null; setVoiceTarget(null); };
+	                            rec.onend = () => { voiceRecRef.current = null; setVoiceTarget(null); };
                             rec.start(); voiceRecRef.current = rec; setVoiceTarget({ rKey, index: pi });
                           }
                         }} className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[14px] ${voiceTarget?.rKey === rKey && voiceTarget?.index === pi ? "bg-red-100 text-red-600 animate-pulse" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
@@ -6042,10 +6132,10 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
             {/* Room navigation */}
             <div className="px-4 py-2 flex justify-between gap-3">
               {prevRoom ? (
-                <button onClick={() => { stopCamera(); setWalkthroughRoom({ fi: prevRoom.fi, ri: prevRoom.ri }); setTimeout(() => startCamera(), 300); }} className="rounded-[12px] border border-slate-200 bg-white px-4 py-2 text-[12px] font-bold text-slate-600 hover:bg-slate-50">← {prevRoom.name}</button>
+                <button onClick={() => switchToRoom(prevRoom.fi, prevRoom.ri)} className="rounded-[12px] border border-slate-200 bg-white px-4 py-2 text-[12px] font-bold text-slate-600 hover:bg-slate-50">← {prevRoom.name}</button>
               ) : <div />}
               {nextRoom ? (
-                <button onClick={() => { stopCamera(); setWalkthroughRoom({ fi: nextRoom.fi, ri: nextRoom.ri }); setTimeout(() => startCamera(), 300); }} className="rounded-[12px] bg-slate-100 px-4 py-2 text-[12px] font-bold text-slate-700 hover:bg-slate-200">
+                <button onClick={() => switchToRoom(nextRoom.fi, nextRoom.ri)} className="rounded-[12px] bg-slate-100 px-4 py-2 text-[12px] font-bold text-slate-700 hover:bg-slate-200">
                   {nextRoom.name} →
                 </button>
               ) : (
@@ -6235,8 +6325,8 @@ const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {
     { id: 'sec2', label: 'Do Not Contact', keywords: 'do not contact warning' },
     { id: 'sec2', label: 'Send Welcome Text', keywords: 'welcome text brochure rush guide authorization cos google review' },
     { id: 'sec2', label: 'Customer Notes', keywords: 'notes quick notes' },
-    { id: 'sec5', sub: 'schedule', label: 'Customer Contacted', keywords: 'customer contacted contact attempt call phone reached' },
-    { id: 'sec5', sub: 'schedule', label: 'Bill To Contacted', keywords: 'bill to contacted billing contact attempt insurance adjuster reached' },
+    { id: 'sec5', sub: 'schedule', label: 'Customer Contacted', keywords: 'customer contacted contact attempt call phone reached', navAction: 'scrollContactLog' },
+    { id: 'sec5', sub: 'schedule', label: 'Bill To Contacted', keywords: 'bill to contacted billing contact attempt insurance adjuster reached', navAction: 'scrollContactLog' },
 
     { id: 'sec3', label: 'Address Section', keywords: 'address section' },
     { id: 'sec3', label: 'Find on Google', keywords: 'find on google address lookup' },
@@ -6510,10 +6600,10 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                                 const status = getStatus(step.id);
                                 const isLast = idx === steps.length - 1;
                                 const hasSubsections = !!step.subsections?.length;
-                                let circleClass = "bg-white border-slate-300 text-slate-400 group-hover:border-slate-400";
-                                if (status === 'active') circleClass = "bg-sky-500 border-sky-500 text-white shadow-md scale-110";
-                                else if (status === 'done') circleClass = "bg-sky-50 border-2 border-sky-500 text-sky-700 shadow-sm";
-                                else if (status === 'visited') circleClass = "bg-white border-2 border-sky-500 text-sky-600";
+                                let circleClass = "bg-white border border-slate-300 text-slate-400 group-hover:border-slate-400";
+                                if (status === 'active') circleClass = "bg-sky-500 border-2 border-sky-500 text-white shadow-lg shadow-sky-200 scale-110";
+                                else if (status === 'done') circleClass = "bg-white border-2 border-sky-500 text-sky-600";
+                                else if (status === 'visited') circleClass = "bg-white border-2 border-sky-400 text-sky-500";
 
                                 return (
                                     <React.Fragment key={step.id}>
@@ -6529,10 +6619,10 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                                                 className="group flex flex-col items-center gap-1 focus:outline-none z-10 relative"
                                                 title={hasSubsections ? "Click once for section menu, click again for first subsection" : "Go to section"}
                                               >
-                                                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 border ${circleClass}`}>
-                                                      {status === 'done' ? '✓' : idx + 1}
+                                                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ${circleClass}`}>
+                                                      {idx + 1}
                                                   </div>
-                                                  <span className={`absolute top-9 text-[9px] font-bold uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${status === 'active' ? 'text-sky-700 opacity-100' : status === 'done' ? 'text-sky-600 opacity-100 block' : 'text-slate-400 opacity-100 block'}`}>
+                                                  <span className={`absolute top-9 text-[9px] font-bold uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${status === 'active' ? 'text-sky-700' : status === 'done' || status === 'visited' ? 'text-sky-500' : 'text-slate-400'}`}>
                                                       {step.label}
                                                   </span>
                                               </button>
@@ -6561,9 +6651,7 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                                               )}
                                             </div>
                                             {!isLast && (
-                                                <div className="flex-1 h-[2px] bg-slate-200 mx-2 rounded relative overflow-hidden">
-                                                    <div className={`absolute left-0 top-0 h-full bg-sky-500 transition-all duration-500`} style={{ width: status === 'visited' || status === 'done' || status === 'active' ? '100%' : '0%' }}></div>
-                                                </div>
+                                                <div className={`flex-1 h-[2px] mx-2 rounded transition-all duration-500 ${status === 'visited' || status === 'done' || status === 'active' ? 'bg-sky-400' : 'bg-slate-200'}`}></div>
                                             )}
                                         </div>
                                     </React.Fragment>
@@ -6662,45 +6750,47 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
 };
 
 // --- FLOATING CAPSULE BAR (Bottom) ---
-const FloatingCapsule = ({ entryMode, setEntryMode, onSave, setShowSearch, onInterview, interviewPanelOpen, onActionItems, actionItemsOpen, actionItemCount, modeButtonFlash }) => {
+const FloatingCapsule = ({ entryMode, setEntryMode, onSave, setShowSearch, onInterview, interviewPanelOpen, onActionItems, actionItemsOpen, actionItemCount, modeButtonFlash, compactMode = false }) => {
     return (
-        <div className="fixed bottom-4 sm:bottom-8 left-0 z-50 flex justify-center pointer-events-none fade-in" style={{ right: (interviewPanelOpen || actionItemsOpen) ? '480px' : '0', paddingBottom: "env(safe-area-inset-bottom)", transition: 'right 0.2s ease' }}>
-            <div className="pointer-events-auto bg-white border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.15)] shadow-slate-700/30 rounded-full flex items-center p-1.5 gap-1 sm:gap-2 px-2 sm:px-3">
+        <div className={`fixed left-0 z-50 flex justify-center fade-in ${compactMode ? "bottom-0 pointer-events-auto" : "bottom-4 sm:bottom-8 pointer-events-none"}`} style={{ right: (interviewPanelOpen || actionItemsOpen) ? '480px' : '0', paddingBottom: compactMode ? "0" : "env(safe-area-inset-bottom)", transition: 'right 0.2s ease' }}>
+            <div className={`pointer-events-auto bg-white border-t border-slate-200 flex items-center ${compactMode ? "w-full justify-between px-4 py-2 shadow-[0_-4px_20px_rgb(0,0,0,0.08)] gap-2" : "border rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.15)] shadow-slate-700/30 p-1.5 px-2 sm:px-3 gap-1 sm:gap-2"}`}>
 
-                <button data-noe-action="search" onClick={() => setShowSearch(true)} className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 bg-slate-50">
-                    <span className="text-xs sm:text-sm font-bold">Search</span>
-                </button>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <button data-noe-action="search" onClick={() => setShowSearch(true)} className="flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 bg-slate-50">
+                      <span className="text-xs sm:text-sm font-bold">Search</span>
+                  </button>
 
-                <button
-                    data-noe-action="interview"
-                    onClick={onInterview}
-                    className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all ${interviewPanelOpen ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'hover:bg-violet-50 text-slate-600 hover:text-violet-600 bg-slate-50'}`}
-                >
-                    <span className="text-xs sm:text-sm font-bold">Interview</span>
-                </button>
+                  <button
+                      data-noe-action="interview"
+                      onClick={onInterview}
+                      className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all ${interviewPanelOpen ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'hover:bg-violet-50 text-slate-600 hover:text-violet-600 bg-slate-50'}`}
+                  >
+                      <span className="text-xs sm:text-sm font-bold">Interview</span>
+                  </button>
 
-                <button
-                    data-noe-action="action-items"
-                    onClick={onActionItems}
-                    className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all relative ${actionItemsOpen ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'hover:bg-amber-50 text-slate-600 hover:text-amber-600 bg-slate-50'}`}
-                >
-                    <span className="text-xs sm:text-sm font-bold">Action Items</span>
-                    {actionItemCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1">{actionItemCount}</span>
-                    )}
-                </button>
+                  <button
+                      data-noe-action="action-items"
+                      onClick={onActionItems}
+                      className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all relative ${actionItemsOpen ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'hover:bg-amber-50 text-slate-600 hover:text-amber-600 bg-slate-50'}`}
+                  >
+                      <span className="text-xs sm:text-sm font-bold">Action Items</span>
+                      {actionItemCount > 0 && (
+                        <span className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1">{actionItemCount}</span>
+                      )}
+                  </button>
 
-                <button
-                    data-noe-action="toggle-mode"
-                    data-noe-current-mode={entryMode}
-                    onClick={() => setEntryMode(entryMode === 'quick' ? 'detailed' : 'quick')}
-                    className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 bg-slate-50 ${modeButtonFlash ? 'animate-nav-focus ring-2 ring-sky-400' : ''}`}
-                >
-                    <span className="text-base">{entryMode === 'quick' ? '📝' : '⚡'}</span>
-                    <span className="text-xs sm:text-sm font-bold">{entryMode === 'quick' ? 'Detailed' : 'Quick'}</span>
-                </button>
+                  <button
+                      data-noe-action="toggle-mode"
+                      data-noe-current-mode={entryMode}
+                      onClick={() => setEntryMode(entryMode === 'quick' ? 'detailed' : 'quick')}
+                      className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all hover:bg-sky-50 text-slate-600 hover:text-sky-600 bg-slate-50 ${modeButtonFlash ? 'animate-nav-focus ring-2 ring-sky-400' : ''}`}
+                  >
+                      <span className="text-base">{entryMode === 'quick' ? '📝' : '⚡'}</span>
+                      <span className="text-xs sm:text-sm font-bold">{entryMode === 'quick' ? 'Detailed' : 'Quick'}</span>
+                  </button>
+                </div>
 
-                <button data-noe-action="save" onClick={onSave} className="flex items-center justify-center h-10 px-4 sm:px-6 gap-1.5 rounded-full bg-sky-500 text-white shadow-lg shadow-sky-200 hover:bg-sky-600 transition-all">
+                <button data-noe-action="save" onClick={onSave} className="flex items-center justify-center h-10 px-6 sm:px-8 gap-1.5 rounded-full bg-sky-500 text-white shadow-lg shadow-sky-200 hover:bg-sky-600 transition-all">
                     <span className="text-base">💾</span>
                     <span className="text-xs sm:text-sm font-bold">Save</span>
                 </button>
@@ -6862,6 +6952,7 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
               {customerPlaceholder && (
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>
               )}
+              {c.contacted && <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Contacted</span>}
               {c.doNotContact && <span className="rounded-full bg-rose-100 border border-rose-300 px-2 py-0.5 text-[10px] font-bold text-rose-700">Do Not Contact</span>}
               {c.contactViaRep && <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700">Via Rep</span>}
 	         </div>
@@ -6888,10 +6979,10 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
              <Field label="Last Name"><Input data-audit-key="custLast" className={hasMeaningfulValue(c.first) && !hasMeaningfulValue(c.last) ? "attention-outline" : ""} value={c.last} onChange={e=>updateCust(c.id,{last:e.target.value})} /></Field>
            </div>
            <div className="col-span-2 sm:col-span-1">
-             <Field label="Phone"><Input data-audit-key="custPhone" className={c.type === "Point of Contact" && data.contactAssignment === "rep" ? "!border-violet-400 !ring-2 !ring-violet-200" : ""} type="tel" value={c.phone} onChange={e=>updateCust(c.id,{phone: formatPhoneNumber(e.target.value)})} maxLength={14} placeholder="(555) 123-4567" /></Field>
+             <Field label="Phone"><Input data-audit-key="custPhone" className={c.type === "Point of Contact" ? "!border-violet-300 !ring-1 !ring-violet-100" : ""} type="tel" value={c.phone} onChange={e=>updateCust(c.id,{phone: formatPhoneNumber(e.target.value)})} maxLength={14} placeholder="(555) 123-4567" /></Field>
            </div>
            <div className="col-span-3 sm:col-span-1">
-             <Field label="Email"><Input data-audit-key="custEmail" className={c.type === "Point of Contact" && data.contactAssignment === "rep" ? "!border-violet-400 !ring-2 !ring-violet-200" : ""} type="email" value={c.email} onChange={e=>updateCust(c.id,{email:e.target.value})} placeholder="email@example.com" /></Field>
+             <Field label="Email"><Input data-audit-key="custEmail" className={c.type === "Point of Contact" ? "!border-violet-300 !ring-1 !ring-violet-100" : ""} type="email" value={c.email} onChange={e=>updateCust(c.id,{email:e.target.value})} placeholder="email@example.com" /></Field>
            </div>
          </div>
 
@@ -6903,6 +6994,8 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
                updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false, contactViaRep: false });
              }} className="!text-[10px] !px-2 !py-1" />
            ))}
+           <span className="w-px h-4 bg-slate-200 mx-0.5" />
+           <ToggleMulti label="Contacted" checked={!!c.contacted} onChange={() => updateCust(c.id, { contacted: !c.contacted })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
            <span className="w-px h-4 bg-slate-200 mx-0.5" />
            <ToggleMulti label="Contact via Rep" checked={!!c.contactViaRep} onChange={() => updateCust(c.id, { contactViaRep: !c.contactViaRep, doNotContact: false, preferredContact: "" })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-amber-50 !border-amber-300 !text-amber-700" />
            <ToggleMulti label="Do Not Contact" checked={!!c.doNotContact} onChange={() => updateCust(c.id, { doNotContact: !c.doNotContact, contactViaRep: false, preferredContact: "" })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-rose-50 !border-rose-300 !text-rose-700" />
@@ -7143,6 +7236,18 @@ const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing,
               />
             );
           })()}
+          <button type="button" onClick={() => useCurrentLocation(
+            coords => updateAddr(addr.id, { lat: String(coords.lat), lng: String(coords.lng) }),
+            msg => setToast?.(`Location error: ${msg}`)
+          )} className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-600 hover:bg-sky-100 flex items-center gap-1.5 w-fit">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
+            Use Current Location
+          </button>
+          {addr.street && (
+            <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-100 mt-2">
+              <iframe title="Map" width="100%" height="140" frameBorder="0" style={{ border: 0 }} src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent([addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(", "))}&zoom=16`} allowFullScreen />
+            </div>
+          )}
           <div className="grid grid-cols-4 gap-3">
             <div className="col-span-3"><Field label="Street"><Input data-audit-key="addrStreet" className={index===0 && auditOn && highlightMissing?.addrStreet ? "audit-missing" : ""} value={addr.street} onChange={e=>updateAddr(addr.id,{street:e.target.value})} /></Field></div>
             <div className="col-span-1"><Field label="Apt / Unit"><Input value={addr.apt} onChange={e=>updateAddr(addr.id,{apt:e.target.value})} placeholder="Apt #" /></Field></div>
@@ -7326,8 +7431,8 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
     };
 
     return (
-        <div className="space-y-6 fade-in pt-4">
-            {showInlineHelp && (
+        <div className={`fade-in pt-4 ${compactMode ? "" : "space-y-6"}`}>
+            {showInlineHelp && !compactMode && (
               <div className="rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3 flex items-center justify-between gap-3">
                 <p className="text-xs text-slate-500">
                   <strong className="text-slate-700">Quick Entry</strong> — capture the basics fast. Need more fields? <button type="button" onClick={onSwitchToDetailed} className="font-bold text-sky-600 hover:text-sky-700 underline underline-offset-2">Switch to Detailed</button> anytime, or add extra details in Event Instructions below.
@@ -7339,13 +7444,222 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 )}
               </div>
             )}
+            {compactMode ? (
+            /* ═══ COMPACT DESKTOP 2-COLUMN LAYOUT ═══ */
+            <div className="space-y-3 pb-28">
+              {/* Order Name — full width */}
+              <input value={data.orderName || ""} onChange={e => updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })} placeholder={`${recordWord} Name (e.g. Baker-PennsaukenNJ)`} className="w-full text-lg font-bold text-sky-700 border-b-2 border-slate-200 outline-none bg-transparent py-1 focus:border-sky-400 placeholder:text-slate-400/70 placeholder:font-normal" data-noe-field="orderName" />
+
+              {/* ── ORDER ── */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-2.5">
+                  <ToggleGroup options={["Order", "Lead"]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-700 mb-1">What caused the loss?</div>
+                    <div className="rounded-lg bg-slate-50/80 border border-slate-100 p-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map(lt => (
+                          <ToggleMulti key={lt} label={lt} checked={data.primaryLossType === lt || (lt === NON_RESTORATION_PRIMARY && nonRestorationSelected)} onChange={() => { if (lt === NON_RESTORATION_PRIMARY) { toggleNonRestorationPrimary(); updateMany({ primaryLossType: NON_RESTORATION_PRIMARY }); return; } const np = data.primaryLossType === lt ? "" : lt; updateMany({ primaryLossType: np, orderTypes: np ? [np, ...(data.secondaryContaminants || []).filter(s => s !== np)] : [...(data.secondaryContaminants || [])] }); }} className="!text-[11px] !px-3 !py-1" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {data.primaryLossType && !nonRestorationSelected && (
+                    <div>
+                      <div className="text-[11px] font-bold text-slate-700 mb-1">Additional contaminants</div>
+                      <div className="rounded-lg bg-slate-50/80 border border-slate-100 p-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {LOSS_TYPES.filter(t => t !== data.primaryLossType && t !== "Unknown").map(t => {
+                            const ok = (COMPATIBLE_SECONDARY_LOSS[data.primaryLossType] || LOSS_TYPES).includes(t);
+                            return <ToggleMulti key={t} label={t} checked={(data.secondaryContaminants || []).includes(t)} onChange={() => { if (!ok) return; const next = (data.secondaryContaminants||[]).includes(t) ? (data.secondaryContaminants||[]).filter(s=>s!==t) : [...(data.secondaryContaminants||[]),t]; updateMany({ secondaryContaminants: next, orderTypes: [data.primaryLossType, ...next] }); }} className={`!text-[11px] !px-3 !py-1 ${!ok ? "!opacity-30 !cursor-not-allowed" : ""}`} />;
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {nonRestorationSelected && (
+                    <div>
+                      <div className="text-[11px] font-bold text-slate-700 mb-1">Non-Restoration Type</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {NON_RESTORATION_SUBTYPES.map(s => <ToggleMulti key={s} label={s} checked={nonRestorationSubtype === s} onChange={() => selectNonRestorationSubtype(s)} className="!text-[11px] !px-3 !py-1" />)}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-700 mb-1">Who is contacting the customer?</div>
+                    <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-1.5">
+                      <div className="flex flex-wrap gap-1">
+                        {[{k:"done",l:"Already contacted"},{k:"rep",l:"Contact POC only"},{k:"office",l:"Office please contact"},{k:"enter-only",l:"Enter only — do not contact"}].map(o => <ToggleMulti key={o.k} label={o.l} checked={data.contactAssignment===o.k} onChange={()=>updateMany({contactAssignment:data.contactAssignment===o.k?"":o.k})} className="!text-[11px] !px-3 !py-1" />)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT: Referrer + Sales Rep + Companies */}
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-2.5">
+                  <h3 className="text-xs font-bold uppercase text-sky-600">Billing & Attribution</h3>
+                  {isRestorationProject && (
+                    <div>
+                      <div className="text-[11px] font-bold text-slate-700 mb-1">Who will be paying?</div>
+                      <ToggleGroup options={["Insurance","Self-pay","Referrer","Public Adjuster","Other"]} value={data.payorQuick} onChange={v => { const patch: any = { payorQuick: v, billingPayer: v === "Self-pay" ? "Customer" : v }; if (v === "Insurance") { patch.involvesInsurance = "Yes"; patch.insuranceClaim = "Yes"; } else { patch.involvesInsurance = "No"; } updateMany(patch); }} />
+                    </div>
+                  )}
+                  {data.payorQuick === "Insurance" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Claim #</div><Input value={data.claimNumber || ""} onChange={e => update("claimNumber", e.target.value)} placeholder="Claim number" className="!py-1 !text-xs" /></div>
+                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Policy #</div><Input value={data.policyNumber || ""} onChange={e => update("policyNumber", e.target.value)} placeholder="Policy number" className="!py-1 !text-xs" /></div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-700 mb-1">Source</div>
+                    <ToggleGroup options={["Referral","Marketing","Internal"]} value={data.leadSourceCategory} onChange={v => update("leadSourceCategory", v)} />
+                  </div>
+                  {data.leadSourceCategory === "Marketing" && (
+                    <div className="rounded-lg bg-sky-50/30 border border-sky-100 p-2">
+                      <div className="text-[10px] font-bold text-slate-500 mb-1">Channel</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {MARKETING_SOURCES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} className="!text-[11px] !px-3 !py-1" />)}
+                      </div>
+                    </div>
+                  )}
+                  {data.leadSourceCategory === "Internal" && (
+                    <div className="rounded-lg bg-sky-50/30 border border-sky-100 p-2">
+                      <div className="text-[10px] font-bold text-slate-500 mb-1">Type</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {INTERNAL_TYPES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} className="!text-[11px] !px-3 !py-1" />)}
+                      </div>
+                    </div>
+                  )}
+                  {data.leadSourceCategory === "Referral" && <div>
+                    <div className="text-[11px] font-bold text-slate-700 mb-1">Referrer</div>
+                    <SearchSelect value={data.referrer || data.referringCompany || ""} onChange={v => { const parsed = parseCombinedContact(v); updateMany(parsed); }} options={combinedContactOptions} placeholder="Search referrer..." onAddNew={name => { setModal({ type: "contact", value: name, onSave: (n) => updateMany({ referrer: n }) }); }} />
+                    {(data.referrer || data.referringCompany) && (
+                      <div className="flex gap-1 mt-1.5">
+                        <ToggleMulti label="Referrer" checked={true} onChange={() => {}} className="!text-[11px] !px-3 !py-1" colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
+                        <ToggleMulti label="Bill To" checked={!!data.referrerIsBillTo} onChange={() => update("referrerIsBillTo", !data.referrerIsBillTo)} className="!text-[11px] !px-3 !py-1" />
+                        <ToggleMulti label="Insurance" checked={!!data.referrerIsInsurance} onChange={() => update("referrerIsInsurance", !data.referrerIsInsurance)} className="!text-[11px] !px-3 !py-1" />
+                      </div>
+                    )}
+                  </div>}
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-700 mb-1">Sales Rep</div>
+                    <SearchSelect value={data.salesRep || ""} onChange={v => update("salesRep", v)} options={["Mike S.", "Sarah J.", "Tom B."]} placeholder="Rep..." />
+                    {data.salesRep && suggestedReferrerRoles?.salesRep && data.salesRep !== suggestedReferrerRoles.salesRep && <div className="text-[9px] text-amber-600 mt-0.5">Referrer's rep is {suggestedReferrerRoles.salesRep}</div>}
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-700 mb-1">Companies & Contacts</div>
+                    <SearchSelect value="" onChange={v => { const parsed = parseCombinedContact?.(v) || { contact: "", company: "" }; const entry = { company: parsed.company || v, contact: parsed.contact || "", type: "", id: safeUid(), incomplete: !combinedContactOptions.some(o => o.value === v) }; update("vendors", [...(data.vendors || []), entry]); setToast?.(`Added ${entry.company || entry.contact}`); }} options={combinedContactOptions} placeholder="Search to add..." clearOnCommit onAddNew={v => { update("vendors", [...(data.vendors || []), { company: "", contact: v, type: "", id: safeUid(), incomplete: true }]); setToast?.(`Added "${v}" as placeholder`); }} className="!border-sky-300 !rounded-lg" />
+                    {(data.vendors || []).length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{(data.vendors || []).map((v, i) => <span key={v.id || i} className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${v.incomplete ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-600"}`}>{v.company || v.contact} <button type="button" onClick={() => update("vendors", (data.vendors||[]).filter((_,j)=>j!==i))} className="ml-1 text-slate-400 hover:text-rose-500">×</button></span>)}</div>}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── CUSTOMER + ADDRESS ── */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <h3 className="text-xs font-bold uppercase text-sky-600 mb-2">Customer</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">First Name</div><Input value={data.customers?.[0]?.first || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { first: e.target.value })} className="!py-1.5 !text-sm" /></div>
+                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Last Name</div><Input value={data.customers?.[0]?.last || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { last: e.target.value })} className="!py-1.5 !text-sm" /></div>
+                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Phone</div><Input value={data.customers?.[0]?.phone || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { phone: formatPhoneNumber(e.target.value) })} placeholder="(555) 123-4567" className="!py-1.5 !text-sm" /></div>
+                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Email</div><Input type="email" value={data.customers?.[0]?.email || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { email: e.target.value })} placeholder="email@example.com" className="!py-1.5 !text-sm" /></div>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <h3 className="text-xs font-bold uppercase text-sky-600 mb-2">Address</h3>
+                  <div className="space-y-2">
+                    <div className="flex gap-1.5">
+                      <Input placeholder="Search address on Google..." value={primaryAddr.googleQuery || ""} onChange={e=>updateAddr(primaryAddr.id,{googleQuery:e.target.value})} className="!py-1.5 !text-sm flex-1" />
+                      <button onClick={()=>updateAddr(primaryAddr.id,{street:"1 Main St",city:"Bloomingdale",state:"NJ",zip:"07403"})} className="rounded-lg bg-sky-500 px-3 text-[10px] font-bold text-white hover:bg-sky-600 shrink-0">Search</button>
+                      <button type="button" onClick={() => useCurrentLocation(
+                        coords => updateAddr(primaryAddr.id, { lat: String(coords.lat), lng: String(coords.lng), googleQuery: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}` }),
+                        msg => setToast?.(`Location error: ${msg}`)
+                      )} className="rounded-lg border border-sky-300 bg-sky-50 px-2 text-[10px] font-bold text-sky-600 hover:bg-sky-100 shrink-0" title="Use current GPS location">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
+                      </button>
+                    </div>
+                    {primaryAddr.lat && primaryAddr.lng && (
+                      <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                        <iframe title="Map" width="100%" height="100" frameBorder="0" style={{ border: 0 }} src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${primaryAddr.lat},${primaryAddr.lng}&zoom=16`} allowFullScreen />
+                      </div>
+                    )}
+                    {!primaryAddr.lat && primaryAddr.street && (
+                      <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                        <iframe title="Map" width="100%" height="100" frameBorder="0" style={{ border: 0 }} src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent([primaryAddr.street, primaryAddr.city, primaryAddr.state, primaryAddr.zip].filter(Boolean).join(", "))}&zoom=16`} allowFullScreen />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-4 gap-1.5">
+                      <div className="col-span-3"><div className="text-[10px] font-bold text-slate-500 mb-0.5">Street</div><Input placeholder="Street address" value={primaryAddr.street || ""} onChange={e=>updateAddr(primaryAddr.id,{street:e.target.value})} className="!py-1.5 !text-sm" /></div>
+                      <div className="col-span-1"><div className="text-[10px] font-bold text-slate-500 mb-0.5">Apt/Unit</div><Input placeholder="Apt" value={primaryAddr.apt || ""} onChange={e=>updateAddr(primaryAddr.id,{apt:e.target.value})} className="!py-1.5 !text-sm" /></div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">City</div><Input placeholder="City" value={primaryAddr.city || ""} onChange={e=>updateAddr(primaryAddr.id,{city:e.target.value})} className="!py-1.5 !text-sm" /></div>
+                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">State</div><Select value={primaryAddr.state || ""} onChange={e=>updateAddr(primaryAddr.id,{state:e.target.value})} className="!py-1.5 !text-sm"><option value="">State</option>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</Select></div>
+                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Zip</div><Input placeholder="Zip" value={primaryAddr.zip || ""} onChange={e=>updateAddr(primaryAddr.id,{zip:e.target.value})} className="!py-1.5 !text-sm" /></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SCHEDULE + EVENT INSTRUCTIONS ── */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <h3 className="text-xs font-bold uppercase text-sky-600 mb-2">Schedule</h3>
+                  <div className="space-y-2">
+                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Event Type</div><ToggleGroup options={["Scope","Pickup","In-Home","Meeting"]} value={data.scheduleType} onChange={v => update("scheduleType", v)} /></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <div className="text-[10px] font-bold text-slate-500">Date</div>
+                          <button type="button" onClick={() => { onSetNowDate?.(); onSetNowTime?.(); updateMany({ eventFirm: true, pickupTimeTentative: false }); }} className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[8px] font-bold text-sky-700 hover:bg-sky-100">Now</button>
+                        </div>
+                        <DatePicker value={data.pickupDate} onChange={v=>update("pickupDate", v)} closeSignal={dateCloseSignal} />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <div className="text-[10px] font-bold text-slate-500">Time</div>
+                          <button type="button" onClick={() => updateMany({ pickupTime: '12:00 AM', pickupTimeTentative: true, eventFirm: false })} className={`rounded-full px-2 py-0.5 text-[8px] font-bold ${data.pickupTime === '12:00 AM' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'border border-slate-200 text-slate-500'}`}>TBD</button>
+                        </div>
+                        <TimePicker value={data.pickupTime} onChange={v=>update("pickupTime", v)} closeSignal={timeCloseSignal} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Assignee</div><Input value={data.eventAssignee || ""} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" className="!py-1.5 !text-sm" /></div>
+                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Vehicle</div><Input value={data.eventVehicle || ""} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Optional" className="!py-1.5 !text-sm" /></div>
+                    </div>
+                    {data.pickupTime === '12:00 AM' && <div className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-700 font-semibold">TBD — time not yet confirmed</div>}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <h3 className="text-xs font-bold uppercase text-sky-600 mb-2">Event Instructions</h3>
+                  <AutoGrowTextarea value={stripEventSystemLines(data.eventInstructions || "")} onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))} placeholder="Conditions, access, preferences, what to bring..." className="!min-h-[60px] !text-sm" />
+                  {eventSystemEntries.length > 0 && (
+                    <div className="mt-1.5 rounded border border-slate-100 bg-slate-50 px-2 py-1 space-y-0.5">
+                      <div className="text-[8px] font-bold text-slate-400 uppercase">Auto-filled</div>
+                      {eventSystemEntries.map((entry, i) => <div key={i} className="text-[10px] text-slate-600"><span className="font-semibold">{entry.label}:</span> {entry.value}</div>)}
+                    </div>
+                  )}
+                  <details className="mt-2">
+                    <summary className="text-[10px] font-bold text-slate-400 cursor-pointer hover:text-slate-600 select-none">Quick Notes ›</summary>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {["Everything Affected", "Save what you can", "Determine Impact", "Only specific items", "Pack the house"].map(n => (
+                        <ToggleMulti key={n} label={n} checked={(data.quickInstructionNotes||[]).includes(n)} onChange={()=>appendQuickNote(n)} className="!text-[11px] !px-3 !py-1" />
+                      ))}
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </div>
+            ) : (
+            /* ═══ COMFORTABLE SINGLE-COLUMN LAYOUT ═══ */
+            <>
             <div id="quick-questions" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm scroll-mt-28">
               <div className="mb-4">
                 <input
                   value={data.orderName || ""}
                   onChange={e => updateMany({ orderName: e.target.value, orderNameAuto: !e.target.value.trim() })}
                   placeholder={`${recordWord} Name (e.g. Baker-PennsaukenNJ)`}
-                  className="w-full text-lg font-bold text-sky-700 border-none outline-none bg-transparent placeholder:text-slate-300 placeholder:font-normal"
+                  className="w-full text-lg font-bold text-sky-700 border-none outline-none bg-transparent placeholder:text-slate-400/70 placeholder:font-normal"
                   data-noe-field="orderName"
                 />
                 <div className="h-px bg-slate-100 mt-1"></div>
@@ -7660,9 +7974,21 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                              <div className="flex gap-2">
                                 <Input placeholder="Start typing address..." value={primaryAddr.googleQuery || ""} onChange={e=>updateAddr(primaryAddr.id,{googleQuery:e.target.value})} />
                                 <button data-noe-action="address-search" className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-600 transition-all" onClick={()=>updateAddr(primaryAddr.id,{street:"1 Main St",city:"Bloomingdale",state:"NJ",zip:"07403"})}>Search</button>
+                                <button type="button" onClick={() => useCurrentLocation(
+                                  coords => updateAddr(primaryAddr.id, { lat: String(coords.lat), lng: String(coords.lng), googleQuery: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}` }),
+                                  msg => setToast?.(`Location error: ${msg}`)
+                                )} className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-bold text-sky-600 hover:bg-sky-50 shrink-0 flex items-center gap-1" title="Use current GPS location">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
+                                  <span className="hidden sm:inline">Location</span>
+                                </button>
                              </div>
                         </Field>
                     </div>
+                    {primaryAddr.street && (
+                      <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                        <iframe title="Map" width="100%" height="120" frameBorder="0" style={{ border: 0 }} src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent([primaryAddr.street, primaryAddr.city, primaryAddr.state, primaryAddr.zip].filter(Boolean).join(", "))}&zoom=16`} allowFullScreen />
+                      </div>
+                    )}
                     <div className="grid grid-cols-4 gap-2">
                       <div className="col-span-3"><Field label="Street" noeField="addressStreet"><Input value={primaryAddr.street || ""} onChange={e=>updateAddr(primaryAddr.id,{street:e.target.value})} /></Field></div>
                       <div className="col-span-1"><Field label="Apt/Unit" noeField="addressApt"><Input value={primaryAddr.apt || ""} onChange={e=>updateAddr(primaryAddr.id,{apt:e.target.value})} placeholder="Apt #" /></Field></div>
@@ -7862,7 +8188,8 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 </div>
               </div>
             )}
-
+            </>
+            )}
         </div>
     );
 };
@@ -7952,7 +8279,8 @@ export default function App(){
   const tipVisible = (key) => showCoaching && !dismissedTips.has(key);
   const [compactMode, setCompactMode] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewView, setPreviewView] = useState("narrative");
+  const [previewView, setPreviewView] = useState("table");
+  const [saveMissingOpen, setSaveMissingOpen] = useState(false);
   const [data, setData] = useState(() => {
     try {
       const s = localStorage.getItem("same-day-scope-v52");
@@ -7975,11 +8303,12 @@ export default function App(){
           selectedGroups: mergedSelectedGroups,
         }),
       };
-    } catch(e) { return DEFAULT_FORM; }
+    } catch { return DEFAULT_FORM; }
   });
   const recordWord = data.isLead === true ? "Lead" : "Order";
   const [interviewPanelOpen, setInterviewPanelOpen] = useState(false);
   const [interviewExpanded, setInterviewExpanded] = useState({});
+  const [dismissedCoaching, setDismissedCoaching] = useState(new Set<string>());
   const [interviewSearch, setInterviewSearch] = useState("");
   const [rushGuideOpen, setRushGuideOpen] = useState(false);
   const [rushGuideStep, setRushGuideStep] = useState(1);
@@ -8211,7 +8540,7 @@ export default function App(){
   const [addCompanyModalOpen, setAddCompanyModalOpen] = useState(false);
   const [addNewSystemModal, setAddNewSystemModal] = useState(null);
   const [addCompanyType, setAddCompanyType] = useState("");
-  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [, setShowTypePicker] = useState(false);
   const [companyModalCloseArmed, setCompanyModalCloseArmed] = useState(false);
   const [addCompanyPanel, setAddCompanyPanel] = useState("");
   const [newCompanyDraft, setNewCompanyDraft] = useState({ contact: "", company: "" });
@@ -8222,7 +8551,7 @@ export default function App(){
     try {
       const s = localStorage.getItem("sample-contacts");
       return normalizeSampleContacts(s ? JSON.parse(s) : SAMPLE_CONTACTS);
-    } catch (e) {
+    } catch {
       return normalizeSampleContacts(SAMPLE_CONTACTS);
     }
   });
@@ -8360,6 +8689,7 @@ export default function App(){
   const quickNudgeShownRef = useRef(false);
   const [modeButtonFlash, setModeButtonFlash] = useState(false);
   const [showSdsPreview, setShowSdsPreview] = useState(false);
+  const [showSdsQuestionnaire, setShowSdsQuestionnaire] = useState(false);
   const [showScope, setShowScope] = useState(false);
   const closeSds = useCallback(() => {
     setShowSdsPreview(false);
@@ -8378,8 +8708,9 @@ export default function App(){
   const [pendingAddressFromGoogle, setPendingAddressFromGoogle] = useState(null);
   const [orderSubOpen, setOrderSubOpen] = useState(true);
   const [sourceSubOpen, setSourceSubOpen] = useState(false);
-  const [interviewSubOpen, setInterviewSubOpen] = useState(false);
+  const [, setInterviewSubOpen] = useState(false);
   const [codesSubOpen, setCodesSubOpen] = useState(false);
+  const [expandedService, setExpandedService] = useState<string | null>(null);
   const [scheduleSubOpen, setScheduleSubOpen] = useState(true);
   const [scheduleBridgeOpen, setScheduleBridgeOpen] = useState(false);
 
@@ -8415,14 +8746,14 @@ export default function App(){
       const s=localStorage.getItem("companies-registry"); 
       const parsed = s?JSON.parse(s):[]; 
       return Array.from(new Set([...(parsed||[]), ...DEFAULT_COMPANIES])); 
-    } catch(e){ return DEFAULT_COMPANIES; }
+    } catch { return DEFAULT_COMPANIES; }
   });
-  const [contacts,setContacts]=useState(()=>{ 
+  const [contacts,setContacts]=useState(()=>{
     try { 
       const s=localStorage.getItem("contacts-registry"); 
       const parsed = s?JSON.parse(s):[]; 
       return Array.from(new Set([...(parsed||[]), ...DEFAULT_CONTACTS])); 
-    } catch(e){ return DEFAULT_CONTACTS; }
+    } catch { return DEFAULT_CONTACTS; }
   });
 
   useEffect(()=>{ localStorage.setItem("companies-registry",JSON.stringify(companies)); },[companies]);
@@ -8668,7 +8999,7 @@ export default function App(){
   useEffect(() => {
     try {
       localStorage.setItem(TEST_PRESETS_KEY, JSON.stringify(testPresets));
-    } catch {}
+    } catch { /* storage unavailable */ }
   }, [testPresets]);
 
   const saveTestPreset = useCallback(() => {
@@ -9163,11 +9494,11 @@ export default function App(){
   }, []);
 
   const updateSmart = (k, v) => {
-      let loadListAdded = [];
-      let addHandling = [];
+      const loadListAdded = [];
+      const addHandling = [];
       const isOn = v === true || v === "Y";
       const isOff = v === false || v === "N" || v === "" || v === null;
-      let currentLoadList = new Set(data.loadList || []);
+      const currentLoadList = new Set(data.loadList || []);
       const currentHandling = new Set(data.handlingCodes || []);
       const currentOrderTypes = new Set(data.orderTypes || []);
       const pendingRemovals = { load: [], handling: [], orderTypes: [] };
@@ -9233,12 +9564,13 @@ export default function App(){
       }
       
       setData(prev => {
-          let newData = { ...prev, [k]: v };
-          let newLoadList = new Set(prev.loadList || []);
+          const newData = { ...prev, [k]: v };
+          const newLoadList = new Set(prev.loadList || []);
           loadListAdded.forEach(i => newLoadList.add(i));
           newData.loadList = Array.from(newLoadList);
           if (k === "damageMoldMildew" && isOn && !(prev.orderTypes || []).includes("Mold")) {
             newData.orderTypes = [...(prev.orderTypes || []), "Mold"];
+            newData.autoAddedOrderTypes = [...(prev.autoAddedOrderTypes || []), "Mold"];
           }
           if (addHandling.length) {
             const handling = new Set(prev.handlingCodes || []);
@@ -9255,6 +9587,22 @@ export default function App(){
 
       if (isOff && hasPendingRemovals) {
         const label = SMART_TRIGGER_LABELS[k] || "this condition";
+        const autoAdded = (data.autoAddedOrderTypes || []) as string[];
+
+        // Auto-remove items that were auto-suggested (not user-selected)
+        const autoRemoveTypes = pendingRemovals.orderTypes.filter(type => autoAdded.includes(type));
+        const manualTypes = pendingRemovals.orderTypes.filter(type => !autoAdded.includes(type));
+
+        // Silently remove auto-suggested order types
+        if (autoRemoveTypes.length > 0) {
+          setData(prev => ({
+            ...prev,
+            orderTypes: (prev.orderTypes || []).filter(type => !autoRemoveTypes.includes(type)),
+            autoAddedOrderTypes: (prev.autoAddedOrderTypes || []).filter(t => !autoRemoveTypes.includes(t)),
+          }));
+        }
+
+        // Build prompt only for remaining manual items
         const details = [];
         if (pendingRemovals.load.length) {
           details.push(`Bring Instructions: ${pendingRemovals.load.join(", ")}`);
@@ -9262,35 +9610,38 @@ export default function App(){
         if (pendingRemovals.handling.length) {
           details.push(`Handling Codes: ${pendingRemovals.handling.join(", ")}`);
         }
-        if (pendingRemovals.orderTypes.length) {
-          details.push(`Order Type: ${pendingRemovals.orderTypes.join(", ")}`);
+        if (manualTypes.length) {
+          details.push(`Order Type: ${manualTypes.join(", ")}`);
         }
-        openSmartConfirm({
-          title: "Remove Smart-Triggered Fields?",
-          message: `Since "${label}" is no longer selected, do you want to remove these linked fields?`,
-          details,
-          confirmLabel: "Yes, Remove",
-          cancelLabel: "Keep Fields",
-          onConfirm: () => {
-            setData(prev => {
-              const next = { ...prev };
-              if (pendingRemovals.load.length) {
-                const list = new Set(prev.loadList || []);
-                pendingRemovals.load.forEach(item => list.delete(item));
-                next.loadList = Array.from(list);
-              }
-              if (pendingRemovals.handling.length) {
-                const handling = new Set(prev.handlingCodes || []);
-                pendingRemovals.handling.forEach(code => handling.delete(code));
-                next.handlingCodes = Array.from(handling);
-              }
-              if (pendingRemovals.orderTypes.length) {
-                next.orderTypes = (prev.orderTypes || []).filter(type => !pendingRemovals.orderTypes.includes(type));
-              }
-              return next;
-            });
-          }
-        });
+
+        if (details.length > 0) {
+          openSmartConfirm({
+            title: "Remove Smart-Triggered Fields?",
+            message: `Since "${label}" is no longer selected, do you want to remove these linked fields?`,
+            details,
+            confirmLabel: "Yes, Remove",
+            cancelLabel: "Keep Fields",
+            onConfirm: () => {
+              setData(prev => {
+                const next = { ...prev };
+                if (pendingRemovals.load.length) {
+                  const list = new Set(prev.loadList || []);
+                  pendingRemovals.load.forEach(item => list.delete(item));
+                  next.loadList = Array.from(list);
+                }
+                if (pendingRemovals.handling.length) {
+                  const handling = new Set(prev.handlingCodes || []);
+                  pendingRemovals.handling.forEach(code => handling.delete(code));
+                  next.handlingCodes = Array.from(handling);
+                }
+                if (manualTypes.length) {
+                  next.orderTypes = (prev.orderTypes || []).filter(type => !manualTypes.includes(type));
+                }
+                return next;
+              });
+            }
+          });
+        }
       }
   };
 
@@ -9827,6 +10178,17 @@ export default function App(){
       setInterviewPanelOpen(true);
       // Scroll to top of interview panel after opening
       setTimeout(() => { const panel = document.querySelector("[data-interview-panel]"); if (panel) panel.scrollTop = 0; }, 200);
+      return;
+    } else if (item.navAction === 'scrollContactLog') {
+      setTimeout(() => {
+        const el = document.getElementById("contact-log-section");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.remove("audit-pulse");
+          void el.offsetWidth;
+          el.classList.add("audit-pulse");
+        }
+      }, 400);
       return;
     } else if (item.navAction === 'openPets') {
       setTimeout(() => {
@@ -10872,8 +11234,14 @@ export default function App(){
   const runAudit = () => {
     const missing = computeAuditMissing();
     setAuditMissing(missing);
-    const highlight = missing.reduce((acc, item) => { acc[item.key] = true; return acc; }, {});
-    setData(p => ({ ...p, highlightMissing: { ...(p.highlightMissing||{}), ...highlight } }));
+    const missingKeys = new Set(missing.map(m => m.key));
+    setData(p => {
+      const highlight = {};
+      // Set all missing keys to true, clear previously-flagged keys that are now resolved
+      Object.keys(p.highlightMissing || {}).forEach(k => { highlight[k] = missingKeys.has(k); });
+      missingKeys.forEach(k => { highlight[k] = true; });
+      return { ...p, highlightMissing: highlight };
+    });
     const sections = new Set(missing.map(m => m.section));
     const subsections = new Set();
     missing.forEach(m => {
@@ -11141,7 +11509,7 @@ export default function App(){
     const candidate = typeof updater === "function"
       ? updater(current)
       : { ...current, ...(updater || {}) };
-    let next = normalizeScopeBridgeState(candidate);
+    const next = normalizeScopeBridgeState(candidate);
     if (!options.manualStatus && next.projectStatus !== "red") {
       next.projectStatus = deriveScopeBridgeStatus(next);
       if (next.projectStatus === "green") {
@@ -12894,7 +13262,7 @@ export default function App(){
             showCoaching={showCoaching}
             setShowCoaching={setShowCoaching}
             compactMode={compactMode}
-            onShowSds={() => setShowSdsPreview(true)}
+            onShowSds={() => setShowSdsQuestionnaire(true)}
             setCompactMode={setCompactMode}
             onReset={handleReset}
             currentUser={data.currentUser}
@@ -12915,7 +13283,7 @@ export default function App(){
             orderData={data as any}
             onOrderUpdate={(updates) => updateMany(updates)}
             onShowOrder={() => { setShowScope(false); setEntryMode('detailed'); }}
-            onShowSds={() => { setShowScope(false); setTimeout(() => { setShowSdsPreview(true); (window as any).__returnToScope = true; }, 300); }}
+            onShowSds={() => { setShowScope(false); setTimeout(() => { setShowSdsQuestionnaire(true); (window as any).__returnToScope = true; }, 300); }}
             showCoaching={showCoaching}
             onToggleCoaching={() => setShowCoaching(v => !v)}
           />
@@ -13113,13 +13481,18 @@ export default function App(){
                                   </div>
                                 )}
                                 {attentionMold && !(data.orderTypes||[]).includes("Mold") && !dismissedTips.has("Mold Suggestion") && (
-                                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Mold Suggestion:</span> Visible Mold was selected — consider adding Mold as a contaminant.
+                                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[10px] text-amber-800">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Mold Suggestion"); e.currentTarget.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-amber-400 hover:text-amber-600 font-bold text-sm" title="Dismiss">×</button><span className="font-bold">Suggested:</span> "Visible Mold" was selected in Interview → Conditions. Should Mold be added as a loss type?
                                   </div>
                                 )}
-                                {attentionMold && (data.orderTypes||[]).includes("Mold") && !dismissedTips.has("Mold Confirmed") && (
+                                {attentionMold && (data.orderTypes||[]).includes("Mold") && (data.autoAddedOrderTypes || []).includes("Mold") && !dismissedTips.has("Mold Auto") && (
+                                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[10px] text-amber-800">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Mold Auto"); e.currentTarget.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-amber-400 hover:text-amber-600 font-bold text-sm" title="Dismiss">×</button><span className="font-bold">Auto-suggested:</span> Mold was added because "Visible Mold" was selected in conditions. <button type="button" onClick={(e) => { e.stopPropagation(); updateMany({ orderTypes: (data.orderTypes || []).filter(t => t !== "Mold"), autoAddedOrderTypes: (data.autoAddedOrderTypes || []).filter(t => t !== "Mold"), primaryLossType: data.primaryLossType === "Mold" ? (data.orderTypes || []).find(t => t !== "Mold") || "" : data.primaryLossType }); dismissTip("Mold Auto"); setToast("Mold suggestion removed"); }} className="underline underline-offset-2 font-bold text-amber-900 hover:text-amber-950">Remove Mold</button> or review <button type="button" onClick={(e) => { e.stopPropagation(); jumpToSectionAndSubsection("sec4", "insurance"); }} className="underline underline-offset-2 font-bold text-amber-900 hover:text-amber-950">coverage limit</button>.
+                                  </div>
+                                )}
+                                {attentionMold && (data.orderTypes||[]).includes("Mold") && !(data.autoAddedOrderTypes || []).includes("Mold") && !dismissedTips.has("Mold Confirmed") && (
                                   <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Mold Confirmed:</span> Review severity and <button type="button" onClick={(e) => { e.stopPropagation(); jumpToSectionAndSubsection("sec4", "insurance"); }} className="underline underline-offset-2 font-bold text-violet-800 hover:text-violet-900">Mold coverage limit in Insurance</button>.
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Mold Confirmed"); e.currentTarget.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss">×</button>🎓 <span className="font-bold">Mold Confirmed:</span> Review severity and <button type="button" onClick={(e) => { e.stopPropagation(); jumpToSectionAndSubsection("sec4", "insurance"); }} className="underline underline-offset-2 font-bold text-violet-800 hover:text-violet-900">Mold coverage limit in Insurance</button>.
                                   </div>
                                 )}
                                 {(data.orderTypes || []).filter(t => LOSS_TYPES.includes(t)).map(type => {
@@ -13201,10 +13574,44 @@ export default function App(){
                                 })}
                                 <Field label="Service Offerings">
                                   <div className="flex flex-wrap gap-2">
-                                    {SERVICE_OFFERINGS.map(s => (
-                                      <ToggleMulti key={s} label={s} title={SERVICE_OFFERING_HELP[s] || "Services to be performed on this project."} checked={(data.serviceOfferings||[]).includes(s)} onChange={()=>update("serviceOfferings", toggleMulti(data.serviceOfferings||[], s))} />
-                                    ))}
+                                    {SERVICE_OFFERINGS.map(s => {
+                                      const isOn = (data.serviceOfferings||[]).includes(s);
+                                      const hasSubs = !!SERVICE_SUB_CATEGORIES[s];
+                                      const subs = (data.serviceSubCategories || []).filter(x => x.startsWith(`${s}: `)).map(x => x.replace(`${s}: `, ""));
+                                      const subLabel = isOn && subs.length > 0 ? ` (${subs.join(", ")})` : "";
+                                      return (
+                                        <ToggleMulti key={s} label={`${s}${subLabel}`} title={SERVICE_OFFERING_HELP[s] || "Services to be performed on this project."} checked={isOn} onChange={() => {
+                                          if (!isOn) {
+                                            update("serviceOfferings", toggleMulti(data.serviceOfferings||[], s));
+                                            if (hasSubs) setExpandedService(s);
+                                          } else if (hasSubs && expandedService !== s) {
+                                            setExpandedService(s);
+                                          } else {
+                                            update("serviceOfferings", toggleMulti(data.serviceOfferings||[], s));
+                                            const cleaned = (data.serviceSubCategories || []).filter(x => !x.startsWith(`${s}: `));
+                                            update("serviceSubCategories", cleaned);
+                                            if (expandedService === s) setExpandedService(null);
+                                          }
+                                        }} />
+                                      );
+                                    })}
                                   </div>
+                                  {/* Collapsible subcategory panel for the expanded service */}
+                                  {expandedService && SERVICE_SUB_CATEGORIES[expandedService] && (data.serviceOfferings || []).includes(expandedService) && (
+                                    <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50/50 p-2">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <div className="text-[9px] font-bold text-sky-600 uppercase tracking-wider">{expandedService} Details</div>
+                                        <button onClick={() => setExpandedService(null)} className="text-[9px] font-bold text-slate-400 hover:text-slate-600">Done</button>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {SERVICE_SUB_CATEGORIES[expandedService].map(sub => {
+                                          const subKey = `${expandedService}: ${sub}`;
+                                          const selected = (data.serviceSubCategories || []).includes(subKey);
+                                          return <ToggleMulti key={sub} label={sub} checked={selected} onChange={() => update("serviceSubCategories", toggleMulti(data.serviceSubCategories || [], subKey))} className="!text-[11px] !px-2 !py-1" />;
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
                                 </Field>
                             </SubSection>
 
@@ -13883,6 +14290,15 @@ export default function App(){
                             </div>
                           )}
                           <Field label="Billing Note"><Textarea value={data.billingNote} onChange={e=>update("billingNote",e.target.value)} /></Field>
+                          {data.billingPayer && data.billingPayer !== "Customer" && (
+                            <div className="mt-2">
+                              <ToggleMulti label="Bill To Contacted" checked={!!data.eventBillToContacted} onChange={() => {
+                                if (data.eventBillToContacted) { updateMany({ eventBillToContacted: false, billToContactedAt: "", billToContactedBy: "" }); return; }
+                                updateMany({ eventBillToContacted: true, billToContactedAt: formatShortTimestamp(), billToContactedBy: data.currentUser || "Unknown" });
+                              }} className="!text-[10px] !px-2 !py-1" colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
+                              {data.eventBillToContacted && <span className="ml-2 text-[9px] text-emerald-600">{data.billToContactedBy} · {data.billToContactedAt}</span>}
+                            </div>
+                          )}
                         </SubSection>
                         <SubSection id="sec4-finance" title="Finance" open={financeSubOpen} onToggle={(nextOpen) => setFinanceSubOpen(!!nextOpen)} compact={compactMode}>
                           <div className="grid sm:grid-cols-3 gap-4">
@@ -14030,6 +14446,11 @@ export default function App(){
                                       <SearchSelect data-audit-key="insuranceAdjuster" value={data.insuranceAdjuster} onChange={(v)=>handleAdjusterContactChange(v)} options={combinedContactOptions} listId="insurance-adjuster-list" />
                                       <button className="rounded-lg bg-white px-3 font-bold text-sky-600 shadow-sm hover:bg-sky-50" onClick={()=>setModal({type:"contact",value:"",onSave:(name)=>update("insuranceAdjuster",name)})}>+</button>
                                     </div>
+                                    {data.insuranceAdjuster && (
+                                      <div className="mt-1">
+                                        <ToggleMulti label="Contacted" checked={!!data.adjusterContacted} onChange={() => update("adjusterContacted", !data.adjusterContacted)} className="!text-[10px] !px-2 !py-1" colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
+                                      </div>
+                                    )}
                                   </Field>
                                 </>
                               ) : null}
@@ -14256,7 +14677,7 @@ export default function App(){
                                 </div>
                               </div>
                               <div>
-                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Contact Log</div>
+                                <div id="contact-log-section" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Contact Log</div>
                                 {/* Contact Milestones */}
                                 <div className="space-y-2">
                                   <div className="flex items-center gap-2">
@@ -14393,7 +14814,7 @@ export default function App(){
                             <div className="flex justify-end gap-2">
                               <button
                                 type="button"
-                                onClick={() => setShowSdsPreview(true)}
+                                onClick={() => setShowSdsQuestionnaire(true)}
                                 className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100"
                                 title="Preview the Same Day Scope document — the approval document sent to the adjuster"
                               >
@@ -14815,6 +15236,7 @@ export default function App(){
             actionItemsOpen={actionItemsOpen}
             actionItemCount={(() => { try { return computeAuditMissing().length; } catch { return 0; } })()}
             modeButtonFlash={modeButtonFlash}
+            compactMode={compactMode}
         />
 
         {/* Interview Docked Side Panel */}
@@ -14837,6 +15259,9 @@ export default function App(){
                   { key: "delivery", title: "Where should we make final delivery?", configKey: "processType",
                     isAnswered: () => !!data.processType,
                     summary: () => data.processType || "" },
+                  { key: "groupBuilder", title: "Delivery Group Builder", configKey: "suggestedGroups",
+                    isAnswered: () => (data.suggestedGroups || []).length > 0 || !!data.estimatedReturnDate,
+                    summary: () => { const g = (data.suggestedGroups || []).join(", "); const d = data.estimatedReturnDate || ""; return g + (d ? ` → ${d}` : ""); } },
                   { key: "packoutScope", title: "Has packing out been discussed?", configKey: "packoutSummary",
                     isAnswered: () => !!(data as any).packoutScope,
                     summary: () => (data as any).packoutScope || "" },
@@ -14885,7 +15310,13 @@ export default function App(){
                   </> );
               })()}
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {showCoaching && !interviewSearch && <div className="text-xs text-violet-400 mb-2">🎓 Ask the customer these questions during or before the initial visit.</div>}
+                {!interviewSearch && (
+                  <div className="flex items-center gap-2 mb-2">
+                    {showCoaching && !dismissedCoaching.has("interview-header") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex-1 flex items-start gap-1"><span className="flex-1">🎓 Ask the customer these questions during or before the initial visit.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "interview-header"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+                    {!showCoaching && <div className="flex-1" />}
+                    <button onClick={() => { const el = document.getElementById("noe-interview-timeline"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-full bg-green-100 border border-green-300 px-3 py-1 text-[10px] font-bold text-green-700 hover:bg-green-200 shrink-0">Timeline</button>
+                  </div>
+                )}
 
                 {isFieldVisible("damageWasWet") && matchesInterviewSearch("Is anything still wet or damaged", "Still Wet Visible Mold Structural Damage No Electricity No Heat Boarded Up") && (() => {
                   const log = (data.interviewLog || {}).conditions;
@@ -14895,8 +15326,9 @@ export default function App(){
                   const expanded = interviewExpanded.conditions !== false;
                   return <div className={`rounded-xl border ${answered ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                   <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: !p.conditions})); if (!log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                    <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("Is anything still wet or damaged?")}</div>
+                    <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">1</span>{highlightSearch("Is anything still wet or damaged?")}</div>
                     {answered && !expanded && <div className="flex items-center gap-2"><span className="text-[11px] text-sky-600 font-semibold">{summary}</span>{log && <span className="text-[9px] text-slate-300">{log.user} · {log.at}</span>}</div>}
+
                   </button>
                   {expanded && <div className="px-3 pb-3 space-y-2">
                   <div className="flex flex-wrap gap-2">
@@ -14917,9 +15349,10 @@ export default function App(){
                     { label: "Structural Damage", active: data.structuralElectricDamage === "Y" },
                     { label: "No Electricity", active: !!data.noLights },
                     { label: "Boarded Up", active: !!data.boardedUp },
-                  ].filter(i => i.active && interviewActions[i.label]?.coaching).map(i => (
-                    <div key={i.label} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
-                      <span className="font-bold">{i.label}:</span> {interviewActions[i.label].coaching}
+                  ].filter(i => i.active && interviewActions[i.label]?.coaching && !dismissedCoaching.has(`c-${i.label}`)).map(i => (
+                    <div key={i.label} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                      <div className="flex-1">🎓 <span className="font-bold">{i.label}:</span> {interviewActions[i.label].coaching}</div>
+                      <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${i.label}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
                     </div>
                   ))}
                   {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
@@ -14927,16 +15360,247 @@ export default function App(){
                 </div>;
                 })()}
 
+                {/* Packout */}
+                {isFieldVisible("packoutSummary") && matchesInterviewSearch("picking up", "Rugs Window Treatments Clothing Bedding Furniture Art Electronics Hardware Appliances") && (() => {
+                  const log = (data.interviewLog || {}).packout; const hasAnswers = (data.packoutSummary || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.packoutSummary || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packout !== false;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">2</span>{highlightSearch("What are we picking up?")}</div>
+                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => { const isAdding = !(data.packoutSummary || []).includes(s); update("packoutSummary", toggleMulti(data.packoutSummary || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {showCoaching && (data.packoutSummary || []).filter(s => interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`)).map(s => (
+                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                          <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                        </div>
+                      ))}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Load List */}
+                {isFieldVisible("loadList") && matchesInterviewSearch("need to bring", "Tall Ladder Extra Manpower Floor Protection Dollies Wardrobe Boxes TV Boxes Blankets Plastic Bags") && (() => {
+                  const log = (data.interviewLog || {}).loadList; const hasAnswers = (data.loadList || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.loadList || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.loadList !== false;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">3</span>{highlightSearch("What do we need to bring?")}</div>
+                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      <Input value={(data as any).loadListNote || ""} onChange={e => update("loadListNote", e.target.value)} placeholder="Additional notes about what to bring..." className="!text-xs" />
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Considerations */}
+                {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity") && (() => {
+                  const log = (data.interviewLog || {}).considerations; const hasAnswers = (data.sdsConsiderations || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.sdsConsiderations || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.considerations !== false;
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">4</span>{highlightSearch("Special considerations")}</div>
+                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => { const isAdding = !(data.sdsConsiderations || []).includes(s); update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
+                        <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
+                          <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[["Det","special detergent"], ["NoDC","no dry clean"], ["Low","low heat"], ["NoDry","no dryer"], ["PPE","wear PPE"], ["Hand","hand finish"]].map(([code, desc]) => (
+                              <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} className="!text-[10px] !px-2 !py-1" />
+                            ))}
+                          </div>
+                          <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities" className="!text-xs !py-1.5" />
+                        </div>
+                      )}
+                      {showCoaching && (data.sdsConsiderations || []).filter(s => interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`)).map(s => (
+                        <div key={`coach-${s}`} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                          <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                        </div>
+                      ))}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Pets in Home */}
+                {matchesInterviewSearch("pets animals dog cat", "dog cat bird fish rabbit hamster pet") && (() => {
+                  const pets = (data.household || []).filter(m => m.category === "pet");
+                  const log = (data.interviewLog || {}).pets;
+                  const hasAnswers = pets.length > 0;
+                  const answered = hasAnswers || !!log;
+                  const summary = pets.map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ") || (!!log && !hasAnswers ? "None" : "");
+                  const expanded = interviewExpanded.pets !== false;
+                  const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"];
+                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: !p.pets}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">5</span>{highlightSearch("Pets in home?")}</div>
+                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {petTypes.map(type => {
+                          const hasPet = pets.some(p => p.type === type);
+                          return <button key={type} type="button" onClick={() => {
+                            const members = data.household || [];
+                            let next;
+                            if (hasPet) {
+                              next = members.filter(m => !(m.category === "pet" && m.type === type));
+                            } else {
+                              next = [...members, { id: safeUid(), category: "pet", type, name: "" }];
+                            }
+                            update("household", next);
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                            const sdsC = data.sdsConsiderations || [];
+                            if (petStr && !sdsC.includes("Pets")) update("sdsConsiderations", [...sdsC, "Pets"]);
+                            if (!petStr && sdsC.includes("Pets")) update("sdsConsiderations", sdsC.filter(s => s !== "Pets"));
+                            if (!(data.sdsObservations || []).includes("Pets") && petStr) { update("sdsObservations", [...(data.sdsObservations || []), "Pets"]); executeInterviewActions("Pets", true); }
+                            if (!petStr && (data.sdsObservations || []).includes("Pets")) update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
+                            setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                          }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${hasPet ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{type}</button>;
+                        })}
+                      </div>
+                      {pets.map(pet => (
+                        <div key={pet.id} className="flex items-center gap-2 bg-teal-50/50 rounded-lg border border-teal-100 px-3 py-1.5">
+                          <span className="text-[10px] font-bold text-teal-700">{pet.type}</span>
+                          <input value={pet.name || ""} onChange={e => {
+                            const next = (data.household || []).map(m => m.id === pet.id ? {...m, name: e.target.value} : m);
+                            update("household", next);
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                          }} placeholder="Pet name" className="flex-1 rounded border border-teal-200 px-2 py-0.5 text-[10px] text-slate-700 bg-white outline-none focus:border-teal-400" />
+                          <button type="button" onClick={() => {
+                            const next = (data.household || []).filter(m => m.id !== pet.id);
+                            update("household", next);
+                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            update("householdAnimals", petStr);
+                            if (!petStr) {
+                              update("sdsConsiderations", (data.sdsConsiderations || []).filter(s => s !== "Pets"));
+                              update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
+                            }
+                          }} className="text-slate-400 hover:text-rose-500 text-xs">×</button>
+                        </div>
+                      ))}
+                      {pets.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {[...new Set(pets.map(p => p.type))].map(type => (
+                            <button key={type} type="button" onClick={() => {
+                              const next = [...(data.household || []), { id: safeUid(), category: "pet", type, name: "" }];
+                              update("household", next);
+                              const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                              update("householdAnimals", petStr);
+                            }} className="rounded-full border border-dashed border-teal-300 px-2 py-0.5 text-[9px] font-bold text-teal-600 hover:bg-teal-50">+ {type}</button>
+                          ))}
+                        </div>
+                      )}
+                      {showCoaching && answered && !dismissedCoaching.has("c-Pets") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                        <div className="flex-1">🎓 <span className="font-bold">Pets:</span> Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.</div>
+                        <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-Pets"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                      </div>}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Customer Preferences — individual Y/N questions */}
+                {[
+                  { key: "medical", configKey: "familyMedicalIssues", title: "Any medical issues?", searchTerms: "medical health asthma", isAnswered: () => !!data.familyMedicalIssues, summary: () => data.familyMedicalIssues === "Y" ? `Yes${data.familyMedicalNote ? ": " + data.familyMedicalNote : ""}` : "No" },
+                  { key: "allergies", configKey: "soapFragAllergies", title: "Soap or fragrance allergies?", searchTerms: "allergy allergies detergent soap fragrance sensitive", isAnswered: () => !!data.soapFragAllergies, summary: () => data.soapFragAllergies === "Y" ? `Yes${data.soapFragNote ? ": " + data.soapFragNote : ""}` : "No" },
+                  { key: "selfClean", configKey: "selfCleaning", title: "Self-clean anything?", searchTerms: "drawers undergarments linens towels baby items clean themselves", isAnswered: () => !!data.selfCleaning, summary: () => data.selfCleaning === "Y" ? `Yes${data.selfCleaningNote ? ": " + data.selfCleaningNote : ""}` : "No" },
+                  { key: "dryCleaner", configKey: "useDryCleaner", title: "Use a dry cleaner?", searchTerms: "dry cleaner dry cleaning", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
+                  { key: "laundry", configKey: "howDryLaundry", title: "How do they dry laundry?", searchTerms: "air dry low heat dryer machine", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
+                  { key: "storage", configKey: "storageNeeded", title: "Need storage?", searchTerms: "storage months long term warehouse", isAnswered: () => !!data.storageNeeded, summary: () => data.storageNeeded === "Y" ? `Yes${data.storageMonths ? ", " + data.storageMonths + " months" : ""}` : "No" },
+                ].filter(q => isFieldVisible(q.configKey) && matchesInterviewSearch(q.title, q.searchTerms || "")).map((q, qi) => {
+                  const log = (data.interviewLog || {})[q.key]; const hasAnswers = q.isAnswered(); const answered = hasAnswers || !!log;
+                  const needsFollowUp = (q.key === "storage" && data.storageNeeded === "Y") || (q.key === "medical" && data.familyMedicalIssues === "Y") || (q.key === "allergies" && data.soapFragAllergies === "Y") || (q.key === "selfClean" && data.selfCleaning === "Y");
+                  const expanded = !answered || interviewExpanded[q.key] || (needsFollowUp && interviewExpanded[q.key] !== false);
+                  return (
+                    <div key={q.key} className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                      <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: !p[q.key]})); if (answered && !log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                        <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">{6 + qi}</span>{highlightSearch(q.title)}</div>
+                        {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{q.summary()}</span>}
+                      </button>
+                      {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                      {expanded && <div className="px-3 pb-3">
+                        {q.key === "medical" && <>
+                          <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => { update("familyMedicalIssues", v); if (v === "Y") executeInterviewActions("Medical Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), medical: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e => update("familyMedicalNote", e.target.value)} placeholder="What medical issues?" className="!text-xs mt-2" />}
+                        </>}
+                        {q.key === "allergies" && <>
+                          <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => { update("soapFragAllergies", v); if (v === "Y") executeInterviewActions("Allergies Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), allergies: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="What allergies?" className="!text-xs mt-2" />}
+                        </>}
+                        {q.key === "selfClean" && <>
+                          <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => { update("selfCleaning", v); if (v === "Y") executeInterviewActions("SelfClean Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), selfClean: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.selfCleaning === "Y" && <div className="mt-2 space-y-1.5">
+                            <div className="flex flex-wrap gap-1.5">
+                              {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
+                                const active = (data.selfCleaningNote || "").toLowerCase().includes(item.toLowerCase());
+                                return <button key={item} type="button" onClick={() => { const note = data.selfCleaningNote || ""; if (active) update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", ")); else update("selfCleaningNote", note ? `${note}, ${item}` : item); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{item}</button>;
+                              })}
+                            </div>
+                            <Input value={data.selfCleaningNote || ""} onChange={e => update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
+                          </div>}
+                        </>}
+                        {q.key === "dryCleaner" && <ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => { update("useDryCleaner", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), dryCleaner: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
+                        {q.key === "laundry" && <>
+                          <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => { updateHowDry(v); executeInterviewActions(v, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), laundry: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.howDryLaundry && <div className="mt-2">
+                            <Input value={data.howDryNote || ""} onChange={e => update("howDryNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
+                          </div>}
+                        </>}
+                        {q.key === "storage" && <>
+                          <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => { update("storageNeeded", v); if (v === "Y") executeInterviewActions("Storage Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), storage: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                          {data.storageNeeded === "Y" && <div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-600">Months?</span><Input className="w-16 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" /></div>}
+                        </>}
+                        <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white mt-2 ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>
+                      </div>}
+                    </div>
+                  );
+                })}
+
+                {/* Timeline Section Header */}
+                <div id="noe-interview-timeline" className="px-3 pt-3 pb-1 bg-green-50 border-t-2 border-green-300 rounded-t-xl mt-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-green-700 uppercase tracking-wider">Delivery Timeline</span>
+                    <span className="text-[9px] text-green-500">These questions inform the Rush Guide</span>
+                  </div>
+                </div>
+
                 {isFieldVisible("repairsSummary") && matchesInterviewSearch("repairs", "Just Cleaning Paint Refinish Floors Replace Floors Cosmetic Damage Major Structural Complete Rebuild") && (() => {
                   const log = (data.interviewLog || {}).repairs;
                   const hasAnswers = !!data.repairsSummary;
                   const answered = hasAnswers || !!log;
                   const summary = data.repairsSummary || (!!log && !hasAnswers ? "None" : "");
                   const expanded = interviewExpanded.repairs !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden ${rushPlanningRecommended ? "border-l-4 border-l-green-400" : ""}`}>
-                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("What repairs are being done?")}{rushPlanningRecommended && <span className="ml-2 text-[9px] text-green-600 font-bold">Timeline</span>}</div>
+                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">12</span>{highlightSearch("What repairs are being done?")}</div>
                       {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+  
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -14951,9 +15615,10 @@ export default function App(){
                           }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
-                      {showCoaching && ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].filter(s => (data.repairsSummary || "").includes(s) && interviewActions[s]?.coaching).map(s => (
-                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
-                          <span className="font-bold">{s}:</span> {interviewActions[s].coaching}
+                      {showCoaching && ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].filter(s => (data.repairsSummary || "").includes(s) && interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`)).map(s => (
+                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                          <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
                         </div>
                       ))}
                       {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
@@ -14961,21 +15626,9 @@ export default function App(){
                   </div>;
                 })()}
 
-                {/* Delivery Timeline Section — collapsible, auto-expands when recommended */}
-                <div className={`rounded-xl border-2 overflow-hidden transition-all ${rushPlanningVisible ? "border-green-400 shadow-md shadow-green-100" : rushPlanningRecommended ? "border-green-200" : "border-slate-200"}`}>
-                  <button type="button" onClick={() => setInterviewExpanded(p => ({...p, rushPlanning: !rushPlanningVisible}))} className={`w-full flex items-center justify-between px-3 py-2 text-left ${rushPlanningRecommended ? "bg-green-50 hover:bg-green-100" : "bg-slate-50 hover:bg-slate-100"}`}>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-bold ${rushPlanningRecommended ? "text-green-700" : "text-slate-500"}`}>Delivery Timeline</span>
-                      {rushPlanningRecommended && <span className="rounded-full bg-green-600 text-white px-2 py-0.5 text-[9px] font-bold">Recommended</span>}
-                      {!rushPlanningRecommended && <span className="text-[10px] text-slate-400">Expand when delivery planning is needed</span>}
-                    </div>
-                    <span className="text-slate-400 text-xs">{rushPlanningVisible ? "▾" : "▸"}</span>
-                  </button>
-                </div>
 
-                {/* Living Timeline — inside rush planning */}
-                {rushPlanningVisible &&
-                isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving Neighbor Relative Rental") && (() => {
+                {/* Living Timeline */}
+                {isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving Neighbor Relative Rental") && (() => {
                   const timeline = data.livingTimeline || [];
                   const log = (data.interviewLog || {}).living;
                   const hasAnswers = timeline.length > 0 || !!data.livingStatus;
@@ -15017,18 +15670,19 @@ export default function App(){
                   };
                   const DURATION_OPTIONS = ["A few days", "1-2 weeks", "1 month", "2-3 months", "6+ months", "Until repairs done"];
 
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden ${rushPlanningRecommended ? "border-l-4 border-l-green-400" : ""}`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("Where will the customer live during repairs?")}{rushPlanningRecommended && <span className="ml-2 text-[9px] text-green-600 font-bold">Timeline</span>}</div>
+                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">13</span>{highlightSearch("Where will the customer live during repairs?")}</div>
                       {answered && !expanded && <div className="flex items-center gap-1 ml-2">
                         {timeline.length > 0 ? timeline.map((s, i) => (
                           <span key={s.id} className="text-[10px] text-emerald-600">{i > 0 && " → "}{s.type}{s.duration ? ` (${s.duration})` : ""}</span>
                         )) : <span className="text-[10px] text-emerald-600">{summary}</span>}
                       </div>}
+  
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-3">
-                      {showCoaching && <div className="text-[10px] text-violet-400">🎓 Build the sequence of where the customer will stay during repairs. Each stay becomes a delivery point on the timeline.</div>}
+                      {showCoaching && !dismissedCoaching.has("c-living") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Build the sequence of where the customer will stay during repairs. Each stay becomes a delivery point on the timeline.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-living"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
 
                       {/* Current timeline sequence — draggable */}
                       {timeline.length > 0 && <div className="space-y-2">
@@ -15086,10 +15740,11 @@ export default function App(){
                 {/* Delivery */}
                 {isFieldVisible("processType") && matchesInterviewSearch("final delivery", "Return Home ASAP Temp Address New Home Store Until Repaired") && (() => {
                   const log = (data.interviewLog || {}).delivery; const hasAnswers = !!data.processType; const answered = hasAnswers || !!log; const expanded = !answered || interviewExpanded.delivery;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden ${rushPlanningRecommended ? "border-l-4 border-l-green-400" : ""}`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, delivery: !p.delivery}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("Where should we make final delivery?")}{rushPlanningRecommended && <span className="ml-2 text-[9px] text-green-600 font-bold">Timeline</span>}</div>
+                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, delivery: !p.delivery}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">14</span>{highlightSearch("Where should we make final delivery?")}</div>
                       {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold ml-2">{data.processType}</span>}
+  
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -15098,6 +15753,107 @@ export default function App(){
                           <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => { const isAdding = data.processType !== s.value; update("processType", isAdding ? s.value : ""); if (isAdding) executeInterviewActions(s.value, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, delivery: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Delivery Group Builder — combined Q15+Q17 */}
+                {matchesInterviewSearch("delivery group builder final suggested", "RD RFD STD STFD LTD LTFD Inhome TLI Test Dispose Storage Only final months date") && (() => {
+                  const log = (data.interviewLog || {}).suggestedGroups || (data.interviewLog || {}).finalDeliveryDate;
+                  const selectedGroups = data.suggestedGroups || [];
+                  const groupDetails = (data as any).deliveryGroupDetails || {};
+                  const hasAnswers = selectedGroups.length > 0 || !!data.estimatedReturnDate;
+                  const answered = hasAnswers || !!log;
+                  const expanded = interviewExpanded.groupBuilder !== false;
+                  const hasFinal = selectedGroups.some(g => g.endsWith("FD") || g === "LTFD" || g === "STFD" || g === "RFD") || !!(groupDetails as any).__finalDate;
+                  const finalDate = data.estimatedReturnDate || "";
+                  const summary = selectedGroups.length > 0 ? selectedGroups.join(", ") + (finalDate ? ` → ${finalDate}` : "") : finalDate ? `Final: ${finalDate}` : "";
+                  const addresses = (data.addresses || []).map((a: any, i: number) => ({ label: a.type || `Address ${i + 1}`, value: [a.street, a.city].filter(Boolean).join(", ") || "TBD" }));
+                  const logBoth = () => setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), suggestedGroups: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}, finalDeliveryDate: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, groupBuilder: !p.groupBuilder}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">15</span>{highlightSearch("Delivery Group Builder")}</div>
+                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-3">
+                      {showCoaching && !dismissedCoaching.has("c-groupBuilder") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Select delivery groups and assign dates/addresses. One group must be the Final (F) delivery — this determines storage duration.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-groupBuilder"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+                      {/* Group selection chips */}
+                      <div className="space-y-1.5">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase">Select Groups</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {SUGGESTED_GROUPS.map(g => {
+                            const active = selectedGroups.includes(g);
+                            return <button key={g} type="button" onClick={() => {
+                              update("suggestedGroups", active ? selectedGroups.filter(x => x !== g) : [...selectedGroups, g]);
+                              logBoth();
+                            }} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${active ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`} title={SUGGESTED_GROUP_HELP[g] || g}>{g}</button>;
+                          })}
+                        </div>
+                      </div>
+                      {/* Per-group detail rows — date + address */}
+                      {selectedGroups.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-[10px] font-bold text-slate-500 uppercase">Group Details</div>
+                          {selectedGroups.map((g, gi) => {
+                            const det = groupDetails[g] || {};
+                            const isFinal = det.isFinal || (gi === selectedGroups.length - 1 && !selectedGroups.some((x, xi) => xi !== gi && (groupDetails[x] || {}).isFinal));
+                            const updateDet = (field: string, val: any) => {
+                              const next = { ...groupDetails, [g]: { ...det, [field]: val } };
+                              update("deliveryGroupDetails", next);
+                              if (field === "date" && isFinal) update("estimatedReturnDate", val);
+                              logBoth();
+                            };
+                            return (
+                              <div key={g} className={`rounded-lg border ${isFinal ? "border-emerald-300 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50"} px-3 py-2 space-y-1.5`}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold text-slate-700">{g}</span>
+                                    <span className="text-[9px] text-slate-400">{SUGGESTED_GROUP_HELP[g] || ""}</span>
+                                  </div>
+                                  <button type="button" onClick={() => {
+                                    const next = { ...groupDetails };
+                                    Object.keys(next).forEach(k => { if (next[k]) next[k] = { ...next[k], isFinal: false }; });
+                                    next[g] = { ...(next[g] || {}), isFinal: !isFinal };
+                                    update("deliveryGroupDetails", next);
+                                    if (!isFinal && det.date) update("estimatedReturnDate", det.date);
+                                    logBoth();
+                                  }} className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${isFinal ? "border-emerald-500 bg-emerald-100 text-emerald-700" : "border-slate-200 text-slate-400 hover:border-emerald-300"}`}>
+                                    {isFinal ? "Final ✓" : "Set as Final"}
+                                  </button>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <input type="date" value={det.date || ""} onChange={e => updateDet("date", e.target.value)} className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] outline-none focus:border-sky-400 flex-1" />
+                                  <select value={det.address || ""} onChange={e => updateDet("address", e.target.value)} className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] outline-none focus:border-sky-400 flex-1 bg-white">
+                                    <option value="">Address...</option>
+                                    {addresses.map((a, ai) => <option key={ai} value={a.value}>{a.label}: {a.value}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {!hasFinal && selectedGroups.length > 0 && (
+                            <div className="text-[9px] text-amber-600 font-bold">One group should be marked as Final (F) — this determines storage duration.</div>
+                          )}
+                        </div>
+                      )}
+                      {/* Post-final inhome events */}
+                      {hasFinal && (
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 p-2 space-y-1.5">
+                          <div className="text-[9px] font-bold text-slate-400 uppercase">Post-Final Delivery Events</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {["Inhome Cleaning", "Unpacking", "Art Hanging", "Appliance Install"].map(evt => {
+                              const active = ((data as any).postFinalEvents || []).includes(evt);
+                              return <button key={evt} type="button" onClick={() => {
+                                const current = (data as any).postFinalEvents || [];
+                                update("postFinalEvents", active ? current.filter(e => e !== evt) : [...current, evt]);
+                              }} className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${active ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>{evt}</button>;
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, groupBuilder: false})); logBoth(); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
                     </div>}
                   </div>;
                 })()}
@@ -15106,10 +15862,11 @@ export default function App(){
                 {matchesInterviewSearch("packout packing", "No Packout Content Manipulation Partial Packout Full Packout packing furniture") && (() => {
                   const log = (data.interviewLog || {}).packoutScope; const hasAnswers = !!(data as any).packoutScope; const answered = hasAnswers || !!log; const summary = (data as any).packoutScope || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packoutScope !== false;
                   const PACKOUT_SCOPES = ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout"];
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packoutScope: !p.packoutScope}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("Has packing out been discussed?")}</div>
+                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packoutScope: !p.packoutScope}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">16</span>{highlightSearch("Has packing out been discussed?")}</div>
                       {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+  
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -15118,9 +15875,10 @@ export default function App(){
                           <ToggleMulti key={s} label={s} checked={(data as any).packoutScope === s} onChange={() => { update("packoutScope", (data as any).packoutScope === s ? "" : s); executeInterviewActions(s, (data as any).packoutScope !== s); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
-                      {showCoaching && (data as any).packoutScope && interviewActions[(data as any).packoutScope]?.coaching && (
-                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
-                          <span className="font-bold">{(data as any).packoutScope}:</span> {interviewActions[(data as any).packoutScope].coaching}
+                      {showCoaching && (data as any).packoutScope && interviewActions[(data as any).packoutScope]?.coaching && !dismissedCoaching.has(`c-${(data as any).packoutScope}`) && (
+                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                          <div className="flex-1">🎓 <span className="font-bold">{(data as any).packoutScope}:</span> {interviewActions[(data as any).packoutScope].coaching}</div>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${(data as any).packoutScope}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
                         </div>
                       )}
                       {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packoutScope: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packoutScope: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
@@ -15128,237 +15886,19 @@ export default function App(){
                   </div>;
                 })()}
 
-                {/* Packout */}
-                {isFieldVisible("packoutSummary") && matchesInterviewSearch("picking up", "Rugs Window Treatments Clothing Bedding Furniture Art Electronics Hardware Appliances") && (() => {
-                  const log = (data.interviewLog || {}).packout; const hasAnswers = (data.packoutSummary || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.packoutSummary || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packout !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("What are we picking up?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.packoutSummary || []).includes(s)} onChange={() => { const isAdding = !(data.packoutSummary || []).includes(s); update("packoutSummary", toggleMulti(data.packoutSummary || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
-                        ))}
-                      </div>
-                      {showCoaching && (data.packoutSummary || []).filter(s => interviewActions[s]?.coaching).map(s => (
-                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
-                          <span className="font-bold">{s}:</span> {interviewActions[s].coaching}
-                        </div>
-                      ))}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
-                    </div>}
-                  </div>;
-                })()}
 
-                {/* Load List */}
-                {isFieldVisible("loadList") && matchesInterviewSearch("need to bring", "Tall Ladder Extra Manpower Floor Protection Dollies Wardrobe Boxes TV Boxes Blankets Plastic Bags") && (() => {
-                  const log = (data.interviewLog || {}).loadList; const hasAnswers = (data.loadList || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.loadList || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.loadList !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("What do we need to bring?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
-                        ))}
-                      </div>
-                      <Input value={(data as any).loadListNote || ""} onChange={e => update("loadListNote", e.target.value)} placeholder="Additional notes about what to bring..." className="!text-xs" />
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
-                    </div>}
-                  </div>;
-                })()}
-
-                {/* Considerations */}
-                {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity") && (() => {
-                  const log = (data.interviewLog || {}).considerations; const hasAnswers = (data.sdsConsiderations || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.sdsConsiderations || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.considerations !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("Special considerations")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => { const isAdding = !(data.sdsConsiderations || []).includes(s); update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
-                        ))}
-                      </div>
-                      {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
-                        <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
-                          <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {[["Det","special detergent"], ["NoDC","no dry clean"], ["Low","low heat"], ["NoDry","no dryer"], ["PPE","wear PPE"], ["Hand","hand finish"]].map(([code, desc]) => (
-                              <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} className="!text-[10px] !px-2 !py-1" />
-                            ))}
-                          </div>
-                          <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities" className="!text-xs !py-1.5" />
-                        </div>
-                      )}
-                      {showCoaching && (data.sdsConsiderations || []).filter(s => interviewActions[s]?.coaching).map(s => (
-                        <div key={`coach-${s}`} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
-                          <span className="font-bold">{s}:</span> {interviewActions[s].coaching}
-                        </div>
-                      ))}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
-                    </div>}
-                  </div>;
-                })()}
-
-                {/* Pets in Home */}
-                {matchesInterviewSearch("pets animals dog cat", "dog cat bird fish rabbit hamster pet") && (() => {
-                  const pets = (data.household || []).filter(m => m.category === "pet");
-                  const log = (data.interviewLog || {}).pets;
-                  const hasAnswers = pets.length > 0;
-                  const answered = hasAnswers || !!log;
-                  const summary = pets.map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ") || (!!log && !hasAnswers ? "None" : "");
-                  const expanded = interviewExpanded.pets !== false;
-                  const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"];
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: !p.pets}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("Pets in home?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {petTypes.map(type => {
-                          const hasPet = pets.some(p => p.type === type);
-                          return <button key={type} type="button" onClick={() => {
-                            const members = data.household || [];
-                            let next;
-                            if (hasPet) {
-                              next = members.filter(m => !(m.category === "pet" && m.type === type));
-                            } else {
-                              next = [...members, { id: safeUid(), category: "pet", type, name: "" }];
-                            }
-                            update("household", next);
-                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
-                            update("householdAnimals", petStr);
-                            const sdsC = data.sdsConsiderations || [];
-                            if (petStr && !sdsC.includes("Pets")) update("sdsConsiderations", [...sdsC, "Pets"]);
-                            if (!petStr && sdsC.includes("Pets")) update("sdsConsiderations", sdsC.filter(s => s !== "Pets"));
-                            if (!(data.sdsObservations || []).includes("Pets") && petStr) { update("sdsObservations", [...(data.sdsObservations || []), "Pets"]); executeInterviewActions("Pets", true); }
-                            if (!petStr && (data.sdsObservations || []).includes("Pets")) update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
-                            setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
-                          }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${hasPet ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{type}</button>;
-                        })}
-                      </div>
-                      {pets.map(pet => (
-                        <div key={pet.id} className="flex items-center gap-2 bg-teal-50/50 rounded-lg border border-teal-100 px-3 py-1.5">
-                          <span className="text-[10px] font-bold text-teal-700">{pet.type}</span>
-                          <input value={pet.name || ""} onChange={e => {
-                            const next = (data.household || []).map(m => m.id === pet.id ? {...m, name: e.target.value} : m);
-                            update("household", next);
-                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
-                            update("householdAnimals", petStr);
-                          }} placeholder="Pet name" className="flex-1 rounded border border-teal-200 px-2 py-0.5 text-[10px] text-slate-700 bg-white outline-none focus:border-teal-400" />
-                          <button type="button" onClick={() => {
-                            const next = (data.household || []).filter(m => m.id !== pet.id);
-                            update("household", next);
-                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
-                            update("householdAnimals", petStr);
-                            if (!petStr) {
-                              update("sdsConsiderations", (data.sdsConsiderations || []).filter(s => s !== "Pets"));
-                              update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
-                            }
-                          }} className="text-slate-400 hover:text-rose-500 text-xs">×</button>
-                        </div>
-                      ))}
-                      {/* Add another pet of an existing type */}
-                      {pets.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {[...new Set(pets.map(p => p.type))].map(type => (
-                            <button key={type} type="button" onClick={() => {
-                              const next = [...(data.household || []), { id: safeUid(), category: "pet", type, name: "" }];
-                              update("household", next);
-                              const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
-                              update("householdAnimals", petStr);
-                            }} className="rounded-full border border-dashed border-teal-300 px-2 py-0.5 text-[9px] font-bold text-teal-600 hover:bg-teal-50">+ {type}</button>
-                          ))}
-                        </div>
-                      )}
-                      {showCoaching && answered && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700">
-                        <span className="font-bold">Pets:</span> Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.
-                      </div>}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
-                    </div>}
-                  </div>;
-                })()}
-
-                {/* Customer Preferences */}
-                {/* Individual preference questions */}
-                {[
-                  { key: "medical", configKey: "familyMedicalIssues", title: "Any medical issues?", searchTerms: "medical health asthma", isAnswered: () => !!data.familyMedicalIssues, summary: () => data.familyMedicalIssues === "Y" ? `Yes${data.familyMedicalNote ? ": " + data.familyMedicalNote : ""}` : "No" },
-                  { key: "allergies", configKey: "soapFragAllergies", title: "Soap or fragrance allergies?", searchTerms: "allergy allergies detergent soap fragrance sensitive", isAnswered: () => !!data.soapFragAllergies, summary: () => data.soapFragAllergies === "Y" ? `Yes${data.soapFragNote ? ": " + data.soapFragNote : ""}` : "No" },
-                  { key: "selfClean", configKey: "selfCleaning", title: "Self-clean anything?", searchTerms: "drawers undergarments linens towels baby items clean themselves", isAnswered: () => !!data.selfCleaning, summary: () => data.selfCleaning === "Y" ? `Yes${data.selfCleaningNote ? ": " + data.selfCleaningNote : ""}` : "No" },
-                  { key: "dryCleaner", configKey: "useDryCleaner", title: "Use a dry cleaner?", searchTerms: "dry cleaner dry cleaning", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
-                  { key: "laundry", configKey: "howDryLaundry", title: "How do they dry laundry?", searchTerms: "air dry low heat dryer machine", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
-                  { key: "storage", configKey: "storageNeeded", title: "Need storage?", searchTerms: "storage months long term warehouse", isAnswered: () => !!data.storageNeeded, summary: () => data.storageNeeded === "Y" ? `Yes${data.storageMonths ? ", " + data.storageMonths + " months" : ""}` : "No" },
-                ].filter(q => isFieldVisible(q.configKey) && matchesInterviewSearch(q.title, q.searchTerms || "")).map(q => {
-                  const log = (data.interviewLog || {})[q.key]; const hasAnswers = q.isAnswered(); const answered = hasAnswers || !!log;
-                  const needsFollowUp = (q.key === "storage" && data.storageNeeded === "Y") || (q.key === "medical" && data.familyMedicalIssues === "Y") || (q.key === "allergies" && data.soapFragAllergies === "Y") || (q.key === "selfClean" && data.selfCleaning === "Y");
-                  const expanded = !answered || interviewExpanded[q.key] || (needsFollowUp && interviewExpanded[q.key] !== false);
-                  return (
-                    <div key={q.key} className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                      <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: !p[q.key]})); if (answered && !log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                        <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch(q.title)}</div>
-                        {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{q.summary()}</span>}
-                      </button>
-                      {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                      {expanded && <div className="px-3 pb-3">
-                        {q.key === "medical" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => { update("familyMedicalIssues", v); if (v === "Y") executeInterviewActions("Medical Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), medical: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
-                          {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e => update("familyMedicalNote", e.target.value)} placeholder="What medical issues?" className="!text-xs mt-2" />}
-                        </>}
-                        {q.key === "allergies" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => { update("soapFragAllergies", v); if (v === "Y") executeInterviewActions("Allergies Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), allergies: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
-                          {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="What allergies?" className="!text-xs mt-2" />}
-                        </>}
-                        {q.key === "selfClean" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => { update("selfCleaning", v); if (v === "Y") executeInterviewActions("SelfClean Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), selfClean: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
-                          {data.selfCleaning === "Y" && <div className="mt-2 space-y-1.5">
-                            <div className="flex flex-wrap gap-1.5">
-                              {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
-                                const active = (data.selfCleaningNote || "").toLowerCase().includes(item.toLowerCase());
-                                return <button key={item} type="button" onClick={() => { const note = data.selfCleaningNote || ""; if (active) update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", ")); else update("selfCleaningNote", note ? `${note}, ${item}` : item); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{item}</button>;
-                              })}
-                            </div>
-                            <Input value={data.selfCleaningNote || ""} onChange={e => update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
-                          </div>}
-                        </>}
-                        {q.key === "dryCleaner" && <ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => { update("useDryCleaner", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), dryCleaner: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
-                        {q.key === "laundry" && <>
-                          <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => { updateHowDry(v); executeInterviewActions(v, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), laundry: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
-                          {data.howDryLaundry && <div className="mt-2">
-                            <Input value={data.howDryNote || ""} onChange={e => update("howDryNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
-                          </div>}
-                        </>}
-                        {q.key === "storage" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => { update("storageNeeded", v); if (v === "Y") executeInterviewActions("Storage Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), storage: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
-                          {data.storageNeeded === "Y" && <div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-600">Months?</span><Input className="w-16 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" /></div>}
-                        </>}
-                      </div>}
-                    </div>
-                  );
-                })}
-
-                {/* Activities & Interests — inside rush planning */}
-                {rushPlanningVisible && (() => {
+                {/* Activities & Interests */}
+                {(() => {
                   const log = (data.interviewLog || {}).interests;
                   const hasAnswers = (data.rushInterests || []).length > 0;
                   const answered = hasAnswers || !!log;
                   const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ") || (!!log && !hasAnswers ? "None" : "");
                   const expanded = interviewExpanded.interests !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !expanded}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("Activities & interests")}</div>
+                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !expanded}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">17</span>{highlightSearch("Activities & interests")}</div>
                       {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+  
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
@@ -15370,25 +15910,27 @@ export default function App(){
                           </button>;
                         })}
                       </div>
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, interests: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
                     </div>}
                   </div>;
                 })()}
 
-                {/* Upcoming Events — inside rush planning */}
-                {rushPlanningVisible && (() => {
+                {/* Upcoming Events */}
+                {(() => {
                   const log = (data.interviewLog || {}).events;
                   const hasAnswers = (data.upcomingEvents || []).length > 0;
                   const answered = hasAnswers || !!log;
                   const summary = (data.upcomingEvents || []).map(e => e.name || "Event").join(", ") || (!!log && !hasAnswers ? "None" : "");
                   const expanded = interviewExpanded.events !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600`}>{highlightSearch("Upcoming trips & events")}</div>
+                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">18</span>{highlightSearch("Upcoming trips & events")}</div>
                       {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+  
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
-                      {showCoaching && <div className="text-[10px] text-violet-400">🎓 Any travel or formal events during the repair period? We'll make sure the right items are pulled and delivered on time.</div>}
+                      {showCoaching && !dismissedCoaching.has("c-events") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Any travel or formal events during the repair period? We'll make sure the right items are pulled and delivered on time.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-events"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
                       {(data.upcomingEvents || []).map(evt => (
                         <div key={evt.id} className="p-2 rounded-lg border border-slate-200 bg-slate-50 grid grid-cols-3 gap-2 relative">
                           <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents||[]).filter(e => e.id !== evt.id))} className="absolute top-1 right-1 text-slate-400 hover:text-rose-500 text-xs">×</button>
@@ -15405,7 +15947,7 @@ export default function App(){
 
               </div>
               <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-4">
-                {rushPlanningVisible && <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100">Rush Guide</button>}
+                <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100">Rush Guide</button>
                 <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-violet-500 px-5 py-2 text-sm font-bold text-white hover:bg-violet-600">Done</button>
               </div>
           </div>
@@ -15647,7 +16189,7 @@ export default function App(){
                     <span className="text-sm font-bold text-violet-800">Interview Answer Actions</span>
                     <span className="text-xs text-violet-500 ml-2">{Object.keys(interviewActions).length} answers configured</span>
                   </div>
-                  <button onClick={() => { setInterviewActions({...DEFAULT_INTERVIEW_ACTIONS}); try { localStorage.removeItem("noe-interview-actions-v1"); } catch {} setToast("Interview actions reset"); }} className="rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[10px] font-bold text-violet-600 hover:bg-violet-50">Reset</button>
+                  <button onClick={() => { setInterviewActions({...DEFAULT_INTERVIEW_ACTIONS}); try { localStorage.removeItem("noe-interview-actions-v1"); } catch { /* ignore */ } setToast("Interview actions reset"); }} className="rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[10px] font-bold text-violet-600 hover:bg-violet-50">Reset</button>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {(() => {
@@ -15760,7 +16302,7 @@ export default function App(){
           const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === orderRepairType);
           const now = new Date();
           // Estimated return: explicit date > repair timeline > storage months > null
-          const explicitReturn = data.estimatedReturnDate ? new Date(data.estimatedReturnDate) : null;
+	          const explicitReturn = parseLocalDate(data.estimatedReturnDate);
           const repairReturn = repairInfo ? rushAddDays(now, repairInfo.days) : null;
           const storageReturn = data.storageMonths ? rushAddDays(now, parseInt(data.storageMonths) * 30) : null;
           const estimatedReturn = explicitReturn || (repairReturn && storageReturn ? (repairReturn > storageReturn ? repairReturn : storageReturn) : repairReturn || storageReturn);
@@ -16047,6 +16589,11 @@ export default function App(){
                       if (packoutItems.includes("Appliances")) finalHouseholdTags.push("Appliances installed");
                       deliveryGroups.push({ id: "final", label: "Final Delivery", date: estimatedReturn, icon: "🏡", items: ["All remaining wardrobe and household items"], location: "Home", address: finalDeliverTo, householdTags: finalHouseholdTags, color: DELIVERY_COLORS[deliveryGroups.length] });
                     }
+                    // Default final delivery placeholder when no final delivery exists
+                    if (!estimatedReturn && !deliveryGroups.some(g => g.id === "final")) {
+                      const defaultFinalDate = rushAddDays(now, 30);
+                      deliveryGroups.push({ id: "final", label: "Final Delivery", date: defaultFinalDate, icon: "🏡", items: ["All remaining items"], location: "Home", address: rushDeliverTo || primaryAddrStr, color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length] });
+                    }
                     // Custom deliveries created by user
                     const customDeliveries = ((rushGuideData as any).customDeliveries || []) as {id: string; label: string; dateStr: string; address: string; sourceId: string}[];
                     // Address resolver from timeline bands
@@ -16056,10 +16603,29 @@ export default function App(){
                       return { location: hasHotel ? "Hotel" : "Home", address: primaryAddrStr };
                     };
                     customDeliveries.forEach(cd => {
-                      const cdDate = new Date(cd.dateStr);
-                      const loc = resolveAddressAtDate(cdDate);
+	                      const cdDate = parseLocalDate(cd.dateStr);
+	                      if (!cdDate) return;
+	                      const loc = resolveAddressAtDate(cdDate);
                       deliveryGroups.push({ id: cd.id, label: cd.label, date: cdDate, icon: "📦", items: [], location: loc.location, address: cd.address || loc.address, color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length] });
                     });
+                    // Apply user overrides for date/address
+                    const groupOverrides = (rushGuideData as any).groupOverrides || {};
+                    deliveryGroups.forEach(dg => {
+                      const ovr = groupOverrides[dg.id];
+                      if (ovr) {
+	                        if (ovr.dateStr) { const d = parseLocalDate(ovr.dateStr); if (d) dg.date = d; }
+                        if (ovr.address !== undefined) dg.address = ovr.address;
+                      }
+                    });
+                    // Post-final delivery events (inhome cleaning, unpacking, etc.)
+                    const postFinalEvents = (data as any).postFinalEvents || [];
+                    const finalGroup = deliveryGroups.find(g => g.id === "final");
+                    if (finalGroup && postFinalEvents.length > 0) {
+                      postFinalEvents.forEach((evt: string, i: number) => {
+                        const postDate = rushAddDays(finalGroup.date, 3 + i * 2);
+                        deliveryGroups.push({ id: `post_${evt.replace(/\s/g, "_").toLowerCase()}`, label: evt, date: postDate, icon: "🏠", items: [`Post-final: ${evt}`], location: finalGroup.location, address: finalGroup.address, color: DELIVERY_COLORS[(deliveryGroups.length) % DELIVERY_COLORS.length] });
+                      });
+                    }
                     // Sort by date
                     deliveryGroups.sort((a, b) => a.date.getTime() - b.date.getTime());
 
@@ -16130,13 +16696,32 @@ export default function App(){
                         <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{totalPeople} People{petCount > 0 ? `, ${petCount} Pet${petCount > 1 ? "s" : ""}` : ""}</span>
                         {isLongTerm && <span className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">Long-Term Order</span>}
                         {estimatedReturn && <span className="rounded-full bg-teal-100 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-700">Return: {rushFormatDate(estimatedReturn)}</span>}
-                        {storageRepairMismatch && <span className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">Storage/Repair Mismatch</span>}
+                        {storageRepairMismatch && (() => {
+                          const repairDays = repairInfo?.days || 0;
+                          const storageDays = data.storageMonths ? parseInt(data.storageMonths) * 30 : 0;
+                          const repairLabel = repairInfo ? `${repairInfo.label} (~${Math.round(repairDays / 30)}mo)` : "Unknown";
+                          const storageLabel = data.storageMonths ? `${data.storageMonths} months` : "Unknown";
+                          return (
+                            <span className="group relative rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700 cursor-help">
+                              Storage/Repair Mismatch
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 rounded-lg bg-slate-800 text-white p-3 text-[11px] font-normal shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                                <div className="font-bold text-amber-300 mb-1">Timeline Conflict</div>
+                                <div className="space-y-1">
+                                  <div>Repairs estimate: <span className="font-semibold">{repairLabel}</span></div>
+                                  <div>Storage requested: <span className="font-semibold">{storageLabel}</span></div>
+                                  <div className="border-t border-slate-600 pt-1 mt-1 text-slate-300">These differ by more than 30 days. Adjust the storage months in Interview → "Need storage?" or update the repair type to align them.</div>
+                                </div>
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                              </div>
+                            </span>
+                          );
+                        })()}
                         {seasonChanges.length > 0 && <span className="rounded-full bg-violet-100 border border-violet-200 px-3 py-1 text-xs font-bold text-violet-700">{seasonChanges.length} Season Change{seasonChanges.length > 1 ? "s" : ""}</span>}
                       </div>
                       {/* Editable return date */}
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] font-bold text-slate-500">Return date:</span>
-                        <input type="date" value={data.estimatedReturnDate || (estimatedReturn ? estimatedReturn.toISOString().split("T")[0] : "")} onChange={e => update("estimatedReturnDate", e.target.value)} className="rounded border border-slate-200 px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-teal-400" />
+	                        <input type="date" value={data.estimatedReturnDate || formatDateInputValue(estimatedReturn)} onChange={e => update("estimatedReturnDate", e.target.value)} className="rounded border border-slate-200 px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-teal-400" />
                         {data.estimatedReturnDate && <button type="button" onClick={() => update("estimatedReturnDate", "")} className="text-[9px] text-slate-400 hover:text-slate-600">Reset to auto</button>}
                       </div>
                     </div>
@@ -16144,14 +16729,13 @@ export default function App(){
                     {/* (Timeline overview removed — integrated into Gantt below) */}
 
                     {/* Unified Delivery Timeline */}
-                    {estimatedReturn && (() => {
+                    {(() => {
+                      const effectiveReturn = estimatedReturn || rushAddDays(now, 30);
                       const timelineStart = new Date(now);
-                      const displacementMs = estimatedReturn.getTime() - now.getTime();
-                      const bufferMs = Math.max(displacementMs * 0.5, 30 * 86400000);
-                      const rawEnd = estimatedReturn.getTime() + bufferMs;
-                      const minEnd = now.getTime() + 90 * 86400000;
-                      const maxEnd = now.getTime() + 548 * 86400000;
-                      const timelineEnd = new Date(Math.min(maxEnd, Math.max(minEnd, rawEnd)));
+                      const displacementDays = (effectiveReturn.getTime() - now.getTime()) / 86400000;
+                      // Dynamic trailing: ≤30d=30d extra, 31-270d=proportional (1-3mo), >270d=90d max
+                      const trailingDays = displacementDays <= 30 ? 30 : displacementDays > 270 ? 90 : 30 + ((displacementDays - 30) / 240) * 60;
+                      const timelineEnd = new Date(effectiveReturn.getTime() + trailingDays * 86400000);
                       const totalMs = timelineEnd.getTime() - timelineStart.getTime();
                       const pct = (d: Date) => Math.max(0, Math.min(100, ((d.getTime() - timelineStart.getTime()) / totalMs) * 100));
                       const monthLabels: {label: string; pct: number}[] = [];
@@ -16170,15 +16754,15 @@ export default function App(){
                         if (hasHotel && hasRental) {
                           const hotelEnd = rushAddDays(now, isLongTerm ? 14 : 7);
                           bands.push({ label: "Hotel", color: "bg-amber-400", startPct: pct(now), widthPct: pct(hotelEnd) - pct(now), address: hotelAddrStr });
-                          bands.push({ label: "Rental", color: "bg-sky-400", startPct: pct(hotelEnd), widthPct: pct(estimatedReturn) - pct(hotelEnd), address: rentalAddrStr });
+                          bands.push({ label: "Rental", color: "bg-sky-400", startPct: pct(hotelEnd), widthPct: pct(effectiveReturn) - pct(hotelEnd), address: rentalAddrStr });
                         } else if (hasHotel) {
-                          bands.push({ label: "Hotel", color: "bg-amber-400", startPct: pct(now), widthPct: pct(estimatedReturn) - pct(now), address: hotelAddrStr });
+                          bands.push({ label: "Hotel", color: "bg-amber-400", startPct: pct(now), widthPct: pct(effectiveReturn) - pct(now), address: hotelAddrStr });
                         } else if (hasRental) {
-                          bands.push({ label: "Rental", color: "bg-sky-400", startPct: pct(now), widthPct: pct(estimatedReturn) - pct(now), address: rentalAddrStr });
+                          bands.push({ label: "Rental", color: "bg-sky-400", startPct: pct(now), widthPct: pct(effectiveReturn) - pct(now), address: rentalAddrStr });
                         } else {
-                          bands.push({ label: "Home", color: "bg-emerald-400", startPct: pct(now), widthPct: pct(estimatedReturn) - pct(now), address: primaryAddrStr });
+                          bands.push({ label: "Home", color: "bg-emerald-400", startPct: pct(now), widthPct: pct(effectiveReturn) - pct(now), address: primaryAddrStr });
                         }
-                        bands.push({ label: "Home", color: "bg-emerald-400", startPct: pct(estimatedReturn), widthPct: 100 - pct(estimatedReturn), address: primaryAddrStr });
+                        bands.push({ label: "Home", color: "bg-emerald-400", startPct: pct(effectiveReturn), widthPct: 100 - pct(effectiveReturn), address: primaryAddrStr });
                       }
 
                       // All possible pins
@@ -16219,6 +16803,9 @@ export default function App(){
                               <div className="text-[10px] text-slate-500">Toggle pins to mark needs. Drag to reposition.</div>
                             </div>
                             <div className="text-[10px] text-slate-400">{rushFormatDate(now)} → {rushFormatDate(timelineEnd)}</div>
+                          </div>
+                          <div className="px-4 py-2 border-b border-slate-100 bg-amber-50/50">
+                            <p className="text-[10px] text-amber-700 leading-relaxed">This timeline is based on estimated information as of {rushFormatDate(now)} and is likely to change as additional information is learned. Please use this as a guide and communicate new realities as they occur so dates can be adjusted. These are not intended to be firm appointments — all appointments will need to be confirmed.</p>
                           </div>
 
                           {/* Pin toggles */}
@@ -16287,7 +16874,7 @@ export default function App(){
                             </div>
 
                             {/* === THE BAR: Location bands === */}
-                            <div ref={timelineRef} className="relative h-7 bg-slate-100 rounded-lg overflow-hidden">
+                            <div ref={timelineRef} className="relative z-20 h-7 bg-slate-100 rounded-lg overflow-hidden">
                               {bands.map((b, i) => (
                                 <div key={i} className={`absolute top-0 bottom-0 ${b.color} flex items-center justify-center cursor-default`} style={{ left: `${b.startPct}%`, width: `${Math.max(b.widthPct, 1)}%` }} title={`${b.label}${b.address ? `\n→ ${b.address}` : ""}`}>
                                   <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">{b.label}</span>
@@ -16296,22 +16883,90 @@ export default function App(){
                               <div className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-10" style={{ left: `${pct(now)}%` }} title="Today" />
                             </div>
 
-                            {/* === BELOW THE BAR: Delivery markers pointing up — click to scroll === */}
-                            <div className="relative h-14 mt-0.5">
-                              {deliveryGroups.map((dg, i) => (
-                                <div key={dg.id} className="absolute flex flex-col items-center cursor-pointer hover:scale-110 transition-transform" style={{ left: `${pct(dg.date)}%`, transform: "translateX(-50%)" }} onClick={() => {
-                                  const el = document.getElementById(`delivery-card-${dg.id}`);
-                                  if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("ring-2", "ring-offset-2", "ring-sky-400"); setTimeout(() => el.classList.remove("ring-2", "ring-offset-2", "ring-sky-400"), 2000); }
-                                }} title={`Click to view #${i + 1} ${dg.label}`}>
-                                  <div className="w-px h-2 bg-slate-400" />
-                                  <div className={`${dg.color} rounded-full w-6 h-6 flex items-center justify-center text-white text-[10px] font-bold shadow-sm border-2 border-white`}>{i + 1}</div>
-                                  <div className="text-[7px] font-bold text-slate-600 whitespace-nowrap mt-0.5">{dg.label}</div>
-                                  <div className="text-[7px] text-slate-400 whitespace-nowrap">{rushFormatDate(dg.date)}</div>
-                                </div>
-                              ))}
+                            {/* === BELOW THE BAR: Delivery markers with extended connectors for clustered dates === */}
+                            {(() => {
+                              const markerClearancePct = 10;
+                              const markerLaneGapPx = 48;
+                              const markerBaseConnectorPx = 6;
+                              const markerRowsById: Record<string, number> = {};
+                              const rowEnds: number[] = [];
+                              deliveryGroups
+                                .map(dg => ({ id: dg.id, pos: pct(dg.date) }))
+                                .sort((a, b) => a.pos - b.pos)
+                                .forEach(marker => {
+                                  let row = rowEnds.findIndex(end => marker.pos > end + markerClearancePct);
+                                  if (row === -1) row = rowEnds.length;
+                                  markerRowsById[marker.id] = row;
+                                  rowEnds[row] = marker.pos;
+                                });
+                              const maxMarkerRow = Math.max(0, ...Object.values(markerRowsById));
+                              const markerAreaHeight = markerBaseConnectorPx + maxMarkerRow * markerLaneGapPx + 58;
+
+                              return (
+                            <div className="relative z-0 mt-0.5" style={{ height: `${markerAreaHeight}px` }}>
+                              <div className="pointer-events-none absolute inset-0 z-0">
+                                {deliveryGroups.map(dg => {
+                                  const markerRow = markerRowsById[dg.id] || 0;
+                                  const connectorHeight = markerBaseConnectorPx + markerRow * markerLaneGapPx;
+                                  return (
+                                    <div key={`${dg.id}-connector`} className="absolute top-0" style={{ left: `${pct(dg.date)}%`, transform: "translateX(-50%)" }}>
+                                      <div className="w-px bg-slate-300" style={{ height: `${connectorHeight + 12}px` }} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {deliveryGroups.map((dg, i) => {
+                                const markerRow = markerRowsById[dg.id] || 0;
+                                const connectorHeight = markerBaseConnectorPx + markerRow * markerLaneGapPx;
+                                return (
+                                <div key={dg.id} className="absolute z-10 cursor-pointer hover:scale-105 transition-transform" style={{ left: `${pct(dg.date)}%`, transform: "translateX(-50%)", height: `${connectorHeight + 48}px` }}
+                                  draggable
+                                  onDragStart={e => { e.dataTransfer.setData("text/plain", dg.id); e.dataTransfer.effectAllowed = "move"; }}
+                                  onDrag={e => {
+                                    if (!e.clientX) return;
+                                    const bar = e.currentTarget.parentElement;
+                                    if (!bar) return;
+                                    const rect = bar.getBoundingClientRect();
+                                    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                                    const newDate = new Date(timelineStart.getTime() + x * (timelineEnd.getTime() - timelineStart.getTime()));
+                                    if (dg.id.startsWith("custom_")) {
+	                                      setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, dateStr: formatDateInputValue(newDate) } : cd) }));
+                                    } else {
+	                                      setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), dateStr: formatDateInputValue(newDate) } } }));
+                                    }
+                                  }}
+                                  onClick={() => {
+                                    const el = document.getElementById(`delivery-card-${dg.id}`);
+                                    if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("ring-2", "ring-offset-2", "ring-sky-400"); setTimeout(() => el.classList.remove("ring-2", "ring-offset-2", "ring-sky-400"), 2000); }
+                                  }} title={`Drag to move · Click to view #${i + 1} ${dg.label}`}>
+                                  <div className="relative z-10 flex flex-col items-center" style={{ paddingTop: `${connectorHeight}px` }}>
+                                    <div className={`${dg.color} rounded-full w-6 h-6 flex items-center justify-center text-white text-[10px] font-bold shadow-sm border-2 border-white`}>{i + 1}</div>
+                                    <div className="text-[7px] font-bold text-slate-600 whitespace-nowrap mt-0.5 bg-white/90 px-0.5 rounded">{dg.label}</div>
+                                    <div className="text-[7px] text-slate-400 whitespace-nowrap bg-white/90 px-0.5 rounded">{rushFormatDate(dg.date)}</div>
+                                  </div>
+                                </div>);
+                              })}
                             </div>
+                              );
+                            })()}
 
                           </div>
+
+                          {/* Address legend — color-coded */}
+                          {bands.length > 0 && (
+                            <div className="px-4 pb-2">
+                              <div className="flex flex-wrap gap-2 items-center">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase">Addresses:</span>
+                                {bands.map((b, bi) => (
+                                  <div key={bi} className="flex items-center gap-1">
+                                    <div className={`w-3 h-3 rounded-sm ${b.color}`} />
+                                    <span className="text-[9px] font-bold text-slate-600">{b.label}</span>
+                                    {b.address && <span className="text-[9px] text-slate-400 truncate max-w-[120px]">{b.address}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Delivery group cards with merged sublists */}
                           <div className="px-4 pb-4 space-y-3">
@@ -16327,18 +16982,47 @@ export default function App(){
                               });
                               return (
                               <div key={dg.id} id={`delivery-card-${dg.id}`} className="rounded-2xl border border-slate-200 overflow-hidden transition-all duration-300">
-                                <div className={`${dg.color} px-4 py-3 text-white flex items-center gap-3`}>
-                                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-bold shrink-0">{i + 1}</div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-bold text-sm">{dg.icon} {dg.label}</div>
-                                    <div className="text-[10px] text-white/80">{rushFormatDate(dg.date)} → {dg.location}{dg.address ? ` — ${dg.address}` : ""}</div>
-                                  </div>
+	                                <div className={`${dg.color} px-4 py-3 text-white flex items-center gap-3`}>
+	                                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0 shadow-sm ring-2 ring-white/20">
+	                                    <span className="text-xl font-bold leading-none">{i + 1}</span>
+	                                  </div>
+	                                  <div className="flex-1 min-w-0">
+	                                    <div className="font-bold text-sm">{dg.icon} {dg.label}</div>
+	                                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
+	                                      <label className="min-w-[170px] flex-1 sm:flex-none">
+	                                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-white/65">Date</span>
+	                                        <input type="date" value={formatDateInputValue(dg.date)} onChange={e => {
+	                                          if (dg.id.startsWith("custom_")) {
+	                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, dateStr: e.target.value } : cd) }));
+	                                          } else {
+	                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), dateStr: e.target.value } } }));
+	                                          }
+	                                        }} className="h-9 w-full rounded-lg border border-white/30 bg-white/95 px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-white focus:ring-2 focus:ring-white/40" />
+	                                      </label>
+	                                      <label className="min-w-0 flex-[2]">
+	                                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-white/65">Address</span>
+	                                        <input value={dg.address || ""} list={`delivery-addresses-${dg.id}`} onChange={e => {
+	                                          if (dg.id.startsWith("custom_")) {
+	                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, address: e.target.value } : cd) }));
+	                                          } else {
+	                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), address: e.target.value } } }));
+	                                          }
+	                                        }} placeholder={`${dg.location || "Delivery"} address...`} className="h-9 w-full rounded-lg border border-white/30 bg-white/95 px-3 text-[13px] font-bold text-slate-800 placeholder:text-slate-400 outline-none focus:border-white focus:ring-2 focus:ring-white/40" />
+	                                        <datalist id={`delivery-addresses-${dg.id}`}>
+	                                          {(data.addresses || []).map((a: any, ai: number) => {
+	                                            const address = [a.street, a.city, a.state].filter(Boolean).join(", ");
+	                                            return <option key={ai} value={address} label={`${a.type || `Address ${ai + 1}`}: ${a.street || "TBD"}`} />;
+	                                          })}
+	                                        </datalist>
+	                                      </label>
+	                                    </div>
+	                                  </div>
                                   {(() => { const GROUP_MAP: Record<string,string[]> = { rush: ["RD","RFD"], rental: ["STD","STFD"], "short-term": ["STD","STFD"], final: ["LTD","LTFD","RFD","STFD","LTFD"] }; const matched = (GROUP_MAP[dg.id] || []).filter(g => interviewGroups.includes(g)); return matched.length > 0 ? <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold">{matched.join("/")}</span> : null; })()}
                                   {(mergedSeasons.length > 0 || mergedEvents.length > 0) && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold">+{mergedSeasons.length + mergedEvents.length} added</span>}
                                   {dg.id.startsWith("custom_") && <button type="button" onClick={() => removeCustomDelivery(dg.id)} className="rounded-full bg-white/20 hover:bg-white/30 px-2 py-0.5 text-[9px] font-bold text-white" title="Delete this delivery group">Delete</button>}
                                 </div>
-                                <div className="bg-white p-4 space-y-2">
-                                  {/* Core items */}
+	                                <div className="bg-white p-4 space-y-2">
+	                                  {/* Core items */}
                                   {dg.items.map((item, j) => (
                                     <div key={j} className="flex items-start gap-2">
                                       <span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" />
@@ -16490,7 +17174,7 @@ export default function App(){
                                     </div>
                                     <div className="border-l border-slate-200 pl-2">
                                       <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Or</div>
-                                      <button type="button" onClick={() => createCustomDelivery(`${sw.season} Delivery`, sw.rawDate.toISOString().split("T")[0], sw.id)} className="rounded-lg border-2 border-dashed border-violet-300 px-3 py-1.5 text-[10px] font-bold text-violet-600 hover:border-violet-400 hover:bg-violet-50 transition-all bg-white">
+	                                      <button type="button" onClick={() => createCustomDelivery(`${sw.season} Delivery`, formatDateInputValue(sw.rawDate), sw.id)} className="rounded-lg border-2 border-dashed border-violet-300 px-3 py-1.5 text-[10px] font-bold text-violet-600 hover:border-violet-400 hover:bg-violet-50 transition-all bg-white">
                                         + Create New Delivery
                                       </button>
                                     </div>
@@ -16598,7 +17282,7 @@ export default function App(){
                     </div>
 
                     {/* Required: Living Status — click to open interview */}
-                    <button type="button" onClick={() => { setRushGuideOpen(false); setInterviewPanelOpen(true); setInterviewExpanded((p: any) => ({...p, living: true})); }} className={`w-full rounded-xl border-2 p-4 text-left hover:shadow-md transition-shadow cursor-pointer ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+                    <button type="button" onClick={() => { setRushGuideOpen(false); setTimeout(() => { setInterviewPanelOpen(true); setInterviewExpanded((p: any) => ({...p, living: true})); }, 100); }} className={`w-full rounded-xl border-2 p-4 text-left hover:shadow-md transition-shadow cursor-pointer ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
                       <div className="flex items-start gap-2">
                         <span className={`text-lg mt-0.5 ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "text-emerald-500" : "text-amber-500"}`}>{data.livingStatus || (data.livingTimeline || []).length > 0 ? "✓" : "1"}</span>
                         <div className="flex-1">
@@ -16645,7 +17329,7 @@ export default function App(){
 
                           {(data.repairsSummary || data.estimatedReturnDate || data.storageMonths) && (() => {
                             const ri = RUSH_REPAIR_TIMELINES.find(r => (data.repairsSummary || "").includes(r.label));
-                            const explicit = data.estimatedReturnDate ? new Date(data.estimatedReturnDate) : null;
+	                            const explicit = parseLocalDate(data.estimatedReturnDate);
                             const fromRepairs = ri ? rushAddDays(new Date(), ri.days) : null;
                             const fromStorage = data.storageMonths ? rushAddDays(new Date(), parseInt(data.storageMonths) * 30) : null;
                             const est = explicit || fromRepairs || fromStorage;
@@ -16668,7 +17352,7 @@ export default function App(){
                       ].map(q => <span key={q.label} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${q.done ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 text-slate-400"}`}>{q.done ? "✓" : "○"} {q.label}</span>)}
                     </div>
                     <div className="text-center">
-                      <button onClick={() => { setRushGuideOpen(false); setInterviewPanelOpen(true); }} className="rounded-xl bg-violet-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-600">Open Full Interview</button>
+                      <button onClick={() => { setRushGuideOpen(false); setTimeout(() => setInterviewPanelOpen(true), 100); }} className="rounded-xl bg-violet-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-600">Open Full Interview</button>
                     </div>
                   </div>}
 
@@ -16778,6 +17462,65 @@ export default function App(){
       )}
       {toast && <Toast message={toast} onClose={()=>setToast("")} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
       {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
+      {/* SDS Pre-Generation Questionnaire */}
+      {showSdsQuestionnaire && (
+        <div className="fixed inset-0 z-[195] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="bg-sky-600 px-5 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">Before Generating SDS</h3>
+              <button onClick={() => setShowSdsQuestionnaire(false)} className="text-white/70 hover:text-white text-lg font-bold">×</button>
+            </div>
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="text-sm text-slate-500">Confirm scope details to include in the document.</div>
+              {/* Q1: Picking up? */}
+              <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+                <div className="text-xs font-bold text-slate-700">Will we be picking anything up?</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SERVICE_OFFERINGS.filter(s => ["Contents", "Furniture", "Rugs", "Textiles", "Art", "Appliance", "Hand Clean"].includes(s)).map(s => {
+                    const isOn = (data.serviceOfferings || []).includes(s);
+                    return <button key={s} type="button" onClick={() => update("serviceOfferings", isOn ? (data.serviceOfferings || []).filter(x => x !== s) : [...(data.serviceOfferings || []), s])} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${isOn ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{s}</button>;
+                  })}
+                </div>
+              </div>
+              {/* Q2: Cleaning in home? */}
+              <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+                <div className="text-xs font-bold text-slate-700">Will we be cleaning anything in the home?</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Consulting", "Expert Stain Removal", "Hand Clean"].map(s => {
+                    const isOn = (data.serviceOfferings || []).includes(s);
+                    return <button key={s} type="button" onClick={() => update("serviceOfferings", isOn ? (data.serviceOfferings || []).filter(x => x !== s) : [...(data.serviceOfferings || []), s])} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${isOn ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{s}</button>;
+                  })}
+                </div>
+              </div>
+              {/* Q3: Total loss? */}
+              <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+                <div className="text-xs font-bold text-slate-700">Are there any total loss items?</div>
+                <div className="flex gap-2">
+                  {[{ id: "tli-writing", label: "Yes — We Are Writing" }, { id: "tli-not-writing", label: "Yes — We Are Not Writing" }, { id: "tli-no", label: "No" }].map(opt => {
+                    const isOn = (data as any).tliScope === opt.id;
+                    return <button key={opt.id} type="button" onClick={() => { update("tliScope", isOn ? "" : opt.id); if (opt.id !== "tli-no" && !isOn && !(data.serviceOfferings || []).includes("TLI")) update("serviceOfferings", [...(data.serviceOfferings || []), "TLI"]); }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold flex-1 ${isOn ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{opt.label}</button>;
+                  })}
+                </div>
+              </div>
+              {/* Q4: Special services */}
+              <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+                <div className="text-xs font-bold text-slate-700">Any special services required?</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SERVICE_OFFERINGS.map(s => {
+                    const isOn = (data.serviceOfferings || []).includes(s);
+                    return <button key={s} type="button" onClick={() => update("serviceOfferings", isOn ? (data.serviceOfferings || []).filter(x => x !== s) : [...(data.serviceOfferings || []), s])} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${isOn ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{s}</button>;
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-50 px-5 py-4 flex justify-end gap-3 border-t border-slate-200">
+              <button onClick={() => setShowSdsQuestionnaire(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700">Cancel</button>
+              <button onClick={() => { setShowSdsQuestionnaire(false); setShowSdsPreview(true); }} className="rounded-lg bg-sky-600 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-700">Generate SDS</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showSdsPreview && (
         <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") closeSds(); }} tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
           <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-2 shadow-sm z-10 relative">
@@ -17047,16 +17790,26 @@ export default function App(){
               <button onClick={() => setPreviewOpen(false)} className="text-white/70 hover:text-white text-lg font-bold">✕</button>
             </div>
             <div className="p-6 space-y-4 overflow-y-auto custom-scroll flex-1">
-              {saveSummaryMissing.length > 0 && (
-                <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  <div className="font-bold mb-1">Missing Fields ({saveSummaryMissing.length})</div>
-                  <ul className="list-disc pl-5">
-                    {saveSummaryMissing.map((m, idx) => (
-                      <li key={`${m.key}-${idx}`}>{m.label}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {saveSummaryMissing.length > 0 && (() => {
+                const [missingOpen, setMissingOpen] = [saveMissingOpen, setSaveMissingOpen];
+                return (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 overflow-hidden">
+                    <button type="button" onClick={() => setMissingOpen(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-rose-100/50">
+                      <div className="text-sm font-bold text-rose-700">Missing Fields ({saveSummaryMissing.length})</div>
+                      <span className="text-rose-400 text-xs">{missingOpen ? "▾" : "▸"}</span>
+                    </button>
+                    {missingOpen && (
+                      <div className="px-4 pb-3">
+                        <ul className="list-disc pl-5 text-sm text-rose-700">
+                          {saveSummaryMissing.map((m, idx) => (
+                            <li key={`${m.key}-${idx}`}>{m.label}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <button type="button" onClick={() => setPreviewView("narrative")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "narrative" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>Narrative</button>
@@ -17127,6 +17880,57 @@ export default function App(){
                 >
                   Send to Event Instructions
                 </button>
+              </div>
+              {/* Outbound Actions — queue messages for send on save */}
+              <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Outbound Actions</div>
+                  <span className="text-[9px] text-teal-500">Queued for send on save</span>
+                </div>
+                <div className="space-y-2">
+                  {(() => {
+                    const autoQueued: Record<string, string> = {};
+                    if ((data.customers || []).some(c => c.sendWelcomeText)) autoQueued["sendWelcomeText"] = "Welcome text was toggled on a customer";
+                    if ((data.customers || []).some(c => c.sendRushGuide)) autoQueued["sendRushGuide"] = "Rush Guide was toggled on a customer";
+                    if (data.eventCustomerContacted) autoQueued["sendConfirmation"] = "Customer was marked as contacted";
+                    if (data.pickupDate) autoQueued["sendConfirmation"] = "Appointment scheduled";
+                    const dismissed = (data as any).dismissedOutbound || [];
+                    return [
+                      { key: "sendNewOrderText", label: "Send New Order Text", desc: "Notify team of the new order", icon: "📱" },
+                      { key: "sendWelcomeText", label: "Send Welcome Text / Email", desc: "Customer welcome with order details", icon: "👋" },
+                      { key: "sendRushGuide", label: "Send Rush Guide & Timeline", desc: "Delivery timeline to customer", icon: "📋" },
+                      { key: "sendConfirmation", label: "Send Appointment Confirmation", desc: "Confirm scheduled event details", icon: "✅" },
+                    ].map(action => {
+                      const isQueued = (data.queuedOutbound || []).includes(action.key);
+                      const isDismissed = dismissed.includes(action.key);
+                      const wasAutoQueued = !isDismissed && autoQueued[action.key];
+                      const isActive = isQueued || !!wasAutoQueued;
+                    return (
+                      <button key={action.key} type="button" onClick={() => {
+                        if (isQueued) {
+                          update("queuedOutbound", (data.queuedOutbound || []).filter(k => k !== action.key));
+                        } else if (wasAutoQueued) {
+                          update("dismissedOutbound", [...dismissed, action.key]);
+                        } else {
+                          update("queuedOutbound", [...(data.queuedOutbound || []), action.key]);
+                          update("dismissedOutbound", dismissed.filter(k => k !== action.key));
+                        }
+                      }} className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all ${isActive ? "border-teal-400 bg-teal-100/60" : "border-slate-200 bg-white hover:border-teal-300"}`}>
+                        <span className="text-base shrink-0">{action.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-xs font-bold ${isActive ? "text-teal-800" : "text-slate-700"}`}>{action.label}</div>
+                          <div className="text-[10px] text-slate-500">{action.desc}</div>
+                          {wasAutoQueued && <div className="text-[9px] text-teal-600 mt-0.5">{wasAutoQueued}</div>}
+                        </div>
+                        {isActive && <span className="rounded-full bg-teal-500 text-white px-2 py-0.5 text-[9px] font-bold shrink-0">{isQueued ? "Queued" : "Suggested"}</span>}
+                      </button>
+                    );
+                  });
+                  })()}
+                </div>
+                {(data.queuedOutbound || []).length > 0 && (
+                  <div className="text-[10px] text-teal-600 font-semibold">{(data.queuedOutbound || []).length} action(s) will execute on save</div>
+                )}
               </div>
             </div>
             <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 shrink-0">
