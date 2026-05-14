@@ -1811,11 +1811,11 @@ export default function SdsDocument({ lossSeverity, onChange, onClose, rooms = [
                       </div>
                     )}
                     <div className="space-y-3">
-                      {roomEntries.map(([room, photos, floorLabel]) => {
+                      {roomEntries.map(([room, photos, floorLabel], reIdx) => {
                         const roomCover = photos[0];
                         if (!roomCover) return null;
                         return (
-                          <div key={room}>
+                          <div key={`${room}-${reIdx}`}>
                           {floorLabel && <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 pb-1 mb-2 mt-2">{floorLabel}</div>}
                           <div className="rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow bg-slate-50" onClick={() => { setEditingPhotoId(roomCover.id); setEditingPhotoNote(roomCover.note || ""); }}>
                             <img src={roomCover.src} alt={room} className="w-full h-32 object-contain" />
