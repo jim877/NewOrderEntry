@@ -88,6 +88,16 @@
 
 ---
 
+## From Notes.md (2026-05-14)
+
+- [x] Photo cancel/delete/retake on review — renamed "Retake" to "Delete" (red), kept distinct from "Another" (take more in same room); buttons at line 5766 in post-capture overlay (2026-05-14)
+- [x] Camera next room / same room — added "Another" (blue, stay in room) and "Next Room" (green, advance to next affected room) buttons on post-capture overlay; "Done" shows when on last room (2026-05-14)
+- [x] Camera button sizes for mobile — floor tabs from py-0.5/9px to py-1.5/12px/min-h-32px; room carousel from min-w-52px to 60px/min-h-44px; "+" floor button now says "+ Floor" with larger target; room names 12px (2026-05-14)
+- [x] Camera X icon too small — already h-10 w-10 from prior fix; verified at line 5959 (2026-05-14)
+- [x] Photo review minimal view — tags hidden behind "▸ Tag & Notes" toggle; notes input always visible; tags expand on click; photo-focused by default (2026-05-14)
+
+---
+
 ## Visual / UI Fixes
 
 > Paste browser observations here. Include a screenshot description and what needs to change.

@@ -452,19 +452,7 @@ const SERVICE_SUB_CATEGORIES: Record<string, string[]> = {
 };
 const SUGGESTED_GROUPS = ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"];
 const LIVING_STATUS_ADDRESS_TYPES = ["Moving", "Hotel", "Temp", "Neighbor", "Relative", "Rental", "Other Home"];
-const SUGGESTED_GROUP_HELP = {
-  RD: "Rush Delivery (within 1 week)",
-  RFD: "Rush Final Delivery (all within 1 week)",
-  STD: "Short Term Delivery (within 1 month)",
-  STFD: "Short Term Final (all within 1 month)",
-  LTD: "Long Term Delivery (greater than 1 month)",
-  LTFD: "Long Term Final Delivery (greater than 1 month)",
-  Inhome: "In-Home-Cleaning",
-  TLI: "Total Loss Inventory of non-salvageable items",
-  Test: "Test cleaning to determine scope (results needed ASAP)",
-  Dispose: "Items that will not be returned",
-  "Storage Only": "Items that will be stored and returned without cleaning"
-};
+const SUGGESTED_GROUP_HELP = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("group.")).map(k => [k.replace("group.", ""), DEFAULT_COACHING[k]]));
 const BRIDGE_CUSTOMER_BLOCKERS = [
   "Wants Everything Replaced",
   "Not sure if submitting a claim",
@@ -544,21 +532,7 @@ const bridgeStageToneClass = (tone, active) => {
   if (tone === "red") return active ? "border-rose-300 bg-rose-100 text-rose-800" : "border-slate-200 bg-white text-slate-700 hover:border-rose-300";
   return active ? "border-sky-300 bg-sky-100 text-sky-800" : "border-slate-200 bg-white text-slate-600 hover:border-sky-300";
 };
-const SERVICE_OFFERING_HELP = {
-  Appliance: "Large items requiring specialized handling (refrigerators, ranges, etc.).",
-  Art: "Items valued for artistic/aesthetic merit.",
-  Consulting: "Expert opinions and guidance.",
-  Contents: "Hard furniture and all possessions.",
-  Furniture: "Upholstered furniture pieces.",
-  "Hand Clean": "Delicate shoes, bags, belts etc.",
-  Taxidermy: "Preserved animals, birds, etc.",
-  "Pack-out": "Moving and relocation services.",
-  Rugs: "Area rugs and carpets.",
-  "Storage Only": "Items stored without cleaning.",
-  Textiles: "Fabric/leather items (clothing, accessories, etc.).",
-  TLI: "Total Loss Inventory - listing/valuing non-restorable items.",
-  "Expert Stain Removal": "Specialized stain removal services."
-};
+const SERVICE_OFFERING_HELP = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("service.")).map(k => [k.replace("service.", ""), DEFAULT_COACHING[k]]));
 const INSURANCE_COMPANY_SHORTCUTS = [
   {
     company: "Not Yet Known",
@@ -1017,24 +991,111 @@ const EntityPreferencePanel = ({
 
 // --- CONSTANTS FOR SELECTIONS ---
 const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil", "Unknown", "Other"];
-const LOSS_TYPE_COACHING = {
-  "Fire": "Includes smoke, soot, protein fires. If water was used to extinguish, add Water as secondary.",
-  "Water": "Verify coverage for groundwater, flood, and sump pump failure — these are often excluded or capped.",
-  "Mold": "Usually has coverage limits. Mold from covered water damage is typically covered in full under water coverage.",
-  "Dust/Debris": "From construction or remediation (flood cuts, charred material). Common secondary contaminant.",
-  "Puffback": "Furnace/fireplace malfunction pushes soot or oily residue into the home. No flames.",
-  "Oil": "Heating oil spill/mist. Requires dry cleaning only — washing won't work. May need to replace non-dry-cleanable items.",
-  "Unknown": "Cause of loss is not yet determined. No sub-type options — update once identified.",
-  "Other": "Windstorms, fallen trees, etc. — perils that don't fit other categories.",
-  "Non-Restoration": "Not an insurance claim — regular residential or commercial cleaning unrelated to a loss event.",
+// These objects now read from DEFAULT_COACHING for single-source-of-truth
+const LOSS_TYPE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("loss.")).map(k => [k.replace("loss.", ""), DEFAULT_COACHING[k]]));
+const ROLE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("role.")).map(k => [k.replace("role.", ""), DEFAULT_COACHING[k]]));
+// ═══ CENTRALIZED COACHING CONFIG ═══
+// All coaching/help text in one place. Edit via Settings → Coaching & Help Text.
+// User overrides are stored in localStorage and take precedence over defaults.
+const DEFAULT_COACHING: Record<string, string> = {
+  // Loss Types
+  "loss.Fire": "Includes smoke, soot, protein fires. If water was used to extinguish, add Water as secondary.",
+  "loss.Water": "Verify coverage for groundwater, flood, and sump pump failure — these are often excluded or capped.",
+  "loss.Mold": "Usually has coverage limits. Mold from covered water damage is typically covered in full under water coverage.",
+  "loss.Dust/Debris": "From construction or remediation (flood cuts, charred material). Common secondary contaminant.",
+  "loss.Puffback": "Furnace/fireplace malfunction pushes soot or oily residue into the home. No flames.",
+  "loss.Oil": "Heating oil spill/mist. Requires dry cleaning only — washing won't work. May need to replace non-dry-cleanable items.",
+  "loss.Unknown": "Cause of loss is not yet determined. No sub-type options — update once identified.",
+  "loss.Other": "Windstorms, fallen trees, etc. — perils that don't fit other categories.",
+  "loss.Non-Restoration": "Not an insurance claim — regular residential or commercial cleaning unrelated to a loss event.",
+  // Roles
+  "role.Policyholder": "The person(s) named on the policy who is required to sign our authorization paperwork.",
+  "role.Primary": "The primary contact handling our portion of the project. May or may not be the policyholder or owner — can be a PA, employee, or family member.",
+  "role.Referral": "The first person that called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead.",
+  "role.ExpertStainRemoval": "A per-hour charge for removing complicated loss-related stains from items worth saving.",
+  "role.FindAddress": "Use Google to insert a valid, verified address.",
+  // Delivery Groups
+  "group.RD": "Rush Delivery (within 1 week)",
+  "group.RFD": "Rush Final Delivery (all within 1 week)",
+  "group.STD": "Short Term Delivery (within 1 month)",
+  "group.STFD": "Short Term Final (all within 1 month)",
+  "group.LTD": "Long Term Delivery (greater than 1 month)",
+  "group.LTFD": "Long Term Final Delivery (greater than 1 month)",
+  "group.Inhome": "In-Home-Cleaning",
+  "group.TLI": "Total Loss Inventory of non-salvageable items",
+  "group.Test": "Test cleaning to determine scope (results needed ASAP)",
+  "group.Dispose": "Items that will not be returned",
+  "group.Storage Only": "Items that will be stored and returned without cleaning",
+  // Service Offerings
+  "service.Appliance": "Large items requiring specialized handling (refrigerators, ranges, etc.).",
+  "service.Art": "Items valued for artistic/aesthetic merit.",
+  "service.Consulting": "Expert opinions and guidance.",
+  "service.Contents": "Hard furniture and all possessions.",
+  "service.Furniture": "Upholstered furniture pieces.",
+  "service.Hand Clean": "Delicate shoes, bags, belts etc.",
+  "service.Taxidermy": "Preserved animals, birds, etc.",
+  "service.Pack-out": "Moving and relocation services.",
+  "service.Rugs": "Area rugs and carpets.",
+  "service.Storage Only": "Items stored without cleaning.",
+  "service.Textiles": "Fabric/leather items (clothing, accessories, etc.).",
+  "service.TLI": "Total Loss Inventory - listing/valuing non-restorable items.",
+  "service.Expert Stain Removal": "Specialized stain removal services.",
+  // Section / Field Help
+  "section.interview": "Ask the customer these questions during or before the initial visit.",
+  "section.eventInstructions": "What scheduling and field team need to know — conditions, access, customer preferences, what to bring.",
+  "section.repairs": "Repair type determines your delivery timeline and potential blockers. Each option auto-suggests a delivery group and adds delivery instructions.",
+  "section.rush": "Rush deliveries get essentials (clothing, bedding, toiletries) to the customer within days. The delivery address will auto-link to their first living situation.",
+  "section.planner": "Select delivery groups and assign dates/addresses. One group must be the Final (F) delivery — this determines storage duration.",
+  "section.finalWarning": "One group should be marked as Final (F) — this determines storage duration.",
+  "section.stayingHome": "Customer is staying in the home. Deliveries will be made to the primary address. Consider a Rush Final Delivery (RFD) if everything can be rushed.",
+  "section.addHome": "Add \"Their Home\" as the last step to mark return after repairs.",
+  "section.events": "Any travel or formal events during the repair period? We'll make sure the right items are pulled and delivered on time.",
+  "section.groups": "Select the delivery groups that apply. These feed into the Rush Guide timeline.",
+  "field.orderName": "Auto-generated from LastName-TownST. Lock to prevent changes.",
+  "field.lossType": "Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.",
+  "field.contaminants": "e.g. Fire with water damage from firefighting, or water loss leading to mold. Incompatible types are grayed out.",
+  "field.severity": "Typically entered after the site inspection, not during intake.",
+  "field.rejectScale": "Severity reject scale: 1 = None, 2 = Possible, 3 = Many expected, 5 = Extreme.",
+  "field.contaminantLevels": "Rate specific contaminant levels. 0 = None, 3 = Severe. Typically completed after the site inspection — not during intake.",
+  "field.qualityCode": "Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).",
+  "field.handlingCodes": "Special processing instructions. Hover each code for its meaning.",
+  "field.salesRep": "Employee managing customer relationships/accounts.",
+  "field.referrer": "The referrer reached out with this order. If assigned, we can begin. If only a lead, we cannot contact the customer yet.",
+  "field.autoAssigned": "Auto-assigned from referrer.",
+  // Lead/Order
+  "field.isLead": "A Lead requires selling the customer and getting approvals from the adjuster before we proceed. No billable charges yet — just an opportunity we will pursue.",
+  "field.isOrder": "An Order is a confirmed project ready to be scheduled and worked.",
+  // Step Guidance (Scope Wizard)
+  "step.1": "Select the building type and access details for the property.",
+  "step.2": "Set the property size — floors, bedrooms, and square footage.",
+  "step.3": "Confirm rooms and mark affected areas.",
+  "step.4": "Set severity, handling codes, and instructions per room.",
+  // Work Types
+  "event.scope": "On-site scope / inspection",
+  "event.pickup": "Pack-out, transport, clean, deliver back",
+  "event.inhome": "On-site cleaning or restoration",
+  "event.consult": "On-site consultation",
+  "event.none": "Remote — no on-site event",
 };
-const ROLE_COACHING = {
-  "Policyholder": "The person(s) named on the policy who is required to sign our authorization paperwork.",
-  "Primary": "The primary contact handling our portion of the project. May or may not be the policyholder or owner — can be a PA, employee, or family member.",
-  "Referral": "The first person that called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead.",
-  "Expert Stain Removal": "A per-hour charge for removing complicated loss-related stains from items worth saving. Example: removing rust or dye stains from a rug or carpet.",
-  "Find Address": "Use Google to insert a valid, verified address.",
+
+// Coaching accessor — checks user overrides (localStorage) then defaults
+const getCoaching = (key: string, overrides?: Record<string, string>): string => {
+  if (overrides?.[key] !== undefined) return overrides[key];
+  return DEFAULT_COACHING[key] || "";
 };
+
+// Category definitions for the Settings panel
+const COACHING_CATEGORIES = [
+  { key: "loss", label: "Loss Types", prefix: "loss." },
+  { key: "role", label: "Roles", prefix: "role." },
+  { key: "group", label: "Delivery Groups", prefix: "group." },
+  { key: "service", label: "Service Offerings", prefix: "service." },
+  { key: "section", label: "Section Help", prefix: "section." },
+  { key: "field", label: "Field Help", prefix: "field." },
+  { key: "step", label: "Step Guidance", prefix: "step." },
+  { key: "event", label: "Event Types", prefix: "event." },
+];
+
 const NON_RESTORATION_PRIMARY = "Non-Restoration";
 const NON_RESTORATION_SUBTYPES = ["Commercial Cleaning", "Residential Cleaning", "Other"];
 const getNonRestorationSubtype = (orderTypes = []) =>
@@ -1105,6 +1166,7 @@ const COMPATIBLE_SECONDARY_LOSS: Record<string, string[]> = {
 const ESTIMATE_TYPES = ["Ballpark", "Tag and Hold", "Itemized (costs)", "TLI", "Cash-out"];
 const PRICING_PLATFORMS = ["Xactimate", "Cotality", "Textile Solutions"];
 const TECHS = ["Mike S.", "Sarah J.", "Tom B.", "Unassigned"];
+const VEHICLES = ["Truck 1", "Truck 2", "Truck 3", "Truck 4", "Van 1", "Van 2", "Sprinter 1", "SUV 1", "Personal Vehicle"];
 const LEAD_SOURCES = ["Referral", "Marketing", "Internal"];
 const CONTACT_METHODS = ["Call", "Email", "Form Submission", "Meeting", "Text", "TPA Assignment"];
 
@@ -1705,6 +1767,7 @@ const DEFAULT_FIELD_CONFIG = {
   howDryLaundry:             { label: "How Dry Laundry?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
   storageNeeded:             { label: "Storage Needed?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
   finalDeliveryQualifier:    { label: "Final Delivery Date",      section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
+  rushDeliveryNeeded:        { label: "Rush Delivery Needed",     section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
   suggestedGroups:           { label: "Suggested Groups",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
 
   // --- Codes (post-inspection) ---
@@ -1731,13 +1794,13 @@ const DEFAULT_INTERVIEW_ACTIONS = {
   "Boarded Up":         { coaching: "Please confirm safe entry and available access.", actions: [{ type: "loadList", value: "Lights" }] },
 
   // Q2: Repairs
-  "Just Cleaning":              { coaching: "Since it's just a cleaning, we should plan the essentials for a quick turnaround.", actions: [{ type: "eventInstruction", value: "Delivery: Standard pack-out/pack-back" }, { type: "suggestGroup", value: "RFD" }] },
-  "Paint":                      { coaching: "We usually require waiting 48 hours after painting is finished before delivering to avoid odors or items sticking to the walls.", actions: [{ type: "sdsObservation", value: "Delivery Note: Hold until paint cures (48hr)" }, { type: "suggestGroup", value: "STD" }] },
-  "Refinish Floors":            { coaching: "We will strictly follow your contractor's advice on floor curing times before we bring heavy furniture back in.", actions: [{ type: "loadList", value: "Floor Protection" }, { type: "eventInstruction", value: "Delivery: Hold until floors cured" }, { type: "suggestGroup", value: "STD" }] },
-  "Replace Floors":             { coaching: "We'll make sure to bring extra floor protection during delivery to keep your brand new floors pristine.", actions: [{ type: "eventInstruction", value: "Delivery: Floor replacement in progress" }, { type: "loadList", value: "Floor Protection" }, { type: "suggestGroup", value: "LTD" }] },
-  "Cosmetic Damage":            { coaching: "Once the minor repairs are wrapped up, just give us a call and we'll arrange your delivery.", actions: [{ type: "eventInstruction", value: "Delivery: Hold for minor repairs" }, { type: "suggestGroup", value: "LTD" }] },
-  "Major Structural Damage":    { coaching: "We can prep your belongings for safe, long-term storage in our facility.", actions: [{ type: "suggestGroup", value: "LTD" }, { type: "blocker", value: "Timeline TBD" }] },
-  "Complete Rebuild":           { coaching: "We can prep your belongings for safe, long-term storage in our facility.", actions: [{ type: "suggestGroup", value: "LTFD" }] },
+  "Just Cleaning":              { coaching: "Timeline: 1-2 weeks. Quick turnaround — plan for a Rush Final Delivery (RFD) where everything goes back at once.", actions: [{ type: "eventInstruction", value: "Delivery: Standard pack-out/pack-back" }, { type: "suggestGroup", value: "RFD" }] },
+  "Paint":                      { coaching: "Timeline: 2-4 weeks. Wait 48 hours after painting before delivering to avoid odors or items sticking. Blocker: Verify hardware is back up and walls are ready before re-hanging window treatments.", actions: [{ type: "sdsObservation", value: "Delivery Note: Hold until paint cures (48hr)" }, { type: "eventInstruction", value: "Delivery: Verify paint cured & hardware reinstalled before hanging treatments" }, { type: "suggestGroup", value: "STD" }] },
+  "Refinish Floors":            { coaching: "Timeline: 3-6 weeks. Follow contractor's advice on curing times before placing heavy furniture. Blocker: Confirm floors are fully cured before final delivery — bring extra floor protection.", actions: [{ type: "loadList", value: "Floor Protection" }, { type: "eventInstruction", value: "Delivery: Hold until floors cured — verify before scheduling" }, { type: "suggestGroup", value: "STD" }] },
+  "Replace Floors":             { coaching: "Timeline: 1-3 months. New floors need full cure time before heavy furniture. Blocker: Bring extra floor protection during delivery to protect new floors.", actions: [{ type: "eventInstruction", value: "Delivery: Floor replacement in progress — protect new floors" }, { type: "loadList", value: "Floor Protection" }, { type: "suggestGroup", value: "LTD" }] },
+  "Cosmetic Damage":            { coaching: "Timeline: 2-6 weeks. Minor repairs (cabinets, tile, cosmetic). Blocker: Confirm all repairs complete before scheduling final delivery.", actions: [{ type: "eventInstruction", value: "Delivery: Hold for minor repairs — confirm completion" }, { type: "suggestGroup", value: "LTD" }] },
+  "Major Structural Damage":    { coaching: "Timeline: 3-9+ months. Significant construction required. Long-term storage needed. Blocker: Timeline TBD — coordinate with contractor for completion estimate.", actions: [{ type: "suggestGroup", value: "LTD" }, { type: "blocker", value: "Timeline TBD — awaiting contractor estimate" }] },
+  "Complete Rebuild":           { coaching: "Timeline: 6-12+ months. Full reconstruction. Plan for long-term storage. Blocker: No delivery until certificate of occupancy. Coordinate with contractor for phased delivery if possible.", actions: [{ type: "suggestGroup", value: "LTFD" }, { type: "blocker", value: "Awaiting certificate of occupancy" }] },
 
   // Q3: Living Status
   "Staying in home":    { coaching: "We'll try to work as quietly as possible and expedite your household essentials like bedding, shower curtains and throw rugs. We also have temporary shades if you need privacy on the windows.", actions: [{ type: "eventInstruction", value: "Customer on-site" }] },
@@ -1956,6 +2019,8 @@ const DEFAULT_FORM={
   reminderEnabled: false,
   reminderDate: "",
   reminderTime: "",
+  rushDeliveryNeeded: "",
+  timelineWorkTypes: [],
   eventAssignee: "",
   eventAttendee: "",
   eventVehicle: "",
@@ -2586,7 +2651,7 @@ const SmartNotification = ({ message, onReject, onClose, panelOffset = 0 }) => {
     );
 };
 
-const pillBase = "inline-flex items-center justify-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-all duration-200 cursor-pointer select-none min-w-[44px]";
+const pillBase = "inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all duration-200 cursor-pointer select-none";
 const pillInactive = "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50";
 const pillActive = "bg-sky-50 border-sky-300 text-sky-700 font-bold shadow-sm"; 
 
@@ -2597,7 +2662,6 @@ const ToggleGroup = ({ options, value, onChange, noeField }) => (
        const title = typeof opt === "string" ? undefined : opt.title;
        const isActive = value === label;
        return (<button key={label} type="button" title={title} aria-pressed={isActive} data-noe-option={label} data-noe-selected={isActive} onClick={() => onChange(isActive ? "" : label)} className={isActive ? `${pillBase} ${pillActive}` : `${pillBase} ${pillInactive}`}>
-         <span className={`inline-block w-3 h-3 rounded-full border-2 mr-1.5 shrink-0 ${isActive ? "border-sky-500 bg-sky-500 shadow-[inset_0_0_0_2px_white]" : "border-slate-300"}`} />
          {label}
        </button>)
     })}
@@ -2697,7 +2761,6 @@ const ToggleMulti = ({ label, checked, onChange, className, colorClass, title, s
     const activeClass = colorClass || pillActive;
     return (
         <button type="button" onClick={onChange} title={title} aria-pressed={checked} data-noe-option={label} data-noe-selected={checked} data-noe-field={noeField || undefined} className={(checked ? `${pillBase} ${activeClass}` : `${pillBase} ${pillInactive}`) + " " + (className||"")}>
-            {showDot && <span className={`inline-block w-3 h-3 rounded-sm border-2 mr-1.5 shrink-0 text-[8px] leading-[10px] text-center ${checked ? "border-sky-500 bg-sky-500 text-white" : "border-slate-300"}`}>{checked ? "✓" : ""}</span>}
             {label}
         </button>
     );
@@ -2990,7 +3053,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                            setToast?.("Referrer removed");
                          }
                        }}
-                       className="!text-[10px] !px-2.5 !py-1"
+                       className=""
                        title="Click to remove referrer"
                      />
                      <ToggleMulti
@@ -3003,7 +3066,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                            updateMany({ billingCompany: data.referringCompany, billingContact: data.referrer, billingPayer: "Referrer" });
                          }
                        }}
-                       className="!text-[10px] !px-2.5 !py-1"
+                       className=""
                      />
                      <ToggleMulti
                        label="Insurance"
@@ -3015,7 +3078,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
                            updateMany({ insuranceCompany: data.referringCompany, insuranceAdjuster: data.referrer, insuranceClaim: "Yes", involvesInsurance: "Yes" });
                          }
                        }}
-                       className="!text-[10px] !px-2.5 !py-1"
+                       className=""
                      />
                    </div>
                  </div>
@@ -3041,7 +3104,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold shadow-sm">{getRepInitials(salesRep)}</span>
             <span className="text-sm font-semibold text-slate-700">{salesRep.split(",")[0]}</span>
           </div>
-          {showInlineHelp && <div className="text-[10px] text-violet-400 mt-1">🎓 Auto-assigned from referrer.</div>}
+          {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">🎓 Auto-assigned from referrer.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
         </Field>
       )}
 
@@ -3084,7 +3147,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       {referrerRep && salesRep && salesRep !== referrerRep && (
         <div className="text-[10px] text-amber-600 font-semibold mt-1">Referrer's rep is {referrerRep}</div>
       )}
-      {showInlineHelp && !referrerRep && <div className="text-[11px] text-violet-400">🎓 Employee managing customer relationships/accounts.</div>}
+      {showInlineHelp && !referrerRep && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Employee managing customer relationships/accounts.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
       </React.Fragment>
       )}
       {showSuggestedRoles && (
@@ -3163,7 +3226,9 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [activeTab, setActiveTab] = useState<"order" | "interview" | "scope" | "photos" | "report">("scope");
   const [expandedService, setExpandedService] = useState<string | null>(null);
   const [step, setStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = 5;
+  const [visitedSteps, setVisitedSteps] = useState<Set<number>>(new Set([1]));
+  useEffect(() => { setVisitedSteps(prev => { if (prev.has(step)) return prev; return new Set([...prev, step]); }); }, [step]);
   const [roomPass, setRoomPass] = useState<1 | 2 | 3>(1);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [autoAddRooms, setAutoAddRooms] = useState(true);
@@ -3171,6 +3236,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [walkthroughRoom, setWalkthroughRoom] = useState<{ fi: number; ri: number } | null>(null);
   const [roomSwitching, setRoomSwitching] = useState(false);
   const [lastCapturedIdx, setLastCapturedIdx] = useState<number | null>(null);
+  const [photoTagsOpen, setPhotoTagsOpen] = useState(false);
   const [roomPhotos, setRoomPhotos] = useState<Record<string, { src: string; note: string; reason: string; ts: number; tag?: string }[]>>(() => {
     return (orderData as any)?.scopePhotos || {};
   });
@@ -3332,7 +3398,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     { id: "considerations", title: "Special considerations", type: "multi" as const, critical: false, timeline: false, options: ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory", "Skin Sensitivity", "Premium Brands"] },
     { id: "petsInHome", title: "Pets in home?", type: "multi" as const, critical: false, timeline: false, options: ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"] },
     { id: "loadList", title: "What do we need to bring?", type: "multi" as const, critical: false, timeline: false, options: ["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"] },
-    // --- Timeline / Rush Guide questions (green group) ---
+    // --- Timeline / Rush Guide questions (unchanged — app interview keeps original order) ---
     { id: "suggestedGroups", title: "Suggested groups", type: "multi" as const, critical: false, timeline: true, options: ["RD", "RFD", "STD", "STFD", "LTD", "LTFD", "Inhome", "TLI", "Test", "Dispose", "Storage Only"] },
     { id: "repairs", title: "What repairs are being done?", type: "multi" as const, critical: true, timeline: true, options: ["Cleaning Exposed", "Cleaning Everywhere", "Clean & Paint", "Plaster/Wall Repairs", "Refinish Floors", "Replace Floors", "Cosmetic (Cabinets/Tile)", "Major Structural/Electrical", "Gut/Rebuild"] },
     { id: "packoutScope", title: "Has packout been discussed?", type: "single" as const, critical: true, timeline: true, options: ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout"] },
@@ -3373,6 +3439,8 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     if (d.sdsConsiderations?.length) a.considerations = d.sdsConsiderations;
     if (d.suggestedGroups?.length) a.suggestedGroups = d.suggestedGroups;
     if (d.finalDeliveryQualifier) a.finalDeliveryDate = d.finalDeliveryQualifier;
+    if (d.rushDeliveryNeeded === "Y") a.rushDelivery = true;
+    if (d.rushDeliveryNeeded === "N") a.rushDelivery = false;
     // Conditions from boolean flags
     const conditions: string[] = [];
     if (d.damageWasWet === true || d.damageWasWet === "Y") conditions.push("Still Wet");
@@ -3396,6 +3464,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     // Map interview keys → NOE fields
     if (answers.living !== undefined) updates.livingStatus = answers.living;
     if (answers.delivery !== undefined) updates.processType = answers.delivery;
+    if (answers.rushDelivery !== undefined) updates.rushDeliveryNeeded = answers.rushDelivery === true ? "Y" : answers.rushDelivery === false ? "N" : "";
     if (answers.deliveryAddress !== undefined) updates.deliveryAddress = answers.deliveryAddress;
     if (answers.livingAddresses !== undefined) updates.livingAddresses = answers.livingAddresses;
     if (answers.repairs !== undefined) updates.repairsSummary = Array.isArray(answers.repairs) ? answers.repairs.join(", ") : "";
@@ -3870,12 +3939,14 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   });
 
   // Step labels — reordered: Building → Space → Rooms → Severity
-  const stepLabels = ["Building", "Size", "Rooms", "Severity"];
+  const totalPhotos = Object.values(roomPhotos).reduce((s, arr) => s + arr.length, 0);
+  const stepLabels = ["Building", "Size", "Rooms", "Severity", `Pics${totalPhotos > 0 ? ` (${totalPhotos})` : ""}`];
   const stepQuestions = [
     "Building type",
     propType === "trailer" ? "Trailer size" : isHouseType ? "Home size" : "Unit size",
     "Confirm rooms",
     roomPass === 1 ? "What type of damage occurred?" : roomPass === 2 ? "Which areas were affected?" : "Set instructions",
+    "Take photos",
   ];
 
   // Auto-generate rooms when entering step 3 (Rooms)
@@ -3890,7 +3961,18 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
       const firstActive = Object.entries(damageTypes).find(([, v]) => v > 0);
       if (firstActive) setExpandedDamage(firstActive[0]);
     }
-    if (step < totalSteps) setStep(step + 1);
+    if (step === 4) {
+      // Advancing from Severity → Pics: open photo walkthrough
+      setStep(5);
+      setShowWalkthrough(true);
+      const firstAffected = homeRooms.findIndex(f => f.rooms.some(r => r.affected));
+      if (firstAffected >= 0) {
+        const ri = homeRooms[firstAffected].rooms.findIndex(r => r.affected);
+        if (ri >= 0) { setWalkthroughRoom({ fi: firstAffected, ri }); setTimeout(() => startCamera(), 400); }
+      }
+    } else if (step < totalSteps) {
+      setStep(step + 1);
+    }
     syncScopeToNoe();
   };
 
@@ -3904,12 +3986,22 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
       <div className="absolute top-0 left-0 right-0 h-[46px] flex items-end justify-center pb-1.5 z-50 pointer-events-none">
         <div className="pointer-events-auto flex items-center gap-1.5 rounded-[18px] bg-[#1a1a1a] px-3.5 h-7 min-w-[100px]">
           {stepLabels.map((_, i) => {
-            const active = step === i + 1;
-            const complete = step > i + 1;
+            const stepNum = i + 1;
+            const active = step === stepNum;
+            const visited = visitedSteps.has(stepNum);
+            const skipped = step > stepNum && !visited;
             return (
               <React.Fragment key={i}>
-                {i > 0 && <div className={`flex-1 min-w-1 h-0.5 ${complete ? "bg-blue-500/60" : "bg-white/30"}`} />}
-                <button type="button" onClick={() => { if (complete || active) setStep(i + 1); }} className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${active ? "bg-blue-600 text-white" : complete ? "bg-blue-500/60 text-white cursor-pointer hover:bg-blue-500 hover:text-white" : "bg-white/25 text-white/80 cursor-default"}`}>{i + 1}</button>
+                {i > 0 && <div className={`flex-1 min-w-1 h-0.5 ${visited && !active ? "bg-blue-500/60" : skipped ? "bg-amber-400/60" : step > stepNum ? "bg-white/30" : "bg-white/30"}`} />}
+                <button type="button" onClick={() => {
+                  if (stepNum === 5) {
+                    setStep(5); setShowWalkthrough(true);
+                    const fa = homeRooms.findIndex(f => f.rooms.some(r => r.affected));
+                    if (fa >= 0) { const ri = homeRooms[fa].rooms.findIndex(r => r.affected); if (ri >= 0) setWalkthroughRoom({ fi: fa, ri }); }
+                  } else {
+                    setStep(stepNum); setShowWalkthrough(false); setWalkthroughRoom(null);
+                  }
+                }} className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${active ? "bg-blue-600 text-white" : visited ? "bg-blue-500/60 text-white cursor-pointer hover:bg-blue-500" : "bg-white/25 text-white/80 cursor-pointer hover:bg-white/40"}`}>{stepNum === 5 && totalPhotos > 0 ? `${totalPhotos}` : stepNum}</button>
               </React.Fragment>
             );
           })}
@@ -4155,7 +4247,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
             </div>
             <div className="flex items-center gap-2 mt-1">
               <div className="text-[12px] text-slate-400 flex-1">Ask the customer these questions during or before the initial visit.</div>
-              <button onClick={() => { const el = document.getElementById("interview-timeline-header"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-full bg-green-100 border border-green-300 px-3 py-1 text-[10px] font-bold text-green-700 hover:bg-green-200 shrink-0">Timeline</button>
+              <button onClick={() => { const el = document.getElementById("interview-timeline-header"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-full bg-teal-50 border border-teal-300 px-3 py-1.5 text-[11px] font-bold text-teal-700 hover:bg-teal-100 shrink-0 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Timeline</button>
             </div>
           </div>
           <div className="pb-20">
@@ -4168,17 +4260,18 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
               return (
                 <React.Fragment key={section.id}>
                 {isFirstTimeline && (
-                  <div id="interview-timeline-header" className="px-5 pt-4 pb-2 bg-green-50 border-t-2 border-green-300">
+                  <div id="interview-timeline-header" className="px-5 pt-4 pb-2 bg-teal-50 border-t-2 border-teal-300">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-green-700 uppercase tracking-wider">Delivery Timeline</span>
-                      <span className="text-[9px] text-green-500">These questions inform the Rush Guide</span>
+                      <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <span className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Delivery Timeline</span>
+                      <span className="text-[9px] text-teal-500">These questions inform the Timeline</span>
                     </div>
                   </div>
                 )}
-                <div id={`app-interview-q-${qIdx + 1}`} className={`px-5 py-4 border-b border-slate-100 ${(section as any).timeline ? "bg-green-50/30 border-l-4 border-l-green-400" : ""}`}>
+                <div id={`app-interview-q-${qIdx + 1}`} className={`px-5 py-4 border-b border-slate-100 ${(section as any).timeline ? "bg-teal-50/20 border-l-4 border-l-teal-400" : ""}`}>
                   <div className="mb-3 flex items-center gap-2">
                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${hasAnswer ? ((section as any).timeline ? "bg-green-500 text-white" : "bg-sky-500 text-white") : "bg-slate-200 text-slate-500"}`}>{hasAnswer ? "✓" : qIdx + 1}</span>
-                    <span className={`text-[13px] font-bold ${(section as any).timeline ? "text-green-700" : "text-sky-600"}`}>{section.title}</span>
+                    <span className={`text-[13px] font-bold ${(section as any).timeline ? "text-teal-700" : "text-sky-600"}`}>{section.title}</span>
                     {section.critical && !hasAnswer && <span className="text-[10px] font-bold text-orange-500">Required</span>}
                   </div>
                   {section.type === "boolean" && (
@@ -4316,11 +4409,16 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
       <div className="flex-shrink-0 px-4 pt-2 pb-1 bg-white">
         <div className="flex gap-1">
           {stepLabels.map((label, i) => {
-            const canJump = i + 1 < step;
+            const stepNum = i + 1;
+            const active = step === stepNum;
+            const visited = visitedSteps.has(stepNum);
             return (
-              <button key={i} onClick={() => setStep(i + 1)} className={`flex-1 flex flex-col items-center gap-1 cursor-pointer`}>
-                <div className={`w-full h-1.5 rounded-full transition-all ${step > i + 1 ? "bg-blue-500" : step === i + 1 ? "bg-blue-400" : "bg-slate-200"}`} />
-                <span className={`text-[11px] font-semibold ${step === i + 1 ? "text-blue-600" : step > i + 1 ? "text-blue-500" : "text-slate-400"}`}>{label}</span>
+              <button key={i} onClick={() => {
+                if (stepNum === 5) { setStep(5); setShowWalkthrough(true); const fa = homeRooms.findIndex(f => f.rooms.some(r => r.affected)); if (fa >= 0) { const ri = homeRooms[fa].rooms.findIndex(r => r.affected); if (ri >= 0) setWalkthroughRoom({ fi: fa, ri }); } }
+                else { setStep(stepNum); setShowWalkthrough(false); setWalkthroughRoom(null); }
+              }} className={`flex-1 flex flex-col items-center gap-1 cursor-pointer`}>
+                <div className={`w-full h-1.5 rounded-full transition-all ${active ? "bg-blue-400" : visited ? "bg-blue-500" : "bg-slate-200"}`} />
+                <span className={`text-[11px] font-semibold ${active ? "text-blue-600" : visited ? "text-blue-500" : "text-slate-400"}`}>{label}</span>
               </button>
             );
           })}
@@ -5408,7 +5506,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
       </div>{/* end scope tab wrapper */}
 
       {/* ═══ BOTTOM TAB BAR ═══ */}
-      {!showWalkthrough && (
+      {!(showWalkthrough && cameraActive) && (
       <div className="flex-shrink-0 border-t border-slate-200 bg-white">
         <div className="flex">
           {([
@@ -5421,7 +5519,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
             const isActive = activeTab === tab.id;
             const color = tab.id === "interview" ? (interviewAnswered === interviewTotal ? "text-green-600" : "text-violet-600") : isActive ? "text-blue-600" : "text-slate-400";
             return (
-              <button key={tab.id} onClick={() => { if (tab.id === "photos") { setActiveTab("scope"); setShowWalkthrough(true); const firstAffected = homeRooms.findIndex(f => f.rooms.some(r => r.affected)); if (firstAffected >= 0) { const ri = homeRooms[firstAffected].rooms.findIndex(r => r.affected); if (ri >= 0) setWalkthroughRoom({ fi: firstAffected, ri }); } setTimeout(() => startCamera(), 400); } else { setActiveTab(tab.id); } }} className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors ${isActive ? "border-t-2 border-blue-600 -mt-[2px]" : ""}`}>
+              <button key={tab.id} onClick={() => { if (tab.id === "photos") { setActiveTab("scope"); setShowWalkthrough(true); setWalkthroughRoom(null); stopCamera(); } else { setActiveTab(tab.id); setShowWalkthrough(false); setWalkthroughRoom(null); stopCamera(); setWalkthroughExitWarning(null); } }} className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors ${isActive ? "border-t-2 border-blue-600 -mt-[2px]" : ""}`}>
                 <div className={color}>{tab.icon}</div>
                 <span className={`text-[10px] font-bold ${color}`}>{tab.label}</span>
                 {tab.badge && <span className={`text-[8px] font-bold ${color}`}>{tab.badge}</span>}
@@ -5564,14 +5662,14 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
         // When autoAddRooms is on, show all rooms; when off, only affected rooms
         const displayFloors = homeRooms.map((f, fi) => ({ ...f, fi, displayRooms: f.rooms.map((r, ri) => ({ ...r, ri })).filter(r => autoAddRooms || r.affected) })).filter(f => f.displayRooms.length > 0);
         return (
-        <div className="absolute inset-0 z-50 bg-white flex flex-col rounded-[44px] overflow-hidden">
-          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3">
-            <button onClick={tryExitWalkthrough} className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100">
+        <div className="absolute inset-0 bottom-[52px] z-40 bg-white flex flex-col overflow-hidden">
+          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-2" style={{ paddingTop: "52px" }}>
+            <button onClick={() => { setShowWalkthrough(false); setWalkthroughRoom(null); setWalkthroughExitWarning(null); }} className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100">
               <span className="text-sm">←</span>
             </button>
             <span className="flex-1 text-[15px] font-bold text-slate-800">Photos</span>
             <span className="text-[12px] font-bold text-slate-400 mr-2">{totalPhotos} photos</span>
-            <button onClick={tryExitWalkthrough} className="rounded-full px-3 py-1.5 text-xs font-bold bg-blue-600 text-white">Done</button>
+            <button onClick={() => { setShowWalkthrough(false); setWalkthroughRoom(null); setWalkthroughExitWarning(null); }} className="rounded-full px-3 py-1.5 text-xs font-bold bg-blue-600 text-white">Done</button>
           </div>
           <div className="flex-1 overflow-auto p-4 space-y-3">
             {homeRooms.length === 0 ? (
@@ -5718,7 +5816,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
         };
 
         return (
-        <div className="absolute inset-0 z-50 bg-black flex flex-col rounded-[44px] overflow-hidden">
+        <div className={`absolute inset-0 ${cameraActive ? "z-50 rounded-[44px]" : "bottom-[52px] z-40 rounded-t-[44px]"} ${cameraActive ? "bg-black" : "bg-white"} flex flex-col overflow-hidden`}>
 
           {/* Live camera viewfinder */}
           {cameraActive && (
@@ -5727,8 +5825,10 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
               {roomSwitching && <div className="absolute inset-0 z-40 bg-black" />}
               {/* Overlay controls */}
               <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-14 pb-2 bg-gradient-to-b from-black/60 to-transparent">
-                <button onClick={() => stopCamera()} className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-sm font-bold">×</button>
-                <div className="text-white text-[13px] font-bold">{room.name} <span className="text-white/60">#{photos.length + 1}</span></div>
+                <button onClick={() => stopCamera()} className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <div className="text-white text-[13px] font-bold">{room.name}</div>
                 <span className="text-[11px] text-white/60 font-bold">{curIdx + 1}/{allAffected.length}</span>
               </div>
               {/* Photo preview + quick-tag after capture */}
@@ -5753,7 +5853,9 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                   <div className="absolute left-0 right-0 bottom-0 px-3 pb-6 pt-2 bg-gradient-to-t from-black/90 via-black/70 to-transparent" style={{ maxHeight: "60%" }}>
                     <div className="space-y-2 overflow-auto" style={{ maxHeight: "calc(60vh - 40px)" }}>
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-white/70">Tag & Notes</span>
+                        <button type="button" onClick={() => setPhotoTagsOpen(p => !p)} className="text-[12px] font-bold text-white/70 hover:text-white flex items-center gap-1">
+                          {photoTagsOpen ? "▾" : "▸"} Tag & Notes
+                        </button>
                         <div className="flex gap-2">
                           <button onClick={() => {
                             // Delete this photo and return to camera
@@ -5763,15 +5865,17 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                               return { ...p, [rKey]: arr };
                             });
                             setLastCapturedIdx(null);
-                          }} className="rounded-full bg-white/20 px-3 py-1.5 text-white/80 text-xs font-bold hover:bg-red-500/50">Retake</button>
-                          <button onClick={() => { updatePhoto(lastCapturedIdx, "scopeInclude", !(capturedPhoto as any).scopeInclude); }} className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all ${(capturedPhoto as any).scopeInclude ? "bg-violet-500 text-white" : "bg-white/20 text-white/80 hover:bg-violet-500/50"}`}>{(capturedPhoto as any).scopeInclude ? "In Scope ✓" : "Add to Scope"}</button>
-                          <button onClick={() => setLastCapturedIdx(null)} className="rounded-full bg-green-500 px-4 py-1.5 text-white text-xs font-bold">Done</button>
+                          }} className="rounded-full bg-red-500/70 px-4 py-2 text-white text-sm font-bold hover:bg-red-600 min-w-[80px]">Delete</button>
+                          <button onClick={() => { updatePhoto(lastCapturedIdx, "scopeInclude", !(capturedPhoto as any).scopeInclude); }} className={`rounded-full px-4 py-2 text-sm font-bold transition-all min-w-[80px] ${(capturedPhoto as any).scopeInclude ? "bg-violet-500 text-white" : "bg-white/20 text-white/80 hover:bg-violet-500/50"}`}>{(capturedPhoto as any).scopeInclude ? "Scope ✓" : "Scope"}</button>
+                          <button onClick={() => setLastCapturedIdx(null)} className="rounded-full bg-blue-500 px-4 py-2 text-white text-sm font-bold min-w-[80px]">Another</button>
+                          {(() => { const nextRoomInfo = allAffected.find((_, idx) => idx === curIdx + 1); return nextRoomInfo ? <button onClick={() => { setLastCapturedIdx(null); switchToRoom(nextRoomInfo.fi, nextRoomInfo.ri); }} className="rounded-full bg-green-500 px-4 py-2 text-white text-sm font-bold min-w-[80px]">Next Room</button> : <button onClick={() => { setLastCapturedIdx(null); stopCamera(); setWalkthroughRoom(null); tryExitWalkthrough(); }} className="rounded-full bg-green-500 px-4 py-2 text-white text-sm font-bold min-w-[80px]">Done</button>; })()}
                         </div>
                       </div>
+                      {photoTagsOpen && <>
                       {/* Primary reason tags */}
                       <div className="flex flex-wrap gap-1">
                         {PHOTO_REASONS.map(r => (
-                          <button key={r} onClick={() => { updatePhoto(lastCapturedIdx, "reason", capturedPhoto.reason === r ? "" : r); }} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold text-white transition-all ${capturedPhoto.reason === r ? "border-white bg-white/30" : "border-white/30 hover:bg-white/10"}`}>{r}</button>
+                          <button key={r} onClick={() => { updatePhoto(lastCapturedIdx, "reason", capturedPhoto.reason === r ? "" : r); }} className={`rounded-full border px-3 py-1.5 text-[12px] font-bold text-white transition-all min-h-[36px] ${capturedPhoto.reason === r ? "border-white bg-white/30" : "border-white/30 hover:bg-white/10"}`}>{r}</button>
                         ))}
                       </div>
                       {/* Sub-selections for selected reason */}
@@ -5839,6 +5943,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                           </div>
                         </div>
                       )}
+                      </>}
                       {/* Notes input + mic */}
                       <div className="flex items-center gap-1.5">
                         <input
@@ -5902,8 +6007,8 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                         <button key={fIdx} onClick={() => {
                           const firstRoom = f.rooms.findIndex(r => autoAddRooms || r.affected);
                           if (firstRoom >= 0 && !isCurrentFloor) switchToRoom(fIdx, firstRoom);
-                        }} className={`rounded-full px-3 py-0.5 text-[9px] font-bold transition-all ${isCurrentFloor ? "bg-blue-500 text-white" : "bg-white/15 text-white/60 hover:bg-white/25"}`}>
-                          {f.name} {floorPhotos > 0 && <span className="text-green-300 ml-0.5">{floorPhotos}</span>}
+                        }} className={`rounded-full px-3 py-1.5 text-[12px] font-bold transition-all min-h-[32px] ${isCurrentFloor ? "bg-blue-500 text-white" : "bg-white/15 text-white/60 hover:bg-white/25"}`}>
+                          {f.name}
                         </button>
                       );
                     })}
@@ -5914,8 +6019,8 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                         const newFi = homeRooms.length;
                         stopCamera(); setWalkthroughRoom({ fi: newFi, ri: 0 }); setTimeout(() => startCamera(), 300);
                       }, 100);
-                    }} className="rounded-full px-2 py-0.5 text-[9px] font-bold bg-blue-500/30 text-blue-300 hover:bg-blue-500/50 border border-dashed border-blue-300/50" title="Add floor">+</button>
-                    <button onClick={() => { stopCamera(); setWalkthroughRoom(null); tryExitWalkthrough(); }} className="rounded-full px-3 py-0.5 text-[9px] font-bold bg-green-500/30 text-green-300 hover:bg-green-500/50">Done</button>
+                    }} className="rounded-full px-3 py-1.5 text-[12px] font-bold bg-blue-500/30 text-blue-300 hover:bg-blue-500/50 border border-dashed border-blue-300/50 min-w-[44px] min-h-[32px]" title="Add floor">+ Floor</button>
+                    <button onClick={() => { stopCamera(); setWalkthroughRoom(null); tryExitWalkthrough(); }} className="rounded-full px-3 py-1.5 text-[12px] font-bold bg-green-500/30 text-green-300 hover:bg-green-500/50 min-h-[32px]">Done</button>
                   </div>
                   {/* Rooms on current floor */}
                   <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -5926,9 +6031,9 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                         const isCurrent = rIdx === ri;
                         const count = (roomPhotos[rk] || []).length;
                         return (
-                          <button key={rk} onClick={() => { if (!isCurrent) switchToRoom(fi, rIdx); }} className={`flex flex-col items-center rounded-lg px-2 py-1 min-w-[52px] transition-all ${isCurrent ? "bg-white/30 ring-1 ring-white" : "bg-white/10 hover:bg-white/20"}`}>
-                            <span className={`text-[10px] font-bold leading-tight ${isCurrent ? "text-white" : "text-white/70"}`}>{r.name}</span>
-                            <span className={`text-[8px] font-bold ${count > 0 ? "text-green-400" : "text-white/30"}`}>{count > 0 ? `${count}` : "—"}</span>
+                          <button key={rk} onClick={() => { if (!isCurrent) switchToRoom(fi, rIdx); }} className={`flex flex-col items-center rounded-lg px-3 py-2 min-w-[60px] min-h-[44px] transition-all ${isCurrent ? "bg-white/30 ring-1 ring-white" : "bg-white/10 hover:bg-white/20"}`}>
+                            <span className={`text-[12px] font-bold leading-tight ${isCurrent ? "text-white" : "text-white/70"}`}>{r.name}</span>
+                            <span className={`text-[10px] font-bold ${count > 0 ? "text-green-400" : "text-white/30"}`}>{count > 0 ? `${count}` : "—"}</span>
                           </button>
                         );
                       }).filter(Boolean)}
@@ -5942,7 +6047,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                           const newIdx = floor.rooms.length;
                           stopCamera(); setWalkthroughRoom({ fi, ri: newIdx }); setTimeout(() => startCamera(), 300);
                         }, 100);
-                      }} className="flex flex-col items-center rounded-lg px-2 py-1 min-w-[52px] bg-white/10 hover:bg-white/20 border border-dashed border-white/30">
+                      }} className="flex flex-col items-center rounded-lg px-3 py-2 min-w-[60px] min-h-[44px] bg-white/10 hover:bg-white/20 border border-dashed border-white/30">
                         <span className="text-[10px] font-bold text-white/70">+</span>
                         <span className="text-[8px] font-bold text-white/40">Add</span>
                       </button>
@@ -5954,7 +6059,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
           )}
 
           {/* Header */}
-          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-3 z-0">
+          <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-2 z-0" style={{ paddingTop: cameraActive ? "12px" : "52px" }}>
             <button onClick={() => { stopCamera(); setWalkthroughRoom(null); }} className="flex items-center justify-center h-10 w-10 rounded-full border-2 border-slate-300 text-slate-500 hover:bg-slate-100 hover:border-slate-400">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
@@ -6957,9 +7062,9 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
               {c.contactViaRep && <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700">Via Rep</span>}
 	         </div>
 	         {!customerPlaceholder && <div className="flex flex-wrap gap-1.5">
-	            <ToggleMulti className={`${open ? '!py-1 !px-3' : '!py-0.5 !px-2'} !text-[10px]`} label="Primary" title={ROLE_COACHING["Primary"]} checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
-            <ToggleMulti className={`${open ? '!py-1 !px-2 sm:!px-3' : '!py-0.5 !px-2'} !text-[10px]`} label="Policy Holder" title={ROLE_COACHING["Policyholder"]} checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder })} />
-            <ToggleMulti className={`${open ? '!py-1 !px-2 sm:!px-3' : '!py-0.5 !px-2'} !text-[10px]`} label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay })} />
+	            <ToggleMulti className={open ? '' : '!py-1 !px-2'} label="Primary" title={ROLE_COACHING["Primary"]} checked={!!c.isPrimary} onChange={()=>updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
+            <ToggleMulti className={open ? '' : '!py-1 !px-2'} label="Policy Holder" title={ROLE_COACHING["Policyholder"]} checked={!!c.policyHolder} onChange={()=>updateCust(c.id, { policyHolder: !c.policyHolder })} />
+            <ToggleMulti className={open ? '' : '!py-1 !px-2'} label="Self Pay" checked={!!c.selfPay} onChange={()=>updateCust(c.id, { selfPay: !c.selfPay })} />
          </div>}
       </div>
 
@@ -6992,13 +7097,13 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
            {["Phone", "Email", "Text"].map(m => (
              <ToggleMulti key={m} label={m} checked={c.preferredContact === m} onChange={() => {
                updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false, contactViaRep: false });
-             }} className="!text-[10px] !px-2 !py-1" />
+             }} />
            ))}
            <span className="w-px h-4 bg-slate-200 mx-0.5" />
-           <ToggleMulti label="Contacted" checked={!!c.contacted} onChange={() => updateCust(c.id, { contacted: !c.contacted })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
+           <ToggleMulti label="Contacted" checked={!!c.contacted} onChange={() => updateCust(c.id, { contacted: !c.contacted })} colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
            <span className="w-px h-4 bg-slate-200 mx-0.5" />
-           <ToggleMulti label="Contact via Rep" checked={!!c.contactViaRep} onChange={() => updateCust(c.id, { contactViaRep: !c.contactViaRep, doNotContact: false, preferredContact: "" })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-amber-50 !border-amber-300 !text-amber-700" />
-           <ToggleMulti label="Do Not Contact" checked={!!c.doNotContact} onChange={() => updateCust(c.id, { doNotContact: !c.doNotContact, contactViaRep: false, preferredContact: "" })} className="!text-[10px] !px-2 !py-1" colorClass="!bg-rose-50 !border-rose-300 !text-rose-700" />
+           <ToggleMulti label="Contact via Rep" checked={!!c.contactViaRep} onChange={() => updateCust(c.id, { contactViaRep: !c.contactViaRep, doNotContact: false, preferredContact: "" })} colorClass="!bg-amber-50 !border-amber-300 !text-amber-700" />
+           <ToggleMulti label="Do Not Contact" checked={!!c.doNotContact} onChange={() => updateCust(c.id, { doNotContact: !c.doNotContact, contactViaRep: false, preferredContact: "" })} colorClass="!bg-rose-50 !border-rose-300 !text-rose-700" />
          </div>
          {c.contactViaRep && (
            <div className="text-[10px] text-amber-600 pl-1">All communication for this contact should go through their representative.</div>
@@ -7055,7 +7160,7 @@ const CustomerItem = memo(({ c, index, total, updateCust, onRemove, highlightMis
            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
              <div className="flex flex-wrap gap-1.5">
                {CUSTOMER_QUICK_NOTES.map(n => (
-                 <ToggleMulti key={n} label={n} checked={(c.quickNotes || []).includes(n)} onChange={() => toggleQuickNote(n)} className="!text-[10px] !px-2 !py-1" />
+                 <ToggleMulti key={n} label={n} checked={(c.quickNotes || []).includes(n)} onChange={() => toggleQuickNote(n)} />
                ))}
              </div>
              <Input value={c.note} onChange={e => updateCust(c.id, { note: e.target.value })} placeholder="Additional notes..." />
@@ -7459,7 +7564,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     <div className="rounded-lg bg-slate-50/80 border border-slate-100 p-2">
                       <div className="flex flex-wrap gap-1.5">
                         {[NON_RESTORATION_PRIMARY, ...LOSS_TYPES].map(lt => (
-                          <ToggleMulti key={lt} label={lt} checked={data.primaryLossType === lt || (lt === NON_RESTORATION_PRIMARY && nonRestorationSelected)} onChange={() => { if (lt === NON_RESTORATION_PRIMARY) { toggleNonRestorationPrimary(); updateMany({ primaryLossType: NON_RESTORATION_PRIMARY }); return; } const np = data.primaryLossType === lt ? "" : lt; updateMany({ primaryLossType: np, orderTypes: np ? [np, ...(data.secondaryContaminants || []).filter(s => s !== np)] : [...(data.secondaryContaminants || [])] }); }} className="!text-[11px] !px-3 !py-1" />
+                          <ToggleMulti key={lt} label={lt} checked={data.primaryLossType === lt || (lt === NON_RESTORATION_PRIMARY && nonRestorationSelected)} onChange={() => { if (lt === NON_RESTORATION_PRIMARY) { toggleNonRestorationPrimary(); updateMany({ primaryLossType: NON_RESTORATION_PRIMARY }); return; } const np = data.primaryLossType === lt ? "" : lt; updateMany({ primaryLossType: np, orderTypes: np ? [np, ...(data.secondaryContaminants || []).filter(s => s !== np)] : [...(data.secondaryContaminants || [])] }); }} />
                         ))}
                       </div>
                     </div>
@@ -7471,7 +7576,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         <div className="flex flex-wrap gap-1.5">
                           {LOSS_TYPES.filter(t => t !== data.primaryLossType && t !== "Unknown").map(t => {
                             const ok = (COMPATIBLE_SECONDARY_LOSS[data.primaryLossType] || LOSS_TYPES).includes(t);
-                            return <ToggleMulti key={t} label={t} checked={(data.secondaryContaminants || []).includes(t)} onChange={() => { if (!ok) return; const next = (data.secondaryContaminants||[]).includes(t) ? (data.secondaryContaminants||[]).filter(s=>s!==t) : [...(data.secondaryContaminants||[]),t]; updateMany({ secondaryContaminants: next, orderTypes: [data.primaryLossType, ...next] }); }} className={`!text-[11px] !px-3 !py-1 ${!ok ? "!opacity-30 !cursor-not-allowed" : ""}`} />;
+                            return <ToggleMulti key={t} label={t} checked={(data.secondaryContaminants || []).includes(t)} onChange={() => { if (!ok) return; const next = (data.secondaryContaminants||[]).includes(t) ? (data.secondaryContaminants||[]).filter(s=>s!==t) : [...(data.secondaryContaminants||[]),t]; updateMany({ secondaryContaminants: next, orderTypes: [data.primaryLossType, ...next] }); }} className={!ok ? "!opacity-30 !cursor-not-allowed" : ""} />;
                           })}
                         </div>
                       </div>
@@ -7481,7 +7586,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     <div>
                       <div className="text-[11px] font-bold text-slate-700 mb-1">Non-Restoration Type</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {NON_RESTORATION_SUBTYPES.map(s => <ToggleMulti key={s} label={s} checked={nonRestorationSubtype === s} onChange={() => selectNonRestorationSubtype(s)} className="!text-[11px] !px-3 !py-1" />)}
+                        {NON_RESTORATION_SUBTYPES.map(s => <ToggleMulti key={s} label={s} checked={nonRestorationSubtype === s} onChange={() => selectNonRestorationSubtype(s)} />)}
                       </div>
                     </div>
                   )}
@@ -7489,7 +7594,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     <div className="text-[11px] font-bold text-slate-700 mb-1">Who is contacting the customer?</div>
                     <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-1.5">
                       <div className="flex flex-wrap gap-1">
-                        {[{k:"done",l:"Already contacted"},{k:"rep",l:"Contact POC only"},{k:"office",l:"Office please contact"},{k:"enter-only",l:"Enter only — do not contact"}].map(o => <ToggleMulti key={o.k} label={o.l} checked={data.contactAssignment===o.k} onChange={()=>updateMany({contactAssignment:data.contactAssignment===o.k?"":o.k})} className="!text-[11px] !px-3 !py-1" />)}
+                        {[{k:"done",l:"Already contacted"},{k:"rep",l:"Contact POC only"},{k:"office",l:"Office please contact"},{k:"enter-only",l:"Enter only — do not contact"}].map(o => <ToggleMulti key={o.k} label={o.l} checked={data.contactAssignment===o.k} onChange={()=>updateMany({contactAssignment:data.contactAssignment===o.k?"":o.k})} />)}
                       </div>
                     </div>
                   </div>
@@ -7506,8 +7611,8 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   )}
                   {data.payorQuick === "Insurance" && (
                     <div className="grid grid-cols-2 gap-2">
-                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Claim #</div><Input value={data.claimNumber || ""} onChange={e => update("claimNumber", e.target.value)} placeholder="Claim number" className="!py-1 !text-xs" /></div>
-                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Policy #</div><Input value={data.policyNumber || ""} onChange={e => update("policyNumber", e.target.value)} placeholder="Policy number" className="!py-1 !text-xs" /></div>
+                      <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">Claim #</div><Input value={data.claimNumber || ""} onChange={e => update("claimNumber", e.target.value)} placeholder="Claim number" className="!py-1 !text-xs" /></div>
+                      <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">Policy #</div><Input value={data.policyNumber || ""} onChange={e => update("policyNumber", e.target.value)} placeholder="Policy number" className="!py-1 !text-xs" /></div>
                     </div>
                   )}
                   <div>
@@ -7516,17 +7621,17 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   </div>
                   {data.leadSourceCategory === "Marketing" && (
                     <div className="rounded-lg bg-sky-50/30 border border-sky-100 p-2">
-                      <div className="text-[10px] font-bold text-slate-500 mb-1">Channel</div>
+                      <div className="text-[11px] font-bold text-slate-500 mb-1">Channel</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {MARKETING_SOURCES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} className="!text-[11px] !px-3 !py-1" />)}
+                        {MARKETING_SOURCES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} />)}
                       </div>
                     </div>
                   )}
                   {data.leadSourceCategory === "Internal" && (
                     <div className="rounded-lg bg-sky-50/30 border border-sky-100 p-2">
-                      <div className="text-[10px] font-bold text-slate-500 mb-1">Type</div>
+                      <div className="text-[11px] font-bold text-slate-500 mb-1">Type</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {INTERNAL_TYPES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} className="!text-[11px] !px-3 !py-1" />)}
+                        {INTERNAL_TYPES.map(s => <ToggleMulti key={s} label={s} checked={data.leadSourceDetail === s} onChange={() => update("leadSourceDetail", s)} />)}
                       </div>
                     </div>
                   )}
@@ -7535,21 +7640,21 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     <SearchSelect value={data.referrer || data.referringCompany || ""} onChange={v => { const parsed = parseCombinedContact(v); updateMany(parsed); }} options={combinedContactOptions} placeholder="Search referrer..." onAddNew={name => { setModal({ type: "contact", value: name, onSave: (n) => updateMany({ referrer: n }) }); }} />
                     {(data.referrer || data.referringCompany) && (
                       <div className="flex gap-1 mt-1.5">
-                        <ToggleMulti label="Referrer" checked={true} onChange={() => {}} className="!text-[11px] !px-3 !py-1" colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
-                        <ToggleMulti label="Bill To" checked={!!data.referrerIsBillTo} onChange={() => update("referrerIsBillTo", !data.referrerIsBillTo)} className="!text-[11px] !px-3 !py-1" />
-                        <ToggleMulti label="Insurance" checked={!!data.referrerIsInsurance} onChange={() => update("referrerIsInsurance", !data.referrerIsInsurance)} className="!text-[11px] !px-3 !py-1" />
+                        <ToggleMulti label="Referrer" checked={true} onChange={() => {}} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
+                        <ToggleMulti label="Bill To" checked={!!data.referrerIsBillTo} onChange={() => update("referrerIsBillTo", !data.referrerIsBillTo)} />
+                        <ToggleMulti label="Insurance" checked={!!data.referrerIsInsurance} onChange={() => update("referrerIsInsurance", !data.referrerIsInsurance)} />
                       </div>
                     )}
                   </div>}
                   <div>
                     <div className="text-[11px] font-bold text-slate-700 mb-1">Sales Rep</div>
                     <SearchSelect value={data.salesRep || ""} onChange={v => update("salesRep", v)} options={["Mike S.", "Sarah J.", "Tom B."]} placeholder="Rep..." />
-                    {data.salesRep && suggestedReferrerRoles?.salesRep && data.salesRep !== suggestedReferrerRoles.salesRep && <div className="text-[9px] text-amber-600 mt-0.5">Referrer's rep is {suggestedReferrerRoles.salesRep}</div>}
+                    {data.salesRep && suggestedReferrerRoles?.salesRep && data.salesRep !== suggestedReferrerRoles.salesRep && <div className="text-[11px] text-amber-600 mt-0.5">Referrer's rep is {suggestedReferrerRoles.salesRep}</div>}
                   </div>
                   <div>
                     <div className="text-[11px] font-bold text-slate-700 mb-1">Companies & Contacts</div>
                     <SearchSelect value="" onChange={v => { const parsed = parseCombinedContact?.(v) || { contact: "", company: "" }; const entry = { company: parsed.company || v, contact: parsed.contact || "", type: "", id: safeUid(), incomplete: !combinedContactOptions.some(o => o.value === v) }; update("vendors", [...(data.vendors || []), entry]); setToast?.(`Added ${entry.company || entry.contact}`); }} options={combinedContactOptions} placeholder="Search to add..." clearOnCommit onAddNew={v => { update("vendors", [...(data.vendors || []), { company: "", contact: v, type: "", id: safeUid(), incomplete: true }]); setToast?.(`Added "${v}" as placeholder`); }} className="!border-sky-300 !rounded-lg" />
-                    {(data.vendors || []).length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{(data.vendors || []).map((v, i) => <span key={v.id || i} className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${v.incomplete ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-600"}`}>{v.company || v.contact} <button type="button" onClick={() => update("vendors", (data.vendors||[]).filter((_,j)=>j!==i))} className="ml-1 text-slate-400 hover:text-rose-500">×</button></span>)}</div>}
+                    {(data.vendors || []).length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{(data.vendors || []).map((v, i) => <span key={v.id || i} className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${v.incomplete ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-600"}`}>{v.company || v.contact} <button type="button" onClick={() => update("vendors", (data.vendors||[]).filter((_,j)=>j!==i))} className="ml-1 text-slate-400 hover:text-rose-500">×</button></span>)}</div>}
                   </div>
                 </div>
               </div>
@@ -7559,10 +7664,10 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   <h3 className="text-xs font-bold uppercase text-sky-600 mb-2">Customer</h3>
                   <div className="grid grid-cols-2 gap-2">
-                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">First Name</div><Input value={data.customers?.[0]?.first || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { first: e.target.value })} className="!py-1.5 !text-sm" /></div>
-                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Last Name</div><Input value={data.customers?.[0]?.last || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { last: e.target.value })} className="!py-1.5 !text-sm" /></div>
-                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Phone</div><Input value={data.customers?.[0]?.phone || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { phone: formatPhoneNumber(e.target.value) })} placeholder="(555) 123-4567" className="!py-1.5 !text-sm" /></div>
-                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Email</div><Input type="email" value={data.customers?.[0]?.email || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { email: e.target.value })} placeholder="email@example.com" className="!py-1.5 !text-sm" /></div>
+                    <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">First Name</div><Input value={data.customers?.[0]?.first || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { first: e.target.value })} className="!py-1.5 !text-sm" /></div>
+                    <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">Last Name</div><Input value={data.customers?.[0]?.last || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { last: e.target.value })} className="!py-1.5 !text-sm" /></div>
+                    <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">Phone</div><Input value={data.customers?.[0]?.phone || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { phone: formatPhoneNumber(e.target.value) })} placeholder="(555) 123-4567" className="!py-1.5 !text-sm" /></div>
+                    <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">Email</div><Input type="email" value={data.customers?.[0]?.email || ""} onChange={e=>updateCust(data.customers?.[0]?.id, { email: e.target.value })} placeholder="email@example.com" className="!py-1.5 !text-sm" /></div>
                   </div>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -7589,13 +7694,13 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       </div>
                     )}
                     <div className="grid grid-cols-4 gap-1.5">
-                      <div className="col-span-3"><div className="text-[10px] font-bold text-slate-500 mb-0.5">Street</div><Input placeholder="Street address" value={primaryAddr.street || ""} onChange={e=>updateAddr(primaryAddr.id,{street:e.target.value})} className="!py-1.5 !text-sm" /></div>
-                      <div className="col-span-1"><div className="text-[10px] font-bold text-slate-500 mb-0.5">Apt/Unit</div><Input placeholder="Apt" value={primaryAddr.apt || ""} onChange={e=>updateAddr(primaryAddr.id,{apt:e.target.value})} className="!py-1.5 !text-sm" /></div>
+                      <div className="col-span-3"><div className="text-[11px] font-bold text-slate-500 mb-0.5">Street</div><Input placeholder="Street address" value={primaryAddr.street || ""} onChange={e=>updateAddr(primaryAddr.id,{street:e.target.value})} className="!py-1.5 !text-sm" /></div>
+                      <div className="col-span-1"><div className="text-[11px] font-bold text-slate-500 mb-0.5">Apt/Unit</div><Input placeholder="Apt" value={primaryAddr.apt || ""} onChange={e=>updateAddr(primaryAddr.id,{apt:e.target.value})} className="!py-1.5 !text-sm" /></div>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
-                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">City</div><Input placeholder="City" value={primaryAddr.city || ""} onChange={e=>updateAddr(primaryAddr.id,{city:e.target.value})} className="!py-1.5 !text-sm" /></div>
-                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">State</div><Select value={primaryAddr.state || ""} onChange={e=>updateAddr(primaryAddr.id,{state:e.target.value})} className="!py-1.5 !text-sm"><option value="">State</option>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</Select></div>
-                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Zip</div><Input placeholder="Zip" value={primaryAddr.zip || ""} onChange={e=>updateAddr(primaryAddr.id,{zip:e.target.value})} className="!py-1.5 !text-sm" /></div>
+                      <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">City</div><Input placeholder="City" value={primaryAddr.city || ""} onChange={e=>updateAddr(primaryAddr.id,{city:e.target.value})} className="!py-1.5 !text-sm" /></div>
+                      <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">State</div><Select value={primaryAddr.state || ""} onChange={e=>updateAddr(primaryAddr.id,{state:e.target.value})} className="!py-1.5 !text-sm"><option value="">State</option>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</Select></div>
+                      <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">Zip</div><Input placeholder="Zip" value={primaryAddr.zip || ""} onChange={e=>updateAddr(primaryAddr.id,{zip:e.target.value})} className="!py-1.5 !text-sm" /></div>
                     </div>
                   </div>
                 </div>
@@ -7606,26 +7711,26 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   <h3 className="text-xs font-bold uppercase text-sky-600 mb-2">Schedule</h3>
                   <div className="space-y-2">
-                    <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Event Type</div><ToggleGroup options={["Scope","Pickup","In-Home","Meeting"]} value={data.scheduleType} onChange={v => update("scheduleType", v)} /></div>
+                    <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">Event Type</div><ToggleGroup options={["Scope","Pickup","In-Home","Meeting"]} value={data.scheduleType} onChange={v => update("scheduleType", v)} /></div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <div className="flex items-center justify-between mb-0.5">
-                          <div className="text-[10px] font-bold text-slate-500">Date</div>
-                          <button type="button" onClick={() => { onSetNowDate?.(); onSetNowTime?.(); updateMany({ eventFirm: true, pickupTimeTentative: false }); }} className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[8px] font-bold text-sky-700 hover:bg-sky-100">Now</button>
+                          <div className="text-[11px] font-bold text-slate-500">Date</div>
+                          <button type="button" onClick={() => { onSetNowDate?.(); onSetNowTime?.(); updateMany({ eventFirm: true, pickupTimeTentative: false }); }} className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Now</button>
                         </div>
                         <DatePicker value={data.pickupDate} onChange={v=>update("pickupDate", v)} closeSignal={dateCloseSignal} />
                       </div>
                       <div>
                         <div className="flex items-center justify-between mb-0.5">
-                          <div className="text-[10px] font-bold text-slate-500">Time</div>
-                          <button type="button" onClick={() => updateMany({ pickupTime: '12:00 AM', pickupTimeTentative: true, eventFirm: false })} className={`rounded-full px-2 py-0.5 text-[8px] font-bold ${data.pickupTime === '12:00 AM' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'border border-slate-200 text-slate-500'}`}>TBD</button>
+                          <div className="text-[11px] font-bold text-slate-500">Time</div>
+                          <button type="button" onClick={() => updateMany({ pickupTime: '12:00 AM', pickupTimeTentative: true, eventFirm: false })} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${data.pickupTime === '12:00 AM' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'border border-slate-200 text-slate-500'}`}>TBD</button>
                         </div>
                         <TimePicker value={data.pickupTime} onChange={v=>update("pickupTime", v)} closeSignal={timeCloseSignal} />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Assignee</div><Input value={data.eventAssignee || ""} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" className="!py-1.5 !text-sm" /></div>
-                      <div><div className="text-[10px] font-bold text-slate-500 mb-0.5">Vehicle</div><Input value={data.eventVehicle || ""} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Optional" className="!py-1.5 !text-sm" /></div>
+                      <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">Assignee</div><SearchSelect value={data.eventAssignee || ""} onChange={v=>update("eventAssignee", v)} options={TECHS} placeholder="Select..." /></div>
+                      <div><div className="text-[11px] font-bold text-slate-500 mb-0.5">Vehicle</div><SearchSelect value={data.eventVehicle || ""} onChange={v=>update("eventVehicle", v)} options={VEHICLES} placeholder="Select..." /></div>
                     </div>
                     {data.pickupTime === '12:00 AM' && <div className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-700 font-semibold">TBD — time not yet confirmed</div>}
                   </div>
@@ -7635,15 +7740,15 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   <AutoGrowTextarea value={stripEventSystemLines(data.eventInstructions || "")} onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))} placeholder="Conditions, access, preferences, what to bring..." className="!min-h-[60px] !text-sm" />
                   {eventSystemEntries.length > 0 && (
                     <div className="mt-1.5 rounded border border-slate-100 bg-slate-50 px-2 py-1 space-y-0.5">
-                      <div className="text-[8px] font-bold text-slate-400 uppercase">Auto-filled</div>
-                      {eventSystemEntries.map((entry, i) => <div key={i} className="text-[10px] text-slate-600"><span className="font-semibold">{entry.label}:</span> {entry.value}</div>)}
+                      <div className="text-[11px] font-bold text-slate-400 uppercase">Auto-filled</div>
+                      {eventSystemEntries.map((entry, i) => <div key={i} className="text-[11px] text-slate-600"><span className="font-semibold">{entry.label}:</span> {entry.value}</div>)}
                     </div>
                   )}
                   <details className="mt-2">
-                    <summary className="text-[10px] font-bold text-slate-400 cursor-pointer hover:text-slate-600 select-none">Quick Notes ›</summary>
+                    <summary className="text-[11px] font-bold text-slate-400 cursor-pointer hover:text-slate-600 select-none">Quick Notes ›</summary>
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {["Everything Affected", "Save what you can", "Determine Impact", "Only specific items", "Pack the house"].map(n => (
-                        <ToggleMulti key={n} label={n} checked={(data.quickInstructionNotes||[]).includes(n)} onChange={()=>appendQuickNote(n)} className="!text-[11px] !px-3 !py-1" />
+                        <ToggleMulti key={n} label={n} checked={(data.quickInstructionNotes||[]).includes(n)} onChange={()=>appendQuickNote(n)} />
                       ))}
                     </div>
                   </details>
@@ -7670,13 +7775,12 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       { label: "Order", title: "Active project with confirmed billing." },
                       { label: "Lead", title: "Potential project; incomplete information or no billing yet." }
                     ]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
-                    {showInlineHelp && (
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      {data.isLead === true
+                    {showInlineHelp && (data.isLead === true || data.isLead === false) && (
+                    <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1">
+                      <span className="flex-1">🎓 {data.isLead === true
                         ? "A Lead requires selling the customer and getting approvals from the adjuster before we proceed. No billable charges yet — just an opportunity we will pursue."
-                        : data.isLead === false
-                          ? "An Order is a confirmed project ready to be scheduled and worked."
-                          : "Select one to continue."}
+                        : "An Order is a confirmed project ready to be scheduled and worked."}</span>
+                      <button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
                     </div>
                     )}
                   </Field>
@@ -7727,8 +7831,9 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                       ))}
                     </div>
                     {showInlineHelp && data.primaryLossType && LOSS_TYPE_COACHING[data.primaryLossType] && (
-                      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mt-1">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">{data.primaryLossType}:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}
+                      <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 mb-2 flex items-start gap-1">
+                        <span className="flex-1">🎓 <span className="font-bold">{data.primaryLossType}:</span> {LOSS_TYPE_COACHING[data.primaryLossType]}</span>
+                        <button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
                       </div>
                     )}
                   </Field>
@@ -7770,7 +7875,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         );
                         })}
                       </div>
-                      {showInlineHelp && <div className="text-[11px] text-violet-400 mt-1">🎓 e.g. Fire with water damage from firefighting, or water loss leading to mold. Incompatible types are grayed out.</div>}
+                      {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">🎓 e.g. Fire with water damage from firefighting, or water loss leading to mold. Incompatible types are grayed out.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                     </Field>
                   )}
                   {isRestorationProject && (
@@ -8039,10 +8144,10 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Assignee">
-                    <Input value={data.eventAssignee} onChange={e=>update("eventAssignee", e.target.value)} placeholder="Assignee" />
+                    <SearchSelect value={data.eventAssignee || ""} onChange={v=>update("eventAssignee", v)} options={TECHS} placeholder="Select assignee..." />
                   </Field>
                   <Field label="Vehicle">
-                    <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle (optional)" />
+                    <SearchSelect value={data.eventVehicle || ""} onChange={v=>update("eventVehicle", v)} options={VEHICLES} placeholder="Select vehicle..." />
                   </Field>
                 </div>
                 {data.pickupTime === '12:00 AM' && (
@@ -8052,7 +8157,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 )}
                 <div className="border-t border-slate-100 pt-4 mt-4">
                   <div className="text-sm font-bold text-slate-700 mb-1">Event Instructions</div>
-                  {showInlineHelp && <p className="text-xs text-violet-400 mb-2">🎓 What the field team needs to know — conditions, access, customer preferences, what to bring.</p>}
+                  {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-2 flex items-start gap-1"><span className="flex-1">🎓 What scheduling and field team need to know — conditions, access, customer preferences, what to bring.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                   <AutoGrowTextarea
                     value={stripEventSystemLines(data.eventInstructions || "")}
                     onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
@@ -8064,10 +8169,10 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   <div>
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Who is contacting the customer?</div>
                     <div className="flex flex-wrap gap-2">
-                      <ToggleMulti label="Already contacted" checked={data.contactAssignment === "done"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "done" ? "" : "done" })} className="!text-[12px] !px-3 !py-1.5" />
-                      <ToggleMulti label="Contact POC only" checked={data.contactAssignment === "rep"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "rep" ? "" : "rep" })} className="!text-[12px] !px-3 !py-1.5" />
-                      <ToggleMulti label="Office please contact" checked={data.contactAssignment === "office"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "office" ? "" : "office" })} className="!text-[12px] !px-3 !py-1.5" />
-                      <ToggleMulti label="Enter only — do not contact" checked={data.contactAssignment === "enter-only"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "enter-only" ? "" : "enter-only" })} className="!text-[12px] !px-3 !py-1.5" />
+                      <ToggleMulti label="Already contacted" checked={data.contactAssignment === "done"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "done" ? "" : "done" })} />
+                      <ToggleMulti label="Contact POC only" checked={data.contactAssignment === "rep"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "rep" ? "" : "rep" })} />
+                      <ToggleMulti label="Office please contact" checked={data.contactAssignment === "office"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "office" ? "" : "office" })} />
+                      <ToggleMulti label="Enter only — do not contact" checked={data.contactAssignment === "enter-only"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "enter-only" ? "" : "enter-only" })} />
                     </div>
                   </div>
                 </div>
@@ -8313,8 +8418,117 @@ export default function App(){
   const [rushGuideOpen, setRushGuideOpen] = useState(false);
   const [rushGuideStep, setRushGuideStep] = useState(1);
   const [rushGuideData, setRushGuideData] = useState({ interests: [], events: [] });
+  const [pendingDeliveryDateChange, setPendingDeliveryDateChange] = useState<any>(null);
+
+  // Sync timeline groupOverrides → interview deliveryGroupDetails + estimatedReturnDate
+  useEffect(() => {
+    const overrides = (rushGuideData as any).groupOverrides;
+    if (!overrides || !Object.keys(overrides).length) return;
+    setData(prev => {
+      const details = { ...(prev as any).deliveryGroupDetails || {} };
+      let returnDate = prev.estimatedReturnDate;
+      let changed = false;
+	      Object.entries(overrides).forEach(([groupId, ovr]: [string, any]) => {
+	        const existing = details[groupId] || {};
+	        const nextDetail = { ...existing };
+	        if (ovr?.dateStr) {
+	          if (!existing || existing.date !== ovr.dateStr) {
+	            nextDetail.date = ovr.dateStr;
+	            changed = true;
+	          }
+	          // If this group is marked final, update estimatedReturnDate
+	          if (existing?.isFinal && returnDate !== ovr.dateStr) {
+	            returnDate = ovr.dateStr;
+	            changed = true;
+	          }
+	        }
+	        ["address", "addressType", "addressId"].forEach(field => {
+	          if (ovr?.[field] !== undefined && nextDetail[field] !== ovr[field]) {
+	            nextDetail[field] = ovr[field];
+	            changed = true;
+	          }
+	        });
+	        if (changed) details[groupId] = nextDetail;
+	      });
+      if (!changed) return prev;
+      return { ...prev, deliveryGroupDetails: details, estimatedReturnDate: returnDate };
+    });
+  }, [(rushGuideData as any).groupOverrides]);
+
+  // Sync interview deliveryGroupDetails → timeline groupOverrides
+  useEffect(() => {
+    const details = (data as any).deliveryGroupDetails;
+    if (!details || !Object.keys(details).length) return;
+    setRushGuideData(prev => {
+      const overrides = { ...(prev as any).groupOverrides || {} };
+      let changed = false;
+	      Object.entries(details).forEach(([groupId, det]: [string, any]) => {
+	        const existing = overrides[groupId] || {};
+	        const nextOverride = { ...existing };
+	        if (det?.date && nextOverride.dateStr !== det.date) {
+	          nextOverride.dateStr = det.date;
+	          changed = true;
+	        }
+	        ["address", "addressType", "addressId"].forEach(field => {
+	          if (det?.[field] !== undefined && nextOverride[field] !== det[field]) {
+	            nextOverride[field] = det[field];
+	            changed = true;
+	          }
+	        });
+	        if (changed) overrides[groupId] = nextOverride;
+	      });
+      if (!changed) return prev;
+      return { ...prev, groupOverrides: overrides };
+    });
+  }, [(data as any).deliveryGroupDetails]);
+
+  // Delivery Planner helpers
+  const computeStorageEstimate = (startDate: string, endDate: string) => {
+    if (!startDate || !endDate) return 0;
+    const s = new Date(startDate); const e = new Date(endDate);
+    return Math.max(0, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+  };
+  const computeAutoAddress = (groupId: string) => {
+    const tl = data.livingTimeline || [];
+    if (!tl.length) return null;
+    if (groupId === "RD" || groupId === "RFD") return tl[0]; // Rush → first stay
+    if (groupId.startsWith("LT") || groupId === "LTFD") return tl[tl.length - 1]; // Final → last stay
+    if (groupId.startsWith("ST")) return tl.find(s => s.type !== "Staying in home") || tl[0]; // Short-term → first non-home
+    return null;
+  };
+
+  // Auto-derive storageNeeded/storageMonths from Final delivery group date
+  useEffect(() => {
+    const details = (data as any).deliveryGroupDetails || {};
+    const finalEntry = Object.entries(details).find(([, det]: [string, any]) => det?.isFinal);
+    if (!finalEntry) return;
+    const finalDate = (finalEntry[1] as any)?.date;
+    if (!finalDate) return;
+    const today = new Date().toISOString().split("T")[0];
+    const months = computeStorageEstimate(today, finalDate);
+    if (months > 0) {
+      if (data.storageNeeded !== "Y" || data.storageMonths !== String(months)) {
+        setData(p => ({ ...p, storageNeeded: "Y", storageMonths: String(months), estimatedReturnDate: finalDate }));
+      }
+    }
+  }, [(data as any).deliveryGroupDetails]);
+
+  // Auto-derive processType from Final group's address type
+  useEffect(() => {
+    const details = (data as any).deliveryGroupDetails || {};
+    const finalEntry = Object.entries(details).find(([, det]: [string, any]) => det?.isFinal);
+    if (!finalEntry) return;
+    const addrType = ((finalEntry[1] as any)?.addressType || "").toLowerCase();
+    let pt = "";
+    if (addrType === "primary" || addrType === "home") pt = "Deliver ASAP";
+    else if (["hotel", "rental", "temp", "temporary"].includes(addrType)) pt = "Deliver to Temp";
+    else if (["moving", "new home"].includes(addrType)) pt = "Deliver to New Home";
+    if (pt && pt !== data.processType) update("processType", pt);
+  }, [(data as any).deliveryGroupDetails]);
+
   const [actionItemsOpen, setActionItemsOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const coaching = useCallback((key: string) => getCoaching(key, (data as any)._coachingOverrides), [data]);
   const [showSearch, setShowSearch] = useState(false);
   const TEST_PRESETS_KEY = "noe-test-presets";
   const [showPresetModal, setShowPresetModal] = useState(false);
@@ -8447,7 +8661,7 @@ export default function App(){
           break;
       }
     });
-    if (executed.length) setToast(executed.join(" · "));
+    if (executed.length && interviewPanelOpen) setToast(executed.join(" · "));
   };
   const matchesInterviewSearch = (title, ...extras) => {
     const q = interviewSearch.trim().toLowerCase();
@@ -9719,6 +9933,68 @@ export default function App(){
   const closeLivingAddressPrompt = useCallback(() => {
     setLivingAddressPrompt({ open: false, type: "" });
   }, []);
+
+  const ORDER_ADDRESS_TYPES = ["Primary", "Hotel", "Rental", "Temporary", "Neighbor", "Relative", "Moving", "Secondary Home", "Storage Facility", "Business", "Other"];
+  const formatOrderAddressLine = useCallback((addr: any = {}) => {
+    return [addr.street, addr.apt, addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
+  }, []);
+  const formatOrderAddressChoiceLabel = useCallback((addr: any = {}, idx = 0) => {
+    const type = addr.type || `Address ${idx + 1}`;
+    const line = formatOrderAddressLine(addr);
+    return `${type} — ${line || "TBD"}`;
+  }, [formatOrderAddressLine]);
+  const orderAddressChoices = useMemo(() => {
+    const activeAddresses = (data.addresses || []).filter((addr: any) => !addr.inactive);
+    const known = activeAddresses.map((addr: any, idx: number) => ({
+      kind: "known",
+      value: `addr:${addr.id}`,
+      type: addr.type || `Address ${idx + 1}`,
+      label: formatOrderAddressChoiceLabel(addr, idx),
+      address: formatOrderAddressLine(addr) || `${addr.type || `Address ${idx + 1}`} address TBD`,
+      addressId: addr.id,
+    }));
+    const types = Array.from(new Set([...ORDER_ADDRESS_TYPES, ...LIVING_STATUS_ADDRESS_TYPES, ...activeAddresses.map((addr: any) => addr.type).filter(Boolean)]));
+    const placeholders = types.map(type => ({
+      kind: "type",
+      value: `type:${type}`,
+      type,
+      label: type,
+      address: `${type} address TBD`,
+      addressId: "",
+    }));
+    return { known, placeholders, all: [...known, ...placeholders] };
+  }, [data.addresses, formatOrderAddressChoiceLabel, formatOrderAddressLine]);
+  const addressPayloadFromChoice = useCallback((choiceValue: string) => {
+    if (!choiceValue) return { addressType: "", address: "", addressId: "" };
+    if (choiceValue.startsWith("addr:")) {
+      const addressId = choiceValue.slice(5);
+      const addr = (data.addresses || []).find((a: any) => a.id === addressId);
+      if (!addr) return { addressType: "", address: "", addressId: "" };
+      const type = addr.type || "Address";
+      return { addressType: type, address: formatOrderAddressLine(addr) || `${type} address TBD`, addressId };
+    }
+    if (choiceValue.startsWith("type:")) {
+      const type = choiceValue.slice(5);
+      const existing = (data.addresses || []).find((a: any) => (a.type || "").toLowerCase() === type.toLowerCase() && !a.inactive);
+      if (!existing) ensureAddressType(type, { placeholder: true });
+      return {
+        addressType: type,
+        address: existing ? (formatOrderAddressLine(existing) || `${type} address TBD`) : `${type} address TBD`,
+        addressId: existing?.id || "",
+      };
+    }
+    return { addressType: "", address: choiceValue, addressId: "" };
+  }, [data.addresses, ensureAddressType, formatOrderAddressLine]);
+  const addressChoiceValue = useCallback((record: any = {}) => {
+    if (record.addressId) return `addr:${record.addressId}`;
+    if (record.addressType) return `type:${record.addressType}`;
+    if (record.location && ORDER_ADDRESS_TYPES.some(type => type.toLowerCase() === String(record.location).toLowerCase())) return `type:${record.location}`;
+    if (record.address) {
+      const match = (data.addresses || []).find((addr: any) => formatOrderAddressLine(addr) === record.address);
+      if (match) return `addr:${match.id}`;
+    }
+    return "";
+  }, [data.addresses, formatOrderAddressLine]);
 
   const updateLivingStatus = (value) => {
     update("livingStatus", value);
@@ -13383,7 +13659,7 @@ export default function App(){
                                       <button className={`rounded-lg border px-3 text-xs font-bold transition-all ${data.orderNameLocked?"bg-slate-800 text-white":"bg-white hover:bg-slate-50"}`} onClick={()=>updateMany({ orderNameLocked: !data.orderNameLocked, orderNameAuto: data.orderNameLocked ? data.orderNameAuto : false })}>{data.orderNameLocked?"LOCKED":"LOCK"}</button>
                                   </div>
                                 </Field>
-                                {showCoaching && <div className="text-[11px] text-violet-400">🎓 Auto-generated from LastName-TownST. Lock to prevent changes.</div>}
+                                {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Auto-generated from LastName-TownST. Lock to prevent changes.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                 <div className="grid gap-4 sm:grid-cols-2">
                                   <Field label="Record Type">
                                     <ToggleGroup options={[
@@ -13467,7 +13743,7 @@ export default function App(){
                                         />
                                       ))}
                                     </div>
-                                    {showCoaching && <div className="text-[11px] text-violet-400">🎓 e.g. Fire with water damage from firefighting, or water loss leading to mold.</div>}
+                                    {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 e.g. Fire with water damage from firefighting, or water loss leading to mold.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                   </Field>
                                 )}
                                 {attentionWater && !(data.orderTypes||[]).includes("Water") && !dismissedTips.has("Water Suggestion") && (
@@ -13525,7 +13801,7 @@ export default function App(){
                                                 <div className="p-4 grid gap-4 border-t border-sky-100 bg-white">
                                                     {hasSeverity && !isNonRestorationProject && (
                                                         <Field label="Severity" subtle>
-                                                            {showCoaching && !(data.severityCodes || []).length && <div className="text-[10px] text-violet-400 mb-1">🎓 Typically entered after the site inspection, not during intake.</div>}
+                                                            {showCoaching && !(data.severityCodes || []).length && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-1 flex items-start gap-1"><span className="flex-1">🎓 Typically entered after the site inspection, not during intake.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                                             <div className={`rounded-lg ${needsSeverityCode ? "border border-orange-200 bg-orange-50/60 p-2" : ""}`}>
                                                               <div className="flex gap-2" data-audit-key={`severity-${severityGroup.toLowerCase()}`}>{SEVERITY_LEVELS.map(level => { const code = `${severityGroup}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`h-9 w-9 rounded-lg text-sm font-bold transition-all border ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : needsSeverityCode ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100' : 'bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-200'} ${attentionForSeverity && !needsSeverityCode ? 'attention-outline' : ''}`}>{level}</button>); })}</div>
                                                               {needsSeverityCode && (
@@ -13607,7 +13883,7 @@ export default function App(){
                                         {SERVICE_SUB_CATEGORIES[expandedService].map(sub => {
                                           const subKey = `${expandedService}: ${sub}`;
                                           const selected = (data.serviceSubCategories || []).includes(subKey);
-                                          return <ToggleMulti key={sub} label={sub} checked={selected} onChange={() => update("serviceSubCategories", toggleMulti(data.serviceSubCategories || [], subKey))} className="!text-[11px] !px-2 !py-1" />;
+                                          return <ToggleMulti key={sub} label={sub} checked={selected} onChange={() => update("serviceSubCategories", toggleMulti(data.serviceSubCategories || [], subKey))} className="" />;
                                         })}
                                       </div>
                                     </div>
@@ -13661,7 +13937,7 @@ export default function App(){
                                             {!isNonRestorationProject && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">SEVERITY</div>
-                                                {showCoaching && <div className="text-xs text-violet-400 mb-1">🎓 Severity reject scale: 1 = None, 2 = Possible, 3 = Many expected, 5 = Extreme.</div>}
+                                                {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-1 flex items-start gap-1"><span className="flex-1">🎓 Severity reject scale: 1 = None, 2 = Possible, 3 = Many expected, 5 = Extreme.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">{SEVERITY_GROUPS.map(type => {
                                                   const hasGroupCode = (data.severityCodes || []).some(c => c.startsWith(`${type}-`));
                                                   const expectsGroupCode = expectedSeverityGroups.has(type);
@@ -13685,7 +13961,7 @@ export default function App(){
                                             {(data.primaryLossType || (data.orderTypes||[]).some(t => ["Fire","Water","Puffback"].includes(t))) && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">DETAILED SEVERITY</div>
-                                                {showCoaching && <div className="text-xs text-violet-400 mb-3">🎓 Rate specific contaminant levels. 0 = None, 3 = Severe. Typically completed after the site inspection — not during intake.</div>}
+                                                {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-3 flex items-start gap-1"><span className="flex-1">🎓 Rate specific contaminant levels. 0 = None, 3 = Severe. Typically completed after the site inspection — not during intake.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                                 <div className="grid gap-4 sm:grid-cols-2">
                                                   {[
                                                     { key: "fire", label: "Fire", fields: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"], colorStart: "#fef3c7", colorEnd: "#f97316" },
@@ -13740,12 +14016,12 @@ export default function App(){
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className={suggestQ1 ? "suggested-field rounded-lg p-2" : ""}>
                                               <div className="mb-2 text-xs font-bold text-slate-400">QUALITY</div>
-                                              {showCoaching && <div className="text-xs text-violet-400 mb-1">🎓 Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).</div>}
+                                              {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-1 flex items-start gap-1"><span className="flex-1">🎓 Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                               {suggestQ1 && <div className="mb-2 text-[10px] font-bold suggested-pill inline-flex rounded-full px-2 py-0.5">Suggested: Q1 — based on insurance carrier or premium service</div>}
                                               <div className="flex flex-wrap gap-2">{QUALITY_CODES.map(q => (<ToggleMulti key={q} label={q} checked={data.qualityCode === q} onChange={() => update("qualityCode", q)} />))}</div>
                                             </div>
                                             <div className="border-t border-slate-100 my-1"></div>
-                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div>{showCoaching && <div className="text-xs text-violet-400 mb-3">🎓 Special processing instructions. Hover each code for its meaning.</div>}<div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className={`${compactMode ? '!px-2 !py-1 !text-xs' : '!px-2.5 !py-1.5 !text-xs'}`} checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
+                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div>{showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-3 flex items-start gap-1"><span className="flex-1">🎓 Special processing instructions. Hover each code for its meaning.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}<div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className={`${compactMode ? '!px-2 !py-1 !text-xs' : '!px-2.5 !py-1.5 !text-xs'}`} checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -14295,7 +14571,7 @@ export default function App(){
                               <ToggleMulti label="Bill To Contacted" checked={!!data.eventBillToContacted} onChange={() => {
                                 if (data.eventBillToContacted) { updateMany({ eventBillToContacted: false, billToContactedAt: "", billToContactedBy: "" }); return; }
                                 updateMany({ eventBillToContacted: true, billToContactedAt: formatShortTimestamp(), billToContactedBy: data.currentUser || "Unknown" });
-                              }} className="!text-[10px] !px-2 !py-1" colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
+                              }} colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
                               {data.eventBillToContacted && <span className="ml-2 text-[9px] text-emerald-600">{data.billToContactedBy} · {data.billToContactedAt}</span>}
                             </div>
                           )}
@@ -14448,7 +14724,7 @@ export default function App(){
                                     </div>
                                     {data.insuranceAdjuster && (
                                       <div className="mt-1">
-                                        <ToggleMulti label="Contacted" checked={!!data.adjusterContacted} onChange={() => update("adjusterContacted", !data.adjusterContacted)} className="!text-[10px] !px-2 !py-1" colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
+                                        <ToggleMulti label="Contacted" checked={!!data.adjusterContacted} onChange={() => update("adjusterContacted", !data.adjusterContacted)} colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
                                       </div>
                                     )}
                                   </Field>
@@ -14670,10 +14946,10 @@ export default function App(){
                               <div>
                                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Who is contacting the customer?</div>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <ToggleMulti label="Already contacted" checked={data.contactAssignment === "done"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "done" ? "" : "done" })} className="!text-[12px] !px-3 !py-1.5" />
-                                  <ToggleMulti label="Contact POC only" checked={data.contactAssignment === "rep"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "rep" ? "" : "rep" })} className="!text-[12px] !px-3 !py-1.5" />
-                                  <ToggleMulti label="Office please contact" checked={data.contactAssignment === "office"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "office" ? "" : "office" })} className="!text-[12px] !px-3 !py-1.5" />
-                                  <ToggleMulti label="Enter only — do not contact" checked={data.contactAssignment === "enter-only"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "enter-only" ? "" : "enter-only" })} className="!text-[12px] !px-3 !py-1.5" />
+                                  <ToggleMulti label="Already contacted" checked={data.contactAssignment === "done"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "done" ? "" : "done" })} />
+                                  <ToggleMulti label="Contact POC only" checked={data.contactAssignment === "rep"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "rep" ? "" : "rep" })} />
+                                  <ToggleMulti label="Office please contact" checked={data.contactAssignment === "office"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "office" ? "" : "office" })} />
+                                  <ToggleMulti label="Enter only — do not contact" checked={data.contactAssignment === "enter-only"} onChange={() => updateMany({ contactAssignment: data.contactAssignment === "enter-only" ? "" : "enter-only" })} />
                                 </div>
                               </div>
                               <div>
@@ -14934,18 +15210,18 @@ export default function App(){
                                             >
                                               <div className="flex items-center justify-between gap-2">
                                                 <span className="text-xs font-semibold text-slate-700">{issue.replace("Customer Wants Estimate", "Wants Estimate").replace("Adjuster Wants Estimate", "Wants estimate")}</span>
-                                                <span className={`text-[10px] font-bold ${active ? "text-sky-700" : "text-slate-400"}`}>{active ? "ON" : "OFF"}</span>
+                                                <span className={`text-[12px] font-bold ${active ? "text-sky-700" : "text-slate-400"}`}>{active ? "ON" : "OFF"}</span>
                                               </div>
                                               {isAuto ? (
-                                                <div className="mt-1 text-[10px] font-semibold text-slate-500">Auto-linked</div>
+                                                <div className="mt-1 text-[12px] font-semibold text-slate-500">Auto-linked</div>
                                               ) : null}
                                               {showAuthDetails ? (
-                                                <div className="mt-1 text-[10px] text-slate-500">
+                                                <div className="mt-1 text-[12px] text-slate-500">
                                                   {authorizationOnFile ? "Authorization marked as blocker." : "Auto-on until authorization is on file."}
                                                 </div>
                                               ) : null}
                                               {showEstimateDetails ? (
-                                                <div className="mt-1 text-[10px] text-slate-500">
+                                                <div className="mt-1 text-[12px] text-slate-500">
                                                   {bridgeEstimateDetails || "Estimate required."}
                                                 </div>
                                               ) : null}
@@ -14989,7 +15265,7 @@ export default function App(){
                                       <div key={group.id} className="rounded-lg border border-slate-200/80 bg-white p-2 space-y-2">
                                         <div className="flex items-center justify-between gap-2">
                                           <div className="text-xs font-bold uppercase tracking-wider text-slate-500">{group.label}</div>
-                                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${bridgeStageToneClass(selectedOption.tone, true)}`}>
+                                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-bold ${bridgeStageToneClass(selectedOption.tone, true)}`}>
                                             {selectedOption.label}
                                           </span>
                                         </div>
@@ -15034,7 +15310,7 @@ export default function App(){
                                         <div className="h-[4.9rem] w-full flex items-center justify-center overflow-hidden">
                                           <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
-                                        <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
+                                        <div className="w-full px-0.5 text-center text-[12px] font-semibold leading-tight text-slate-700">
                                           {item}
                                         </div>
                                       </button>
@@ -15059,7 +15335,7 @@ export default function App(){
                                         <div className="h-[4.9rem] w-full flex items-center justify-center overflow-hidden">
                                           <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
-                                        <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
+                                        <div className="w-full px-0.5 text-center text-[12px] font-semibold leading-tight text-slate-700">
                                           {item}
                                         </div>
                                       </button>
@@ -15084,7 +15360,7 @@ export default function App(){
                                         <div className="h-[4.9rem] w-full flex items-center justify-center overflow-hidden">
                                           <img src={iconSrc} alt={item} className={getSdsIconImageClass(item)} />
                                         </div>
-                                        <div className="w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700">
+                                        <div className="w-full px-0.5 text-center text-[12px] font-semibold leading-tight text-slate-700">
                                           {item}
                                         </div>
                                       </button>
@@ -15097,7 +15373,7 @@ export default function App(){
                             <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <div className="text-xs font-bold text-sky-600 uppercase tracking-wider">Scope Photos</div>
-                                <label className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 cursor-pointer hover:bg-sky-100">
+                                <label className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[12px] font-bold text-sky-700 cursor-pointer hover:bg-sky-100">
                                   + Add Photos
                                   <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => {
                                     const files = Array.from(e.target.files || []);
@@ -15118,7 +15394,7 @@ export default function App(){
                               {(data.sdsPhotos || []).length > 0 ? (
                                 <div className="space-y-3">
                                   {!data.sdsCoverPhoto && (
-                                    <div className="text-[10px] text-slate-400">Tip: Click "Cover" on a photo to set it as the SDS cover image.</div>
+                                    <div className="text-[12px] text-slate-400">Tip: Click "Cover" on a photo to set it as the SDS cover image.</div>
                                   )}
                                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                                     {(data.sdsPhotos || []).map(photo => (
@@ -15130,27 +15406,27 @@ export default function App(){
                                             value={photo.room || ""}
                                             onChange={(e) => update("sdsPhotos", (data.sdsPhotos || []).map(p => p.id === photo.id ? { ...p, room: e.target.value } : p))}
                                             placeholder="Room"
-                                            className="w-full text-[10px] border border-slate-200 rounded px-1 py-0.5"
+                                            className="w-full text-[12px] border border-slate-200 rounded px-1 py-0.5"
                                           />
                                           <input
                                             type="text"
                                             value={photo.note || ""}
                                             onChange={(e) => update("sdsPhotos", (data.sdsPhotos || []).map(p => p.id === photo.id ? { ...p, note: e.target.value } : p))}
                                             placeholder="Note"
-                                            className="w-full text-[10px] border border-slate-200 rounded px-1 py-0.5"
+                                            className="w-full text-[12px] border border-slate-200 rounded px-1 py-0.5"
                                           />
                                           <div className="flex gap-1">
                                             <button
                                               type="button"
                                               onClick={() => update("sdsCoverPhoto", data.sdsCoverPhoto === photo.id ? null : photo.id)}
-                                              className={`text-[9px] font-bold rounded px-1.5 py-0.5 ${photo.id === data.sdsCoverPhoto ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-sky-50'}`}
+                                              className={`text-[13px] font-bold rounded px-1.5 py-0.5 ${photo.id === data.sdsCoverPhoto ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-sky-50'}`}
                                             >
                                               Cover
                                             </button>
                                             <button
                                               type="button"
                                               onClick={() => update("sdsPhotos", (data.sdsPhotos || []).filter(p => p.id !== photo.id))}
-                                              className="text-[9px] font-bold rounded px-1.5 py-0.5 bg-slate-100 text-rose-500 hover:bg-rose-50"
+                                              className="text-[13px] font-bold rounded px-1.5 py-0.5 bg-slate-100 text-rose-500 hover:bg-rose-50"
                                             >
                                               Remove
                                             </button>
@@ -15166,7 +15442,7 @@ export default function App(){
                             </div>
 
                             <div className="rounded-lg border border-slate-200 bg-slate-900 px-3 py-3">
-                              <div className="text-[10px] font-bold uppercase tracking-widest text-sky-200 mb-2">Bridge Summary</div>
+                              <div className="text-[12px] font-bold uppercase tracking-widest text-sky-200 mb-2">Bridge Summary</div>
                               <div className="rounded-md border border-white/15 bg-white/5 px-2 py-2 text-xs leading-relaxed text-slate-100">
                                 {scopeBridgeSnippet || "Set status and blockers to generate the bridge summary."}
                               </div>
@@ -15241,30 +15517,16 @@ export default function App(){
 
         {/* Interview Docked Side Panel */}
         {interviewPanelOpen && (() => {
-          const rushPlanningRecommended = (data.suggestedGroups || []).some((g: string) => ["RD","RFD","STD","STFD"].includes(g)) || (data.packoutSummary || []).some((p: string) => ["Clothing","Bedding","Electronics","Furniture","Appliances"].includes(p)) || !!(data.livingStatus && data.livingStatus !== "Staying in home") || (data.livingTimeline || []).some((s: any) => s.type !== "Staying in home");
+          const rushPlanningRecommended = data.rushDeliveryNeeded === "Y" || (data.suggestedGroups || []).some((g: string) => ["RD","RFD","STD","STFD"].includes(g)) || (data.packoutSummary || []).some((p: string) => ["Clothing","Bedding","Electronics","Furniture","Appliances"].includes(p)) || !!(data.livingStatus && data.livingStatus !== "Staying in home") || (data.livingTimeline || []).some((s: any) => s.type !== "Staying in home");
           const rushPlanningVisible = interviewExpanded.rushPlanning !== undefined ? interviewExpanded.rushPlanning : rushPlanningRecommended;
           return (
           <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] z-[110] bg-white shadow-2xl flex flex-col border-l border-slate-200">
               {(() => {
                 const interviewQuestions = [
+                  // General questions (1-11)
                   { key: "conditions", title: "Is anything still wet or damaged?", configKey: "damageWasWet",
                     isAnswered: () => data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp,
                     summary: () => [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural" : "", data.noLights ? "No Power" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""].filter(Boolean).join(", ") },
-                  { key: "repairs", title: "What repairs are being done?", configKey: "repairsSummary",
-                    isAnswered: () => !!data.repairsSummary,
-                    summary: () => data.repairsSummary || "" },
-                  { key: "living", title: "Where will the customer live during repairs?", configKey: "livingStatus",
-                    isAnswered: () => !!data.livingStatus,
-                    summary: () => data.livingStatus || "" },
-                  { key: "delivery", title: "Where should we make final delivery?", configKey: "processType",
-                    isAnswered: () => !!data.processType,
-                    summary: () => data.processType || "" },
-                  { key: "groupBuilder", title: "Delivery Group Builder", configKey: "suggestedGroups",
-                    isAnswered: () => (data.suggestedGroups || []).length > 0 || !!data.estimatedReturnDate,
-                    summary: () => { const g = (data.suggestedGroups || []).join(", "); const d = data.estimatedReturnDate || ""; return g + (d ? ` → ${d}` : ""); } },
-                  { key: "packoutScope", title: "Has packing out been discussed?", configKey: "packoutSummary",
-                    isAnswered: () => !!(data as any).packoutScope,
-                    summary: () => (data as any).packoutScope || "" },
                   { key: "packout", title: "What are we picking up?", configKey: "packoutSummary",
                     isAnswered: () => (data.packoutSummary || []).length > 0,
                     summary: () => (data.packoutSummary || []).join(", ") },
@@ -15282,9 +15544,24 @@ export default function App(){
                   { key: "selfClean", title: "Self-clean anything?", configKey: "selfCleaning", isAnswered: () => !!data.selfCleaning, summary: () => data.selfCleaning === "Y" ? "Yes" : "No" },
                   { key: "dryCleaner", title: "Use dry cleaner?", configKey: "useDryCleaner", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
                   { key: "laundry", title: "How dry laundry?", configKey: "howDryLaundry", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
-                  { key: "storage", title: "Need storage?", configKey: "storageNeeded", isAnswered: () => !!data.storageNeeded, summary: () => data.storageNeeded === "Y" ? "Yes" : "No" },
+                  // Timeline questions (12-18)
+                  { key: "repairs", title: "What repairs are being done?", configKey: "repairsSummary",
+                    isAnswered: () => !!data.repairsSummary,
+                    summary: () => data.repairsSummary || "" },
+                  { key: "living", title: "Where will the customer live?", configKey: "livingStatus",
+                    isAnswered: () => !!data.livingStatus,
+                    summary: () => data.livingStatus || "" },
+                  { key: "rushDelivery", title: "Rush delivery needed?", configKey: "rushDeliveryNeeded",
+                    isAnswered: () => !!data.rushDeliveryNeeded,
+                    summary: () => data.rushDeliveryNeeded === "Y" ? "Yes" : data.rushDeliveryNeeded === "N" ? "No" : "" },
                   { key: "interests", title: "Activities & interests", configKey: "rushInterests", isAnswered: () => (data.rushInterests || []).length > 0, summary: () => (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ") },
                   { key: "events", title: "Upcoming events", configKey: "upcomingEvents", isAnswered: () => (data.upcomingEvents || []).length > 0, summary: () => (data.upcomingEvents || []).map(e => e.name || "Event").join(", ") },
+                  { key: "packoutScope", title: "Has packing out been discussed?", configKey: "packoutSummary",
+                    isAnswered: () => !!(data as any).packoutScope,
+                    summary: () => (data as any).packoutScope || "" },
+                  { key: "deliveryPlanner", title: "Delivery Planner", configKey: "suggestedGroups",
+                    isAnswered: () => (data.suggestedGroups || []).length > 0 || !!data.estimatedReturnDate,
+                    summary: () => { const g = (data.suggestedGroups || []).join(", "); const d = data.estimatedReturnDate || ""; return g + (d ? ` → ${d}` : ""); } },
                 ];
                 const visibleQuestions = interviewQuestions.filter(q => isFieldVisible(q.configKey));
                 const answeredCount = visibleQuestions.filter(q => q.isAnswered()).length;
@@ -15303,7 +15580,7 @@ export default function App(){
                   </div>
                   <div className="px-5 py-2 border-b border-slate-100">
                     <div className="relative">
-                      <input value={interviewSearch} onChange={e => setInterviewSearch(e.target.value)} placeholder="Search questions..." className="w-full rounded-lg border border-slate-200 px-3 py-1.5 pr-7 text-xs text-slate-700 outline-none focus:border-violet-300 bg-slate-50/50" />
+                      <input value={interviewSearch} onChange={e => setInterviewSearch(e.target.value)} placeholder="Search questions..." className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-7 text-sm text-slate-700 outline-none focus:border-violet-300 bg-slate-50/50" />
                       {interviewSearch && <button type="button" onClick={() => setInterviewSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold">×</button>}
                     </div>
                   </div>
@@ -15312,9 +15589,10 @@ export default function App(){
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {!interviewSearch && (
                   <div className="flex items-center gap-2 mb-2">
-                    {showCoaching && !dismissedCoaching.has("interview-header") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex-1 flex items-start gap-1"><span className="flex-1">🎓 Ask the customer these questions during or before the initial visit.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "interview-header"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+                    {showCoaching && !dismissedCoaching.has("interview-header") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex-1 flex items-start gap-1"><span className="flex-1">🎓 Ask the customer these questions during or before the initial visit.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "interview-header"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button></div>}
                     {!showCoaching && <div className="flex-1" />}
-                    <button onClick={() => { const el = document.getElementById("noe-interview-timeline"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-full bg-green-100 border border-green-300 px-3 py-1 text-[10px] font-bold text-green-700 hover:bg-green-200 shrink-0">Timeline</button>
+                    <button onClick={() => { const el = document.getElementById("noe-interview-timeline"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-full border-2 border-teal-400 bg-teal-50 px-4 py-2 text-[13px] font-bold text-teal-700 hover:bg-teal-100 shrink-0 flex items-center gap-1.5 shadow-sm">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Start Timeline</button>
                   </div>
                 )}
 
@@ -15326,8 +15604,8 @@ export default function App(){
                   const expanded = interviewExpanded.conditions !== false;
                   return <div className={`rounded-xl border ${answered ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                   <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: !p.conditions})); if (!log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                    <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">1</span>{highlightSearch("Is anything still wet or damaged?")}</div>
-                    {answered && !expanded && <div className="flex items-center gap-2"><span className="text-[11px] text-sky-600 font-semibold">{summary}</span>{log && <span className="text-[9px] text-slate-300">{log.user} · {log.at}</span>}</div>}
+                    <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">1</span>{highlightSearch("Is anything still wet or damaged?")}</div>
+                    {answered && !expanded && <div className="flex items-center gap-2"><span className="text-[13px] text-sky-600 font-semibold">{summary}</span>{log && <span className="text-[13px] text-slate-300">{log.user} · {log.at}</span>}</div>}
 
                   </button>
                   {expanded && <div className="px-3 pb-3 space-y-2">
@@ -15350,12 +15628,12 @@ export default function App(){
                     { label: "No Electricity", active: !!data.noLights },
                     { label: "Boarded Up", active: !!data.boardedUp },
                   ].filter(i => i.active && interviewActions[i.label]?.coaching && !dismissedCoaching.has(`c-${i.label}`)).map(i => (
-                    <div key={i.label} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                    <div key={i.label} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
                       <div className="flex-1">🎓 <span className="font-bold">{i.label}:</span> {interviewActions[i.label].coaching}</div>
-                      <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${i.label}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                      <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${i.label}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                     </div>
                   ))}
-                  {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                  {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
                   </div>}
                 </div>;
                 })()}
@@ -15365,10 +15643,10 @@ export default function App(){
                   const log = (data.interviewLog || {}).packout; const hasAnswers = (data.packoutSummary || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.packoutSummary || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packout !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">2</span>{highlightSearch("What are we picking up?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">2</span>{highlightSearch("What are we picking up?")}</div>
+                      {answered && !expanded && <span className="text-[13px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
@@ -15376,12 +15654,12 @@ export default function App(){
                         ))}
                       </div>
                       {showCoaching && (data.packoutSummary || []).filter(s => interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`)).map(s => (
-                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
                           <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
-                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                         </div>
                       ))}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
                     </div>}
                   </div>;
                 })()}
@@ -15391,10 +15669,10 @@ export default function App(){
                   const log = (data.interviewLog || {}).loadList; const hasAnswers = (data.loadList || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.loadList || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.loadList !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">3</span>{highlightSearch("What do we need to bring?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">3</span>{highlightSearch("What do we need to bring?")}</div>
+                      {answered && !expanded && <span className="text-[13px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
@@ -15402,7 +15680,7 @@ export default function App(){
                         ))}
                       </div>
                       <Input value={(data as any).loadListNote || ""} onChange={e => update("loadListNote", e.target.value)} placeholder="Additional notes about what to bring..." className="!text-xs" />
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
                     </div>}
                   </div>;
                 })()}
@@ -15412,10 +15690,10 @@ export default function App(){
                   const log = (data.interviewLog || {}).considerations; const hasAnswers = (data.sdsConsiderations || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.sdsConsiderations || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.considerations !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">4</span>{highlightSearch("Special considerations")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">4</span>{highlightSearch("Special considerations")}</div>
+                      {answered && !expanded && <span className="text-[13px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"].map(s => (
@@ -15424,22 +15702,22 @@ export default function App(){
                       </div>
                       {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
                         <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
-                          <div className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes</div>
+                          <div className="text-[12px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes</div>
                           <div className="flex flex-wrap gap-1.5">
                             {[["Det","special detergent"], ["NoDC","no dry clean"], ["Low","low heat"], ["NoDry","no dryer"], ["PPE","wear PPE"], ["Hand","hand finish"]].map(([code, desc]) => (
-                              <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} className="!text-[10px] !px-2 !py-1" />
+                              <ToggleMulti key={code} label={code} title={desc} checked={(data.handlingCodes || []).includes(code)} onChange={() => update("handlingCodes", toggleMulti(data.handlingCodes || [], code))} />
                             ))}
                           </div>
                           <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities" className="!text-xs !py-1.5" />
                         </div>
                       )}
                       {showCoaching && (data.sdsConsiderations || []).filter(s => interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`)).map(s => (
-                        <div key={`coach-${s}`} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                        <div key={`coach-${s}`} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
                           <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
-                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                         </div>
                       ))}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
                     </div>}
                   </div>;
                 })()}
@@ -15455,10 +15733,10 @@ export default function App(){
                   const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"];
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: !p.pets}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">5</span>{highlightSearch("Pets in home?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">5</span>{highlightSearch("Pets in home?")}</div>
+                      {answered && !expanded && <span className="text-[13px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {petTypes.map(type => {
@@ -15480,18 +15758,18 @@ export default function App(){
                             if (!(data.sdsObservations || []).includes("Pets") && petStr) { update("sdsObservations", [...(data.sdsObservations || []), "Pets"]); executeInterviewActions("Pets", true); }
                             if (!petStr && (data.sdsObservations || []).includes("Pets")) update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
                             setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
-                          }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${hasPet ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{type}</button>;
+                          }} className={`rounded-full border px-3 py-1.5 text-[12px] font-bold ${hasPet ? 'border-sky-400 bg-sky-50 text-sky-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{type}</button>;
                         })}
                       </div>
                       {pets.map(pet => (
-                        <div key={pet.id} className="flex items-center gap-2 bg-teal-50/50 rounded-lg border border-teal-100 px-3 py-1.5">
-                          <span className="text-[10px] font-bold text-teal-700">{pet.type}</span>
+                        <div key={pet.id} className="flex items-center gap-2 bg-sky-50/50 rounded-lg border border-sky-100 px-3 py-1.5">
+                          <span className="text-[12px] font-bold text-sky-700">{pet.type}</span>
                           <input value={pet.name || ""} onChange={e => {
                             const next = (data.household || []).map(m => m.id === pet.id ? {...m, name: e.target.value} : m);
                             update("household", next);
                             const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
                             update("householdAnimals", petStr);
-                          }} placeholder="Pet name" className="flex-1 rounded border border-teal-200 px-2 py-0.5 text-[10px] text-slate-700 bg-white outline-none focus:border-teal-400" />
+                          }} placeholder="Pet name" className="flex-1 rounded border border-sky-200 px-2 py-0.5 text-[12px] text-slate-700 bg-white outline-none focus:border-sky-400" />
                           <button type="button" onClick={() => {
                             const next = (data.household || []).filter(m => m.id !== pet.id);
                             update("household", next);
@@ -15512,15 +15790,15 @@ export default function App(){
                               update("household", next);
                               const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
                               update("householdAnimals", petStr);
-                            }} className="rounded-full border border-dashed border-teal-300 px-2 py-0.5 text-[9px] font-bold text-teal-600 hover:bg-teal-50">+ {type}</button>
+                            }} className="rounded-full border border-dashed border-sky-300 px-2 py-0.5 text-[13px] font-bold text-sky-600 hover:bg-sky-50">+ {type}</button>
                           ))}
                         </div>
                       )}
-                      {showCoaching && answered && !dismissedCoaching.has("c-Pets") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                      {showCoaching && answered && !dismissedCoaching.has("c-Pets") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
                         <div className="flex-1">🎓 <span className="font-bold">Pets:</span> Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.</div>
-                        <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-Pets"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                        <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-Pets"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                       </div>}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
                     </div>}
                   </div>;
                 })()}
@@ -15532,10 +15810,9 @@ export default function App(){
                   { key: "selfClean", configKey: "selfCleaning", title: "Self-clean anything?", searchTerms: "drawers undergarments linens towels baby items clean themselves", isAnswered: () => !!data.selfCleaning, summary: () => data.selfCleaning === "Y" ? `Yes${data.selfCleaningNote ? ": " + data.selfCleaningNote : ""}` : "No" },
                   { key: "dryCleaner", configKey: "useDryCleaner", title: "Use a dry cleaner?", searchTerms: "dry cleaner dry cleaning", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
                   { key: "laundry", configKey: "howDryLaundry", title: "How do they dry laundry?", searchTerms: "air dry low heat dryer machine", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
-                  { key: "storage", configKey: "storageNeeded", title: "Need storage?", searchTerms: "storage months long term warehouse", isAnswered: () => !!data.storageNeeded, summary: () => data.storageNeeded === "Y" ? `Yes${data.storageMonths ? ", " + data.storageMonths + " months" : ""}` : "No" },
                 ].filter(q => isFieldVisible(q.configKey) && matchesInterviewSearch(q.title, q.searchTerms || "")).map((q, qi) => {
                   const log = (data.interviewLog || {})[q.key]; const hasAnswers = q.isAnswered(); const answered = hasAnswers || !!log;
-                  const needsFollowUp = (q.key === "storage" && data.storageNeeded === "Y") || (q.key === "medical" && data.familyMedicalIssues === "Y") || (q.key === "allergies" && data.soapFragAllergies === "Y") || (q.key === "selfClean" && data.selfCleaning === "Y");
+                  const needsFollowUp = (q.key === "medical" && data.familyMedicalIssues === "Y") || (q.key === "allergies" && data.soapFragAllergies === "Y") || (q.key === "selfClean" && data.selfCleaning === "Y");
                   const expanded = !answered || interviewExpanded[q.key] || (needsFollowUp && interviewExpanded[q.key] !== false);
                   return (
                     <div key={q.key} className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
@@ -15572,10 +15849,6 @@ export default function App(){
                             <Input value={data.howDryNote || ""} onChange={e => update("howDryNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
                           </div>}
                         </>}
-                        {q.key === "storage" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.storageNeeded || ""} onChange={v => { update("storageNeeded", v); if (v === "Y") executeInterviewActions("Storage Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), storage: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
-                          {data.storageNeeded === "Y" && <div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-600">Months?</span><Input className="w-16 !text-xs" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" /></div>}
-                        </>}
                         <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white mt-2 ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>
                       </div>}
                     </div>
@@ -15583,10 +15856,58 @@ export default function App(){
                 })}
 
                 {/* Timeline Section Header */}
-                <div id="noe-interview-timeline" className="px-3 pt-3 pb-1 bg-green-50 border-t-2 border-green-300 rounded-t-xl mt-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-green-700 uppercase tracking-wider">Delivery Timeline</span>
-                    <span className="text-[9px] text-green-500">These questions inform the Rush Guide</span>
+                {/* Timeline Gateway */}
+                <div id="noe-interview-timeline" className="mt-4 mb-1 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-teal-200" />
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-teal-50 border border-teal-200">
+                      <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <span className="text-[12px] font-bold text-teal-700 uppercase tracking-wide">Delivery Timeline</span>
+                    </div>
+                    <div className="h-px flex-1 bg-teal-200" />
+                  </div>
+                  <div className="rounded-xl border border-teal-200 bg-teal-50/30 p-3 space-y-2">
+                    {/* Show scheduled event if exists */}
+                    {data.scheduleType && data.pickupDate && (
+                      <div className="rounded-lg bg-white border border-teal-300 px-3 py-2 flex items-center gap-2">
+                        <span className="text-base">{data.scheduleType === "Pickup" ? "📦" : data.scheduleType === "In-Home" ? "🏠" : data.scheduleType === "Scope" ? "🔍" : "🤝"}</span>
+                        <div className="flex-1">
+                          <div className="text-[12px] font-bold text-teal-800">{data.scheduleType} scheduled</div>
+                          <div className="text-[11px] text-teal-600">{data.pickupDate}{data.pickupTime && data.pickupTime !== "12:00 AM" ? ` at ${data.pickupTime}` : ""}{data.eventAssignee ? ` — ${data.eventAssignee}` : ""}</div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="text-[12px] font-bold text-teal-800">What type of work will we be doing?</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(() => {
+                        const workTypes = (data as any).timelineWorkTypes || [];
+                        // Auto-derive from scheduled event
+                        const autoTypes = data.scheduleType ? ({ "Scope": ["scope"], "Pickup": ["pickup"], "In-Home": ["inhome"], "Meeting": ["consult"] }[data.scheduleType] || []) : [];
+                        const effective = workTypes.length > 0 ? workTypes : autoTypes;
+                        return [
+                          { key: "scope", label: "Scope", icon: "🔍", desc: "On-site scope / inspection" },
+                          { key: "pickup", label: "Pickup", icon: "📦", desc: "Pack-out, transport, clean, deliver back" },
+                          { key: "inhome", label: "In-Home Cleaning", icon: "🏠", desc: "On-site cleaning or restoration" },
+                          { key: "consult", label: "Consult Meeting", icon: "🤝", desc: "On-site consultation" },
+                          { key: "none", label: "Desk Consult", icon: "💻", desc: "Remote — no on-site event" },
+                        ].map(opt => {
+                          const isActive = effective.includes(opt.key);
+                          return <button key={opt.key} type="button" onClick={() => {
+                            const current = (data as any).timelineWorkTypes || [];
+                            const next = opt.key === "none"
+                              ? (current.includes("none") ? [] : ["none"])
+                              : (current.includes(opt.key) ? current.filter(k => k !== opt.key) : [...current.filter(k => k !== "none"), opt.key]);
+                            update("timelineWorkTypes", next);
+                            setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), timelineWork: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                          }} className={`rounded-lg border-2 px-3 py-2.5 text-[12px] font-bold transition-all flex items-center gap-1.5 ${isActive ? "border-teal-500 bg-teal-50 text-teal-700 shadow-sm" : "border-teal-200 bg-white text-slate-600 hover:border-teal-400 hover:text-teal-700"}`}><span className="text-base">{opt.icon}</span>{opt.label}</button>;
+                        });
+                      })()}
+                    </div>
+                    {((data as any).timelineWorkTypes || []).includes("none") && (
+                      <div className="rounded-lg bg-white border border-teal-200 px-3 py-2 text-[11px] text-teal-600">
+                        Desk consult — no on-site events to schedule. Timeline questions below are optional.
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -15596,14 +15917,15 @@ export default function App(){
                   const answered = hasAnswers || !!log;
                   const summary = data.repairsSummary || (!!log && !hasAnswers ? "None" : "");
                   const expanded = interviewExpanded.repairs !== false;
-                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
+                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">12</span>{highlightSearch("What repairs are being done?")}</div>
                       {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
   
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
+                      {showCoaching && !dismissedCoaching.has("c-repairs") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Repair type determines your delivery timeline and potential blockers. Each option auto-suggests a delivery group and adds delivery instructions.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-repairs"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                       <div className="flex flex-wrap gap-2">
                         {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
                           <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
@@ -15616,12 +15938,12 @@ export default function App(){
                         ))}
                       </div>
                       {showCoaching && ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].filter(s => (data.repairsSummary || "").includes(s) && interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`)).map(s => (
-                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
+                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
                           <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
                           <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
                         </div>
                       ))}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
                     </div>}
                   </div>;
                 })()}
@@ -15633,8 +15955,8 @@ export default function App(){
                   const log = (data.interviewLog || {}).living;
                   const hasAnswers = timeline.length > 0 || !!data.livingStatus;
                   const answered = hasAnswers || !!log;
-                  const summary = timeline.length > 0 ? timeline.map(s => s.type).join(" → ") : data.livingStatus || (!!log && !hasAnswers ? "N/A" : "");
-                  const expanded = true; // Always open so user can enter address details
+	                  const summary = timeline.length > 0 ? timeline.map(s => s.type).join(" → ") : data.livingStatus || (!!log && !hasAnswers ? "N/A" : "");
+	                  const expanded = true; // Always open so user can enter address details
                   const STAY_TYPES = [
                     { id: "Neighbor", desc: "Staying next door" },
                     { id: "Relative", desc: "Family member's home" },
@@ -15643,18 +15965,36 @@ export default function App(){
                     { id: "Staying in home", label: "Their Home", desc: "Living on-site" },
                     { id: "Moving", desc: "Relocating permanently" },
                   ];
-                  const addStay = (type: string) => {
-                    const next = [...timeline, { id: safeUid(), type, duration: "", address: "" }];
-                    update("livingTimeline", next);
-                    update("livingStatus", next[0]?.type || type);
+	                  const addStay = (type: string) => {
+	                    const payload = type === "Staying in home" ? addressPayloadFromChoice("type:Primary") : addressPayloadFromChoice(`type:${type}`);
+	                    const next = [...timeline, { id: safeUid(), type, duration: "", endDate: "", address: payload.address, addressType: payload.addressType, addressId: payload.addressId }];
+	                    update("livingTimeline", next);
+	                    update("livingStatus", next[0]?.type || type);
                     executeInterviewActions(type, true);
                     setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
                   };
-                  const updateStay = (id: string, field: string, val: string) => {
-                    const next = timeline.map(s => s.id === id ? {...s, [field]: val} : s);
-                    update("livingTimeline", next);
-                    if (next.length > 0) update("livingStatus", next[0].type);
-                  };
+	                  const updateStay = (id: string, field: string, val: string) => {
+	                    const next = timeline.map(s => s.id === id ? {...s, [field]: val} : s);
+	                    update("livingTimeline", next);
+	                    if (next.length > 0) update("livingStatus", next[0].type);
+	                  };
+	                  const updateStayAddress = (id: string, choiceValue: string) => {
+	                    const payload = addressPayloadFromChoice(choiceValue);
+	                    const next = timeline.map(s => s.id === id ? {...s, ...payload} : s);
+	                    update("livingTimeline", next);
+	                    if (next.length > 0) update("livingStatus", next[0].type);
+	                  };
+	                  const setCanStayHome = (canStay: boolean) => {
+	                    if (canStay) {
+	                      const payload = addressPayloadFromChoice("type:Primary");
+	                      update("livingTimeline", [{ id: safeUid(), type: "Staying in home", duration: "Until repairs done", endDate: "", address: payload.address, addressType: payload.addressType, addressId: payload.addressId }]);
+	                      update("livingStatus", "Staying in home");
+	                    } else {
+	                      update("livingTimeline", timeline.filter(s => s.type !== "Staying in home"));
+	                      update("livingStatus", timeline.find(s => s.type !== "Staying in home")?.type || "Not staying in home");
+	                    }
+	                    setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+	                  };
                   const removeStay = (id: string) => {
                     const next = timeline.filter(s => s.id !== id);
                     update("livingTimeline", next);
@@ -15670,9 +16010,9 @@ export default function App(){
                   };
                   const DURATION_OPTIONS = ["A few days", "1-2 weeks", "1 month", "2-3 months", "6+ months", "Until repairs done"];
 
-                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">13</span>{highlightSearch("Where will the customer live during repairs?")}</div>
+                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">13</span>{highlightSearch("Will the customer be able to stay in the home?")}</div>
                       {answered && !expanded && <div className="flex items-center gap-1 ml-2">
                         {timeline.length > 0 ? timeline.map((s, i) => (
                           <span key={s.id} className="text-[10px] text-emerald-600">{i > 0 && " → "}{s.type}{s.duration ? ` (${s.duration})` : ""}</span>
@@ -15681,11 +16021,22 @@ export default function App(){
   
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-3">
-                      {showCoaching && !dismissedCoaching.has("c-living") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Build the sequence of where the customer will stay during repairs. Each stay becomes a delivery point on the timeline.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-living"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+	                    {expanded && <div className="px-3 pb-3 space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button type="button" onClick={() => setCanStayHome(true)} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Staying in home" ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-600 hover:border-emerald-300"}`}>Yes, staying home</button>
+                          <button type="button" onClick={() => setCanStayHome(false)} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Not staying in home" || timeline.some(s => s.type !== "Staying in home") ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>No, staying elsewhere</button>
+                        </div>
 
-                      {/* Current timeline sequence — draggable */}
-                      {timeline.length > 0 && <div className="space-y-2">
+                      {/* Staying in home — coaching */}
+                      {data.livingStatus === "Staying in home" && showCoaching && !dismissedCoaching.has("c-stayHome") && (
+                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
+                          <span className="flex-1">🎓 Customer is staying in the home. Deliveries will be made to the primary address. Consider a Rush Final Delivery (RFD) if everything can be rushed.</span>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-stayHome"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
+                        </div>
+                      )}
+
+	                      {/* Current timeline sequence — draggable (hidden when staying home) */}
+	                      {data.livingStatus !== "Staying in home" && timeline.length > 0 && <div className="space-y-2">
                         {timeline.map((stay, idx) => (
                           <div key={stay.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             {/* Header row with drag handles */}
@@ -15699,65 +16050,189 @@ export default function App(){
                                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                                 </button>
                               </div>
-                              <span className="w-5 h-5 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
+                              <span className={`w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center shrink-0 ${{ "Hotel": "bg-amber-500", "Rental": "bg-sky-600", "Temp": "bg-sky-600", "Neighbor": "bg-indigo-500", "Relative": "bg-indigo-500", "Moving": "bg-slate-600", "Staying in home": "bg-emerald-600" }[stay.type] || "bg-sky-500"}`}>{idx + 1}</span>
                               <span className="text-xs font-bold text-slate-700 flex-1">{stay.type}</span>
                               {idx === timeline.length - 1 && <span className="rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-[8px] font-bold uppercase">Final</span>}
                               <button type="button" onClick={() => removeStay(stay.id)} className="w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 text-xs font-bold shrink-0">×</button>
                             </div>
-                            {/* Duration chips + address */}
-                            <div className="px-3 py-2.5 space-y-2">
-                              <div className="flex flex-wrap gap-1.5">
-                                {DURATION_OPTIONS.map(d => (
-                                  <button key={d} type="button" onClick={() => updateStay(stay.id, "duration", stay.duration === d ? "" : d)} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition-all ${stay.duration === d ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{d}</button>
-                                ))}
-                              </div>
-                              <input value={stay.address || ""} onChange={e => updateStay(stay.id, "address", e.target.value)} placeholder="Address (optional)..." className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] outline-none focus:border-sky-400" />
-                            </div>
+	                            {/* Stay timing + address */}
+	                            <div className="px-3 py-2.5 space-y-2">
+	                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+	                                <label>
+	                                  <span className="mb-1 block text-[9px] font-bold uppercase text-slate-400">Expected through</span>
+	                                  <input type="date" value={stay.endDate || ""} onChange={e => updateStay(stay.id, "endDate", e.target.value)} className={`w-full rounded-lg border px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-sky-400 ${stay.type !== "Staying in home" && !stay.endDate ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-white"}`} />
+	                                </label>
+	                                <label>
+	                                  <span className="mb-1 block text-[9px] font-bold uppercase text-slate-400">Address</span>
+	                                  <select value={addressChoiceValue(stay)} onChange={e => updateStayAddress(stay.id, e.target.value)} className={`w-full rounded-lg border px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-sky-400 bg-white ${stay.type !== "Staying in home" && !stay.addressType && !stay.address ? "border-amber-400" : "border-slate-200"}`}>
+	                                    <option value="">Pick address...</option>
+	                                    {orderAddressChoices.known.length > 0 && <optgroup label="── ADDRESSES ON FILE ──">
+	                                      {orderAddressChoices.known.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+	                                    </optgroup>}
+	                                    <optgroup label="── ADD NEW ADDRESS TYPE ──">
+	                                      {orderAddressChoices.placeholders.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+	                                    </optgroup>
+	                                  </select>
+	                                </label>
+	                              </div>
+	                            </div>
                           </div>
                         ))}
                         {timeline.length > 0 && !timeline.some(s => s.type === "Staying in home" || s.type === "Moving") && (
-                          <div className="rounded-lg border border-dashed border-teal-300 bg-teal-50/30 px-3 py-1.5 text-[10px] text-teal-700">
-                            Tip: Add "Their Home" as the last step to mark return after repairs.
+                          <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
+                            <span className="flex-1">🎓 Add "Their Home" as the last step to mark return after repairs.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
                           </div>
                         )}
                       </div>}
 
-                      {/* Add stay buttons */}
-                      <div>
+                      {/* Add stay buttons (hidden when staying home) */}
+                      {data.livingStatus !== "Staying in home" && <div>
                         <div className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">{timeline.length > 0 ? "Add next stay" : "Where first?"}</div>
                         <div className="flex flex-wrap gap-1.5">
                           {STAY_TYPES.map(t => (
                             <button key={t.id} type="button" onClick={() => addStay(t.id)} className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all" title={t.desc}>{(t as any).label || t.id}</button>
                           ))}
                         </div>
-                      </div>
+                      </div>}
 
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, living: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, living: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
                     </div>}
                   </div>;
                 })()}
 
-                {/* Delivery */}
-                {isFieldVisible("processType") && matchesInterviewSearch("final delivery", "Return Home ASAP Temp Address New Home Store Until Repaired") && (() => {
-                  const log = (data.interviewLog || {}).delivery; const hasAnswers = !!data.processType; const answered = hasAnswers || !!log; const expanded = !answered || interviewExpanded.delivery;
-                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, delivery: !p.delivery}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">14</span>{highlightSearch("Where should we make final delivery?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold ml-2">{data.processType}</span>}
+                {/* Rush Delivery Needed? (NEW Q14) */}
+                {isFieldVisible("rushDeliveryNeeded") && matchesInterviewSearch("rush delivery needed urgent ASAP", "rush immediate") && (() => {
+                  const log = (data.interviewLog || {}).rushDelivery;
+                  const hasAnswers = !!data.rushDeliveryNeeded;
+                  const answered = hasAnswers || !!log;
+                  const expanded = interviewExpanded.rushDelivery !== false;
+                  const summary = data.rushDeliveryNeeded === "Y" ? "Yes — Rush group added" : data.rushDeliveryNeeded === "N" ? "No" : "";
+                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, rushDelivery: !p.rushDelivery}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
+                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[12px] font-bold shrink-0">14</span>{highlightSearch("Does the customer need a rush delivery?")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold ml-2">{summary}</span>}
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      {showCoaching && !dismissedCoaching.has("c-rush") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Rush deliveries get essentials (clothing, bedding, toiletries) to the customer within days. The delivery address will auto-link to their first living situation.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-rush"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => {
+                          update("rushDeliveryNeeded", data.rushDeliveryNeeded === "Y" ? "" : "Y");
+                          if (data.rushDeliveryNeeded !== "Y") {
+                            const groups = data.suggestedGroups || [];
+                            if (!groups.includes("RD")) update("suggestedGroups", [...groups, "RD"]);
+                            const firstStay = (data.livingTimeline || [])[0];
+                            if (firstStay) {
+                              const details = (data as any).deliveryGroupDetails || {};
+                              update("deliveryGroupDetails", { ...details, RD: { ...(details.RD || {}), addressType: firstStay.type, address: firstStay.address } });
+                            }
+                          }
+                          setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), rushDelivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                        }} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.rushDeliveryNeeded === "Y" ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>
+                          Yes, rush needed
+                        </button>
+                        <button type="button" onClick={() => {
+                          update("rushDeliveryNeeded", data.rushDeliveryNeeded === "N" ? "" : "N");
+                          setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), rushDelivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                        }} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.rushDeliveryNeeded === "N" ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>
+                          No rush needed
+                        </button>
+                      </div>
+                      {data.rushDeliveryNeeded === "Y" && (
+                        <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] text-emerald-700">
+                          Rush Delivery (RD) group auto-added{(data.livingTimeline || [])[0]?.type ? ` → delivering to ${(data.livingTimeline || [])[0].type}` : ""}.
+                        </div>
+                      )}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, rushDelivery: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), rushDelivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+
+                {/* Activities & Interests */}
+                {(() => {
+                  const log = (data.interviewLog || {}).interests;
+                  const hasAnswers = (data.rushInterests || []).length > 0;
+                  const answered = hasAnswers || !!log;
+                  const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ") || (!!log && !hasAnswers ? "None" : "");
+                  const expanded = interviewExpanded.interests !== false;
+                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !expanded}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">15</span>{highlightSearch("Activities & interests")}</div>
+                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+  
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {RUSH_INTERESTS.map(i => {
+                          const active = (data.rushInterests || []).includes(i.id);
+                          return <button key={i.id} type="button" onClick={() => { update("rushInterests", active ? (data.rushInterests||[]).filter(x=>x!==i.id) : [...(data.rushInterests||[]), i.id]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${active ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`} title={i.desc}>
+                            {i.label}
+                          </button>;
+                        })}
+                      </div>
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, interests: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Upcoming Events */}
+                {(() => {
+                  const log = (data.interviewLog || {}).events;
+                  const hasAnswers = (data.upcomingEvents || []).length > 0;
+                  const answered = hasAnswers || !!log;
+                  const summary = (data.upcomingEvents || []).map(e => e.name || "Event").join(", ") || (!!log && !hasAnswers ? "None" : "");
+                  const expanded = interviewExpanded.events !== false;
+                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">16</span>{highlightSearch("Upcoming trips & events")}</div>
+                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+  
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      {showCoaching && !dismissedCoaching.has("c-events") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Any travel or formal events during the repair period? We'll make sure the right items are pulled and delivered on time.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-events"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+                      {(data.upcomingEvents || []).map(evt => (
+                        <div key={evt.id} className="p-2 rounded-lg border border-slate-200 bg-slate-50 grid grid-cols-3 gap-2 relative">
+                          <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents||[]).filter(e => e.id !== evt.id))} className="absolute top-1 right-1 text-slate-400 hover:text-rose-500 text-xs">×</button>
+                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Name</div><input value={evt.name||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" placeholder="e.g. Florida Trip" /></div>
+                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Type</div><select value={evt.type||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, type: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px] bg-white">{RUSH_EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
+                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Date</div><input type="date" value={evt.date||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, date: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" /></div>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "vacation_beach", date: "", name: ""}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full p-2 border-2 border-dashed border-slate-300 rounded-lg text-[10px] font-bold text-slate-500 hover:border-teal-400 hover:text-teal-600">+ Add Trip or Event</button>
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, events: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                    </div>}
+                  </div>;
+                })()}
+                {/* Packout Scope */}
+                {matchesInterviewSearch("packout packing", "No Packout Content Manipulation Partial Packout Full Packout packing furniture") && (() => {
+                  const log = (data.interviewLog || {}).packoutScope; const hasAnswers = !!(data as any).packoutScope; const answered = hasAnswers || !!log; const summary = (data as any).packoutScope || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packoutScope !== false;
+                  const PACKOUT_SCOPES = ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout"];
+                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packoutScope: !p.packoutScope}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">17</span>{highlightSearch("Has packing out been discussed?")}</div>
+                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
   
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
-                        {[{ label: "Return to Home ASAP", value: "Deliver ASAP" }, { label: "To Temp Address", value: "Deliver to Temp" }, { label: "To New Home", value: "Deliver to New Home" }, { label: "Return to Home After Repairs", value: "Long-Term Storage" }].map(s => (
-                          <ToggleMulti key={s.value} label={s.label} checked={data.processType === s.value} onChange={() => { const isAdding = data.processType !== s.value; update("processType", isAdding ? s.value : ""); if (isAdding) executeInterviewActions(s.value, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`!px-3 !py-1.5 !text-xs ${isSearchMatch(s.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        {PACKOUT_SCOPES.map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data as any).packoutScope === s} onChange={() => { update("packoutScope", (data as any).packoutScope === s ? "" : s); executeInterviewActions(s, (data as any).packoutScope !== s); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, delivery: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), delivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                      {showCoaching && (data as any).packoutScope && interviewActions[(data as any).packoutScope]?.coaching && !dismissedCoaching.has(`c-${(data as any).packoutScope}`) && (
+                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
+                          <div className="flex-1">🎓 <span className="font-bold">{(data as any).packoutScope}:</span> {interviewActions[(data as any).packoutScope].coaching}</div>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${(data as any).packoutScope}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                        </div>
+                      )}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packoutScope: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packoutScope: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
                     </div>}
                   </div>;
                 })()}
-
                 {/* Delivery Group Builder — combined Q15+Q17 */}
                 {matchesInterviewSearch("delivery group builder final suggested", "RD RFD STD STFD LTD LTFD Inhome TLI Test Dispose Storage Only final months date") && (() => {
                   const log = (data.interviewLog || {}).suggestedGroups || (data.interviewLog || {}).finalDeliveryDate;
@@ -15769,16 +16244,15 @@ export default function App(){
                   const hasFinal = selectedGroups.some(g => g.endsWith("FD") || g === "LTFD" || g === "STFD" || g === "RFD") || !!(groupDetails as any).__finalDate;
                   const finalDate = data.estimatedReturnDate || "";
                   const summary = selectedGroups.length > 0 ? selectedGroups.join(", ") + (finalDate ? ` → ${finalDate}` : "") : finalDate ? `Final: ${finalDate}` : "";
-                  const addresses = (data.addresses || []).map((a: any, i: number) => ({ label: a.type || `Address ${i + 1}`, value: [a.street, a.city].filter(Boolean).join(", ") || "TBD" }));
-                  const logBoth = () => setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), suggestedGroups: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}, finalDeliveryDate: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
-                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, groupBuilder: !p.groupBuilder}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">15</span>{highlightSearch("Delivery Group Builder")}</div>
+	                  const logBoth = () => setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), suggestedGroups: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}, finalDeliveryDate: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, groupBuilder: !p.groupBuilder}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">18</span>{highlightSearch("Delivery Planner")}</div>
                       {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-3">
-                      {showCoaching && !dismissedCoaching.has("c-groupBuilder") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Select delivery groups and assign dates/addresses. One group must be the Final (F) delivery — this determines storage duration.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-groupBuilder"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+                      {showCoaching && !dismissedCoaching.has("c-groupBuilder") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Select delivery groups and assign dates/addresses. One group must be the Final (F) delivery — this determines storage duration.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-groupBuilder"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
                       {/* Group selection chips */}
                       <div className="space-y-1.5">
                         <div className="text-[10px] font-bold text-slate-500 uppercase">Select Groups</div>
@@ -15799,18 +16273,25 @@ export default function App(){
                           {selectedGroups.map((g, gi) => {
                             const det = groupDetails[g] || {};
                             const isFinal = det.isFinal || (gi === selectedGroups.length - 1 && !selectedGroups.some((x, xi) => xi !== gi && (groupDetails[x] || {}).isFinal));
-                            const updateDet = (field: string, val: any) => {
-                              const next = { ...groupDetails, [g]: { ...det, [field]: val } };
-                              update("deliveryGroupDetails", next);
-                              if (field === "date" && isFinal) update("estimatedReturnDate", val);
-                              logBoth();
-                            };
+	                            const updateDet = (field: string, val: any) => {
+	                              const next = { ...groupDetails, [g]: { ...det, [field]: val } };
+	                              update("deliveryGroupDetails", next);
+	                              if (field === "date" && isFinal) update("estimatedReturnDate", val);
+	                              logBoth();
+	                            };
+	                            const updateDetAddress = (choiceValue: string) => {
+	                              const payload = addressPayloadFromChoice(choiceValue);
+	                              const next = { ...groupDetails, [g]: { ...det, ...payload } };
+	                              update("deliveryGroupDetails", next);
+	                              logBoth();
+	                            };
                             return (
                               <div key={g} className={`rounded-lg border ${isFinal ? "border-emerald-300 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50"} px-3 py-2 space-y-1.5`}>
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <span className="text-[11px] font-bold text-slate-700">{g}</span>
                                     <span className="text-[9px] text-slate-400">{SUGGESTED_GROUP_HELP[g] || ""}</span>
+                                    {det.qualifier && <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${det.qualifier === "Firm Date" ? "bg-sky-100 text-sky-700 border border-sky-200" : det.qualifier === "Must Be Before" ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-emerald-100 text-emerald-700 border border-emerald-200"}`}>{det.qualifier}</span>}
                                   </div>
                                   <button type="button" onClick={() => {
                                     const next = { ...groupDetails };
@@ -15824,17 +16305,28 @@ export default function App(){
                                   </button>
                                 </div>
                                 <div className="flex gap-2 items-center">
-                                  <input type="date" value={det.date || ""} onChange={e => updateDet("date", e.target.value)} className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] outline-none focus:border-sky-400 flex-1" />
-                                  <select value={det.address || ""} onChange={e => updateDet("address", e.target.value)} className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] outline-none focus:border-sky-400 flex-1 bg-white">
-                                    <option value="">Address...</option>
-                                    {addresses.map((a, ai) => <option key={ai} value={a.value}>{a.label}: {a.value}</option>)}
-                                  </select>
+	                                  <input type="date" value={det.date || ""} onChange={e => updateDet("date", e.target.value)} className={`rounded border px-1.5 py-0.5 text-[11px] outline-none focus:border-sky-400 flex-1 ${!det.date ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`} />
+                                    <select value={det.qualifier || ""} onChange={e => updateDet("qualifier", e.target.value)} className="rounded border border-slate-200 px-1.5 py-0.5 text-[11px] outline-none focus:border-sky-400 bg-white">
+                                      <option value="">Qualifier...</option>
+                                      <option value="Firm Date">Firm Date</option>
+                                      <option value="Must Be Before">Must Be Before</option>
+                                      <option value="Deliver When Ready">Deliver When Ready</option>
+                                    </select>
+	                                  <select value={addressChoiceValue(det)} onChange={e => updateDetAddress(e.target.value)} className={`rounded border px-1.5 py-0.5 text-[11px] outline-none focus:border-sky-400 flex-1 bg-white ${!det.addressType && !det.address ? "border-amber-300 bg-amber-50" : "border-slate-200"}`}>
+	                                    <option value="">Pick address...</option>
+	                                    {orderAddressChoices.known.length > 0 && <optgroup label="── ADDRESSES ON FILE ──">
+	                                      {orderAddressChoices.known.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+	                                    </optgroup>}
+	                                    <optgroup label="── ADD NEW ADDRESS TYPE ──">
+	                                      {orderAddressChoices.placeholders.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+	                                    </optgroup>
+	                                  </select>
                                 </div>
                               </div>
                             );
                           })}
                           {!hasFinal && selectedGroups.length > 0 && (
-                            <div className="text-[9px] text-amber-600 font-bold">One group should be marked as Final (F) — this determines storage duration.</div>
+                            <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 One group should be marked as Final (F) — this determines storage duration.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>
                           )}
                         </div>
                       )}
@@ -15853,101 +16345,19 @@ export default function App(){
                           </div>
                         </div>
                       )}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, groupBuilder: false})); logBoth(); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
-                    </div>}
-                  </div>;
-                })()}
-
-                {/* Packout Scope */}
-                {matchesInterviewSearch("packout packing", "No Packout Content Manipulation Partial Packout Full Packout packing furniture") && (() => {
-                  const log = (data.interviewLog || {}).packoutScope; const hasAnswers = !!(data as any).packoutScope; const answered = hasAnswers || !!log; const summary = (data as any).packoutScope || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packoutScope !== false;
-                  const PACKOUT_SCOPES = ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout"];
-                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packoutScope: !p.packoutScope}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">16</span>{highlightSearch("Has packing out been discussed?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-  
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {PACKOUT_SCOPES.map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data as any).packoutScope === s} onChange={() => { update("packoutScope", (data as any).packoutScope === s ? "" : s); executeInterviewActions(s, (data as any).packoutScope !== s); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
-                        ))}
-                      </div>
-                      {showCoaching && (data as any).packoutScope && interviewActions[(data as any).packoutScope]?.coaching && !dismissedCoaching.has(`c-${(data as any).packoutScope}`) && (
-                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1">
-                          <div className="flex-1">🎓 <span className="font-bold">{(data as any).packoutScope}:</span> {interviewActions[(data as any).packoutScope].coaching}</div>
-                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${(data as any).packoutScope}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
-                        </div>
-                      )}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packoutScope: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packoutScope: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
+                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, groupBuilder: false})); logBoth(); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
                     </div>}
                   </div>;
                 })()}
 
 
-                {/* Activities & Interests */}
-                {(() => {
-                  const log = (data.interviewLog || {}).interests;
-                  const hasAnswers = (data.rushInterests || []).length > 0;
-                  const answered = hasAnswers || !!log;
-                  const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ") || (!!log && !hasAnswers ? "None" : "");
-                  const expanded = interviewExpanded.interests !== false;
-                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !expanded}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">17</span>{highlightSearch("Activities & interests")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-  
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="flex flex-wrap gap-1.5">
-                        {RUSH_INTERESTS.map(i => {
-                          const active = (data.rushInterests || []).includes(i.id);
-                          return <button key={i.id} type="button" onClick={() => { update("rushInterests", active ? (data.rushInterests||[]).filter(x=>x!==i.id) : [...(data.rushInterests||[]), i.id]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${active ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`} title={i.desc}>
-                            {i.label}
-                          </button>;
-                        })}
-                      </div>
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, interests: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
-                    </div>}
-                  </div>;
-                })()}
-
-                {/* Upcoming Events */}
-                {(() => {
-                  const log = (data.interviewLog || {}).events;
-                  const hasAnswers = (data.upcomingEvents || []).length > 0;
-                  const answered = hasAnswers || !!log;
-                  const summary = (data.upcomingEvents || []).map(e => e.name || "Event").join(", ") || (!!log && !hasAnswers ? "None" : "");
-                  const expanded = interviewExpanded.events !== false;
-                  return <div className={`rounded-xl border border-green-300 bg-white overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-green-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">18</span>{highlightSearch("Upcoming trips & events")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-  
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      {showCoaching && !dismissedCoaching.has("c-events") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[10px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Any travel or formal events during the repair period? We'll make sure the right items are pulled and delivered on time.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-events"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
-                      {(data.upcomingEvents || []).map(evt => (
-                        <div key={evt.id} className="p-2 rounded-lg border border-slate-200 bg-slate-50 grid grid-cols-3 gap-2 relative">
-                          <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents||[]).filter(e => e.id !== evt.id))} className="absolute top-1 right-1 text-slate-400 hover:text-rose-500 text-xs">×</button>
-                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Name</div><input value={evt.name||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" placeholder="e.g. Florida Trip" /></div>
-                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Type</div><select value={evt.type||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, type: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px] bg-white">{RUSH_EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
-                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Date</div><input type="date" value={evt.date||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, date: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" /></div>
-                        </div>
-                      ))}
-                      <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "vacation_beach", date: "", name: ""}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full p-2 border-2 border-dashed border-slate-300 rounded-lg text-[10px] font-bold text-slate-500 hover:border-teal-400 hover:text-teal-600">+ Add Trip or Event</button>
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, events: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>}
-                    </div>}
-                  </div>;
-                })()}
 
               </div>
               <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-4">
-                <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100">Rush Guide</button>
+                <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-full border-2 border-teal-400 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100 flex items-center gap-1.5 shadow-sm">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Timeline
+                </button>
                 <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-violet-500 px-5 py-2 text-sm font-bold text-white hover:bg-violet-600">Done</button>
               </div>
           </div>
@@ -16182,6 +16592,68 @@ export default function App(){
                 </div>
               </div>
 
+              {/* Coaching & Help Text Config */}
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="px-4 py-3 bg-teal-50 border-b border-teal-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-bold text-teal-800">Coaching & Help Text</span>
+                    <span className="text-xs text-teal-500 ml-2">{Object.keys(DEFAULT_COACHING).length} entries</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => {
+                      const overrides = (data as any)._coachingOverrides || {};
+                      const merged = { ...DEFAULT_COACHING, ...overrides };
+                      const code = `const DEFAULT_COACHING: Record<string, string> = ${JSON.stringify(merged, null, 2)};`;
+                      navigator.clipboard?.writeText(code);
+                      setToast("Coaching config copied to clipboard as code");
+                    }} className="rounded-full border border-teal-200 bg-white px-2 py-0.5 text-[10px] font-bold text-teal-600 hover:bg-teal-50">Export as Code</button>
+                    <button onClick={() => {
+                      if (window.confirm("Reset all coaching text to defaults? Your customizations will be lost.")) {
+                        setData(p => { const next = { ...p }; delete (next as any)._coachingOverrides; return next; });
+                        setToast("All coaching text reset to defaults");
+                      }
+                    }} className="rounded-full border border-teal-200 bg-white px-2 py-0.5 text-[10px] font-bold text-teal-600 hover:bg-teal-50">Reset All</button>
+                  </div>
+                </div>
+                <div className="px-4 py-2 border-b border-slate-100">
+                  <input value={(data as any)._coachingSearch || ""} onChange={e => setData(p => ({...p, _coachingSearch: e.target.value}))} placeholder="Search coaching text..." className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-teal-300 bg-slate-50/50 placeholder:text-slate-400/70" />
+                </div>
+                <div className="max-h-[500px] overflow-y-auto divide-y divide-slate-100">
+                  {COACHING_CATEGORIES.map(cat => {
+                    const searchQ = ((data as any)._coachingSearch || "").toLowerCase().trim();
+                    const entries = Object.keys(DEFAULT_COACHING).filter(k => k.startsWith(cat.prefix)).filter(k => !searchQ || k.toLowerCase().includes(searchQ) || DEFAULT_COACHING[k].toLowerCase().includes(searchQ));
+                    if (!entries.length) return null;
+                    const overrides = (data as any)._coachingOverrides || {};
+                    const customCount = entries.filter(k => overrides[k] !== undefined).length;
+                    return (
+                      <details key={cat.key}>
+                        <summary className="px-4 py-2 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none flex items-center justify-between">
+                          <span>{cat.label} ({entries.length})</span>
+                          {customCount > 0 && <span className="rounded-full bg-teal-100 text-teal-700 px-2 py-0.5 text-[9px] font-bold">{customCount} customized</span>}
+                        </summary>
+                        <div className="divide-y divide-slate-50">
+                          {entries.map(key => {
+                            const defaultVal = DEFAULT_COACHING[key];
+                            const currentVal = overrides[key] !== undefined ? overrides[key] : defaultVal;
+                            const isCustom = overrides[key] !== undefined;
+                            const shortKey = key.replace(cat.prefix, "");
+                            return (
+                              <div key={key} className={`px-4 py-2 space-y-1 ${isCustom ? "bg-teal-50/30" : ""}`}>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-semibold text-slate-700">{shortKey}</span>
+                                  {isCustom && <button onClick={() => setData(p => { const ovr = { ...((p as any)._coachingOverrides || {}) }; delete ovr[key]; return { ...p, _coachingOverrides: ovr }; })} className="text-[9px] font-bold text-teal-500 hover:text-teal-700">Reset</button>}
+                                </div>
+                                <textarea value={currentVal} onChange={e => setData(p => ({...p, _coachingOverrides: { ...((p as any)._coachingOverrides || {}), [key]: e.target.value }}))} rows={2} className={`w-full rounded border px-2 py-1 text-[11px] text-slate-700 outline-none resize-none ${isCustom ? "border-teal-300 bg-white" : "border-slate-200 bg-slate-50/50"} focus:border-teal-400`} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Interview Actions */}
               <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
                 <div className="px-4 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
@@ -16330,20 +16802,27 @@ export default function App(){
             if (livingTimeline.length === 0) return [];
             const bands: {type: string; startDate: Date; endDate: Date; address: string; color: string}[] = [];
             const BAND_COLORS: Record<string, string> = { "Neighbor": "bg-orange-400", "Relative": "bg-pink-400", "Hotel": "bg-amber-400", "Rental": "bg-sky-400", "Temp": "bg-sky-400", "Staying in home": "bg-emerald-400", "Moving": "bg-violet-400" };
-            // Calculate start dates for each stay using durations
-            const starts: Date[] = [new Date(now)];
-            for (let i = 0; i < livingTimeline.length - 1; i++) {
-              const days = DURATION_DAYS[livingTimeline[i].duration] || 30;
-              starts.push(rushAddDays(starts[i], days));
-            }
-            // Each band runs from its start to the next band's start (contiguous, no gaps)
-            // Last band runs to estimatedReturn or 30 days out
-            const totalEnd = estimatedReturn || rushAddDays(now, 90);
-            livingTimeline.forEach((stay, i) => {
-              const start = starts[i];
-              const end = i < livingTimeline.length - 1 ? starts[i + 1] : totalEnd;
-              bands.push({ type: stay.type, startDate: start, endDate: end, address: stay.address || "", color: BAND_COLORS[stay.type] || "bg-slate-400" });
-            });
+	            // Calculate start dates for each stay using explicit end dates first, then rough durations.
+	            const starts: Date[] = [new Date(now)];
+	            for (let i = 0; i < livingTimeline.length - 1; i++) {
+	              const explicitEnd = parseLocalDate(livingTimeline[i].endDate);
+	              if (explicitEnd && explicitEnd > starts[i]) starts.push(explicitEnd);
+	              else {
+	                const days = DURATION_DAYS[livingTimeline[i].duration] || 30;
+	                starts.push(rushAddDays(starts[i], days));
+	              }
+	            }
+	            // Each band runs from its start to the next band's start (contiguous, no gaps)
+	            // Last band runs to the explicit stay date, estimated return, or 90 days out.
+	            const totalEnd = estimatedReturn || rushAddDays(now, 90);
+	            livingTimeline.forEach((stay, i) => {
+	              const start = starts[i];
+	              const explicitEnd = parseLocalDate(stay.endDate);
+	              const end = i < livingTimeline.length - 1 ? starts[i + 1] : (explicitEnd && explicitEnd > start ? explicitEnd : totalEnd);
+	              const addressFromType = stay.addressType ? (allAddresses.find(a => (a.type || "").toLowerCase() === stay.addressType.toLowerCase()) || {}) : {};
+	              const addressLine = stay.address || [addressFromType.street, addressFromType.city, addressFromType.state, addressFromType.zip].filter(Boolean).join(", ") || (stay.addressType ? `${stay.addressType} address TBD` : "");
+	              bands.push({ type: stay.type, startDate: start, endDate: end, address: addressLine, color: BAND_COLORS[stay.type] || "bg-slate-400" });
+	            });
             return bands;
           };
           const timelineBands = computeTimelineBands();
@@ -16559,18 +17038,20 @@ export default function App(){
                     // Delivery groups — computed at outer scope so seasonal/event sections can reference them
                     const hasHouseholdItems = packoutItems.some(p => ["Rugs", "Window Treatments", "Furniture", "Art", "Appliances"].includes(p));
                     const DELIVERY_COLORS = ["bg-teal-600", "bg-sky-600", "bg-indigo-600", "bg-amber-600", "bg-emerald-700"];
+                    const STAY_TYPE_COLORS: Record<string, string> = { "Hotel": "bg-amber-500", "Rental": "bg-sky-600", "Temp": "bg-sky-600", "Neighbor": "bg-indigo-500", "Relative": "bg-indigo-500", "Moving": "bg-slate-600", "Staying in home": "bg-emerald-600" };
                     const deliveryGroups: {id: string; label: string; date: Date; icon: string; items: string[]; location: string; address: string; householdTags?: string[]; color: string}[] = [];
                     // 1) Rush
                     const rushDate = rushAddDays(now, 2);
                     const rushBandIdx = timelineBands.length > 0 ? 0 : 0;
                     const rushLoc = timelineBands.length > 0 ? { location: timelineBands[0].type, address: timelineBands[0].address } : { location: hasHotel ? "Hotel" : hasRental ? "Rental" : "Home", address: rushDeliverTo };
-                    deliveryGroups.push({ id: "rush", label: "Rush Delivery", date: rushDate, icon: "⚡", items: rushItems, location: rushLoc.location, address: rushLoc.address, color: DELIVERY_COLORS[0] });
+                    const rushColor = STAY_TYPE_COLORS[rushLoc.location] || DELIVERY_COLORS[0];
+                    deliveryGroups.push({ id: "rush", label: "Rush Delivery", date: rushDate, icon: "⚡", items: rushItems, location: rushLoc.location, address: rushLoc.address, color: rushColor });
                     // 2) Rental (only if rental exists)
                     if (hasRental && timelineBands.length > 1) {
                       const rentalBand = timelineBands.find(b => ["Rental", "Temp"].includes(b.type));
                       if (rentalBand) {
                         const stDelivery = rushAddDays(rentalBand.startDate, 3);
-                        deliveryGroups.push({ id: "rental", label: "Rental Delivery", date: stDelivery, icon: "📦", items: shortTermItems, location: rentalBand.type, address: rentalBand.address, color: DELIVERY_COLORS[1] });
+                        deliveryGroups.push({ id: "rental", label: "Rental Delivery", date: stDelivery, icon: "📦", items: shortTermItems, location: rentalBand.type, address: rentalBand.address, color: STAY_TYPE_COLORS[rentalBand.type] || DELIVERY_COLORS[1] });
                       }
                     }
                     // 2b) Short-Term Delivery (when STD/STFD suggested but no rental band)
@@ -16608,28 +17089,53 @@ export default function App(){
 	                      const loc = resolveAddressAtDate(cdDate);
                       deliveryGroups.push({ id: cd.id, label: cd.label, date: cdDate, icon: "📦", items: [], location: loc.location, address: cd.address || loc.address, color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length] });
                     });
-                    // Apply user overrides for date/address
+                    // Post-final delivery events (inhome cleaning, unpacking, etc.)
+                    const postFinalEvents = (data as any).postFinalEvents || [];
+                    const preFinalGroup = deliveryGroups.find(g => g.id === "final");
+                    const _postOverrides = (rushGuideData as any).groupOverrides || {};
+                    if (preFinalGroup && postFinalEvents.length > 0) {
+                      postFinalEvents.forEach((evt: string, i: number) => {
+                        const postId = `post_${evt.replace(/\s/g, "_").toLowerCase()}`;
+                        const savedDate = _postOverrides[postId]?.dateStr ? parseLocalDate(_postOverrides[postId].dateStr) : null;
+                        const postDate = savedDate || rushAddDays(preFinalGroup.date, 3 + i * 2);
+                        const savedAddress = _postOverrides[postId]?.address;
+                        deliveryGroups.push({ id: postId, label: evt, date: postDate, icon: "🏠", items: [`Post-final: ${evt}`], location: preFinalGroup.location, address: savedAddress !== undefined ? savedAddress : preFinalGroup.address, color: DELIVERY_COLORS[(deliveryGroups.length) % DELIVERY_COLORS.length] });
+                      });
+                    }
+                    // Apply user overrides for date/address — AFTER all groups including post-final
                     const groupOverrides = (rushGuideData as any).groupOverrides || {};
                     deliveryGroups.forEach(dg => {
                       const ovr = groupOverrides[dg.id];
-                      if (ovr) {
+	                      if (ovr) {
 	                        if (ovr.dateStr) { const d = parseLocalDate(ovr.dateStr); if (d) dg.date = d; }
-                        if (ovr.address !== undefined) dg.address = ovr.address;
-                      }
-                    });
-                    // Post-final delivery events (inhome cleaning, unpacking, etc.)
-                    const postFinalEvents = (data as any).postFinalEvents || [];
-                    const finalGroup = deliveryGroups.find(g => g.id === "final");
-                    if (finalGroup && postFinalEvents.length > 0) {
-                      postFinalEvents.forEach((evt: string, i: number) => {
-                        const postDate = rushAddDays(finalGroup.date, 3 + i * 2);
-                        deliveryGroups.push({ id: `post_${evt.replace(/\s/g, "_").toLowerCase()}`, label: evt, date: postDate, icon: "🏠", items: [`Post-final: ${evt}`], location: finalGroup.location, address: finalGroup.address, color: DELIVERY_COLORS[(deliveryGroups.length) % DELIVERY_COLORS.length] });
-                      });
-                    }
-                    // Sort by date
-                    deliveryGroups.sort((a, b) => a.date.getTime() - b.date.getTime());
+	                        if (ovr.address !== undefined) dg.address = ovr.address;
+	                        if (ovr.addressType !== undefined) dg.addressType = ovr.addressType;
+	                        if (ovr.addressId !== undefined) dg.addressId = ovr.addressId;
+	                      }
+	                    });
+	                    // Sort by date
+	                    deliveryGroups.sort((a, b) => a.date.getTime() - b.date.getTime());
+	                    const applyDeliveryDateChange = (change: any) => {
+	                      if (!change?.id || !change.newDateStr) return;
+	                      if (change.id.startsWith("custom_")) {
+	                        setRushGuideData((p: any) => ({
+	                          ...p,
+	                          customDeliveries: (p.customDeliveries || []).map((cd: any) => cd.id === change.id ? { ...cd, dateStr: change.newDateStr } : cd),
+	                        }));
+	                      } else {
+	                        setRushGuideData((p: any) => ({
+	                          ...p,
+	                          groupOverrides: {
+	                            ...(p.groupOverrides || {}),
+	                            [change.id]: { ...((p.groupOverrides || {})[change.id] || {}), dateStr: change.newDateStr },
+	                          },
+	                        }));
+	                        if (change.id === "final") update("estimatedReturnDate", change.newDateStr);
+	                      }
+	                      setPendingDeliveryDateChange(null);
+	                    };
 
-                    // Helper to create a new custom delivery
+	                    // Helper to create a new custom delivery
                     const createCustomDelivery = (label: string, dateStr: string, sourceId: string) => {
                       const loc = resolveAddressAtDate(new Date(dateStr));
                       const newId = `custom_${safeUid()}`;
@@ -16743,14 +17249,27 @@ export default function App(){
                         monthLabels.push({ label: m.toLocaleDateString("en-US", { month: "short" }), pct: pct(m) });
                       }
                       // Living situation bands — from timeline sequence or fallback
-                      const bands: {label: string; color: string; startPct: number; widthPct: number; address: string}[] = [];
-                      if (timelineBands.length > 0) {
-                        timelineBands.forEach(b => {
-                          const sp = pct(b.startDate);
-                          const ep = pct(b.endDate);
-                          bands.push({ label: b.type, color: b.color, startPct: sp, widthPct: Math.max(ep - sp, 1), address: b.address });
-                        });
-                      } else {
+	                      const bands: {label: string; color: string; startPct: number; widthPct: number; address: string; textClass?: string}[] = [];
+	                      if (timelineBands.length > 0) {
+	                        timelineBands.forEach(b => {
+	                          const sp = pct(b.startDate);
+	                          const ep = pct(b.endDate);
+	                          bands.push({ label: b.type, color: b.color, startPct: sp, widthPct: Math.max(ep - sp, 1), address: b.address });
+	                        });
+	                        const finalDelivery = deliveryGroups.find(dg => dg.id === "final" || dg.label === "Final Delivery");
+	                        const homeStart = finalDelivery?.date || effectiveReturn;
+	                        const homeStartPct = pct(homeStart);
+	                        if (homeStartPct < 99) {
+	                          bands.push({
+	                            label: finalDelivery?.location || "Home",
+	                            color: "bg-slate-200",
+	                            startPct: homeStartPct,
+	                            widthPct: Math.max(100 - homeStartPct, 1),
+	                            address: finalDelivery?.address || primaryAddrStr,
+	                            textClass: "text-slate-600",
+	                          });
+	                        }
+	                      } else {
                         if (hasHotel && hasRental) {
                           const hotelEnd = rushAddDays(now, isLongTerm ? 14 : 7);
                           bands.push({ label: "Hotel", color: "bg-amber-400", startPct: pct(now), widthPct: pct(hotelEnd) - pct(now), address: hotelAddrStr });
@@ -16877,7 +17396,7 @@ export default function App(){
                             <div ref={timelineRef} className="relative z-20 h-7 bg-slate-100 rounded-lg overflow-hidden">
                               {bands.map((b, i) => (
                                 <div key={i} className={`absolute top-0 bottom-0 ${b.color} flex items-center justify-center cursor-default`} style={{ left: `${b.startPct}%`, width: `${Math.max(b.widthPct, 1)}%` }} title={`${b.label}${b.address ? `\n→ ${b.address}` : ""}`}>
-                                  <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">{b.label}</span>
+	                                  <span className={`text-[10px] font-bold truncate px-1 ${b.textClass || "text-white drop-shadow-sm"}`}>{b.label}</span>
                                 </div>
                               ))}
                               <div className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-10" style={{ left: `${pct(now)}%` }} title="Today" />
@@ -16919,22 +17438,31 @@ export default function App(){
                                 const markerRow = markerRowsById[dg.id] || 0;
                                 const connectorHeight = markerBaseConnectorPx + markerRow * markerLaneGapPx;
                                 return (
-                                <div key={dg.id} className="absolute z-10 cursor-pointer hover:scale-105 transition-transform" style={{ left: `${pct(dg.date)}%`, transform: "translateX(-50%)", height: `${connectorHeight + 48}px` }}
-                                  draggable
-                                  onDragStart={e => { e.dataTransfer.setData("text/plain", dg.id); e.dataTransfer.effectAllowed = "move"; }}
-                                  onDrag={e => {
-                                    if (!e.clientX) return;
-                                    const bar = e.currentTarget.parentElement;
-                                    if (!bar) return;
-                                    const rect = bar.getBoundingClientRect();
-                                    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                                    const newDate = new Date(timelineStart.getTime() + x * (timelineEnd.getTime() - timelineStart.getTime()));
-                                    if (dg.id.startsWith("custom_")) {
-	                                      setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, dateStr: formatDateInputValue(newDate) } : cd) }));
-                                    } else {
-	                                      setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), dateStr: formatDateInputValue(newDate) } } }));
-                                    }
-                                  }}
+	                                <div key={dg.id} className="absolute z-10 cursor-pointer hover:scale-105 transition-transform" style={{ left: `${pct(dg.date)}%`, transform: "translateX(-50%)", height: `${connectorHeight + 48}px` }}
+	                                  draggable
+	                                  onDragStart={e => { e.dataTransfer.setData("text/plain", dg.id); e.dataTransfer.effectAllowed = "move"; }}
+	                                  onDragEnd={e => {
+	                                    if (!e.clientX) return;
+	                                    const bar = e.currentTarget.parentElement;
+	                                    if (!bar) return;
+	                                    const rect = bar.getBoundingClientRect();
+	                                    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+	                                    const newDate = new Date(timelineStart.getTime() + x * (timelineEnd.getTime() - timelineStart.getTime()));
+	                                    const newDateStr = formatDateInputValue(newDate);
+	                                    const oldDateStr = formatDateInputValue(dg.date);
+	                                    if (!newDateStr || newDateStr === oldDateStr) return;
+	                                    window.setTimeout(() => {
+	                                      setPendingDeliveryDateChange({
+	                                        id: dg.id,
+	                                        label: dg.label,
+	                                        oldDateStr,
+	                                        newDateStr,
+	                                        oldDateLabel: rushFormatDate(dg.date),
+	                                        newDateLabel: rushFormatDate(newDate),
+	                                        isFinal: dg.id === "final",
+	                                      });
+	                                    }, 1200);
+	                                  }}
                                   onClick={() => {
                                     const el = document.getElementById(`delivery-card-${dg.id}`);
                                     if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("ring-2", "ring-offset-2", "ring-sky-400"); setTimeout(() => el.classList.remove("ring-2", "ring-offset-2", "ring-sky-400"), 2000); }
@@ -16948,12 +17476,30 @@ export default function App(){
                               })}
                             </div>
                               );
-                            })()}
+	                            })()}
 
-                          </div>
+	                          </div>
 
-                          {/* Address legend — color-coded */}
-                          {bands.length > 0 && (
+	                          {pendingDeliveryDateChange && (
+	                            <div className="mx-4 mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 shadow-sm">
+	                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+	                                <div className="min-w-0">
+	                                  <div className="text-[11px] font-bold text-amber-900">Change {pendingDeliveryDateChange.label} date?</div>
+	                                  <div className="text-[10px] text-amber-800">
+	                                    {pendingDeliveryDateChange.oldDateLabel} → {pendingDeliveryDateChange.newDateLabel}
+	                                    {pendingDeliveryDateChange.isFinal ? " This will also update the expected return date." : ""}
+	                                  </div>
+	                                </div>
+	                                <div className="flex gap-2 shrink-0">
+	                                  <button type="button" onClick={() => setPendingDeliveryDateChange(null)} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-[10px] font-bold text-amber-800 hover:bg-amber-100">Keep current</button>
+	                                  <button type="button" onClick={() => applyDeliveryDateChange(pendingDeliveryDateChange)} className="rounded-lg bg-amber-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-amber-700">Confirm change</button>
+	                                </div>
+	                              </div>
+	                            </div>
+	                          )}
+
+	                          {/* Address legend — color-coded */}
+	                          {bands.length > 0 && (
                             <div className="px-4 pb-2">
                               <div className="flex flex-wrap gap-2 items-center">
                                 <span className="text-[9px] font-bold text-slate-400 uppercase">Addresses:</span>
@@ -16991,30 +17537,43 @@ export default function App(){
 	                                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
 	                                      <label className="min-w-[170px] flex-1 sm:flex-none">
 	                                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-white/65">Date</span>
-	                                        <input type="date" value={formatDateInputValue(dg.date)} onChange={e => {
+	                                        <input type="date" defaultValue={formatDateInputValue(dg.date)} key={`date-${dg.id}-${formatDateInputValue(dg.date)}`} onBlur={e => {
+	                                          const val = e.target.value;
+	                                          if (!val || val === formatDateInputValue(dg.date)) return;
 	                                          if (dg.id.startsWith("custom_")) {
-	                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, dateStr: e.target.value } : cd) }));
+	                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, dateStr: val } : cd) }));
 	                                          } else {
-	                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), dateStr: e.target.value } } }));
+	                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), dateStr: val } } }));
+	                                          }
+	                                        }} onChange={e => {
+	                                          const val = e.target.value;
+	                                          if (!val) return;
+	                                          if (dg.id.startsWith("custom_")) {
+	                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, dateStr: val } : cd) }));
+	                                          } else {
+	                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), dateStr: val } } }));
 	                                          }
 	                                        }} className="h-9 w-full rounded-lg border border-white/30 bg-white/95 px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-white focus:ring-2 focus:ring-white/40" />
 	                                      </label>
 	                                      <label className="min-w-0 flex-[2]">
 	                                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-white/65">Address</span>
-	                                        <input value={dg.address || ""} list={`delivery-addresses-${dg.id}`} onChange={e => {
-	                                          if (dg.id.startsWith("custom_")) {
-	                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, address: e.target.value } : cd) }));
-	                                          } else {
-	                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), address: e.target.value } } }));
-	                                          }
-	                                        }} placeholder={`${dg.location || "Delivery"} address...`} className="h-9 w-full rounded-lg border border-white/30 bg-white/95 px-3 text-[13px] font-bold text-slate-800 placeholder:text-slate-400 outline-none focus:border-white focus:ring-2 focus:ring-white/40" />
-	                                        <datalist id={`delivery-addresses-${dg.id}`}>
-	                                          {(data.addresses || []).map((a: any, ai: number) => {
-	                                            const address = [a.street, a.city, a.state].filter(Boolean).join(", ");
-	                                            return <option key={ai} value={address} label={`${a.type || `Address ${ai + 1}`}: ${a.street || "TBD"}`} />;
-	                                          })}
-	                                        </datalist>
-	                                      </label>
+		                                        <select value={addressChoiceValue(dg)} onChange={e => {
+		                                          const payload = addressPayloadFromChoice(e.target.value);
+		                                          if (dg.id.startsWith("custom_")) {
+		                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, ...payload } : cd) }));
+		                                          } else {
+		                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), ...payload } } }));
+		                                          }
+		                                        }} className="h-9 w-full rounded-lg border border-white/30 bg-white/95 px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-white focus:ring-2 focus:ring-white/40">
+		                                          <option value="">{dg.address || `${dg.location || "Delivery"} address...`}</option>
+		                                          {orderAddressChoices.known.length > 0 && <optgroup label="── ADDRESSES ON FILE ──">
+		                                            {orderAddressChoices.known.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+		                                          </optgroup>}
+		                                          <optgroup label="── ADD NEW ADDRESS TYPE ──">
+		                                            {orderAddressChoices.placeholders.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+		                                          </optgroup>
+		                                        </select>
+		                                      </label>
 	                                    </div>
 	                                  </div>
                                   {(() => { const GROUP_MAP: Record<string,string[]> = { rush: ["RD","RFD"], rental: ["STD","STFD"], "short-term": ["STD","STFD"], final: ["LTD","LTFD","RFD","STFD","LTFD"] }; const matched = (GROUP_MAP[dg.id] || []).filter(g => interviewGroups.includes(g)); return matched.length > 0 ? <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold">{matched.join("/")}</span> : null; })()}
