@@ -1076,6 +1076,16 @@ const DEFAULT_COACHING: Record<string, string> = {
   "event.inhome": "On-site cleaning or restoration",
   "event.consult": "On-site consultation",
   "event.none": "Remote — no on-site event",
+  // Toast Templates — use {value} as placeholder for the action value
+  "toast.loadList": "+ {value} to load",
+  "toast.handlingCode": "+ {value} handling code",
+  "toast.eventInstruction": "+ \"{value}\" to instructions",
+  "toast.sdsObservation": "+ {value} to SDS",
+  "toast.suggestGroup": "Suggested {value} group",
+  "toast.blocker": "Blocker: {value}",
+  "toast.addressPlaceholder": "+ {value} address placeholder",
+  "toast.suggestOrderType": "Suggested order type: {value}",
+  "toast.openMoldLimit": "Mold limit warning",
 };
 
 // Coaching accessor — checks user overrides (localStorage) then defaults
@@ -1094,6 +1104,7 @@ const COACHING_CATEGORIES = [
   { key: "field", label: "Field Help", prefix: "field." },
   { key: "step", label: "Step Guidance", prefix: "step." },
   { key: "event", label: "Event Types", prefix: "event." },
+  { key: "toast", label: "Toast Messages", prefix: "toast." },
 ];
 
 const NON_RESTORATION_PRIMARY = "Non-Restoration";
@@ -2974,7 +2985,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       </Field>
       {showInlineHelp && data.leadSourceCategory === "Referral" && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Referrer:</span> The referrer reached out with this order. If assigned, we can begin. If only a lead, we cannot contact the customer yet.
+          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Referrer:</span> {coaching("field.referrer")}
         </div>
       )}
 
@@ -3104,7 +3115,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold shadow-sm">{getRepInitials(salesRep)}</span>
             <span className="text-sm font-semibold text-slate-700">{salesRep.split(",")[0]}</span>
           </div>
-          {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">🎓 Auto-assigned from referrer.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+          {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">{coaching("field.autoAssigned")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
         </Field>
       )}
 
@@ -3147,7 +3158,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       {referrerRep && salesRep && salesRep !== referrerRep && (
         <div className="text-[10px] text-amber-600 font-semibold mt-1">Referrer's rep is {referrerRep}</div>
       )}
-      {showInlineHelp && !referrerRep && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Employee managing customer relationships/accounts.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+      {showInlineHelp && !referrerRep && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("field.salesRep")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
       </React.Fragment>
       )}
       {showSuggestedRoles && (
@@ -6798,6 +6809,18 @@ const Header = ({ activeSection, visitedSections, completedSections, onJump, onJ
                                 <span>Density</span>
                                 <span>{compactMode ? 'Compact' : 'Comfortable'}</span>
                             </button>
+                            <button
+                                onClick={() => {
+                                  const current = localStorage.getItem("noe-action-toasts") !== "off";
+                                  localStorage.setItem("noe-action-toasts", current ? "off" : "on");
+                                  window.dispatchEvent(new Event("storage"));
+                                  setShowCoaching(showCoaching); // force re-render
+                                }}
+                                className={`w-full mt-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all ${localStorage.getItem("noe-action-toasts") === "off" ? 'hover:bg-slate-50 text-slate-400' : 'bg-teal-50 text-teal-600'}`}
+                            >
+                                <span>Action Toasts</span>
+                                <span>{localStorage.getItem("noe-action-toasts") === "off" ? 'Off' : 'On'}</span>
+                            </button>
                             <div className="mt-1 pt-1 border-t border-slate-100">
                               <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1">Navigate</div>
                               <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5 mx-2 mb-1">
@@ -7777,9 +7800,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     ]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
                     {showInlineHelp && (data.isLead === true || data.isLead === false) && (
                     <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1">
-                      <span className="flex-1">🎓 {data.isLead === true
-                        ? "A Lead requires selling the customer and getting approvals from the adjuster before we proceed. No billable charges yet — just an opportunity we will pursue."
-                        : "An Order is a confirmed project ready to be scheduled and worked."}</span>
+                      <span className="flex-1">🎓 {data.isLead === true ? coaching("field.isLead") : coaching("field.isOrder")}</span>
                       <button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
                     </div>
                     )}
@@ -7807,7 +7828,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     {showInlineHelp && !data.primaryLossType && !dismissedTips.has("Loss Type") && (
                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-2">
                         <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Loss Type"); e.target.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
-                        🎓 <span className="font-bold">Loss Type:</span> Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.
+                        🎓 <span className="font-bold">Loss Type:</span> {coaching("field.lossType")}
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2">
@@ -7875,7 +7896,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         );
                         })}
                       </div>
-                      {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">🎓 e.g. Fire with water damage from firefighting, or water loss leading to mold. Incompatible types are grayed out.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                      {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">{coaching("field.contaminants")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                     </Field>
                   )}
                   {isRestorationProject && (
@@ -8157,7 +8178,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 )}
                 <div className="border-t border-slate-100 pt-4 mt-4">
                   <div className="text-sm font-bold text-slate-700 mb-1">Event Instructions</div>
-                  {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-2 flex items-start gap-1"><span className="flex-1">🎓 What scheduling and field team need to know — conditions, access, customer preferences, what to bring.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                  {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-2 flex items-start gap-1"><span className="flex-1">{coaching("section.eventInstructions")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                   <AutoGrowTextarea
                     value={stripEventSystemLines(data.eventInstructions || "")}
                     onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
@@ -8588,15 +8609,19 @@ export default function App(){
     if (!config || !config.actions) return;
     if (!isOn) return; // only execute on selection, not deselection
     const executed = [];
+    const toastTemplate = (type: string, value: string) => {
+      const tpl = coaching(`toast.${type}`);
+      return tpl ? tpl.replace(/\{value\}/g, value) : `${type}: ${value}`;
+    };
     config.actions.forEach(action => {
       switch (action.type) {
         case "loadList":
           setData(p => ({ ...p, loadList: Array.from(new Set([...(p.loadList || []), action.value])) }));
-          executed.push(`+ ${action.value} to load`);
+          executed.push(toastTemplate("loadList", action.value));
           break;
         case "handlingCode":
           setData(p => ({ ...p, handlingCodes: Array.from(new Set([...(p.handlingCodes || []), action.value])) }));
-          executed.push(`+ ${action.value} handling code`);
+          executed.push(toastTemplate("handlingCode", action.value));
           break;
         case "eventInstruction": {
           const note = action.value;
@@ -8606,16 +8631,16 @@ export default function App(){
             const combined = current ? `${current}\n${note}` : note;
             return { ...p, eventInstructions: composeEventInstructions(combined, p, conditionSummary) };
           });
-          executed.push(`+ "${note}" to instructions`);
+          executed.push(toastTemplate("eventInstruction", note));
           break;
         }
         case "sdsObservation":
           setData(p => ({ ...p, sdsObservations: Array.from(new Set([...(p.sdsObservations || []), action.value])) }));
-          executed.push(`+ ${action.value} to SDS`);
+          executed.push(toastTemplate("sdsObservation", action.value));
           break;
         case "suggestGroup":
           setData(p => ({ ...p, suggestedGroups: Array.from(new Set([...(p.suggestedGroups || []), action.value])) }));
-          executed.push(`Suggested ${action.value} group`);
+          executed.push(toastTemplate("suggestGroup", action.value));
           break;
         case "blocker":
           setData(p => {
@@ -8623,7 +8648,7 @@ export default function App(){
             if (current.includes(action.value)) return p;
             return { ...p, scopeBridge: { ...(p.scopeBridge || {}), pendingIssues: [...current, action.value] } };
           });
-          executed.push(`Blocker: ${action.value}`);
+          executed.push(toastTemplate("blocker", action.value));
           break;
         case "contactNote":
           // Add to primary customer note
@@ -8646,22 +8671,22 @@ export default function App(){
             addrs.push({ id: safeUid(), street: "", city: "", state: "", zip: "", isPrimary: false, purpose: action.value, label: `${action.value} Address` });
             return { ...p, addresses: addrs };
           });
-          executed.push(`+ ${action.value} address placeholder`);
+          executed.push(toastTemplate("addressPlaceholder", action.value));
           break;
         case "suggestOrderType":
           setData(p => {
             const types = Array.from(new Set([...(p.orderTypes || []), action.value]));
             return { ...p, orderTypes: types };
           });
-          executed.push(`Suggested order type: ${action.value}`);
+          executed.push(toastTemplate("suggestOrderType", action.value));
           break;
         case "openMoldLimit":
           setData(p => ({ ...p, moldLimitWarning: true }));
-          executed.push("Mold limit warning");
+          executed.push(toastTemplate("openMoldLimit", ""));
           break;
       }
     });
-    if (executed.length && interviewPanelOpen) setToast(executed.join(" · "));
+    if (executed.length && localStorage.getItem("noe-action-toasts") !== "off") setToast(executed.join(" · "));
   };
   const matchesInterviewSearch = (title, ...extras) => {
     const q = interviewSearch.trim().toLowerCase();
@@ -13659,7 +13684,7 @@ export default function App(){
                                       <button className={`rounded-lg border px-3 text-xs font-bold transition-all ${data.orderNameLocked?"bg-slate-800 text-white":"bg-white hover:bg-slate-50"}`} onClick={()=>updateMany({ orderNameLocked: !data.orderNameLocked, orderNameAuto: data.orderNameLocked ? data.orderNameAuto : false })}>{data.orderNameLocked?"LOCKED":"LOCK"}</button>
                                   </div>
                                 </Field>
-                                {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Auto-generated from LastName-TownST. Lock to prevent changes.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                                {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("field.orderName")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                 <div className="grid gap-4 sm:grid-cols-2">
                                   <Field label="Record Type">
                                     <ToggleGroup options={[
@@ -13675,7 +13700,7 @@ export default function App(){
                                   {showCoaching && !data.primaryLossType && !dismissedTips.has("Loss Type") && (
                                     <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-2">
                                       <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Loss Type"); e.target.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
-                                      🎓 <span className="font-bold">Loss Type:</span> Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.
+                                      🎓 <span className="font-bold">Loss Type:</span> {coaching("field.lossType")}
                                     </div>
                                   )}
                                   <div className="flex flex-wrap gap-2" data-audit-key="orderTypes">
@@ -13743,7 +13768,7 @@ export default function App(){
                                         />
                                       ))}
                                     </div>
-                                    {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 e.g. Fire with water damage from firefighting, or water loss leading to mold.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                                    {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("field.contaminants")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                   </Field>
                                 )}
                                 {attentionWater && !(data.orderTypes||[]).includes("Water") && !dismissedTips.has("Water Suggestion") && (
@@ -13801,7 +13826,7 @@ export default function App(){
                                                 <div className="p-4 grid gap-4 border-t border-sky-100 bg-white">
                                                     {hasSeverity && !isNonRestorationProject && (
                                                         <Field label="Severity" subtle>
-                                                            {showCoaching && !(data.severityCodes || []).length && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-1 flex items-start gap-1"><span className="flex-1">🎓 Typically entered after the site inspection, not during intake.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                                                            {showCoaching && !(data.severityCodes || []).length && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-1 flex items-start gap-1"><span className="flex-1">{coaching("field.severity")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                                             <div className={`rounded-lg ${needsSeverityCode ? "border border-orange-200 bg-orange-50/60 p-2" : ""}`}>
                                                               <div className="flex gap-2" data-audit-key={`severity-${severityGroup.toLowerCase()}`}>{SEVERITY_LEVELS.map(level => { const code = `${severityGroup}-${level}`; const isActive = (data.severityCodes || []).includes(code); return (<button key={level} onClick={() => toggleSeverity(code)} className={`h-9 w-9 rounded-lg text-sm font-bold transition-all border ${isActive ? 'bg-sky-500 border-sky-700 text-white shadow' : needsSeverityCode ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100' : 'bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-200'} ${attentionForSeverity && !needsSeverityCode ? 'attention-outline' : ''}`}>{level}</button>); })}</div>
                                                               {needsSeverityCode && (
@@ -13937,7 +13962,7 @@ export default function App(){
                                             {!isNonRestorationProject && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">SEVERITY</div>
-                                                {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-1 flex items-start gap-1"><span className="flex-1">🎓 Severity reject scale: 1 = None, 2 = Possible, 3 = Many expected, 5 = Extreme.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                                                {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-1 flex items-start gap-1"><span className="flex-1">{coaching("field.rejectScale")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">{SEVERITY_GROUPS.map(type => {
                                                   const hasGroupCode = (data.severityCodes || []).some(c => c.startsWith(`${type}-`));
                                                   const expectsGroupCode = expectedSeverityGroups.has(type);
@@ -13961,7 +13986,7 @@ export default function App(){
                                             {(data.primaryLossType || (data.orderTypes||[]).some(t => ["Fire","Water","Puffback"].includes(t))) && (
                                               <div>
                                                 <div className="mb-2 text-xs font-bold text-slate-400">DETAILED SEVERITY</div>
-                                                {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-3 flex items-start gap-1"><span className="flex-1">🎓 Rate specific contaminant levels. 0 = None, 3 = Severe. Typically completed after the site inspection — not during intake.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                                                {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-3 flex items-start gap-1"><span className="flex-1">{coaching("field.contaminantLevels")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                                 <div className="grid gap-4 sm:grid-cols-2">
                                                   {[
                                                     { key: "fire", label: "Fire", fields: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"], colorStart: "#fef3c7", colorEnd: "#f97316" },
@@ -14016,12 +14041,12 @@ export default function App(){
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className={suggestQ1 ? "suggested-field rounded-lg p-2" : ""}>
                                               <div className="mb-2 text-xs font-bold text-slate-400">QUALITY</div>
-                                              {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-1 flex items-start gap-1"><span className="flex-1">🎓 Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                                              {showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-1 flex items-start gap-1"><span className="flex-1">{coaching("field.qualityCode")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                                               {suggestQ1 && <div className="mb-2 text-[10px] font-bold suggested-pill inline-flex rounded-full px-2 py-0.5">Suggested: Q1 — based on insurance carrier or premium service</div>}
                                               <div className="flex flex-wrap gap-2">{QUALITY_CODES.map(q => (<ToggleMulti key={q} label={q} checked={data.qualityCode === q} onChange={() => update("qualityCode", q)} />))}</div>
                                             </div>
                                             <div className="border-t border-slate-100 my-1"></div>
-                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div>{showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-3 flex items-start gap-1"><span className="flex-1">🎓 Special processing instructions. Hover each code for its meaning.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}<div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className={`${compactMode ? '!px-2 !py-1 !text-xs' : '!px-2.5 !py-1.5 !text-xs'}`} checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
+                                          <div><div className="mb-2 text-xs font-bold text-slate-400">HANDLING</div>{showCoaching && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-3 flex items-start gap-1"><span className="flex-1">{coaching("field.handlingCodes")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}<div className="flex flex-wrap gap-2">{HANDLING_META.map(([c, d]) => <ToggleMulti key={c} label={c} title={d} className={`${compactMode ? '!px-2 !py-1 !text-xs' : '!px-2.5 !py-1.5 !text-xs'}`} checked={data.handlingCodes.includes(c)} onChange={() => toggleHandling(c)} />)}</div></div>
                                             <div className="border-t border-slate-100 my-1"></div>
                                             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -15589,7 +15614,7 @@ export default function App(){
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {!interviewSearch && (
                   <div className="flex items-center gap-2 mb-2">
-                    {showCoaching && !dismissedCoaching.has("interview-header") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex-1 flex items-start gap-1"><span className="flex-1">🎓 Ask the customer these questions during or before the initial visit.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "interview-header"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button></div>}
+                    {showCoaching && !dismissedCoaching.has("interview-header") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex-1 flex items-start gap-1"><span className="flex-1">{coaching("section.interview")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "interview-header"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button></div>}
                     {!showCoaching && <div className="flex-1" />}
                     <button onClick={() => { const el = document.getElementById("noe-interview-timeline"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-full border-2 border-teal-400 bg-teal-50 px-4 py-2 text-[13px] font-bold text-teal-700 hover:bg-teal-100 shrink-0 flex items-center gap-1.5 shadow-sm">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Start Timeline</button>
@@ -15795,7 +15820,7 @@ export default function App(){
                         </div>
                       )}
                       {showCoaching && answered && !dismissedCoaching.has("c-Pets") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
-                        <div className="flex-1">🎓 <span className="font-bold">Pets:</span> Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.</div>
+                        <div className="flex-1">🎓 <span className="font-bold">Pets:</span> {interviewActions["Pets"]?.coaching || "Please make sure your pets are secured in a safe room."}</div>
                         <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-Pets"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                       </div>}
                       {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
@@ -15925,7 +15950,7 @@ export default function App(){
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
-                      {showCoaching && !dismissedCoaching.has("c-repairs") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Repair type determines your delivery timeline and potential blockers. Each option auto-suggests a delivery group and adds delivery instructions.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-repairs"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                      {showCoaching && !dismissedCoaching.has("c-repairs") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.repairs")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-repairs"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                       <div className="flex flex-wrap gap-2">
                         {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
                           <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
@@ -16030,7 +16055,7 @@ export default function App(){
                       {/* Staying in home — coaching */}
                       {data.livingStatus === "Staying in home" && showCoaching && !dismissedCoaching.has("c-stayHome") && (
                         <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
-                          <span className="flex-1">🎓 Customer is staying in the home. Deliveries will be made to the primary address. Consider a Rush Final Delivery (RFD) if everything can be rushed.</span>
+                          <span className="flex-1">{coaching("section.stayingHome")}</span>
                           <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-stayHome"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
                         </div>
                       )}
@@ -16080,7 +16105,7 @@ export default function App(){
                         ))}
                         {timeline.length > 0 && !timeline.some(s => s.type === "Staying in home" || s.type === "Moving") && (
                           <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
-                            <span className="flex-1">🎓 Add "Their Home" as the last step to mark return after repairs.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
+                            <span className="flex-1">{coaching("section.addHome")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
                           </div>
                         )}
                       </div>}
@@ -16114,7 +16139,7 @@ export default function App(){
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
-                      {showCoaching && !dismissedCoaching.has("c-rush") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Rush deliveries get essentials (clothing, bedding, toiletries) to the customer within days. The delivery address will auto-link to their first living situation.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-rush"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                      {showCoaching && !dismissedCoaching.has("c-rush") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.rush")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-rush"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                       <div className="grid grid-cols-2 gap-2">
                         <button type="button" onClick={() => {
                           update("rushDeliveryNeeded", data.rushDeliveryNeeded === "Y" ? "" : "Y");
@@ -16192,7 +16217,7 @@ export default function App(){
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
-                      {showCoaching && !dismissedCoaching.has("c-events") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Any travel or formal events during the repair period? We'll make sure the right items are pulled and delivered on time.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-events"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+                      {showCoaching && !dismissedCoaching.has("c-events") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.events")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-events"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
                       {(data.upcomingEvents || []).map(evt => (
                         <div key={evt.id} className="p-2 rounded-lg border border-slate-200 bg-slate-50 grid grid-cols-3 gap-2 relative">
                           <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents||[]).filter(e => e.id !== evt.id))} className="absolute top-1 right-1 text-slate-400 hover:text-rose-500 text-xs">×</button>
@@ -16252,7 +16277,7 @@ export default function App(){
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-3">
-                      {showCoaching && !dismissedCoaching.has("c-groupBuilder") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 Select delivery groups and assign dates/addresses. One group must be the Final (F) delivery — this determines storage duration.</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-groupBuilder"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+                      {showCoaching && !dismissedCoaching.has("c-groupBuilder") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.planner")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-groupBuilder"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
                       {/* Group selection chips */}
                       <div className="space-y-1.5">
                         <div className="text-[10px] font-bold text-slate-500 uppercase">Select Groups</div>
@@ -16326,7 +16351,7 @@ export default function App(){
                             );
                           })}
                           {!hasFinal && selectedGroups.length > 0 && (
-                            <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">🎓 One group should be marked as Final (F) — this determines storage duration.</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>
+                            <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.finalWarning")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>
                           )}
                         </div>
                       )}
