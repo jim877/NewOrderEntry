@@ -167,10 +167,42 @@ After implementing, run these checks BEFORE marking [x]:
 3. **Check for duplicates** — if the same pattern exists in multiple places (e.g., room name renders in both camera overlay AND room header), apply the change to ALL relevant locations.
 4. **Report the exact line number and parent context** — when marking complete, state where the code was added and what conditional path reaches it.
 
+### Independent review (MANDATORY before marking [x])
+After implementing a task, spawn a **separate reviewer agent** to independently verify the work before marking it complete. The reviewer has NOT seen your implementation process — it only sees the result.
+
+**Reviewer checklist:**
+1. **Read the task description** — understand what was requested.
+2. **Read the diff** — `git diff` to see exactly what changed.
+3. **Verify intent match** — does the implementation actually do what the task asked? Not just "does it build" but "does it solve the problem."
+4. **Check for regressions** — look for unintended side effects:
+   - Were any existing features broken by the change?
+   - Were any variables referenced that don't exist in scope (e.g., `data` in ScopeWizard)?
+   - Are there dangling references to removed code?
+5. **Verify render path** — confirm the new/changed code is reachable at runtime (correct component, correct conditional branch, correct view state).
+6. **Check for consistency** — if the change applies a pattern (e.g., color change), verify it was applied everywhere (not just one instance).
+7. **Report PASS or FAIL** — if FAIL, list specific issues. The implementing agent must fix all issues before re-submitting for review.
+
+**How to run:**
+```
+Agent({
+  description: "Review task implementation",
+  subagent_type: "general-purpose",
+  prompt: "You are a code reviewer. Read the task: [TASK DESCRIPTION]. Then run `git diff` to see the changes. Verify: (1) the changes match the task intent, (2) no regressions or scope errors, (3) render path is correct, (4) patterns applied consistently. Report PASS or FAIL with specific issues."
+})
+```
+
+**Rules:**
+- Do NOT mark a task `[x]` until the reviewer reports PASS.
+- If the reviewer reports FAIL, fix the issues and re-run the review.
+- The reviewer is a fresh agent with no memory of the implementation — this is intentional. It catches assumptions the implementer missed.
+
 ### Lint baseline
 - Current lint: ~390 errors (mostly `no-explicit-any` and `no-unused-vars` from prototype code)
 - **Rule**: new code must not add new lint errors. If you add `as any`, note it. Remove unused vars/imports.
 - Run `npx eslint src/App.tsx --no-warn-ignored 2>&1 | grep "problems"` after changes to verify count hasn't increased.
+
+### Coding patterns
+- **Read `Coding.Skills.md` before implementing.** It documents established UI/UX patterns (coaching text, smart fields, conditional forms, compact views, toggle buttons, etc.). Use these patterns when building new features — don't reinvent them.
 
 ### Key files
 - `src/App.tsx` — main app + ScopeWizard component (~17K lines)
@@ -188,12 +220,14 @@ After implementing, run these checks BEFORE marking [x]:
 - All UI text uses Tailwind text sizing (text-[12px], text-[14px], etc.)
 - Phone frame is 393px wide, 852px tall with rounded-[44px] corners
 - Bottom sheets use `fixed` positioning at `z-[101]` with `w-[393px]`
-- Violet theme (#7c3aed) for interview UI
+- Indigo theme for interview UI (number badges, panel header/footer, buttons)
+- Violet theme for coaching/help text panels
 - Blue theme for scope wizard UI
 - Component name is `ScopeWizard` (not V2, not InstructionDemo)
 - State variable for showing scope: `showScope` / `setShowScope`
 
 ### Don't
+- Don't write verbose help/coaching text — keep it to one concise sentence. If it can be shorter, make it shorter.
 - Don't add console.log for debugging — remove after use
 - Don't create new files unless necessary — prefer editing existing
 - Don't add emojis to UI unless user requests

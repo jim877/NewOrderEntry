@@ -1176,13 +1176,13 @@ const ScopeBridgeModal = ({ open, value, onClose, onApply, suggestedGroups = [] 
 // --- Main App Component ---
 export default function SameDayScope({ onExit, onNavigateToNoe, onNavigateToSds, eventInstructions, onEventInstructionsChange, serviceOfferings, onServiceOfferingsChange, suggestedGroups, onSuggestedGroupsChange, scopeBridge = createScopeBridgeState(), onScopeBridgeChange, lossSeverity, onLossSeverityChange, orderTypes = [], lossDetails = {}, severityCodes = [], orderName = "", claimNumber = "", insuranceCompany = "", insuranceAdjuster = "", dateOfLoss = "", addressLabel = "", customers = [], familyMedicalIssues = "", soapFragAllergies = "", sdsConsiderations = [], sdsObservations = [], sdsServices = [], onSdsServicesChange, sdsRooms = [], onSdsRoomsChange, sdsProjectFloors = [], onSdsProjectFloorsChange, sdsApartmentType = "", onSdsApartmentTypeChange, sdsPrebagged = "", onSdsPrebaggedChange, sdsInitialInstructions = [], onSdsInitialInstructionsChange, sdsInstructionAgreement = null, onSdsInstructionAgreementChange, sdsDisagreementNote = "", onSdsDisagreementNoteChange }) {
   const [rooms, setRooms] = useState(() => {
-    const defaultDetails = { packOut: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } }, leaveOnsite: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } } };
-    return (Array.isArray(sdsRooms) ? sdsRooms : []).map(r => ({
-      severitySelections: [], roomSeverityCodes: [], tasks: [], affected: null, hasCleaning: null, packOut: null, leaveOnsite: null,
-      details: defaultDetails, ui: { openRoom: false, openStatus: false, openNotes: true, openTasks: true, openCleanQ: false, openPackQ: false, openLeaveQ: false }, completedSections: {},
-      ...r,
-      details: { ...defaultDetails, ...r.details, packOut: { locations: { include: [], exclude: [], ...r.details?.packOut?.locations }, items: { include: [], exclude: [], ...r.details?.packOut?.items } }, leaveOnsite: { locations: { include: [], exclude: [], ...r.details?.leaveOnsite?.locations }, items: { include: [], exclude: [], ...r.details?.leaveOnsite?.items } } },
-    }));
+	    const defaultDetails = { packOut: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } }, leaveOnsite: { locations: { include: [], exclude: [] }, items: { include: [], exclude: [] } } };
+	    return (Array.isArray(sdsRooms) ? sdsRooms : []).map(r => ({
+	      severitySelections: [], roomSeverityCodes: [], tasks: [], affected: null, hasCleaning: null, packOut: null, leaveOnsite: null,
+	      ui: { openRoom: false, openStatus: false, openNotes: true, openTasks: true, openCleanQ: false, openPackQ: false, openLeaveQ: false }, completedSections: {},
+	      ...r,
+	      details: { ...defaultDetails, ...r.details, packOut: { locations: { include: [], exclude: [], ...r.details?.packOut?.locations }, items: { include: [], exclude: [], ...r.details?.packOut?.items } }, leaveOnsite: { locations: { include: [], exclude: [], ...r.details?.leaveOnsite?.locations }, items: { include: [], exclude: [], ...r.details?.leaveOnsite?.items } } },
+	    }));
   });
   const [mode, setMode] = useState("scope");
   const [isSelectionMode, setIsSelectionMode] = useState(false);

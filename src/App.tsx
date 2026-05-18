@@ -353,6 +353,7 @@ const buildEventSystemEntries = (data, conditionSummary) => {
     entries.push({ label: "Services", value: serviceDetails.join(", ") });
   }
   if ((data.packoutSummary || []).length) entries.push({ label: "Picking Up", value: (data.packoutSummary || []).join(", ") });
+  if ((data as any).packoutScope && (data as any).packoutScope !== "No Packout") entries.push({ label: "Packout", value: (data as any).packoutScope + ((data as any).packoutNote ? ` — ${(data as any).packoutNote}` : "") });
   if ((data.quickInstructionNotes || []).length) entries.push({ label: "Quick Notes", value: (data.quickInstructionNotes || []).join(", ") });
   if ((data.quickScopeNotes || []).length) entries.push({ label: "Scope Notes", value: (data.quickScopeNotes || []).join(", ") });
   if (data.estimateRequested) {
@@ -452,7 +453,7 @@ const SERVICE_SUB_CATEGORIES: Record<string, string[]> = {
 };
 const SUGGESTED_GROUPS = ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"];
 const LIVING_STATUS_ADDRESS_TYPES = ["Moving", "Hotel", "Temp", "Neighbor", "Relative", "Rental", "Other Home"];
-const SUGGESTED_GROUP_HELP = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("group.")).map(k => [k.replace("group.", ""), DEFAULT_COACHING[k]]));
+
 const BRIDGE_CUSTOMER_BLOCKERS = [
   "Wants Everything Replaced",
   "Not sure if submitting a claim",
@@ -532,7 +533,6 @@ const bridgeStageToneClass = (tone, active) => {
   if (tone === "red") return active ? "border-rose-300 bg-rose-100 text-rose-800" : "border-slate-200 bg-white text-slate-700 hover:border-rose-300";
   return active ? "border-sky-300 bg-sky-100 text-sky-800" : "border-slate-200 bg-white text-slate-600 hover:border-sky-300";
 };
-const SERVICE_OFFERING_HELP = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("service.")).map(k => [k.replace("service.", ""), DEFAULT_COACHING[k]]));
 const INSURANCE_COMPANY_SHORTCUTS = [
   {
     company: "Not Yet Known",
@@ -991,9 +991,6 @@ const EntityPreferencePanel = ({
 
 // --- CONSTANTS FOR SELECTIONS ---
 const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil", "Unknown", "Other"];
-// These objects now read from DEFAULT_COACHING for single-source-of-truth
-const LOSS_TYPE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("loss.")).map(k => [k.replace("loss.", ""), DEFAULT_COACHING[k]]));
-const ROLE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("role.")).map(k => [k.replace("role.", ""), DEFAULT_COACHING[k]]));
 // ═══ CENTRALIZED COACHING CONFIG ═══
 // All coaching/help text in one place. Edit via Settings → Coaching & Help Text.
 // User overrides are stored in localStorage and take precedence over defaults.
@@ -1042,6 +1039,7 @@ const DEFAULT_COACHING: Record<string, string> = {
   "service.Expert Stain Removal": "Specialized stain removal services.",
   // Section / Field Help
   "section.interview": "Ask the customer these questions during or before the initial visit.",
+  "section.timeline": "Plan pickups, rush deliveries, in-home events, and final delivery based on the repair schedule and living situation.",
   "section.eventInstructions": "What scheduling and field team need to know — conditions, access, customer preferences, what to bring.",
   "section.repairs": "Repair type determines your delivery timeline and potential blockers. Each option auto-suggests a delivery group and adds delivery instructions.",
   "section.rush": "Rush deliveries get essentials (clothing, bedding, toiletries) to the customer within days. The delivery address will auto-link to their first living situation.",
@@ -1087,6 +1085,12 @@ const DEFAULT_COACHING: Record<string, string> = {
   "toast.suggestOrderType": "Suggested order type: {value}",
   "toast.openMoldLimit": "Mold limit warning",
 };
+
+// These objects read from DEFAULT_COACHING for single-source-of-truth
+const LOSS_TYPE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("loss.")).map(k => [k.replace("loss.", ""), DEFAULT_COACHING[k]]));
+const ROLE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("role.")).map(k => [k.replace("role.", ""), DEFAULT_COACHING[k]]));
+const SUGGESTED_GROUP_HELP = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("group.")).map(k => [k.replace("group.", ""), DEFAULT_COACHING[k]]));
+const SERVICE_OFFERING_HELP = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("service.")).map(k => [k.replace("service.", ""), DEFAULT_COACHING[k]]));
 
 // Coaching accessor — checks user overrides (localStorage) then defaults
 const getCoaching = (key: string, overrides?: Record<string, string>): string => {
@@ -1805,13 +1809,13 @@ const DEFAULT_INTERVIEW_ACTIONS = {
   "Boarded Up":         { coaching: "Please confirm safe entry and available access.", actions: [{ type: "loadList", value: "Lights" }] },
 
   // Q2: Repairs
-  "Just Cleaning":              { coaching: "Timeline: 1-2 weeks. Quick turnaround — plan for a Rush Final Delivery (RFD) where everything goes back at once.", actions: [{ type: "eventInstruction", value: "Delivery: Standard pack-out/pack-back" }, { type: "suggestGroup", value: "RFD" }] },
-  "Paint":                      { coaching: "Timeline: 2-4 weeks. Wait 48 hours after painting before delivering to avoid odors or items sticking. Blocker: Verify hardware is back up and walls are ready before re-hanging window treatments.", actions: [{ type: "sdsObservation", value: "Delivery Note: Hold until paint cures (48hr)" }, { type: "eventInstruction", value: "Delivery: Verify paint cured & hardware reinstalled before hanging treatments" }, { type: "suggestGroup", value: "STD" }] },
-  "Refinish Floors":            { coaching: "Timeline: 3-6 weeks. Follow contractor's advice on curing times before placing heavy furniture. Blocker: Confirm floors are fully cured before final delivery — bring extra floor protection.", actions: [{ type: "loadList", value: "Floor Protection" }, { type: "eventInstruction", value: "Delivery: Hold until floors cured — verify before scheduling" }, { type: "suggestGroup", value: "STD" }] },
-  "Replace Floors":             { coaching: "Timeline: 1-3 months. New floors need full cure time before heavy furniture. Blocker: Bring extra floor protection during delivery to protect new floors.", actions: [{ type: "eventInstruction", value: "Delivery: Floor replacement in progress — protect new floors" }, { type: "loadList", value: "Floor Protection" }, { type: "suggestGroup", value: "LTD" }] },
-  "Cosmetic Damage":            { coaching: "Timeline: 2-6 weeks. Minor repairs (cabinets, tile, cosmetic). Blocker: Confirm all repairs complete before scheduling final delivery.", actions: [{ type: "eventInstruction", value: "Delivery: Hold for minor repairs — confirm completion" }, { type: "suggestGroup", value: "LTD" }] },
-  "Major Structural Damage":    { coaching: "Timeline: 3-9+ months. Significant construction required. Long-term storage needed. Blocker: Timeline TBD — coordinate with contractor for completion estimate.", actions: [{ type: "suggestGroup", value: "LTD" }, { type: "blocker", value: "Timeline TBD — awaiting contractor estimate" }] },
-  "Complete Rebuild":           { coaching: "Timeline: 6-12+ months. Full reconstruction. Plan for long-term storage. Blocker: No delivery until certificate of occupancy. Coordinate with contractor for phased delivery if possible.", actions: [{ type: "suggestGroup", value: "LTFD" }, { type: "blocker", value: "Awaiting certificate of occupancy" }] },
+  "Just Cleaning":              { coaching: "Timeline: 1-2 weeks. Customer may stay home or be out briefly. Plan essentials for a quick turnaround — Rush Final Delivery (RFD) where everything goes back at once.", actions: [{ type: "eventInstruction", value: "Repairs: Cleaning only — quick turnaround expected" }, { type: "suggestGroup", value: "RFD" }] },
+  "Paint":                      { coaching: "Timeline: 2-4 weeks. Customer likely out 1-2 weeks for painting + 48hr cure. Consider a Short Term Delivery (STD) — verify hardware is back up and walls are ready before re-hanging window treatments.", actions: [{ type: "sdsObservation", value: "Repairs: Painting scheduled — note window treatments and wall-hung items" }, { type: "eventInstruction", value: "Repairs: Painting in progress — note items near walls, window treatments, and hardware for removal" }, { type: "suggestGroup", value: "STD" }] },
+  "Refinish Floors":            { coaching: "Timeline: 3-6 weeks. Customer out while floors cure — plan Short Term Delivery (STD). Follow contractor's advice on cure times before placing heavy furniture.", actions: [{ type: "eventInstruction", value: "Repairs: Floor refinishing — use protective coverings during pickup, note heavy furniture placement" }, { type: "suggestGroup", value: "STD" }] },
+  "Replace Floors":             { coaching: "Timeline: 1-3 months. Customer likely out for extended period — plan Long Term Delivery (LTD). New floors need full cure before heavy furniture.", actions: [{ type: "eventInstruction", value: "Repairs: Floor replacement — use protective coverings during pickup, note heavy furniture placement" }, { type: "suggestGroup", value: "LTD" }] },
+  "Cosmetic Damage":            { coaching: "Timeline: 2-6 weeks. Customer may be out a few weeks for minor repairs (cabinets, tile, cosmetic). Plan Long Term Delivery (LTD) — confirm all repairs complete before scheduling final.", actions: [{ type: "eventInstruction", value: "Repairs: Cosmetic work in progress — note items near repair areas" }, { type: "suggestGroup", value: "LTD" }] },
+  "Major Structural Damage":    { coaching: "Timeline: 3-9+ months. Customer will be out for an extended period — plan Long Term Delivery (LTD) with long-term storage. Coordinate with contractor for a completion estimate.", actions: [{ type: "suggestGroup", value: "LTD" }, { type: "blocker", value: "Timeline TBD — awaiting contractor estimate" }] },
+  "Complete Rebuild":           { coaching: "Timeline: 6-12+ months. Customer out until certificate of occupancy — plan Long Term Final Delivery (LTFD) with long-term storage. Coordinate with contractor for phased delivery if possible.", actions: [{ type: "suggestGroup", value: "LTFD" }, { type: "blocker", value: "Awaiting certificate of occupancy" }] },
 
   // Q3: Living Status
   "Staying in home":    { coaching: "We'll try to work as quietly as possible and expedite your household essentials like bedding, shower curtains and throw rugs. We also have temporary shades if you need privacy on the windows.", actions: [{ type: "eventInstruction", value: "Customer on-site" }] },
@@ -2630,9 +2634,15 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
   );
 };
 
-const Toast = ({message,onClose,panelOffset=0})=>{
+const ToastItem = ({message, onClose, style}: {message: string; onClose: () => void; style?: React.CSSProperties})=>{
   useEffect(()=>{ const id=setTimeout(onClose,3500); return ()=>clearTimeout(id);},[onClose]);
-  return(<div className="fade-in fixed bottom-28 z-[90] rounded-2xl bg-slate-800/95 backdrop-blur px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2" style={{ left: '0', right: `${panelOffset}px`, margin: '0 auto', width: 'fit-content' }}><span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>{message}</div>)
+  return(<div className="fade-in rounded-2xl bg-slate-800/95 backdrop-blur px-5 py-2.5 text-[12px] font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2 w-fit" style={style}><span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white text-[8px] shrink-0">✓</span>{message}</div>)
+};
+const ToastStack = ({toasts, onRemove, panelOffset=0}: {toasts: {id: number; message: string}[]; onRemove: (id: number) => void; panelOffset?: number})=>{
+  if (!toasts.length) return null;
+  return(<div className="fixed bottom-28 z-[90] flex flex-col-reverse items-center gap-1.5" style={{ left: '0', right: `${panelOffset}px`, margin: '0 auto', width: 'fit-content' }}>
+    {toasts.map(t => <ToastItem key={t.id} message={t.message} onClose={() => onRemove(t.id)} />)}
+  </div>);
 };
 
 const Switch = ({ checked, onChange }) => (
@@ -2985,7 +2995,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       </Field>
       {showInlineHelp && data.leadSourceCategory === "Referral" && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700">
-          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Referrer:</span> {coaching("field.referrer")}
+          <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); const wrapper = e.target.parentElement; const label = wrapper?.querySelector('span.font-bold')?.textContent?.replace(/:$/, '') || ''; if (label) dismissTip(label); if (wrapper) wrapper.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>🎓 <span className="font-bold">Referrer:</span> {getCoaching("field.referrer")}
         </div>
       )}
 
@@ -3115,7 +3125,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold shadow-sm">{getRepInitials(salesRep)}</span>
             <span className="text-sm font-semibold text-slate-700">{salesRep.split(",")[0]}</span>
           </div>
-          {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">{coaching("field.autoAssigned")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+          {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">{getCoaching("field.autoAssigned")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
         </Field>
       )}
 
@@ -3158,7 +3168,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
       {referrerRep && salesRep && salesRep !== referrerRep && (
         <div className="text-[10px] text-amber-600 font-semibold mt-1">Referrer's rep is {referrerRep}</div>
       )}
-      {showInlineHelp && !referrerRep && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("field.salesRep")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+      {showInlineHelp && !referrerRep && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{getCoaching("field.salesRep")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
       </React.Fragment>
       )}
       {showSuggestedRoles && (
@@ -3246,6 +3256,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [expandedContext, setExpandedContext] = useState(false);
   const [walkthroughRoom, setWalkthroughRoom] = useState<{ fi: number; ri: number } | null>(null);
   const [roomSwitching, setRoomSwitching] = useState(false);
+  const [coverMode, setCoverMode] = useState(false);
   const [lastCapturedIdx, setLastCapturedIdx] = useState<number | null>(null);
   const [photoTagsOpen, setPhotoTagsOpen] = useState(false);
   const [roomPhotos, setRoomPhotos] = useState<Record<string, { src: string; note: string; reason: string; ts: number; tag?: string }[]>>(() => {
@@ -3400,7 +3411,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const INTERVIEW_SECTIONS = [
     // --- General questions ---
     { id: "conditions", title: "Current conditions?", type: "multi" as const, critical: true, timeline: false, options: ["Still Wet", "Visible Mold", "Structural Damage", "No Electricity", "No Heat", "Boarded Up"] },
-    { id: "packout", title: "What are we picking up?", type: "multi" as const, critical: true, timeline: false, options: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"] },
+    { id: "packout", title: "What type of items will we be cleaning?", type: "multi" as const, critical: true, timeline: false, options: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"] },
     { id: "medicalIssues", title: "Medical issues?", type: "boolean" as const, critical: true, timeline: false },
     { id: "soapAllergies", title: "Soap/fragrance allergies?", type: "boolean" as const, critical: true, timeline: false },
     { id: "dryLaundry", title: "How do they dry laundry?", type: "single" as const, critical: true, timeline: false, options: ["Air-Dry", "Low Heat", "Dryer"] },
@@ -5807,13 +5818,15 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
             const totalExisting = Object.values(roomPhotos).reduce((s, arr) => s + arr.length, 0);
             const isFirstPhoto = totalExisting === 0 && (roomPhotos[rKey] || []).length === 0;
             const newIdx = (roomPhotos[rKey] || []).length;
-            setRoomPhotos(p => ({ ...p, [rKey]: [...(p[rKey] || []), { src: dataUrl, note: room.affected ? "" : "Not Affected", reason: room.affected ? "" : "Condition", ts: Date.now(), tag: isFirstPhoto ? "cover" : (newIdx === 0 ? "roomCover" : ""), roomName: room.name, floor: homeRooms[fi]?.name || "" }] }));
+            const isCoverMode = coverMode;
+            const tag = isCoverMode ? "cover" : isFirstPhoto ? "cover" : (newIdx === 0 ? "roomCover" : "");
+            setRoomPhotos(p => ({ ...p, [rKey]: [...(p[rKey] || []), { src: dataUrl, note: room.affected ? "" : "Not Affected", reason: room.affected ? "" : "Condition", ts: Date.now(), tag, roomName: room.name, floor: homeRooms[fi]?.name || "" }] }));
             // Show inline reason bar for quick tagging
             setLastCapturedIdx(newIdx);
-            // Prompt for cover designation on first photo
-            if (isFirstPhoto) {
-              setOrderCoverPhoto(`${rKey}-0`);
-              setPhotoCoverPrompt({ rKey, index: newIdx });
+            if (isCoverMode || isFirstPhoto) {
+              setOrderCoverPhoto(`${rKey}-${newIdx}`);
+              if (!isCoverMode) setPhotoCoverPrompt({ rKey, index: newIdx });
+              setCoverMode(false);
             }
           }
         };
@@ -5828,6 +5841,8 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
 
         return (
         <div className={`absolute inset-0 ${cameraActive ? "z-50 rounded-[44px]" : "bottom-[52px] z-40 rounded-t-[44px]"} ${cameraActive ? "bg-black" : "bg-white"} flex flex-col overflow-hidden`}>
+          {/* Room switching overlay — covers entire view to prevent flash */}
+          {roomSwitching && <div className="absolute inset-0 z-[60] bg-black" />}
 
           {/* Live camera viewfinder */}
           {cameraActive && (
@@ -5861,25 +5876,24 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                     {isCover && <span className="rounded-full bg-blue-500 text-white px-2 py-0.5 text-[9px] font-bold">{capturedPhoto.tag === "cover" ? "Order Cover" : "Room Cover"}</span>}
                   </div>
                   {/* Tag overlay — scrollable bottom panel */}
-                  <div className="absolute left-0 right-0 bottom-0 px-3 pb-6 pt-2 bg-gradient-to-t from-black/90 via-black/70 to-transparent" style={{ maxHeight: "60%" }}>
+                  <div className="absolute left-0 right-0 bottom-0 px-3 pb-14 pt-2 bg-gradient-to-t from-black/90 via-black/70 to-transparent" style={{ maxHeight: "65%" }}>
                     <div className="space-y-2 overflow-auto" style={{ maxHeight: "calc(60vh - 40px)" }}>
                       <div className="flex items-center justify-between">
                         <button type="button" onClick={() => setPhotoTagsOpen(p => !p)} className="text-[12px] font-bold text-white/70 hover:text-white flex items-center gap-1">
                           {photoTagsOpen ? "▾" : "▸"} Tag & Notes
                         </button>
-                        <div className="flex gap-2">
+                        <div className="grid grid-cols-4 gap-1.5 w-full">
                           <button onClick={() => {
-                            // Delete this photo and return to camera
                             setRoomPhotos(p => {
                               const arr = [...(p[rKey] || [])];
                               arr.splice(lastCapturedIdx, 1);
                               return { ...p, [rKey]: arr };
                             });
                             setLastCapturedIdx(null);
-                          }} className="rounded-full bg-red-500/70 px-4 py-2 text-white text-sm font-bold hover:bg-red-600 min-w-[80px]">Delete</button>
-                          <button onClick={() => { updatePhoto(lastCapturedIdx, "scopeInclude", !(capturedPhoto as any).scopeInclude); }} className={`rounded-full px-4 py-2 text-sm font-bold transition-all min-w-[80px] ${(capturedPhoto as any).scopeInclude ? "bg-violet-500 text-white" : "bg-white/20 text-white/80 hover:bg-violet-500/50"}`}>{(capturedPhoto as any).scopeInclude ? "Scope ✓" : "Scope"}</button>
-                          <button onClick={() => setLastCapturedIdx(null)} className="rounded-full bg-blue-500 px-4 py-2 text-white text-sm font-bold min-w-[80px]">Another</button>
-                          {(() => { const nextRoomInfo = allAffected.find((_, idx) => idx === curIdx + 1); return nextRoomInfo ? <button onClick={() => { setLastCapturedIdx(null); switchToRoom(nextRoomInfo.fi, nextRoomInfo.ri); }} className="rounded-full bg-green-500 px-4 py-2 text-white text-sm font-bold min-w-[80px]">Next Room</button> : <button onClick={() => { setLastCapturedIdx(null); stopCamera(); setWalkthroughRoom(null); tryExitWalkthrough(); }} className="rounded-full bg-green-500 px-4 py-2 text-white text-sm font-bold min-w-[80px]">Done</button>; })()}
+                          }} className="rounded-xl border border-white/20 bg-white/10 px-2 py-2.5 text-white text-[11px] font-bold hover:bg-red-500/40 transition-all">Delete</button>
+                          <button onClick={() => { updatePhoto(lastCapturedIdx, "scopeInclude", !(capturedPhoto as any).scopeInclude); }} className={`rounded-xl border px-2 py-2.5 text-[11px] font-bold transition-all ${(capturedPhoto as any).scopeInclude ? "border-violet-400 bg-violet-500/60 text-white" : "border-white/20 bg-white/10 text-white/80 hover:bg-violet-500/30"}`}>{(capturedPhoto as any).scopeInclude ? "In Scope ✓" : "Add Scope"}</button>
+                          <button onClick={() => setLastCapturedIdx(null)} className="rounded-xl border border-white/20 bg-white/15 px-2 py-2.5 text-white text-[11px] font-bold hover:bg-white/25 transition-all">Another</button>
+                          {(() => { const nextRoomInfo = allAffected.find((_, idx) => idx === curIdx + 1); return nextRoomInfo ? <button onClick={() => { setLastCapturedIdx(null); switchToRoom(nextRoomInfo.fi, nextRoomInfo.ri); }} className="rounded-xl border border-sky-400/40 bg-sky-500/40 px-2 py-2.5 text-white text-[11px] font-bold hover:bg-sky-500/60 transition-all">Next Room →</button> : <button onClick={() => { setLastCapturedIdx(null); stopCamera(); setWalkthroughRoom(null); tryExitWalkthrough(); }} className="rounded-xl border border-emerald-400/40 bg-emerald-500/40 px-2 py-2.5 text-white text-[11px] font-bold hover:bg-emerald-500/60 transition-all">Done ✓</button>; })()}
                         </div>
                       </div>
                       {photoTagsOpen && <>
@@ -6011,6 +6025,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                 <div className="w-full px-3 space-y-1">
                   {/* Floor tabs */}
                   <div className="flex gap-1 justify-center overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+                    <button onClick={() => setCoverMode(p => !p)} className={`rounded-full px-3 py-1.5 text-[12px] font-bold transition-all min-h-[32px] ${coverMode ? "bg-amber-500 text-white ring-2 ring-amber-300" : "bg-amber-500/30 text-amber-300 hover:bg-amber-500/50"}`}>Cover</button>
                     {homeRooms.map((f, fIdx) => {
                       const isCurrentFloor = fIdx === fi;
                       const floorPhotos = f.rooms.reduce((s, _, rIdx) => s + (roomPhotos[`${fIdx}-${rIdx}`] || []).length, 0);
@@ -6891,7 +6906,7 @@ const FloatingCapsule = ({ entryMode, setEntryMode, onSave, setShowSearch, onInt
                   <button
                       data-noe-action="interview"
                       onClick={onInterview}
-                      className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all ${interviewPanelOpen ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'hover:bg-violet-50 text-slate-600 hover:text-violet-600 bg-slate-50'}`}
+                      className={`flex items-center justify-center h-10 px-3 sm:px-4 gap-1.5 rounded-full transition-all ${interviewPanelOpen ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 bg-slate-50'}`}
                   >
                       <span className="text-xs sm:text-sm font-bold">Interview</span>
                   </button>
@@ -7660,7 +7675,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   )}
                   {data.leadSourceCategory === "Referral" && <div>
                     <div className="text-[11px] font-bold text-slate-700 mb-1">Referrer</div>
-                    <SearchSelect value={data.referrer || data.referringCompany || ""} onChange={v => { const parsed = parseCombinedContact(v); updateMany(parsed); }} options={combinedContactOptions} placeholder="Search referrer..." onAddNew={name => { setModal({ type: "contact", value: name, onSave: (n) => updateMany({ referrer: n }) }); }} />
+                    <SearchSelect value={data.referrer || data.referringCompany || ""} onChange={v => { const parsed = parseCombinedContact(v); updateMany({ referrer: parsed.contact || v, referringCompany: parsed.company || "" }); }} options={combinedContactOptions} placeholder="Search referrer..." onAddNew={name => { setModal({ type: "contact", value: name, onSave: (n) => updateMany({ referrer: n }) }); }} />
                     {(data.referrer || data.referringCompany) && (
                       <div className="flex gap-1 mt-1.5">
                         <ToggleMulti label="Referrer" checked={true} onChange={() => {}} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
@@ -7671,7 +7686,10 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   </div>}
                   <div>
                     <div className="text-[11px] font-bold text-slate-700 mb-1">Sales Rep</div>
-                    <SearchSelect value={data.salesRep || ""} onChange={v => update("salesRep", v)} options={["Mike S.", "Sarah J.", "Tom B."]} placeholder="Rep..." />
+                    <div className="flex items-center gap-2">
+                      {data.salesRep && <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-500 text-white text-[10px] font-bold shadow-sm shrink-0">{getRepInitials(data.salesRep)}</span>}
+                      <div className="flex-1"><SearchSelect value={data.salesRep || ""} onChange={v => update("salesRep", v)} options={["Mike S.", "Sarah J.", "Tom B."]} placeholder="Rep..." /></div>
+                    </div>
                     {data.salesRep && suggestedReferrerRoles?.salesRep && data.salesRep !== suggestedReferrerRoles.salesRep && <div className="text-[11px] text-amber-600 mt-0.5">Referrer's rep is {suggestedReferrerRoles.salesRep}</div>}
                   </div>
                   <div>
@@ -7800,7 +7818,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     ]} value={data.isLead === true ? "Lead" : data.isLead === false ? "Order" : ""} onChange={v => update("isLead", v === "Lead")} />
                     {showInlineHelp && (data.isLead === true || data.isLead === false) && (
                     <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1">
-                      <span className="flex-1">🎓 {data.isLead === true ? coaching("field.isLead") : coaching("field.isOrder")}</span>
+                      <span className="flex-1">🎓 {data.isLead === true ? getCoaching("field.isLead") : getCoaching("field.isOrder")}</span>
                       <button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
                     </div>
                     )}
@@ -7828,7 +7846,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     {showInlineHelp && !data.primaryLossType && !dismissedTips.has("Loss Type") && (
                       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-700 mb-2">
                         <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); dismissTip("Loss Type"); e.target.parentElement.style.display = 'none'; }} className="float-right ml-2 px-1 text-violet-400 hover:text-violet-600 font-bold text-sm" title="Dismiss this tip">×</button>
-                        🎓 <span className="font-bold">Loss Type:</span> {coaching("field.lossType")}
+                        🎓 <span className="font-bold">Loss Type:</span> {getCoaching("field.lossType")}
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2">
@@ -7896,7 +7914,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                         );
                         })}
                       </div>
-                      {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">{coaching("field.contaminants")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                      {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mt-1 flex items-start gap-1"><span className="flex-1">{getCoaching("field.contaminants")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                     </Field>
                   )}
                   {isRestorationProject && (
@@ -8178,7 +8196,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                 )}
                 <div className="border-t border-slate-100 pt-4 mt-4">
                   <div className="text-sm font-bold text-slate-700 mb-1">Event Instructions</div>
-                  {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-2 flex items-start gap-1"><span className="flex-1">{coaching("section.eventInstructions")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                  {showInlineHelp && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 mb-2 flex items-start gap-1"><span className="flex-1">{getCoaching("section.eventInstructions")}</span><button type="button" onClick={e => { e.currentTarget.parentElement.style.display = "none"; }} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                   <AutoGrowTextarea
                     value={stripEventSystemLines(data.eventInstructions || "")}
                     onChange={e => update("eventInstructions", composeEventInstructions(stripEventSystemLines(e.target.value), data, conditionSummary))}
@@ -8440,6 +8458,8 @@ export default function App(){
   const [rushGuideStep, setRushGuideStep] = useState(1);
   const [rushGuideData, setRushGuideData] = useState({ interests: [], events: [] });
   const [pendingDeliveryDateChange, setPendingDeliveryDateChange] = useState<any>(null);
+  const [draggingDelivery, setDraggingDelivery] = useState<{id: string; pct: number} | null>(null);
+  const [deliveryDateVersion, setDeliveryDateVersion] = useState(0);
 
   // Sync timeline groupOverrides → interview deliveryGroupDetails + estimatedReturnDate
   useEffect(() => {
@@ -8548,7 +8568,22 @@ export default function App(){
   }, [(data as any).deliveryGroupDetails]);
 
   const [actionItemsOpen, setActionItemsOpen] = useState(false);
-  const [toast, setToast] = useState("");
+  const [actionItemsBlockerOpen, setActionItemsBlockerOpen] = useState(false);
+  const [toastQueue, setToastQueue] = useState<{id: number; message: string}[]>([]);
+  const toastIdRef = useRef(0);
+  const setToast = useCallback((msg: string) => {
+    if (!msg) return;
+    const id = ++toastIdRef.current;
+    setToastQueue(prev => {
+      if (prev.some(t => t.message === msg)) return prev;
+      return [...prev, { id, message: msg }];
+    });
+  }, []);
+  const removeToast = useCallback((id: number) => {
+    setToastQueue(prev => prev.filter(t => t.id !== id));
+  }, []);
+  // Keep backward compat: `toast` is truthy when queue has items
+  const toast = toastQueue.length > 0 ? toastQueue[0].message : "";
   const coaching = useCallback((key: string) => getCoaching(key, (data as any)._coachingOverrides), [data]);
   const [showSearch, setShowSearch] = useState(false);
   const TEST_PRESETS_KEY = "noe-test-presets";
@@ -8668,7 +8703,7 @@ export default function App(){
             const addrs = [...(p.addresses || [])];
             const exists = addrs.some(a => a.purpose === action.value);
             if (exists) return p;
-            addrs.push({ id: safeUid(), street: "", city: "", state: "", zip: "", isPrimary: false, purpose: action.value, label: `${action.value} Address` });
+            addrs.push({ id: safeUid(), street: "", city: "", state: "", zip: "", isPrimary: false, purpose: action.value, label: `${action.value} Address`, linkedContext: "Living Situation" });
             return { ...p, addresses: addrs };
           });
           executed.push(toastTemplate("addressPlaceholder", action.value));
@@ -9974,7 +10009,7 @@ export default function App(){
       kind: "known",
       value: `addr:${addr.id}`,
       type: addr.type || `Address ${idx + 1}`,
-      label: formatOrderAddressChoiceLabel(addr, idx),
+      label: formatOrderAddressChoiceLabel(addr, idx) + (addr.linkedContext ? ` (${addr.linkedContext})` : ""),
       address: formatOrderAddressLine(addr) || `${addr.type || `Address ${idx + 1}`} address TBD`,
       addressId: addr.id,
     }));
@@ -9983,7 +10018,7 @@ export default function App(){
       kind: "type",
       value: `type:${type}`,
       type,
-      label: type,
+      label: `${type} — TBD`,
       address: `${type} address TBD`,
       addressId: "",
     }));
@@ -10993,7 +11028,9 @@ export default function App(){
     });
     (data.addresses || []).forEach((addr, idx) => {
       if (!isAddressPlaceholder(addr)) return;
-      missing.push({ id: "sec3", label: `Resolve Placeholder: ${addr?.type || (idx === 0 ? "Primary Address" : `Address ${idx + 1}`)}`, section: "sec3", key: `placeholder-address-${addr.id}`, category: "placeholders" });
+      const addrLabel = addr?.type || (idx === 0 ? "Primary Address" : `Address ${idx + 1}`);
+      const addrContext = addr?.linkedContext ? ` (${addr.linkedContext})` : "";
+      missing.push({ id: "sec3", label: `Resolve Placeholder: ${addrLabel}${addrContext}`, section: "sec3", key: `placeholder-address-${addr.id}`, category: "placeholders" });
     });
     Object.entries(data.additionalCompanies || {}).forEach(([type, rawEntry]) => {
       const entry = syncCompanyEntryPlaceholders(rawEntry || {});
@@ -13185,8 +13222,9 @@ export default function App(){
     }
     if (lastNonRestorationToastRef.current === projectType) return;
     lastNonRestorationToastRef.current = projectType;
-    setToast("Insurance Company and National Carrier not Required");
-  }, [isNonRestorationProject, projectType]);
+    // Only show this toast when the user explicitly changes order type, not during interview actions
+    if (!interviewPanelOpen) setToast("Insurance Company and National Carrier not Required");
+  }, [isNonRestorationProject, projectType, interviewPanelOpen]);
 
   useEffect(() => {
     if (isNonRestorationProject) return;
@@ -14295,7 +14333,7 @@ export default function App(){
                           <button onClick={() => goToNextSection('sec2')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec2')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
                         </div>
                         {/* Interview link */}
-                        <button type="button" onClick={() => setInterviewPanelOpen(true)} className={`w-full rounded-xl border-2 px-4 py-3 text-left flex items-center justify-between transition-all ${interviewPanelOpen ? "border-violet-400 bg-violet-50" : "border-violet-200 bg-violet-50/30 hover:border-violet-300"}`}>
+                        <button type="button" onClick={() => setInterviewPanelOpen(true)} className={`w-full rounded-xl border-2 px-4 py-3 text-left flex items-center justify-between transition-all ${interviewPanelOpen ? "border-indigo-400 bg-indigo-50" : "border-indigo-200 bg-indigo-50/30 hover:border-indigo-300"}`}>
                           <div>
                             <div className="text-sm font-bold text-violet-700">Customer Interview</div>
                             <div className="text-[11px] text-violet-500 mt-0.5">Living situation, delivery, packout, medical, pets, interests</div>
@@ -14987,7 +15025,7 @@ export default function App(){
                                       const entry = { id: safeUid(), text: `${data.contactAssignment === "rep" ? "POC" : "Customer"} contacted`, at: formatShortTimestamp(), user: data.currentUser || "Unknown" };
                                       setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])], eventCustomerContacted: true, customerContactedAt: formatShortTimestamp(), customerContactedBy: data.currentUser || "Unknown" }));
                                       setToast(`${data.contactAssignment === "rep" ? "POC" : "Customer"} contacted`);
-                                    }} className={`flex-1 rounded-lg border-2 px-3 py-2 text-left transition-all ${data.eventCustomerContacted ? "border-emerald-400 bg-emerald-50" : "border-slate-200 hover:border-emerald-300"}`}>
+                                    }} className={`flex-1 rounded-lg border-2 px-3 py-2 text-left transition-all ${data.eventCustomerContacted ? "border-indigo-400 bg-indigo-50" : "border-slate-200 hover:border-emerald-300"}`}>
                                       <div className="text-[11px] font-bold text-slate-700">{data.contactAssignment === "rep" ? "POC Contacted" : "Customer Contacted"}</div>
                                       {data.eventCustomerContacted ? <div className="text-[9px] text-emerald-600">{data.customerContactedBy || "Unknown"} · {data.customerContactedAt || ""}</div> : <div className="text-[9px] text-slate-400">Tap when done</div>}
                                     </button>
@@ -14996,7 +15034,7 @@ export default function App(){
                                       const entry = { id: safeUid(), text: "Bill To contacted", at: formatShortTimestamp(), user: data.currentUser || "Unknown" };
                                       setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])], eventBillToContacted: true, billToContactedAt: formatShortTimestamp(), billToContactedBy: data.currentUser || "Unknown" }));
                                       setToast("Bill To contacted");
-                                    }} className={`flex-1 rounded-lg border-2 px-3 py-2 text-left transition-all ${data.eventBillToContacted ? "border-emerald-400 bg-emerald-50" : "border-slate-200 hover:border-emerald-300"}`}>
+                                    }} className={`flex-1 rounded-lg border-2 px-3 py-2 text-left transition-all ${data.eventBillToContacted ? "border-indigo-400 bg-indigo-50" : "border-slate-200 hover:border-emerald-300"}`}>
                                       <div className="text-[11px] font-bold text-slate-700">Bill To Contacted</div>
                                       {data.eventBillToContacted ? <div className="text-[9px] text-emerald-600">{data.billToContactedBy || "Unknown"} · {data.billToContactedAt || ""}</div> : <div className="text-[9px] text-slate-400">Tap when done</div>}
                                     </button>
@@ -15210,53 +15248,19 @@ export default function App(){
                                 </div>
                               </div>
 
-                              <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-3">
-                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Blockers</div>
-                                <div className="grid gap-3 lg:grid-cols-2">
-                                  {groupedBridgeIssues.map((group) => (
-                                    <div key={group.id} className="rounded-lg border border-slate-200/80 bg-white p-2">
-                                      <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-slate-500">{group.label}</div>
-                                      <div className="space-y-1.5">
-                                        {group.rows.map(({ issue, active }) => {
-                                          const isAuto = BRIDGE_AUTO_MANAGED_BLOCKERS.includes(issue);
-                                          const isEstimateIssue = issue === "Customer Wants Estimate" || issue === "Adjuster Wants Estimate";
-                                          const showEstimateDetails = active && isEstimateIssue && !!data.estimateRequested;
-                                          const showAuthDetails = active && issue === "Won't Sign Authorization";
-                                          return (
-                                            <button
-                                              key={issue}
-                                              type="button"
-                                              onClick={() => toggleScopeBridgeIssue(issue)}
-                                              className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-                                                active
-                                                  ? "border-sky-300 bg-sky-50"
-                                                  : "border-slate-200 bg-white hover:border-sky-200"
-                                              }`}
-                                            >
-                                              <div className="flex items-center justify-between gap-2">
-                                                <span className="text-xs font-semibold text-slate-700">{issue.replace("Customer Wants Estimate", "Wants Estimate").replace("Adjuster Wants Estimate", "Wants estimate")}</span>
-                                                <span className={`text-[12px] font-bold ${active ? "text-sky-700" : "text-slate-400"}`}>{active ? "ON" : "OFF"}</span>
-                                              </div>
-                                              {isAuto ? (
-                                                <div className="mt-1 text-[12px] font-semibold text-slate-500">Auto-linked</div>
-                                              ) : null}
-                                              {showAuthDetails ? (
-                                                <div className="mt-1 text-[12px] text-slate-500">
-                                                  {authorizationOnFile ? "Authorization marked as blocker." : "Auto-on until authorization is on file."}
-                                                </div>
-                                              ) : null}
-                                              {showEstimateDetails ? (
-                                                <div className="mt-1 text-[12px] text-slate-500">
-                                                  {bridgeEstimateDetails || "Estimate required."}
-                                                </div>
-                                              ) : null}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  ))}
+                              {/* Blockers — compact summary, managed in Action Items */}
+                              <div className="rounded-lg border border-slate-200/80 bg-white p-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Blockers</div>
+                                  <button type="button" onClick={() => { setActionItemsOpen(true); setActionItemsBlockerOpen(true); }} className="text-[10px] font-bold text-sky-600 hover:text-sky-700">Manage in Action Items →</button>
                                 </div>
+                                {(scopeBridgeState.pendingIssues || []).length > 0 ? (
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {(scopeBridgeState.pendingIssues || []).map((b, i) => (
+                                      <span key={i} className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">{BRIDGE_CUSTOMER_BLOCKERS.includes(b) ? "Customer" : "Insurance"}: {b}</span>
+                                    ))}
+                                  </div>
+                                ) : <div className="text-[11px] text-slate-400 mt-1">No active blockers</div>}
                               </div>
 
                               <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-3">
@@ -15552,7 +15556,7 @@ export default function App(){
                   { key: "conditions", title: "Is anything still wet or damaged?", configKey: "damageWasWet",
                     isAnswered: () => data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp,
                     summary: () => [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural" : "", data.noLights ? "No Power" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""].filter(Boolean).join(", ") },
-                  { key: "packout", title: "What are we picking up?", configKey: "packoutSummary",
+                  { key: "packout", title: "What type of items will we be cleaning?", configKey: "packoutSummary",
                     isAnswered: () => (data.packoutSummary || []).length > 0,
                     summary: () => (data.packoutSummary || []).join(", ") },
                   { key: "loadList", title: "What do we need to bring?", configKey: "loadList",
@@ -15581,7 +15585,7 @@ export default function App(){
                     summary: () => data.rushDeliveryNeeded === "Y" ? "Yes" : data.rushDeliveryNeeded === "N" ? "No" : "" },
                   { key: "interests", title: "Activities & interests", configKey: "rushInterests", isAnswered: () => (data.rushInterests || []).length > 0, summary: () => (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ") },
                   { key: "events", title: "Upcoming events", configKey: "upcomingEvents", isAnswered: () => (data.upcomingEvents || []).length > 0, summary: () => (data.upcomingEvents || []).map(e => e.name || "Event").join(", ") },
-                  { key: "packoutScope", title: "Has packing out been discussed?", configKey: "packoutSummary",
+                  { key: "packoutScope", title: "Will packing out of hard furnishings be necessary?", configKey: "packoutSummary",
                     isAnswered: () => !!(data as any).packoutScope,
                     summary: () => (data as any).packoutScope || "" },
                   { key: "deliveryPlanner", title: "Delivery Planner", configKey: "suggestedGroups",
@@ -15596,28 +15600,27 @@ export default function App(){
                 const getLog = (key) => (data.interviewLog || {})[key];
                 return (
                   <>
-                  <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-violet-50 shrink-0">
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-indigo-50 shrink-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-violet-800">Interview</span>
-                      <span className="text-xs text-violet-500">{answeredCount} of {visibleQuestions.length}</span>
+                      <span className="text-sm font-bold text-indigo-800">Interview</span>
+                      <span className="text-xs text-indigo-500">{answeredCount} of {visibleQuestions.length}</span>
                     </div>
-                    <button onClick={() => setInterviewPanelOpen(false)} className="text-violet-400 hover:text-violet-600 text-lg font-bold">×</button>
+                    <button onClick={() => setInterviewPanelOpen(false)} className="text-indigo-400 hover:text-indigo-600 text-lg font-bold">×</button>
                   </div>
-                  <div className="px-5 py-2 border-b border-slate-100">
-                    <div className="relative">
-                      <input value={interviewSearch} onChange={e => setInterviewSearch(e.target.value)} placeholder="Search questions..." className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-7 text-sm text-slate-700 outline-none focus:border-violet-300 bg-slate-50/50" />
+                  <div className="px-5 py-2 border-b border-slate-100 flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input value={interviewSearch} onChange={e => setInterviewSearch(e.target.value)} placeholder="Search questions..." className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-7 text-sm text-slate-700 outline-none focus:border-indigo-300 bg-slate-50/50" />
                       {interviewSearch && <button type="button" onClick={() => setInterviewSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold">×</button>}
                     </div>
+                    <button onClick={() => { const el = document.getElementById("noe-interview-timeline"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-full border border-teal-400 bg-teal-50 px-3 py-2 text-[11px] font-bold text-teal-700 hover:bg-teal-100 shrink-0 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Timeline</button>
                   </div>
                   </> );
               })()}
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {!interviewSearch && (
-                  <div className="flex items-center gap-2 mb-2">
-                    {showCoaching && !dismissedCoaching.has("interview-header") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex-1 flex items-start gap-1"><span className="flex-1">{coaching("section.interview")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "interview-header"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button></div>}
-                    {!showCoaching && <div className="flex-1" />}
-                    <button onClick={() => { const el = document.getElementById("noe-interview-timeline"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-full border-2 border-teal-400 bg-teal-50 px-4 py-2 text-[13px] font-bold text-teal-700 hover:bg-teal-100 shrink-0 flex items-center gap-1.5 shadow-sm">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Start Timeline</button>
+                {!interviewSearch && showCoaching && !dismissedCoaching.has("interview-header") && (
+                  <div className="mb-2">
+                    <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.interview")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "interview-header"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>
                   </div>
                 )}
 
@@ -15629,10 +15632,11 @@ export default function App(){
                   const expanded = interviewExpanded.conditions !== false;
                   return <div className={`rounded-xl border ${answered ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                   <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: !p.conditions})); if (!log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                    <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">1</span>{highlightSearch("Is anything still wet or damaged?")}</div>
-                    {answered && !expanded && <div className="flex items-center gap-2"><span className="text-[13px] text-sky-600 font-semibold">{summary}</span>{log && <span className="text-[13px] text-slate-300">{log.user} · {log.at}</span>}</div>}
+                    <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">1</span>{highlightSearch(expanded ? "Is anything still wet or damaged?" : "Conditions")}</div>
+                    {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
 
                   </button>
+                  {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                   {expanded && <div className="px-3 pb-3 space-y-2">
                   <div className="flex flex-wrap gap-2">
                     {[
@@ -15658,20 +15662,92 @@ export default function App(){
                       <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${i.label}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                     </div>
                   ))}
-                  {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                  {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                   </div>}
                 </div>;
                 })()}
 
-                {/* Packout */}
+                {/* Repairs (Q2) */}
+                {isFieldVisible("repairsSummary") && matchesInterviewSearch("repairs contractor", "Just Cleaning Paint Refinish Floors Replace Floors Cosmetic Damage Major Structural Complete Rebuild") && (() => {
+                  const log = (data.interviewLog || {}).repairs;
+                  const hasAnswers = !!data.repairsSummary;
+                  const answered = hasAnswers || !!log;
+                  const summary = data.repairsSummary || (!!log && !hasAnswers ? "None" : "");
+                  const expanded = interviewExpanded.repairs !== false;
+                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">2</span>{highlightSearch(expanded ? "What repairs are being done by the contractor?" : "Repairs")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      {showCoaching && !dismissedCoaching.has("c-repairs") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.repairs")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-repairs"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                      <div className="flex flex-wrap gap-2">
+                        {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
+                            const current = (data.repairsSummary || "").split(", ").filter(Boolean);
+                            const isAdding = !current.includes(s);
+                            const next = isAdding ? [...current, s] : current.filter(x => x !== s);
+                            update("repairsSummary", next.join(", "));
+                            executeInterviewActions(s, isAdding);
+                          }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {showCoaching && ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].filter(s => (data.repairsSummary || "").includes(s) && interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`)).map(s => (
+                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
+                          <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                        </div>
+                      ))}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ml-auto border-slate-200 text-slate-500 hover:bg-slate-50`}>Collapse</button></div>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Packout Scope (Q3) */}
+                {matchesInterviewSearch("packout packing", "No Packout Content Manipulation Partial Packout Full Packout packing furniture") && (() => {
+                  const log = (data.interviewLog || {}).packoutScope; const hasAnswers = !!(data as any).packoutScope; const answered = hasAnswers || !!log; const summary = (data as any).packoutScope || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packoutScope !== false;
+                  const PACKOUT_SCOPES = ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout", "TBD"];
+                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden`}>
+                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packoutScope: !p.packoutScope}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">3</span>{highlightSearch(expanded ? "Will packing out of hard furnishings be necessary?" : "Packout")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+
+                    </button>
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
+                    {expanded && <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {PACKOUT_SCOPES.map(s => (
+                          <ToggleMulti key={s} label={s} checked={(data as any).packoutScope === s} onChange={() => { update("packoutScope", (data as any).packoutScope === s ? "" : s); executeInterviewActions(s, (data as any).packoutScope !== s); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {showCoaching && (data as any).packoutScope && interviewActions[(data as any).packoutScope]?.coaching && !dismissedCoaching.has(`c-${(data as any).packoutScope}`) && (
+                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
+                          <div className="flex-1">🎓 <span className="font-bold">{(data as any).packoutScope}:</span> {interviewActions[(data as any).packoutScope].coaching}</div>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${(data as any).packoutScope}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                        </div>
+                      )}
+                      {(data as any).packoutScope && (data as any).packoutScope !== "No Packout" && (
+                        <div>
+                          <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Packout Notes (flows to event instructions)</div>
+                          <textarea value={(data as any).packoutNote || ""} onChange={e => update("packoutNote", e.target.value)} placeholder="e.g. Heavy furniture on 2nd floor, fragile china cabinet..." className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] outline-none focus:border-sky-300 resize-none" rows={2} />
+                        </div>
+                      )}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packoutScope: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packoutScope: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ml-auto border-slate-200 text-slate-500 hover:bg-slate-50`}>Collapse</button></div>}
+                    </div>}
+                  </div>;
+                })()}
+
+                {/* Packout Items (Q4) */}
                 {isFieldVisible("packoutSummary") && matchesInterviewSearch("picking up", "Rugs Window Treatments Clothing Bedding Furniture Art Electronics Hardware Appliances") && (() => {
                   const log = (data.interviewLog || {}).packout; const hasAnswers = (data.packoutSummary || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.packoutSummary || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packout !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">2</span>{highlightSearch("What are we picking up?")}</div>
-                      {answered && !expanded && <span className="text-[13px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">4</span>{highlightSearch(expanded ? "What type of items will we be cleaning?" : "Cleaning")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"].map(s => (
@@ -15684,7 +15760,7 @@ export default function App(){
                           <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                         </div>
                       ))}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -15694,10 +15770,10 @@ export default function App(){
                   const log = (data.interviewLog || {}).loadList; const hasAnswers = (data.loadList || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.loadList || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.loadList !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">3</span>{highlightSearch("What do we need to bring?")}</div>
-                      {answered && !expanded && <span className="text-[13px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">5</span>{highlightSearch(expanded ? "What do we need to bring?" : "Bring")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
@@ -15705,7 +15781,7 @@ export default function App(){
                         ))}
                       </div>
                       <Input value={(data as any).loadListNote || ""} onChange={e => update("loadListNote", e.target.value)} placeholder="Additional notes about what to bring..." className="!text-xs" />
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -15715,10 +15791,10 @@ export default function App(){
                   const log = (data.interviewLog || {}).considerations; const hasAnswers = (data.sdsConsiderations || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.sdsConsiderations || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.considerations !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">4</span>{highlightSearch("Special considerations")}</div>
-                      {answered && !expanded && <span className="text-[13px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">6</span>{highlightSearch(expanded ? "Special considerations" : "Special")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"].map(s => (
@@ -15742,7 +15818,7 @@ export default function App(){
                           <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                         </div>
                       ))}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -15758,10 +15834,10 @@ export default function App(){
                   const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"];
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: !p.pets}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[13px] font-bold shrink-0">5</span>{highlightSearch("Pets in home?")}</div>
-                      {answered && !expanded && <span className="text-[13px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">7</span>{highlightSearch(expanded ? "Pets in home?" : "Pets")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {petTypes.map(type => {
@@ -15823,7 +15899,7 @@ export default function App(){
                         <div className="flex-1">🎓 <span className="font-bold">Pets:</span> {interviewActions["Pets"]?.coaching || "Please make sure your pets are secured in a safe room."}</div>
                         <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-Pets"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                       </div>}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -15842,10 +15918,10 @@ export default function App(){
                   return (
                     <div key={q.key} className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                       <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: !p[q.key]})); if (answered && !log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                        <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">{6 + qi}</span>{highlightSearch(q.title)}</div>
-                        {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{q.summary()}</span>}
+                        <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">{8 + qi}</span>{highlightSearch(q.title)}</div>
+                        {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{q.summary()}</span>}
                       </button>
-                      {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                      {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                       {expanded && <div className="px-3 pb-3">
                         {q.key === "medical" && <>
                           <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => { update("familyMedicalIssues", v); if (v === "Y") executeInterviewActions("Medical Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), medical: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
@@ -15874,7 +15950,7 @@ export default function App(){
                             <Input value={data.howDryNote || ""} onChange={e => update("howDryNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
                           </div>}
                         </>}
-                        <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white mt-2 ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>{hasAnswers ? "Done" : "None"}</button>
+                        <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white mt-2 ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>Done</button>
                       </div>}
                     </div>
                   );
@@ -15891,26 +15967,16 @@ export default function App(){
                     </div>
                     <div className="h-px flex-1 bg-teal-200" />
                   </div>
+                  {showCoaching && !dismissedCoaching.has("c-timeline") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.timeline")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-timeline"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
                   <div className="rounded-xl border border-teal-200 bg-teal-50/30 p-3 space-y-2">
-                    {/* Show scheduled event if exists */}
-                    {data.scheduleType && data.pickupDate && (
-                      <div className="rounded-lg bg-white border border-teal-300 px-3 py-2 flex items-center gap-2">
-                        <span className="text-base">{data.scheduleType === "Pickup" ? "📦" : data.scheduleType === "In-Home" ? "🏠" : data.scheduleType === "Scope" ? "🔍" : "🤝"}</span>
-                        <div className="flex-1">
-                          <div className="text-[12px] font-bold text-teal-800">{data.scheduleType} scheduled</div>
-                          <div className="text-[11px] text-teal-600">{data.pickupDate}{data.pickupTime && data.pickupTime !== "12:00 AM" ? ` at ${data.pickupTime}` : ""}{data.eventAssignee ? ` — ${data.eventAssignee}` : ""}</div>
-                        </div>
-                      </div>
-                    )}
                     <div className="text-[12px] font-bold text-teal-800">What type of work will we be doing?</div>
                     <div className="flex flex-wrap gap-1.5">
                       {(() => {
                         const workTypes = (data as any).timelineWorkTypes || [];
                         // Auto-derive from scheduled event
-                        const autoTypes = data.scheduleType ? ({ "Scope": ["scope"], "Pickup": ["pickup"], "In-Home": ["inhome"], "Meeting": ["consult"] }[data.scheduleType] || []) : [];
+                        const autoTypes = data.scheduleType ? ({ "Pickup": ["pickup"], "In-Home": ["inhome"], "Meeting": ["consult"] }[data.scheduleType] || []) : [];
                         const effective = workTypes.length > 0 ? workTypes : autoTypes;
                         return [
-                          { key: "scope", label: "Scope", icon: "🔍", desc: "On-site scope / inspection" },
                           { key: "pickup", label: "Pickup", icon: "📦", desc: "Pack-out, transport, clean, deliver back" },
                           { key: "inhome", label: "In-Home Cleaning", icon: "🏠", desc: "On-site cleaning or restoration" },
                           { key: "consult", label: "Consult Meeting", icon: "🤝", desc: "On-site consultation" },
@@ -15936,44 +16002,6 @@ export default function App(){
                   </div>
                 </div>
 
-                {isFieldVisible("repairsSummary") && matchesInterviewSearch("repairs", "Just Cleaning Paint Refinish Floors Replace Floors Cosmetic Damage Major Structural Complete Rebuild") && (() => {
-                  const log = (data.interviewLog || {}).repairs;
-                  const hasAnswers = !!data.repairsSummary;
-                  const answered = hasAnswers || !!log;
-                  const summary = data.repairsSummary || (!!log && !hasAnswers ? "None" : "");
-                  const expanded = interviewExpanded.repairs !== false;
-                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
-                    <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">12</span>{highlightSearch("What repairs are being done?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-  
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      {showCoaching && !dismissedCoaching.has("c-repairs") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.repairs")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-repairs"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
-                      <div className="flex flex-wrap gap-2">
-                        {["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.repairsSummary || "").includes(s)} onChange={() => {
-                            const current = (data.repairsSummary || "").split(", ").filter(Boolean);
-                            const isAdding = !current.includes(s);
-                            const next = isAdding ? [...current, s] : current.filter(x => x !== s);
-                            update("repairsSummary", next.join(", "));
-                            executeInterviewActions(s, isAdding);
-                          }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
-                        ))}
-                      </div>
-                      {showCoaching && ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"].filter(s => (data.repairsSummary || "").includes(s) && interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`)).map(s => (
-                        <div key={s} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
-                          <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
-                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
-                        </div>
-                      ))}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
-                    </div>}
-                  </div>;
-                })()}
-
-
                 {/* Living Timeline */}
                 {isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving Neighbor Relative Rental") && (() => {
                   const timeline = data.livingTimeline || [];
@@ -15995,6 +16023,10 @@ export default function App(){
 	                    const next = [...timeline, { id: safeUid(), type, duration: "", endDate: "", address: payload.address, addressType: payload.addressType, addressId: payload.addressId }];
 	                    update("livingTimeline", next);
 	                    update("livingStatus", next[0]?.type || type);
+                    // Tag the placeholder address with its context
+                    if (type !== "Staying in home" && payload.addressId) {
+                      setData(p => ({ ...p, addresses: (p.addresses || []).map(a => a.id === payload.addressId ? { ...a, linkedContext: "Living Situation" } : a) }));
+                    }
                     executeInterviewActions(type, true);
                     setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
                   };
@@ -16037,7 +16069,7 @@ export default function App(){
 
                   return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">13</span>{highlightSearch("Will the customer be able to stay in the home?")}</div>
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">13</span>{highlightSearch(expanded ? "Will the customer be able to stay in the home?" : "Living")}</div>
                       {answered && !expanded && <div className="flex items-center gap-1 ml-2">
                         {timeline.length > 0 ? timeline.map((s, i) => (
                           <span key={s.id} className="text-[10px] text-emerald-600">{i > 0 && " → "}{s.type}{s.duration ? ` (${s.duration})` : ""}</span>
@@ -16045,10 +16077,10 @@ export default function App(){
                       </div>}
   
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
 	                    {expanded && <div className="px-3 pb-3 space-y-3">
                         <div className="grid grid-cols-2 gap-2">
-                          <button type="button" onClick={() => setCanStayHome(true)} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Staying in home" ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-600 hover:border-emerald-300"}`}>Yes, staying home</button>
+                          <button type="button" onClick={() => setCanStayHome(true)} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Staying in home" ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600 hover:border-indigo-300"}`}>Yes, staying home</button>
                           <button type="button" onClick={() => setCanStayHome(false)} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Not staying in home" || timeline.some(s => s.type !== "Staying in home") ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>No, staying elsewhere</button>
                         </div>
 
@@ -16059,6 +16091,39 @@ export default function App(){
                           <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-stayHome"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
                         </div>
                       )}
+
+                      {/* Estimated time away — slider with weeks/months toggle */}
+                      {data.livingStatus && data.livingStatus !== "Staying in home" && (() => {
+                        const unit = (data as any).timeAwayUnit || "months";
+                        const val = (data as any).estimatedTimeAwayValue || 0;
+                        const maxVal = unit === "weeks" ? 8 : 18;
+                        const label = val === 0 ? "Not set" : `${val} ${unit === "weeks" ? (val === 1 ? "week" : "weeks") : (val === 1 ? "month" : "months")}`;
+                        const onSlide = (e) => {
+                          const v = parseInt(e.target.value);
+                          update("estimatedTimeAwayValue", v || "");
+                          update("timeAwayUnit", unit);
+                          const textMap = unit === "weeks"
+                            ? (v === 0 ? "" : v <= 2 ? "1-2 weeks" : v <= 4 ? "3-4 weeks" : "6+ weeks")
+                            : (v === 0 ? "" : v <= 1 ? "A few weeks" : v <= 3 ? "1-3 months" : v <= 6 ? "3-6 months" : v <= 12 ? "6-12 months" : "12+ months");
+                          update("estimatedTimeAway", textMap);
+                          update("estimatedMonthsAway", unit === "months" ? v : "");
+                          setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                        };
+                        return <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-[10px] font-bold text-slate-500 uppercase">How long will they be out?</div>
+                            <div className="text-[13px] font-bold text-sky-700">{label}</div>
+                          </div>
+                          <div className="flex rounded-full border border-slate-200 overflow-hidden w-fit">
+                            <button type="button" onClick={() => { update("timeAwayUnit", "weeks"); update("estimatedTimeAwayValue", Math.min(val, 8)); }} className={`px-2.5 py-1 text-[10px] font-bold ${unit === "weeks" ? "bg-sky-500 text-white" : "bg-white text-slate-500"}`}>Weeks</button>
+                            <button type="button" onClick={() => { update("timeAwayUnit", "months"); }} className={`px-2.5 py-1 text-[10px] font-bold ${unit === "months" ? "bg-sky-500 text-white" : "bg-white text-slate-500"}`}>Months</button>
+                          </div>
+                          <input type="range" min={0} max={maxVal} step={1} value={val} onChange={onSlide} className="w-full accent-sky-500" />
+                          <div className="flex justify-between text-[9px] text-slate-400">
+                            {unit === "weeks" ? <><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span></> : <><span>0</span><span>3</span><span>6</span><span>9</span><span>12</span><span>15</span><span>18</span></>}
+                          </div>
+                        </div>;
+                      })()}
 
 	                      {/* Current timeline sequence — draggable (hidden when staying home) */}
 	                      {data.livingStatus !== "Staying in home" && timeline.length > 0 && <div className="space-y-2">
@@ -16091,10 +16156,10 @@ export default function App(){
 	                                  <span className="mb-1 block text-[9px] font-bold uppercase text-slate-400">Address</span>
 	                                  <select value={addressChoiceValue(stay)} onChange={e => updateStayAddress(stay.id, e.target.value)} className={`w-full rounded-lg border px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-sky-400 bg-white ${stay.type !== "Staying in home" && !stay.addressType && !stay.address ? "border-amber-400" : "border-slate-200"}`}>
 	                                    <option value="">Pick address...</option>
-	                                    {orderAddressChoices.known.length > 0 && <optgroup label="── ADDRESSES ON FILE ──">
+	                                    {orderAddressChoices.known.length > 0 && <optgroup label="★ EXISTING ADDRESSES ON THIS ORDER ★">
 	                                      {orderAddressChoices.known.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
 	                                    </optgroup>}
-	                                    <optgroup label="── ADD NEW ADDRESS TYPE ──">
+	                                    <optgroup label="＋ ADD PLACEHOLDER (address TBD)">
 	                                      {orderAddressChoices.placeholders.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
 	                                    </optgroup>
 	                                  </select>
@@ -16110,17 +16175,19 @@ export default function App(){
                         )}
                       </div>}
 
-                      {/* Add stay buttons (hidden when staying home) */}
-                      {data.livingStatus !== "Staying in home" && <div>
+                      {/* Add stay buttons (only when customer cannot stay home) */}
+                      {data.livingStatus && data.livingStatus !== "Staying in home" && <div>
                         <div className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">{timeline.length > 0 ? "Add next stay" : "Where first?"}</div>
                         <div className="flex flex-wrap gap-1.5">
-                          {STAY_TYPES.map(t => (
-                            <button key={t.id} type="button" onClick={() => addStay(t.id)} className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all" title={t.desc}>{(t as any).label || t.id}</button>
-                          ))}
+                          {STAY_TYPES.map(t => {
+                            const alreadyInTimeline = timeline.some(s => s.type === t.id);
+                            const hasPlaceholder = (data.addresses || []).some(a => a.purpose === t.id);
+                            return <button key={t.id} type="button" onClick={() => { if (alreadyInTimeline) return; addStay(t.id); }} disabled={alreadyInTimeline} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-all ${alreadyInTimeline ? "border-sky-300 bg-sky-50 text-sky-400 cursor-default" : hasPlaceholder ? "border-sky-400 bg-sky-50 text-sky-700 hover:bg-sky-100" : "border-slate-200 text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700"}`} title={alreadyInTimeline ? "Already in timeline" : hasPlaceholder ? `Link to existing ${t.id} address` : t.desc}>{(t as any).label || t.id}{alreadyInTimeline ? " ✓" : hasPlaceholder ? " (exists)" : ""}</button>;
+                          })}
                         </div>
                       </div>}
 
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, living: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, living: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -16134,10 +16201,10 @@ export default function App(){
                   const summary = data.rushDeliveryNeeded === "Y" ? "Yes — Rush group added" : data.rushDeliveryNeeded === "N" ? "No" : "";
                   return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, rushDelivery: !p.rushDelivery}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[14px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[12px] font-bold shrink-0">14</span>{highlightSearch("Does the customer need a rush delivery?")}</div>
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">14</span>{highlightSearch(expanded ? "Does the customer need a rush delivery?" : "Rush")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[12px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       {showCoaching && !dismissedCoaching.has("c-rush") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.rush")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-rush"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
                       <div className="grid grid-cols-2 gap-2">
@@ -16168,7 +16235,7 @@ export default function App(){
                           Rush Delivery (RD) group auto-added{(data.livingTimeline || [])[0]?.type ? ` → delivering to ${(data.livingTimeline || [])[0].type}` : ""}.
                         </div>
                       )}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, rushDelivery: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), rushDelivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, rushDelivery: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), rushDelivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -16183,11 +16250,11 @@ export default function App(){
                   const expanded = interviewExpanded.interests !== false;
                   return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !expanded}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">15</span>{highlightSearch("Activities & interests")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">15</span>{highlightSearch("Activities & interests")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
   
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       <div className="flex flex-wrap gap-1.5">
                         {RUSH_INTERESTS.map(i => {
@@ -16197,7 +16264,7 @@ export default function App(){
                           </button>;
                         })}
                       </div>
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, interests: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, interests: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -16211,54 +16278,48 @@ export default function App(){
                   const expanded = interviewExpanded.events !== false;
                   return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">16</span>{highlightSearch("Upcoming trips & events")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">16</span>{highlightSearch("Upcoming trips & events")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
   
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
                       {showCoaching && !dismissedCoaching.has("c-events") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.events")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-events"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
                       {(data.upcomingEvents || []).map(evt => (
-                        <div key={evt.id} className="p-2 rounded-lg border border-slate-200 bg-slate-50 grid grid-cols-3 gap-2 relative">
-                          <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents||[]).filter(e => e.id !== evt.id))} className="absolute top-1 right-1 text-slate-400 hover:text-rose-500 text-xs">×</button>
-                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Name</div><input value={evt.name||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" placeholder="e.g. Florida Trip" /></div>
-                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Type</div><select value={evt.type||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, type: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px] bg-white">{RUSH_EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
-                          <div><div className="text-[9px] font-bold text-slate-400 uppercase">Date</div><input type="date" value={evt.date||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, date: e.target.value} : ev))} className="w-full rounded border border-slate-200 px-2 py-1 text-[10px]" /></div>
+                        <div key={evt.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2 relative">
+                          <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents||[]).filter(e => e.id !== evt.id))} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 text-sm font-bold">×</button>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${evt.type === "trip" ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"}`}>{evt.type === "trip" ? "Trip" : "Event"}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Name</div>
+                              <input value={evt.name||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev))} className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px]" placeholder={evt.type === "trip" ? "e.g. Florida Vacation" : "e.g. Wedding"} />
+                            </div>
+                            <div>
+                              <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Date</div>
+                              <input type="date" value={evt.date||""} min={new Date().toISOString().split("T")[0]} onChange={e => {
+                                let val = e.target.value;
+                                if (val) {
+                                  const today = new Date(); today.setHours(0,0,0,0);
+                                  let d = new Date(val + "T00:00:00");
+                                  if (d < today) { d.setFullYear(today.getFullYear() + 1); val = d.toISOString().split("T")[0]; }
+                                }
+                                update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, date: val} : ev));
+                              }} className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px]" />
+                            </div>
+                          </div>
                         </div>
                       ))}
-                      <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "vacation_beach", date: "", name: ""}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full p-2 border-2 border-dashed border-slate-300 rounded-lg text-[10px] font-bold text-slate-500 hover:border-teal-400 hover:text-teal-600">+ Add Trip or Event</button>
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, events: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
-                    </div>}
-                  </div>;
-                })()}
-                {/* Packout Scope */}
-                {matchesInterviewSearch("packout packing", "No Packout Content Manipulation Partial Packout Full Packout packing furniture") && (() => {
-                  const log = (data.interviewLog || {}).packoutScope; const hasAnswers = !!(data as any).packoutScope; const answered = hasAnswers || !!log; const summary = (data as any).packoutScope || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packoutScope !== false;
-                  const PACKOUT_SCOPES = ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout"];
-                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packoutScope: !p.packoutScope}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">17</span>{highlightSearch("Has packing out been discussed?")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-  
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {PACKOUT_SCOPES.map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data as any).packoutScope === s} onChange={() => { update("packoutScope", (data as any).packoutScope === s ? "" : s); executeInterviewActions(s, (data as any).packoutScope !== s); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
-                        ))}
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "trip", date: "", name: "Trip"}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="flex-1 p-2 border-2 border-dashed border-slate-300 rounded-lg text-[11px] font-bold text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Add Trip</button>
+                        <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "event", date: "", name: "Event"}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="flex-1 p-2 border-2 border-dashed border-slate-300 rounded-lg text-[11px] font-bold text-slate-500 hover:border-amber-400 hover:text-amber-600">+ Add Event</button>
                       </div>
-                      {showCoaching && (data as any).packoutScope && interviewActions[(data as any).packoutScope]?.coaching && !dismissedCoaching.has(`c-${(data as any).packoutScope}`) && (
-                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
-                          <div className="flex-1">🎓 <span className="font-bold">{(data as any).packoutScope}:</span> {interviewActions[(data as any).packoutScope].coaching}</div>
-                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${(data as any).packoutScope}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
-                        </div>
-                      )}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packoutScope: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packoutScope: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, events: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
-                {/* Delivery Group Builder — combined Q15+Q17 */}
+                {/* Delivery Group Builder */}
                 {matchesInterviewSearch("delivery group builder final suggested", "RD RFD STD STFD LTD LTFD Inhome TLI Test Dispose Storage Only final months date") && (() => {
                   const log = (data.interviewLog || {}).suggestedGroups || (data.interviewLog || {}).finalDeliveryDate;
                   const selectedGroups = data.suggestedGroups || [];
@@ -16272,10 +16333,10 @@ export default function App(){
 	                  const logBoth = () => setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), suggestedGroups: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}, finalDeliveryDate: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
                   return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, groupBuilder: !p.groupBuilder}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold shrink-0">18</span>{highlightSearch("Delivery Planner")}</div>
-                      {answered && !expanded && <span className="text-[11px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">17</span>{highlightSearch("Delivery Planner")}</div>
+                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[8px] text-slate-400">{log.user} · {log.at}</div>}
+                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-3">
                       {showCoaching && !dismissedCoaching.has("c-groupBuilder") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.planner")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-groupBuilder"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
                       {/* Group selection chips */}
@@ -16291,11 +16352,11 @@ export default function App(){
                           })}
                         </div>
                       </div>
-                      {/* Per-group detail rows — date + address */}
+                      {/* Per-group detail rows — date + address, sorted by timeline order */}
                       {selectedGroups.length > 0 && (
                         <div className="space-y-2">
                           <div className="text-[10px] font-bold text-slate-500 uppercase">Group Details</div>
-                          {selectedGroups.map((g, gi) => {
+                          {[...selectedGroups].sort((a, b) => { const ia = SUGGESTED_GROUPS.indexOf(a); const ib = SUGGESTED_GROUPS.indexOf(b); return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib); }).map((g, gi) => {
                             const det = groupDetails[g] || {};
                             const isFinal = det.isFinal || (gi === selectedGroups.length - 1 && !selectedGroups.some((x, xi) => xi !== gi && (groupDetails[x] || {}).isFinal));
 	                            const updateDet = (field: string, val: any) => {
@@ -16339,10 +16400,10 @@ export default function App(){
                                     </select>
 	                                  <select value={addressChoiceValue(det)} onChange={e => updateDetAddress(e.target.value)} className={`rounded border px-1.5 py-0.5 text-[11px] outline-none focus:border-sky-400 flex-1 bg-white ${!det.addressType && !det.address ? "border-amber-300 bg-amber-50" : "border-slate-200"}`}>
 	                                    <option value="">Pick address...</option>
-	                                    {orderAddressChoices.known.length > 0 && <optgroup label="── ADDRESSES ON FILE ──">
+	                                    {orderAddressChoices.known.length > 0 && <optgroup label="★ EXISTING ADDRESSES ON THIS ORDER ★">
 	                                      {orderAddressChoices.known.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
 	                                    </optgroup>}
-	                                    <optgroup label="── ADD NEW ADDRESS TYPE ──">
+	                                    <optgroup label="＋ ADD PLACEHOLDER (address TBD)">
 	                                      {orderAddressChoices.placeholders.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
 	                                    </optgroup>
 	                                  </select>
@@ -16370,7 +16431,7 @@ export default function App(){
                           </div>
                         </div>
                       )}
-                      {<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, groupBuilder: false})); logBoth(); }} className={`block w-fit ml-auto rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{hasAnswers ? "Collapse ▴" : "Skip ▴"}</button>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, groupBuilder: false})); logBoth(); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -16381,9 +16442,9 @@ export default function App(){
               <div className="shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-4">
                 <button onClick={() => { setRushGuideOpen(true); setRushGuideStep(1); }} className="rounded-full border-2 border-teal-400 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 hover:bg-teal-100 flex items-center gap-1.5 shadow-sm">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  Timeline
+                  View Timeline
                 </button>
-                <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-violet-500 px-5 py-2 text-sm font-bold text-white hover:bg-violet-600">Done</button>
+                <button onClick={() => setInterviewPanelOpen(false)} className="rounded-lg bg-indigo-500 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-600">Done</button>
               </div>
           </div>
         ); })()}
@@ -16398,7 +16459,9 @@ export default function App(){
           if (data.pickupDate && !data.eventBillToContacted && (data as any).billToPaymentDirection !== "self-pay") billToBlockers.push("Bill To not yet contacted");
           if (data.pickupDate && !(data as any).billToPaymentDirection) billToBlockers.push("Direction of Payment not confirmed");
           if (data.pickupDate && !(data as any).billToApprovalStatus) billToBlockers.push("Scope approval pending");
-          const blockers = [...coreBlockers, ...billToBlockers];
+          const formalBlockers = coreBlockers;
+          const softBlockers = billToBlockers;
+          const blockers = [...formalBlockers, ...softBlockers];
           const placeholders = [
             ...(data.customers || []).filter(c => {
               if (isPlaceholderFlagActive(c?.placeholder)) return true;
@@ -16420,12 +16483,50 @@ export default function App(){
                   <button onClick={() => setActionItemsOpen(false)} className="text-amber-400 hover:text-amber-600 text-lg font-bold">×</button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {blockers.length > 0 && (
+                  {/* Blockers */}
+                  <div>
+                    {!actionItemsBlockerOpen ? <>
+                      {formalBlockers.length > 0 && <div className="space-y-1.5 mb-3">
+                        {formalBlockers.map((b, i) => {
+                          const source = BRIDGE_CUSTOMER_BLOCKERS.includes(b) ? "Customer" : BRIDGE_INSURANCE_BLOCKERS.includes(b) ? "Insurance" : "";
+                          return <div key={`fb-${i}`} className="flex items-center gap-2 rounded-xl border-2 border-rose-300 bg-rose-50 px-4 py-3">
+                            <div className="flex-1">
+                              <div className="text-[10px] font-bold text-rose-400 uppercase">{source}</div>
+                              <div className="text-sm font-bold text-rose-800">{b}</div>
+                            </div>
+                            <button type="button" onClick={() => toggleScopeBridgeIssue(b)} className="w-7 h-7 rounded-full bg-rose-100 text-rose-500 hover:bg-rose-200 hover:text-rose-700 flex items-center justify-center text-sm font-bold shrink-0">×</button>
+                          </div>;
+                        })}
+                      </div>}
+                      <button type="button" onClick={() => setActionItemsBlockerOpen(true)} className="w-full rounded-xl border-2 border-dashed border-rose-300 bg-rose-50/50 px-4 py-3 text-sm font-bold text-rose-600 hover:bg-rose-50 hover:border-rose-400 transition-all">+ Add Blocker</button>
+                    </> : <>
+                      <div className="space-y-3">
+                        {BRIDGE_BLOCKER_GROUPS.map(group => (
+                          <div key={group.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                            <div className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">{group.label}</div>
+                            <div className="space-y-1.5">
+                              {group.issues.map(issue => {
+                                const active = formalBlockers.includes(issue);
+                                return <button key={issue} type="button" onClick={() => toggleScopeBridgeIssue(issue)} className={`w-full text-left rounded-lg border-2 px-3 py-2.5 text-[13px] font-bold transition-all ${active ? "border-rose-400 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-600 hover:border-rose-300 hover:bg-rose-50/30"}`}>
+                                  <div className="flex items-center justify-between">
+                                    <span>{issue}</span>
+                                    {active && <span className="text-rose-500 text-xs">Active ✓</span>}
+                                  </div>
+                                </button>;
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => setActionItemsBlockerOpen(false)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">Done</button>
+                      </div>
+                    </>}
+                  </div>
+                  {softBlockers.length > 0 && (
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Blockers</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Follow-ups</div>
                       <div className="space-y-1">
-                        {blockers.map((b, i) => (
-                          <button key={`b-${i}`} onClick={() => { setActionItemsOpen(false); jumpToSection("sec5"); setTimeout(() => setScheduleBridgeOpen(true), 150); }} className="w-full text-left rounded-lg border border-rose-200 bg-rose-50/50 px-3 py-2 text-xs text-rose-800 hover:bg-rose-50">
+                        {softBlockers.map((b, i) => (
+                          <button key={`sb-${i}`} onClick={() => { setActionItemsOpen(false); jumpToSection("sec5"); }} className="w-full text-left rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-800 hover:bg-amber-50">
                             {b}
                           </button>
                         ))}
@@ -17157,7 +17258,9 @@ export default function App(){
 	                        }));
 	                        if (change.id === "final") update("estimatedReturnDate", change.newDateStr);
 	                      }
-	                      setPendingDeliveryDateChange(null);
+	                      setDeliveryDateVersion(v => v + 1);
+	                      // Clear pending after state update renders
+	                      setTimeout(() => setPendingDeliveryDateChange(null), 50);
 	                    };
 
 	                    // Helper to create a new custom delivery
@@ -17281,18 +17384,21 @@ export default function App(){
 	                          const ep = pct(b.endDate);
 	                          bands.push({ label: b.type, color: b.color, startPct: sp, widthPct: Math.max(ep - sp, 1), address: b.address });
 	                        });
-	                        const finalDelivery = deliveryGroups.find(dg => dg.id === "final" || dg.label === "Final Delivery");
-	                        const homeStart = finalDelivery?.date || effectiveReturn;
-	                        const homeStartPct = pct(homeStart);
-	                        if (homeStartPct < 99) {
-	                          bands.push({
-	                            label: finalDelivery?.location || "Home",
-	                            color: "bg-slate-200",
-	                            startPct: homeStartPct,
-	                            widthPct: Math.max(100 - homeStartPct, 1),
-	                            address: finalDelivery?.address || primaryAddrStr,
-	                            textClass: "text-slate-600",
-	                          });
+	                        const isStayingHome = data.livingStatus === "Staying in home";
+	                        if (!isStayingHome) {
+	                          const finalDelivery = deliveryGroups.find(dg => dg.id === "final" || dg.label === "Final Delivery");
+	                          const homeStart = finalDelivery?.date || effectiveReturn;
+	                          const homeStartPct = pct(homeStart);
+	                          if (homeStartPct < 99) {
+	                            bands.push({
+	                              label: finalDelivery?.location || "Home",
+	                              color: "bg-slate-200",
+	                              startPct: homeStartPct,
+	                              widthPct: Math.max(100 - homeStartPct, 1),
+	                              address: finalDelivery?.address || primaryAddrStr,
+	                              textClass: "text-slate-600",
+	                            });
+	                          }
 	                        }
 	                      } else {
                         if (hasHotel && hasRental) {
@@ -17304,9 +17410,14 @@ export default function App(){
                         } else if (hasRental) {
                           bands.push({ label: "Rental", color: "bg-sky-400", startPct: pct(now), widthPct: pct(effectiveReturn) - pct(now), address: rentalAddrStr });
                         } else {
-                          bands.push({ label: "Home", color: "bg-emerald-400", startPct: pct(now), widthPct: pct(effectiveReturn) - pct(now), address: primaryAddrStr });
+                          // Staying home or no alternate address — single band
+                          bands.push({ label: "Home", color: "bg-emerald-400", startPct: pct(now), widthPct: 100 - pct(now), address: primaryAddrStr });
                         }
-                        bands.push({ label: "Home", color: "bg-emerald-400", startPct: pct(effectiveReturn), widthPct: 100 - pct(effectiveReturn), address: primaryAddrStr });
+                        // Only add return-home band for customers who were away
+                        if (data.livingStatus && data.livingStatus !== "Staying in home" && (hasHotel || hasRental)) {
+                          const returnPct = pct(effectiveReturn);
+                          if (returnPct < 99) bands.push({ label: "Home", color: "bg-emerald-400", startPct: returnPct, widthPct: 100 - returnPct, address: primaryAddrStr });
+                        }
                       }
 
                       // All possible pins
@@ -17324,10 +17435,10 @@ export default function App(){
                       const isPinOn = (id: string, def: boolean) => pins[id] !== undefined ? pins[id] : def;
                       const togglePin = (id: string) => setRushGuideData((p: any) => ({ ...p, pins: { ...(p.pins || {}), [id]: !isPinOn(id, true) } }));
 
-                      const timelineRef = React.createRef<HTMLDivElement>();
+                      const timelineBarId = "rush-timeline-bar";
                       const handleDrag = (pinId: string, e: React.MouseEvent) => {
                         e.preventDefault();
-                        const bar = timelineRef.current;
+                        const bar = document.getElementById(timelineBarId);
                         if (!bar) return;
                         const onMove = (me: MouseEvent) => {
                           const rect = bar.getBoundingClientRect();
@@ -17418,13 +17529,27 @@ export default function App(){
                             </div>
 
                             {/* === THE BAR: Location bands === */}
-                            <div ref={timelineRef} className="relative z-20 h-7 bg-slate-100 rounded-lg overflow-hidden">
-                              {bands.map((b, i) => (
-                                <div key={i} className={`absolute top-0 bottom-0 ${b.color} flex items-center justify-center cursor-default`} style={{ left: `${b.startPct}%`, width: `${Math.max(b.widthPct, 1)}%` }} title={`${b.label}${b.address ? `\n→ ${b.address}` : ""}`}>
-	                                  <span className={`text-[10px] font-bold truncate px-1 ${b.textClass || "text-white drop-shadow-sm"}`}>{b.label}</span>
-                                </div>
-                              ))}
-                              <div className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-10" style={{ left: `${pct(now)}%` }} title="Today" />
+                            <div className="relative">
+                              {/* Drag indicator — outside overflow-hidden so it's not clipped */}
+                              {(draggingDelivery || pendingDeliveryDateChange) && (() => {
+                                const dp = draggingDelivery || (pendingDeliveryDateChange ? { pct: pct(parseLocalDate(pendingDeliveryDateChange.newDateStr) || new Date()) } : null);
+                                if (!dp) return null;
+                                const dropDate = new Date(timelineStart.getTime() + (dp.pct / 100) * (timelineEnd.getTime() - timelineStart.getTime()));
+                                return <>
+                                  <div className="absolute w-0.5 bg-sky-500 z-30 pointer-events-none" style={{ left: `${dp.pct}%`, transform: "translateX(-50%)", top: "0", bottom: "-55px" }} />
+                                  <div className="absolute z-30 pointer-events-none" style={{ left: `${dp.pct}%`, transform: "translateX(-50%)", top: "-20px" }}>
+                                    <div className="rounded bg-sky-600 px-2 py-0.5 text-[11px] font-bold text-white whitespace-nowrap shadow-md">{rushFormatDate(dropDate)}</div>
+                                  </div>
+                                </>;
+                              })()}
+                              <div id="rush-timeline-bar" className="relative z-20 h-7 bg-slate-100 rounded-lg overflow-hidden">
+                                {bands.map((b, i) => (
+                                  <div key={i} className={`absolute top-0 bottom-0 ${b.color} flex items-center justify-center cursor-default`} style={{ left: `${b.startPct}%`, width: `${Math.max(b.widthPct, 1)}%` }} title={`${b.label}${b.address ? `\n→ ${b.address}` : ""}`}>
+	                                    <span className={`text-[10px] font-bold truncate px-1 ${b.textClass || "text-white drop-shadow-sm"}`}>{b.label}</span>
+                                  </div>
+                                ))}
+                                <div className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-10" style={{ left: `${pct(now)}%` }} title="Today" />
+                              </div>
                             </div>
 
                             {/* === BELOW THE BAR: Delivery markers with extended connectors for clustered dates === */}
@@ -17463,39 +17588,48 @@ export default function App(){
                                 const markerRow = markerRowsById[dg.id] || 0;
                                 const connectorHeight = markerBaseConnectorPx + markerRow * markerLaneGapPx;
                                 return (
-	                                <div key={dg.id} className="absolute z-10 cursor-pointer hover:scale-105 transition-transform" style={{ left: `${pct(dg.date)}%`, transform: "translateX(-50%)", height: `${connectorHeight + 48}px` }}
-	                                  draggable
-	                                  onDragStart={e => { e.dataTransfer.setData("text/plain", dg.id); e.dataTransfer.effectAllowed = "move"; }}
-	                                  onDragEnd={e => {
-	                                    if (!e.clientX) return;
-	                                    const bar = e.currentTarget.parentElement;
-	                                    if (!bar) return;
-	                                    const rect = bar.getBoundingClientRect();
-	                                    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-	                                    const newDate = new Date(timelineStart.getTime() + x * (timelineEnd.getTime() - timelineStart.getTime()));
-	                                    const newDateStr = formatDateInputValue(newDate);
-	                                    const oldDateStr = formatDateInputValue(dg.date);
-	                                    if (!newDateStr || newDateStr === oldDateStr) return;
-	                                    window.setTimeout(() => {
-	                                      setPendingDeliveryDateChange({
-	                                        id: dg.id,
-	                                        label: dg.label,
-	                                        oldDateStr,
-	                                        newDateStr,
-	                                        oldDateLabel: rushFormatDate(dg.date),
-	                                        newDateLabel: rushFormatDate(newDate),
-	                                        isFinal: dg.id === "final",
-	                                      });
-	                                    }, 1200);
-	                                  }}
-                                  onClick={() => {
-                                    const el = document.getElementById(`delivery-card-${dg.id}`);
-                                    if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("ring-2", "ring-offset-2", "ring-sky-400"); setTimeout(() => el.classList.remove("ring-2", "ring-offset-2", "ring-sky-400"), 2000); }
-                                  }} title={`Drag to move · Click to view #${i + 1} ${dg.label}`}>
+	                                <div key={dg.id} className={`absolute z-10 cursor-grab active:cursor-grabbing transition-transform ${draggingDelivery?.id === dg.id ? "scale-125 z-30 opacity-80" : pendingDeliveryDateChange?.id === dg.id ? "scale-110 z-20" : "hover:scale-110"}`} style={{ left: `${draggingDelivery?.id === dg.id ? draggingDelivery.pct : pendingDeliveryDateChange?.id === dg.id ? pct(parseLocalDate(pendingDeliveryDateChange.newDateStr) || dg.date) : pct(dg.date)}%`, transform: "translateX(-50%)", height: `${connectorHeight + 48}px` }}
+                                  onMouseDown={e => {
+                                    e.preventDefault();
+                                    const bar = document.getElementById("rush-timeline-bar");
+                                    if (!bar) return;
+                                    const startX = e.clientX;
+                                    let moved = false;
+                                    const onMove = (me: MouseEvent) => {
+                                      moved = true;
+                                      const rect = bar.getBoundingClientRect();
+                                      const x = Math.max(0, Math.min(100, ((me.clientX - rect.left) / rect.width) * 100));
+                                      setDraggingDelivery({ id: dg.id, pct: x });
+                                    };
+                                    const onUp = (me: MouseEvent) => {
+                                      document.removeEventListener("mousemove", onMove);
+                                      document.removeEventListener("mouseup", onUp);
+                                      if (!moved || Math.abs(me.clientX - startX) < 5) {
+                                        setDraggingDelivery(null);
+                                        const el = document.getElementById(`delivery-card-${dg.id}`);
+                                        if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("ring-2", "ring-offset-2", "ring-sky-400"); setTimeout(() => el.classList.remove("ring-2", "ring-offset-2", "ring-sky-400"), 2000); }
+                                        return;
+                                      }
+                                      const rect = bar.getBoundingClientRect();
+                                      const x = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width));
+                                      const newDate = new Date(timelineStart.getTime() + x * (timelineEnd.getTime() - timelineStart.getTime()));
+                                      const newDateStr = formatDateInputValue(newDate);
+                                      const oldDateStr = formatDateInputValue(dg.date);
+                                      setDraggingDelivery(null);
+                                      if (!newDateStr || newDateStr === oldDateStr) return;
+                                      setPendingDeliveryDateChange({
+                                        id: dg.id, label: dg.label, oldDateStr, newDateStr,
+                                        oldDateLabel: rushFormatDate(dg.date), newDateLabel: rushFormatDate(newDate),
+                                        isFinal: dg.id === "final",
+                                      });
+                                    };
+                                    document.addEventListener("mousemove", onMove);
+                                    document.addEventListener("mouseup", onUp);
+                                  }} title={`Drag to move · Click to view`}>
                                   <div className="relative z-10 flex flex-col items-center" style={{ paddingTop: `${connectorHeight}px` }}>
-                                    <div className={`${dg.color} rounded-full w-6 h-6 flex items-center justify-center text-white text-[10px] font-bold shadow-sm border-2 border-white`}>{i + 1}</div>
+                                    <div className={`${dg.color} rounded-full w-6 h-6 flex items-center justify-center text-white text-[10px] font-bold shadow-sm border-2 border-white ${draggingDelivery?.id === dg.id ? "ring-2 ring-sky-400 ring-offset-1" : ""}`}>{i + 1}</div>
                                     <div className="text-[7px] font-bold text-slate-600 whitespace-nowrap mt-0.5 bg-white/90 px-0.5 rounded">{dg.label}</div>
-                                    <div className="text-[7px] text-slate-400 whitespace-nowrap bg-white/90 px-0.5 rounded">{rushFormatDate(dg.date)}</div>
+                                    <div className="text-[7px] text-slate-400 whitespace-nowrap bg-white/90 px-0.5 rounded">{draggingDelivery?.id === dg.id ? rushFormatDate(new Date(timelineStart.getTime() + (draggingDelivery.pct / 100) * (timelineEnd.getTime() - timelineStart.getTime()))) : pendingDeliveryDateChange?.id === dg.id ? pendingDeliveryDateChange.newDateLabel : rushFormatDate(dg.date)}</div>
                                   </div>
                                 </div>);
                               })}
@@ -17528,7 +17662,7 @@ export default function App(){
                             <div className="px-4 pb-2">
                               <div className="flex flex-wrap gap-2 items-center">
                                 <span className="text-[9px] font-bold text-slate-400 uppercase">Addresses:</span>
-                                {bands.map((b, bi) => (
+                                {bands.filter((b, bi, arr) => arr.findIndex(x => x.label === b.label) === bi).map((b, bi) => (
                                   <div key={bi} className="flex items-center gap-1">
                                     <div className={`w-3 h-3 rounded-sm ${b.color}`} />
                                     <span className="text-[9px] font-bold text-slate-600">{b.label}</span>
@@ -17562,15 +17696,7 @@ export default function App(){
 	                                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
 	                                      <label className="min-w-[170px] flex-1 sm:flex-none">
 	                                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-white/65">Date</span>
-	                                        <input type="date" defaultValue={formatDateInputValue(dg.date)} key={`date-${dg.id}-${formatDateInputValue(dg.date)}`} onBlur={e => {
-	                                          const val = e.target.value;
-	                                          if (!val || val === formatDateInputValue(dg.date)) return;
-	                                          if (dg.id.startsWith("custom_")) {
-	                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, dateStr: val } : cd) }));
-	                                          } else {
-	                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), dateStr: val } } }));
-	                                          }
-	                                        }} onChange={e => {
+	                                        <input type="date" defaultValue={formatDateInputValue(dg.date)} key={`date-${dg.id}-v${deliveryDateVersion}`} onChange={e => {
 	                                          const val = e.target.value;
 	                                          if (!val) return;
 	                                          if (dg.id.startsWith("custom_")) {
@@ -17591,10 +17717,10 @@ export default function App(){
 		                                          }
 		                                        }} className="h-9 w-full rounded-lg border border-white/30 bg-white/95 px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-white focus:ring-2 focus:ring-white/40">
 		                                          <option value="">{dg.address || `${dg.location || "Delivery"} address...`}</option>
-		                                          {orderAddressChoices.known.length > 0 && <optgroup label="── ADDRESSES ON FILE ──">
+		                                          {orderAddressChoices.known.length > 0 && <optgroup label="★ EXISTING ADDRESSES ON THIS ORDER ★">
 		                                            {orderAddressChoices.known.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
 		                                          </optgroup>}
-		                                          <optgroup label="── ADD NEW ADDRESS TYPE ──">
+		                                          <optgroup label="＋ ADD PLACEHOLDER (address TBD)">
 		                                            {orderAddressChoices.placeholders.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
 		                                          </optgroup>
 		                                        </select>
@@ -17865,63 +17991,92 @@ export default function App(){
                       <p className="text-sm text-slate-500 mt-1">Answer these questions to generate the delivery timeline.</p>
                     </div>
 
-                    {/* Required: Living Status — click to open interview */}
-                    <button type="button" onClick={() => { setRushGuideOpen(false); setTimeout(() => { setInterviewPanelOpen(true); setInterviewExpanded((p: any) => ({...p, living: true})); }, 100); }} className={`w-full rounded-xl border-2 p-4 text-left hover:shadow-md transition-shadow cursor-pointer ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+                    {/* Required: Living Status — inline answer */}
+                    <div className={`rounded-xl border-2 p-4 ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
                       <div className="flex items-start gap-2">
                         <span className={`text-lg mt-0.5 ${data.livingStatus || (data.livingTimeline || []).length > 0 ? "text-emerald-500" : "text-amber-500"}`}>{data.livingStatus || (data.livingTimeline || []).length > 0 ? "✓" : "1"}</span>
-                        <div className="flex-1">
-                          <div className="text-sm font-bold text-slate-700">Where will the customer live during repairs?</div>
-                          {data.livingStatus || (data.livingTimeline || []).length > 0
-                            ? <div className="text-xs text-emerald-600 mt-1">{(data.livingTimeline || []).length > 0 ? (data.livingTimeline || []).map((s: any) => s.type).join(" → ") : data.livingStatus}</div>
-                            : <div className="text-xs text-slate-500 mt-1">Click to answer — determines where we deliver</div>
-                          }
-                        </div>
-                        <span className="text-slate-400 text-xs mt-1">→</span>
-                      </div>
-                    </button>
-
-                    {/* Required: Repairs or Return Date */}
-                    <div className={`rounded-xl border-2 p-4 ${data.repairsSummary || data.estimatedReturnDate || data.storageMonths ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
-                      <div className="flex items-start gap-2">
-                        <span className={`text-lg mt-0.5 ${data.repairsSummary || data.estimatedReturnDate || data.storageMonths ? "text-emerald-500" : "text-amber-500"}`}>{data.repairsSummary || data.estimatedReturnDate || data.storageMonths ? "✓" : "2"}</span>
-                        <div className="flex-1">
-                          <div className="text-sm font-bold text-slate-700">When will they return home?</div>
-                          <div className="text-xs text-slate-500 mt-1">Set a repair type, expected return date, or storage duration.</div>
-
-                          {/* Quick-set repair type */}
-                          <div className="mt-3">
-                            <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Repair type (sets estimated timeline)</div>
-                            <div className="flex flex-wrap gap-1">
-                              {RUSH_REPAIR_TIMELINES.map(r => (
-                                <button key={r.id} type="button" onClick={() => update("repairsSummary", r.label)} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-all ${(data.repairsSummary || "").includes(r.label) ? "border-teal-400 bg-teal-50 text-teal-700" : "border-slate-300 text-slate-500 hover:border-slate-400 bg-white"}`}>{r.label} ({r.days}d)</button>
-                              ))}
-                            </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="text-sm font-bold text-slate-700">Will the customer be able to stay in the home?</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button type="button" onClick={() => { const payload = addressPayloadFromChoice("type:Primary"); update("livingTimeline", [{ id: safeUid(), type: "Staying in home", duration: "Until repairs done", endDate: "", address: payload.address, addressType: payload.addressType, addressId: payload.addressId }]); update("livingStatus", "Staying in home"); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Staying in home" ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600 hover:border-indigo-300"}`}>Yes, staying home</button>
+                            <button type="button" onClick={() => { if (data.livingStatus !== "Not staying in home" && data.livingStatus !== "Staying in home" && !data.livingStatus) update("livingStatus", "Not staying in home"); setRushGuideOpen(false); setTimeout(() => { setInterviewPanelOpen(true); setInterviewExpanded((p: any) => ({...p, living: true})); setTimeout(() => { const el = document.getElementById("noe-interview-timeline"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 200); }, 100); }} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus && data.livingStatus !== "Staying in home" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>No, staying elsewhere</button>
                           </div>
-
-                          {/* Or set explicit date */}
-                          <div className="mt-3 flex items-center gap-3">
-                            <div className="flex-1">
-                              <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Or set expected return date</div>
-                              <input type="date" value={data.estimatedReturnDate || ""} onChange={e => update("estimatedReturnDate", e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs outline-none focus:border-teal-400" />
-                            </div>
-                            <div className="text-[10px] text-slate-400 pt-4">or</div>
-                            <div>
-                              <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Storage months</div>
-                              <input type="number" min="1" max="36" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" className="w-16 rounded-lg border border-slate-300 px-3 py-1.5 text-xs outline-none focus:border-teal-400 text-center" />
-                            </div>
-                          </div>
-
-                          {(data.repairsSummary || data.estimatedReturnDate || data.storageMonths) && (() => {
-                            const ri = RUSH_REPAIR_TIMELINES.find(r => (data.repairsSummary || "").includes(r.label));
-	                            const explicit = parseLocalDate(data.estimatedReturnDate);
-                            const fromRepairs = ri ? rushAddDays(new Date(), ri.days) : null;
-                            const fromStorage = data.storageMonths ? rushAddDays(new Date(), parseInt(data.storageMonths) * 30) : null;
-                            const est = explicit || fromRepairs || fromStorage;
-                            return est ? <div className="mt-2 rounded-lg bg-teal-100 border border-teal-200 px-3 py-1.5 text-xs text-teal-800 font-bold">Estimated return: {rushFormatDate(est)}</div> : null;
-                          })()}
+                          {data.livingStatus && (data.livingTimeline || []).length > 0 && <div className="text-xs text-emerald-600">{(data.livingTimeline || []).map((s: any) => s.type).join(" → ")}</div>}
                         </div>
                       </div>
                     </div>
+
+                    {/* Q2: How long will they be out */}
+                    {data.livingStatus && data.livingStatus !== "Staying in home" && (() => {
+                      const unit = (data as any).timeAwayUnit || "months";
+                      const val = (data as any).estimatedTimeAwayValue || 0;
+                      const maxVal = unit === "weeks" ? 8 : 18;
+                      const durLabel = val === 0 ? "Not set" : `${val} ${unit === "weeks" ? (val === 1 ? "week" : "weeks") : (val === 1 ? "month" : "months")}`;
+                      const hasDuration = val > 0;
+                      return <div className={`rounded-xl border-2 p-4 ${hasDuration ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+                        <div className="flex items-start gap-2">
+                          <span className={`text-lg mt-0.5 ${hasDuration ? "text-emerald-500" : "text-amber-500"}`}>{hasDuration ? "✓" : "2"}</span>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-bold text-slate-700">How long will they be out?</div>
+                              <div className="text-sm font-bold text-teal-700">{durLabel}</div>
+                            </div>
+                            <div className="flex rounded-full border border-slate-200 overflow-hidden w-fit">
+                              <button type="button" onClick={() => { update("timeAwayUnit", "weeks"); update("estimatedTimeAwayValue", Math.min(val, 8)); }} className={`px-2.5 py-1 text-[10px] font-bold ${unit === "weeks" ? "bg-sky-500 text-white" : "bg-white text-slate-500"}`}>Weeks</button>
+                              <button type="button" onClick={() => update("timeAwayUnit", "months")} className={`px-2.5 py-1 text-[10px] font-bold ${unit === "months" ? "bg-sky-500 text-white" : "bg-white text-slate-500"}`}>Months</button>
+                            </div>
+                            <input type="range" min={0} max={maxVal} step={1} value={val} onChange={e => { const v = parseInt(e.target.value); update("estimatedTimeAwayValue", v || ""); update("timeAwayUnit", unit); update("estimatedMonthsAway", unit === "months" ? v : ""); }} className="w-full accent-sky-500" />
+                            <div className="flex justify-between text-[9px] text-slate-400">
+                              {unit === "weeks" ? <><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span></> : <><span>0</span><span>3</span><span>6</span><span>9</span><span>12</span><span>15</span><span>18</span></>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>;
+                    })()}
+
+                    {/* Q2/3: Final delivery or return date */}
+                    {(() => {
+                      const hasDate = !!(data.estimatedReturnDate || data.storageMonths || data.repairsSummary);
+                      const stepNum = data.livingStatus === "Staying in home" ? "2" : "3";
+                      return <div className={`rounded-xl border-2 p-4 ${hasDate ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+                        <div className="flex items-start gap-2">
+                          <span className={`text-lg mt-0.5 ${hasDate ? "text-emerald-500" : "text-amber-500"}`}>{hasDate ? "✓" : stepNum}</span>
+                          <div className="flex-1 space-y-3">
+                            <div className="text-sm font-bold text-slate-700">When is the final delivery or in-home date?</div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Target date</div>
+                                <input type="date" defaultValue={data.estimatedReturnDate || ""} onBlur={e => { if (e.target.value && e.target.value !== data.estimatedReturnDate) update("estimatedReturnDate", e.target.value); }} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs outline-none focus:border-teal-400" />
+                              </div>
+                              <div className="text-[10px] text-slate-400 pt-4">or</div>
+                              <div>
+                                <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Storage months</div>
+                                <input type="number" min="1" max="36" value={data.storageMonths || ""} onChange={e => update("storageMonths", e.target.value)} placeholder="#" className="w-16 rounded-lg border border-slate-300 px-3 py-1.5 text-xs outline-none focus:border-teal-400 text-center" />
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Or estimate from repair type</div>
+                              <div className="flex flex-wrap gap-1">
+                                {RUSH_REPAIR_TIMELINES.map(r => (
+                                  <button key={r.id} type="button" onClick={() => update("repairsSummary", r.label)} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-all ${(data.repairsSummary || "").includes(r.label) ? "border-teal-400 bg-teal-50 text-teal-700" : "border-slate-300 text-slate-500 hover:border-slate-400 bg-white"}`}>{r.label} ({r.days}d)</button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {hasDate && (() => {
+                              const ri = RUSH_REPAIR_TIMELINES.find(r => (data.repairsSummary || "").includes(r.label));
+                              const explicit = parseLocalDate(data.estimatedReturnDate);
+                              const fromRepairs = ri ? rushAddDays(new Date(), ri.days) : null;
+                              const fromStorage = data.storageMonths ? rushAddDays(new Date(), parseInt(data.storageMonths) * 30) : null;
+                              const est = explicit || fromRepairs || fromStorage;
+                              return est ? <div className="rounded-lg bg-teal-100 border border-teal-200 px-3 py-1.5 text-xs text-teal-800 font-bold">Estimated final: {rushFormatDate(est)}</div> : null;
+                            })()}
+                          </div>
+                        </div>
+                      </div>;
+                    })()}
 
                     {/* Enhancing questions */}
                     <div className="text-xs text-slate-400 text-center pt-1">These questions also enhance the Rush Guide:</div>
@@ -17936,7 +18091,7 @@ export default function App(){
                       ].map(q => <span key={q.label} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${q.done ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 text-slate-400"}`}>{q.done ? "✓" : "○"} {q.label}</span>)}
                     </div>
                     <div className="text-center">
-                      <button onClick={() => { setRushGuideOpen(false); setTimeout(() => setInterviewPanelOpen(true), 100); }} className="rounded-xl bg-violet-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-600">Open Full Interview</button>
+                      <button onClick={() => { setRushGuideOpen(false); setTimeout(() => setInterviewPanelOpen(true), 100); }} className="rounded-xl bg-indigo-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-indigo-600">Open Full Interview</button>
                     </div>
                   </div>}
 
@@ -18044,7 +18199,7 @@ export default function App(){
           </div>
         </div>
       )}
-      {toast && <Toast message={toast} onClose={()=>setToast("")} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
+      {toastQueue.length > 0 && <ToastStack toasts={toastQueue} onRemove={removeToast} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
       {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
       {/* SDS Pre-Generation Questionnaire */}
       {showSdsQuestionnaire && (
