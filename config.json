@@ -124,6 +124,61 @@
       "WINTER": { "name": "Winter", "months": [11, 0, 1] }
     }
   },
+  "lists": {
+    "lossTypes":             ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil", "Unknown", "Other"],
+    "nonRestorationPrimary": "Non-Restoration",
+    "nonRestorationSubtypes":["Commercial Cleaning", "Residential Cleaning", "Other"],
+    "origins":               ["Basement", "Bathroom", "Attic", "Family", "Garage", "Kitchen", "Laundry", "Living", "Master", "Outside", "Roof", "Walls", "All Over", "Ceiling"],
+    "estimateTypes":         ["Ballpark", "Tag and Hold", "Itemized (costs)", "TLI", "Cash-out"],
+    "pricingPlatforms":      ["Xactimate", "Cotality", "Textile Solutions"],
+    "techs":                 ["Mike S.", "Sarah J.", "Tom B.", "Unassigned"],
+    "vehicles":              ["Truck 1", "Truck 2", "Truck 3", "Truck 4", "Van 1", "Van 2", "Sprinter 1", "SUV 1", "Personal Vehicle"],
+    "leadSources":           ["Referral", "Marketing", "Internal"],
+    "contactMethods":        ["Call", "Email", "Form Submission", "Meeting", "Text", "TPA Assignment"],
+    "marketingSources":      ["Website", "Google Business Page", "AI Recommendation", "Social Media", "Other"],
+    "internalTypes":         ["Met on Site", "Previous Customer", "Friend of Company", "Neighbor", "Building Staff"],
+    "customerQuickNotes":    ["Elderly", "Hearing Impaired", "Spanish Only", "Do not call", "Email only", "Sales rep only"],
+    "nationalCarriers":      ["Allstate", "State Farm", "Nationwide", "Farmers", "USAA", "Liberty Mutual", "Progressive", "Travelers", "Chubb", "American Family", "Pure Insurance"],
+    "loadItems":             ["Heater", "Ladder", "Lights", "Tyvek", "Plastic Bags", "Toolbox", "Floor Protection", "Dolly", "Hand Truck", "Blankets", "Bubble Wrap", "TV Boxes"],
+    "qualityCodes":          ["Q1", "Q2", "Q3", "Q5"],
+    "severityGroups":        ["Fire", "Water", "Mold", "Dust", "Protein", "Oil"],
+    "severityLevels":        ["1", "2", "3", "5"],
+    "causes": {
+      "Fire":                    ["Battery", "Candle", "Cooking", "Electrical", "Explosion", "Fireplace", "Flammables", "Heating", "Neighbor", "Protein", "Smoking", "Wildfire"],
+      "Water":                   ["Roof Leak", "Window/Door Leak", "Frozen Pipes", "Pipe Burst", "Overflow", "Storm", "Sprinkler", "Firefighting", "Groundwater⚠", "Flood⚠", "Sump Pump Failure⚠"],
+      "Mold":                    ["Spores Only", "Visible Mold", "Moldy Odor"],
+      "Dust/Debris":             ["Mitigation", "Construction", "Fiberglass"],
+      "Puffback":                ["Oily Film", "Oily Odor", "Oily Soot"],
+      "Non-Restoration Cleaning":["Inhome Cleaning", "Pickup", "Stain Removal", "Furniture Cleaning", "Drapery Take-down"],
+      "Oil":                     ["Spill", "Furnace", "Leak", "Accident"]
+    },
+    "compatibleSecondaryLoss": {
+      "Fire":        ["Water", "Mold", "Dust/Debris", "Puffback"],
+      "Water":       ["Mold", "Dust/Debris"],
+      "Mold":        ["Water", "Dust/Debris"],
+      "Oil":         ["Puffback", "Dust/Debris", "Mold"],
+      "Puffback":    ["Oil", "Fire", "Dust/Debris"],
+      "Dust/Debris": ["Fire", "Water", "Mold", "Oil", "Puffback"],
+      "Unknown":     ["Fire", "Water", "Mold", "Oil", "Puffback", "Dust/Debris"],
+      "Other":       ["Fire", "Water", "Mold", "Oil", "Puffback", "Dust/Debris"]
+    },
+    "packoutLoadMap": {
+      "Remove Hardware":    ["Toolbox", "Ladder", "Floor Protection"],
+      "Remove Furniture":   ["Dolly", "Hand Truck"],
+      "Remove Electronics": ["Blankets", "Bubble Wrap", "TV Boxes"]
+    },
+    "coachingCategories": [
+      { "key": "loss",    "label": "Loss Types",        "prefix": "loss." },
+      { "key": "role",    "label": "Roles",             "prefix": "role." },
+      { "key": "group",   "label": "Delivery Groups",   "prefix": "group." },
+      { "key": "service", "label": "Service Offerings", "prefix": "service." },
+      { "key": "section", "label": "Section Help",      "prefix": "section." },
+      { "key": "field",   "label": "Field Help",        "prefix": "field." },
+      { "key": "step",    "label": "Step Guidance",     "prefix": "step." },
+      { "key": "event",   "label": "Event Types",       "prefix": "event." },
+      { "key": "toast",   "label": "Toast Messages",    "prefix": "toast." }
+    ]
+  },
   "loadTargets": [
     { "id": "extra_manpower",   "label": "Extra Manpower",   "category": "Crew",      "triggers": [{ "type": "packout", "value": "Furniture" }, { "type": "packout", "value": "Appliances" }, { "type": "packout", "value": "Rugs" }] },
     { "id": "tall_ladder",      "label": "Tall Ladder",      "category": "Equipment", "triggers": [{ "type": "packout", "value": "Window Treatments" }] },

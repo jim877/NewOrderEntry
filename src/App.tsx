@@ -17,6 +17,28 @@ import {
   RUSH_EVENT_TYPES,
   RUSH_INTERESTS,
   RUSH_SEASONS,
+  LOSS_TYPES,
+  NON_RESTORATION_PRIMARY,
+  NON_RESTORATION_SUBTYPES,
+  ORIGINS,
+  ESTIMATE_TYPES,
+  PRICING_PLATFORMS,
+  TECHS,
+  VEHICLES,
+  LEAD_SOURCES,
+  CONTACT_METHODS,
+  MARKETING_SOURCES,
+  INTERNAL_TYPES,
+  CUSTOMER_QUICK_NOTES,
+  NATIONAL_CARRIERS,
+  LOAD_ITEMS,
+  QUALITY_CODES,
+  SEVERITY_GROUPS,
+  SEVERITY_LEVELS,
+  CAUSES,
+  COMPATIBLE_SECONDARY_LOSS,
+  PACKOUT_LOAD_MAP,
+  COACHING_CATEGORIES,
 } from './config';
 import type { LoadTarget, LoadTrigger } from './config';
 
@@ -1001,10 +1023,9 @@ const EntityPreferencePanel = ({
 };
 
 // --- CONSTANTS FOR SELECTIONS ---
-const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil", "Unknown", "Other"];
-// ═══ COACHING CONFIG ═══
-// DEFAULT_COACHING is imported from src/config.ts (sourced from /config.json).
-// User overrides stored in localStorage take precedence at read-time via getCoaching().
+// All pick-list constants (LOSS_TYPES, ESTIMATE_TYPES, VEHICLES, etc.) and coaching text
+// are imported from src/config.ts (sourced from /config.json).
+// User overrides for coaching stored in localStorage take precedence at read-time via getCoaching().
 
 // These objects read from DEFAULT_COACHING for single-source-of-truth
 const LOSS_TYPE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("loss.")).map(k => [k.replace("loss.", ""), DEFAULT_COACHING[k]]));
@@ -1018,21 +1039,7 @@ const getCoaching = (key: string, overrides?: Record<string, string>): string =>
   return DEFAULT_COACHING[key] || "";
 };
 
-// Category definitions for the Settings panel
-const COACHING_CATEGORIES = [
-  { key: "loss", label: "Loss Types", prefix: "loss." },
-  { key: "role", label: "Roles", prefix: "role." },
-  { key: "group", label: "Delivery Groups", prefix: "group." },
-  { key: "service", label: "Service Offerings", prefix: "service." },
-  { key: "section", label: "Section Help", prefix: "section." },
-  { key: "field", label: "Field Help", prefix: "field." },
-  { key: "step", label: "Step Guidance", prefix: "step." },
-  { key: "event", label: "Event Types", prefix: "event." },
-  { key: "toast", label: "Toast Messages", prefix: "toast." },
-];
-
-const NON_RESTORATION_PRIMARY = "Non-Restoration";
-const NON_RESTORATION_SUBTYPES = ["Commercial Cleaning", "Residential Cleaning", "Other"];
+// COACHING_CATEGORIES, NON_RESTORATION_PRIMARY, NON_RESTORATION_SUBTYPES — imported from ./config
 const getNonRestorationSubtype = (orderTypes = []) =>
   NON_RESTORATION_SUBTYPES.find((type) => (orderTypes || []).includes(type)) || "";
 const isNonRestorationSelected = (orderTypes = []) =>
@@ -1076,39 +1083,9 @@ const selectNonRestorationSubtypeSelection = (orderTypes = [], subtype = "") => 
   return [NON_RESTORATION_PRIMARY, subtype];
 };
 
-const CAUSES = {
-  "Fire": ["Battery", "Candle", "Cooking", "Electrical", "Explosion", "Fireplace", "Flammables", "Heating", "Neighbor", "Protein", "Smoking", "Wildfire"],
-  "Water": ["Roof Leak", "Window/Door Leak", "Frozen Pipes", "Pipe Burst", "Overflow", "Storm", "Sprinkler", "Firefighting", "Groundwater⚠", "Flood⚠", "Sump Pump Failure⚠"],
-  "Mold": ["Spores Only", "Visible Mold", "Moldy Odor"],
-  "Dust/Debris": ["Mitigation", "Construction", "Fiberglass"],
-  "Puffback": ["Oily Film", "Oily Odor", "Oily Soot"],
-  "Non-Restoration Cleaning": ["Inhome Cleaning", "Pickup", "Stain Removal", "Furniture Cleaning", "Drapery Take-down"],
-  "Oil": ["Spill", "Furnace", "Leak", "Accident"]
-};
-
-const ORIGINS = ["Basement", "Bathroom", "Attic", "Family", "Garage", "Kitchen", "Laundry", "Living", "Master", "Outside", "Roof", "Walls", "All Over", "Ceiling"];
-const COMPATIBLE_SECONDARY_LOSS: Record<string, string[]> = {
-  "Fire": ["Water", "Mold", "Dust/Debris", "Puffback"],
-  "Water": ["Mold", "Dust/Debris"],
-  "Mold": ["Water", "Dust/Debris"],
-  "Oil": ["Puffback", "Dust/Debris", "Mold"],
-  "Puffback": ["Oil", "Fire", "Dust/Debris"],
-  "Dust/Debris": ["Fire", "Water", "Mold", "Oil", "Puffback"],
-  "Unknown": ["Fire", "Water", "Mold", "Oil", "Puffback", "Dust/Debris"],
-  "Other": ["Fire", "Water", "Mold", "Oil", "Puffback", "Dust/Debris"],
-};
-
-const ESTIMATE_TYPES = ["Ballpark", "Tag and Hold", "Itemized (costs)", "TLI", "Cash-out"];
-const PRICING_PLATFORMS = ["Xactimate", "Cotality", "Textile Solutions"];
-const TECHS = ["Mike S.", "Sarah J.", "Tom B.", "Unassigned"];
-const VEHICLES = ["Truck 1", "Truck 2", "Truck 3", "Truck 4", "Van 1", "Van 2", "Sprinter 1", "SUV 1", "Personal Vehicle"];
-const LEAD_SOURCES = ["Referral", "Marketing", "Internal"];
-const CONTACT_METHODS = ["Call", "Email", "Form Submission", "Meeting", "Text", "TPA Assignment"];
-
-const MARKETING_SOURCES = ["Website", "Google Business Page", "AI Recommendation", "Social Media", "Other"];
-const INTERNAL_TYPES = ["Met on Site", "Previous Customer", "Friend of Company", "Neighbor", "Building Staff"];
-const CUSTOMER_QUICK_NOTES = ["Elderly", "Hearing Impaired", "Spanish Only", "Do not call", "Email only", "Sales rep only"];
-const NATIONAL_CARRIERS = ["Allstate", "State Farm", "Nationwide", "Farmers", "USAA", "Liberty Mutual", "Progressive", "Travelers", "Chubb", "American Family", "Pure Insurance"];
+// CAUSES, ORIGINS, COMPATIBLE_SECONDARY_LOSS, ESTIMATE_TYPES, PRICING_PLATFORMS, TECHS,
+// VEHICLES, LEAD_SOURCES, CONTACT_METHODS, MARKETING_SOURCES, INTERNAL_TYPES,
+// CUSTOMER_QUICK_NOTES, NATIONAL_CARRIERS — imported from ./config
 
 const inferRoleCapabilities = (companyType = "", companyName = "") => {
   const type = (companyType || "").toString().trim().toLowerCase();
@@ -1368,26 +1345,7 @@ const QUICK_INSTRUCTION_NOTES = [
   "Owner on-site",
 ];
 
-const LOAD_ITEMS = [
-  "Heater",
-  "Ladder",
-  "Lights",
-  "Tyvek",
-  "Plastic Bags",
-  "Toolbox",
-  "Floor Protection",
-  "Dolly",
-  "Hand Truck",
-  "Blankets",
-  "Bubble Wrap",
-  "TV Boxes",
-];
-
-const PACKOUT_LOAD_MAP = {
-  "Remove Hardware": ["Toolbox", "Ladder", "Floor Protection"],
-  "Remove Furniture": ["Dolly", "Hand Truck"],
-  "Remove Electronics": ["Blankets", "Bubble Wrap", "TV Boxes"],
-};
+// LOAD_ITEMS, PACKOUT_LOAD_MAP — imported from ./config
 
 const summarizeAddress = (addr = {}) => {
   const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
@@ -1402,9 +1360,7 @@ for(let i=6; i<=20; i++) {
     if (i < 20) TIME_SLOTS.push(`${hour}:30 ${ampm}`);
 }
 
-const QUALITY_CODES = ["Q1", "Q2", "Q3", "Q5"];
-const SEVERITY_GROUPS = ["Fire", "Water", "Mold", "Dust", "Protein", "Oil"];
-const SEVERITY_LEVELS = ["1", "2", "3", "5"];
+// QUALITY_CODES, SEVERITY_GROUPS, SEVERITY_LEVELS — imported from ./config
 
 const COMPANY_ROLE_DEFS = [
   { id: "insurance", label: "Insurance", isCore: true, type: "Insurance", source: "insuranceCompany", contactSource: "insuranceAdjuster" },
