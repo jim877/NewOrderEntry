@@ -41,6 +41,16 @@ import {
   COACHING_CATEGORIES,
   DEFAULT_BLOCKER_RULES,
   DEFAULT_INTERVIEW_ACTIONS,
+  COMPANY_TYPES,
+  COMPANY_ROLE_DEFS,
+  CONTACT_ROLE_BADGES,
+  SDS_CONSIDERATIONS,
+  SDS_OBSERVATIONS,
+  SDS_SERVICES,
+  SDS_ICON_MAP,
+  SDS_ICON_CLASS_OVERRIDES,
+  QUICK_INSTRUCTION_NOTES,
+  LEAD_SOURCE_HELP,
 } from './config';
 import type { LoadTarget, LoadTrigger } from './config';
 
@@ -1256,96 +1266,8 @@ const SAMPLE_PRESET_DATA = () => ({
   sdsDisagreementNote: "",
 });
 
-const LEAD_SOURCE_HELP = {
-  Referral: "Recommendation from existing contact.",
-  Marketing: "Digital/print campaigns to attract business.",
-  Internal: "Company-initiated efforts."
-};
-
-
-const COMPANY_TYPES = [
-  "Insurance",
-  "Public Adjusting",
-  "Independent Adjusting",
-  "TPA",
-  "Invoice Auditor",
-  "Contents Company",
-  "Restoration Company",
-  "Building Consultant",
-  "Engineer",
-  "Hygienist",
-  "Art",
-  "Moving",
-  "Boardup",
-];
-
-const SDS_CONSIDERATIONS = ["Elderly", "Pregnancy", "Baby", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"];
-const SDS_OBSERVATIONS = ["Pets", "Fireplace", "Insects", "Moth Damage", "Sun Damage", "Smoking", "Clutter"];
-const SDS_SERVICES = [
-  "Fold as Much as Possible",
-  "Re-Hanging",
-  "Photo Inventory",
-  "Unpacking",
-  "Needs Assistance",
-  "Anti-Microbial",
-  "Drying",
-  "Disposal",
-  "Fiber Protection",
-  "Moving",
-  "Rolling Racks",
-  "Total Loss Inventory",
-  "Content Manipulation",
-  "High Density",
-  "Expert Stain Removal",
-];
-const SDS_ICON_MAP = {
-  "Elderly": "/Gemini_Elderly.png",
-  "Pregnancy": "/Gemini_Pregnancy.png",
-  "Baby": "/Gemini_Baby.png",
-  "Needs Assistance": "/Gemini_Needs_Assistance.png",
-  "Respiratory Concerns": "/Gemini_Health_Concerns.png",
-  "Premium Brands": "/Gemini_Premium_Brands.png",
-  "Skin Sensitivity": "/Gemini_Skin_Sensitivity.png",
-  "Pets": "/Gemini_Pets.png",
-  "Fireplace": "/Gemini_Fireplace.png",
-  "Insects": "/Insects_Clean.png",
-  "Moth Damage": "/Gemini_Moth_Holes.png",
-  "Sun Damage": "/Gemini_Generated_Image_7b5s067b5s067b5s.png",
-  "Smoking": "/Gemini_Smoking.png",
-  "Clutter": "/Clutter.png",
-  "Fold as Much as Possible": "/Gemini_Fold_AMAP.png",
-  "Re-Hanging": "/Re_Hanging_Clean.png",
-  "Photo Inventory": "/Photo_Inventory.png",
-  "Unpacking": "/Gemini_Unpacking.png",
-  "Anti-Microbial": "/Gemini_Anti_Microbial.png",
-  "Drying Needed": "/Drying.png",
-  "Drying": "/Drying.png",
-  "Disposal": "/Gemini_Generated_Image_tydpketydpketydp.png",
-  "Fiber Protection": "/Gemini_Fiber_Protection.png",
-  "Moving": "/Moving.png",
-  "Rolling Racks": "/Rolling_Racks.png",
-  "Total Loss Inventory": "/Total_Loss_Inventory.png",
-  "Content Manipulation": "/Content_Manipulation.png",
-  "High Density": "/High_Density_Parking.png",
-  "Expert Stain Removal": "/Expert_Stain_Removal.png",
-};
-const SDS_ICON_CLASS_OVERRIDES = {
-  "Clutter": "h-full w-full object-contain object-center scale-[0.82]",
-  "Insects": "h-full w-full object-contain object-center scale-[0.9]",
-  "Re-Hanging": "h-full w-full object-contain object-center scale-[0.95]",
-  "Moving": "h-full w-full object-contain object-center scale-[0.9]",
-  "Rolling Racks": "h-full w-full object-contain object-center scale-[0.9]",
-  "Expert Stain Removal": "h-full w-full object-contain object-center scale-[0.88]",
-};
+// LEAD_SOURCE_HELP, COMPANY_TYPES, SDS_*, QUICK_INSTRUCTION_NOTES — imported from ./config
 const getSdsIconImageClass = (item) => SDS_ICON_CLASS_OVERRIDES[item] || "h-full w-full object-contain object-center";
-
-const QUICK_INSTRUCTION_NOTES = [
-  "Gate code needed",
-  "Call upon arrival",
-  "Parking in rear",
-  "Beware of pets",
-  "Owner on-site",
-];
 
 // LOAD_ITEMS, PACKOUT_LOAD_MAP — imported from ./config
 
@@ -1364,36 +1286,7 @@ for(let i=6; i<=20; i++) {
 
 // QUALITY_CODES, SEVERITY_GROUPS, SEVERITY_LEVELS — imported from ./config
 
-const COMPANY_ROLE_DEFS = [
-  { id: "insurance", label: "Insurance", isCore: true, type: "Insurance", source: "insuranceCompany", contactSource: "insuranceAdjuster" },
-  { id: "restoration", label: "Restoration", isCore: true, type: "Restoration Company" },
-  { id: "rebuild_contractor", label: "Rebuild Contractor", isCore: true, type: "Contractor" },
-  { id: "public_adjuster", label: "Public Adjuster", isCore: true, type: "Public Adjusting", source: "publicAdjustingCompany", contactSource: "publicAdjuster" },
-  { id: "independent_adjuster", label: "Independent Adjuster", isCore: true, type: "Independent Adjusting", source: "independentAdjustingCo", contactSource: "independentAdjuster" },
-  { id: "tpa", label: "TPA", isCore: true, type: "TPA", source: "tpaCompany", contactSource: "tpaContact" },
-  { id: "invoice_audit", label: "Invoice Audit", isCore: true, type: "Invoice Auditor" },
-  { id: "insurance_broker", label: "Insurance Broker", isCore: true, type: "Broker" },
-  { id: "insurance_agent", label: "Insurance Agent", isCore: true, type: "Agent" },
-  { id: "other", label: "Other", isCore: true, type: "Other" },
-  { id: "contents", label: "Contents", isCore: false, type: "Contents" },
-  { id: "inventory", label: "Inventory", isCore: false, type: "Contents Company" },
-  { id: "art", label: "Art", isCore: false, type: "Art" },
-  { id: "electronics", label: "Electronics", isCore: false, type: "Other" },
-  { id: "moving", label: "Moving", isCore: false, type: "Moving" },
-  { id: "hygienist", label: "Hygienist", isCore: false, type: "Hygienist" },
-  { id: "building_consultant", label: "Building Consultant", isCore: false, type: "Building Consultant" },
-  { id: "floor", label: "Floor", isCore: false, type: "Contractor" },
-  { id: "painter", label: "Painter", isCore: false, type: "Contractor" },
-  { id: "board_up", label: "Board-up", isCore: false, type: "Boardup" },
-  { id: "decorator", label: "Decorator", isCore: false, type: "Decorator" },
-  { id: "engineer", label: "Engineer", isCore: false, type: "Engineer" },
-];
-
-const CONTACT_ROLE_BADGES = [
-  { id: "referrer", title: "Referrer" },
-  { id: "insurance", title: "Insurance" },
-  { id: "billto", title: "Bill To" },
-];
+// COMPANY_ROLE_DEFS, CONTACT_ROLE_BADGES — imported from ./config
 const ROLE_ICON_COMPONENTS = {
   referrer: Tag,
   insurance: Shield,

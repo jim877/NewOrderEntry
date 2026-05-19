@@ -81,3 +81,25 @@ export type InterviewAction =
 
 export type InterviewActionConfig = { coaching: string; actions: InterviewAction[] };
 export const DEFAULT_INTERVIEW_ACTIONS: Record<string, InterviewActionConfig> = config.interviewActions;
+
+// --- Company / contact / SDS seed data ---
+export type CompanyRoleDef = {
+  id: string;
+  label: string;
+  isCore: boolean;
+  type: string;
+  source?: string;
+  contactSource?: string;
+};
+export type ContactRoleBadge = { id: string; title: string };
+
+export const COMPANY_TYPES: string[]                 = config.lists.companyTypes;
+export const COMPANY_ROLE_DEFS: CompanyRoleDef[]     = config.lists.companyRoleDefs;
+export const CONTACT_ROLE_BADGES: ContactRoleBadge[] = config.lists.contactRoleBadges;
+export const SDS_CONSIDERATIONS: string[]            = config.lists.sdsConsiderations;
+export const SDS_OBSERVATIONS: string[]              = config.lists.sdsObservations;
+export const SDS_SERVICES: string[]                  = config.lists.sdsServices;
+export const SDS_ICON_MAP: Record<string, string>            = config.lists.sdsIconMap;
+export const SDS_ICON_CLASS_OVERRIDES: Record<string, string> = config.lists.sdsIconClassOverrides;
+export const QUICK_INSTRUCTION_NOTES: string[]       = config.lists.quickInstructionNotes;
+export const LEAD_SOURCE_HELP: Record<string, string> = config.lists.leadSourceHelp;
