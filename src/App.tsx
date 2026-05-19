@@ -9,7 +9,16 @@ import {
   normalizeScopeBridgeState,
   withScopeBridgeSnippet,
 } from './scopeBridgeUtils';
-import { DEFAULT_COACHING } from './config';
+import {
+  DEFAULT_COACHING,
+  DEFAULT_LOAD_TARGETS,
+  RUSH_REPAIR_TIMELINES,
+  RUSH_LIVING_SITUATIONS,
+  RUSH_EVENT_TYPES,
+  RUSH_INTERESTS,
+  RUSH_SEASONS,
+} from './config';
+import type { LoadTarget, LoadTrigger } from './config';
 
 // --- STYLES ---
 const STYLES = `
@@ -1789,89 +1798,9 @@ const DEFAULT_INTERVIEW_ACTIONS = {
   "Storage Yes":            { coaching: "We'll arrange safe, climate-controlled storage at our facility.", actions: [{ type: "suggestGroup", value: "Storage Only" }, { type: "eventInstruction", value: "Customer needs storage" }] },
 };
 
-// --- RUSH GUIDE ---
-const RUSH_REPAIR_TIMELINES = [
-  { id: 'cleaning', label: 'Just Cleaning', days: 7, group: 'RFD' },
-  { id: 'paint', label: 'Painting', days: 21, group: 'STD' },
-  { id: 'refinish_floors', label: 'Refinishing Floors', days: 28, group: 'STD' },
-  { id: 'replace_floors', label: 'Replacing Floors', days: 60, group: 'LTD' },
-  { id: 'cosmetic', label: 'Cosmetic Repairs', days: 90, group: 'LTD' },
-  { id: 'structural', label: 'Major Structural Damage', days: 365, group: 'LTD' },
-  { id: 'rebuild', label: 'Complete Rebuild', days: 480, group: 'LTFD' },
-];
-
-const RUSH_LIVING_SITUATIONS = [
-  { id: 'home', label: 'Staying in my home', desc: 'Living on-site during repairs' },
-  { id: 'hotel', label: 'Staying in a hotel', desc: 'Temporary hotel stay' },
-  { id: 'temp', label: 'Temporary rental', desc: 'Furnished apartment or rental home' },
-  { id: 'moving', label: 'Moving to a new home', desc: 'Relocating permanently' },
-];
-
-const RUSH_EVENT_TYPES = [
-  { id: 'vacation_beach', label: 'Warm Weather / Beach Vacation' },
-  { id: 'vacation_ski', label: 'Cold Weather / Ski Trip' },
-  { id: 'wedding', label: 'Wedding / Formal Event' },
-  { id: 'business', label: 'Business Trip / Conference' },
-  { id: 'sports', label: 'Sports Tournament' },
-];
-
-const RUSH_INTERESTS = [
-  { id: 'school', label: 'School & Kids Sports', desc: 'Backpacks, uniforms, gear' },
-  { id: 'summer_activities', label: 'Summer & Swim', desc: 'Swimwear, beach bags, sun hats' },
-  { id: 'winter_sports', label: 'Winter & Snow', desc: 'Skiing, heavy outerwear' },
-  { id: 'halloween', label: 'Halloween', desc: 'Costumes, decorations' },
-  { id: 'thanksgiving', label: 'Thanksgiving', desc: 'Holiday linens, servingware' },
-  { id: 'christmas', label: 'Christmas / Hanukkah', desc: 'Holiday clothing, decorations, gifts' },
-  { id: 'easter', label: 'Easter / Passover', desc: 'Spring formal, holiday items' },
-  { id: 'religious', label: 'Religious Services', desc: 'Formal wear, prayer items' },
-  { id: 'graduation', label: 'Graduation', desc: 'Caps, gowns, formal attire' },
-  { id: 'workout', label: 'Gym & Fitness', desc: 'Workout clothes, equipment' },
-  { id: 'work_from_home', label: 'Work from Home', desc: 'Office supplies, desk items' },
-];
-
-const RUSH_SEASONS = {
-  SPRING: { name: 'Spring', months: [2, 3, 4] },
-  SUMMER: { name: 'Summer', months: [5, 6, 7] },
-  FALL: { name: 'Fall', months: [8, 9, 10] },
-  WINTER: { name: 'Winter', months: [11, 0, 1] },
-};
-
-// --- LOADING LIST (configurable) ---
-// Each target can be added to the truck. Triggers are rules — if any trigger matches data state,
-// the item is auto-suggested (highlighted orange in the question and added on selection).
-// Triggers reference order data keys with simple matchers.
-type LoadTrigger =
-  | { type: "condition"; value: string }      // matches data.conditions[key] === true (e.g. "damageWasWet")
-  | { type: "loss"; value: string }            // matches data.orderTypes includes value
-  | { type: "packout"; value: string }         // matches data.packoutSummary includes value
-  | { type: "service"; value: string }         // matches data.serviceOfferings includes value
-  | { type: "interview"; value: string };      // matches a condition label (e.g. "Visible Mold")
-
-type LoadTarget = { id: string; label: string; category: string; triggers: LoadTrigger[]; description?: string };
-
-const DEFAULT_LOAD_TARGETS: LoadTarget[] = [
-  // Manpower / capacity
-  { id: "extra_manpower", label: "Extra Manpower", category: "Crew", triggers: [{ type: "packout", value: "Furniture" }, { type: "packout", value: "Appliances" }, { type: "packout", value: "Rugs" }] },
-  // Ladders / heights
-  { id: "tall_ladder",    label: "Tall Ladder",    category: "Equipment", triggers: [{ type: "packout", value: "Window Treatments" }] },
-  // Carrying / moving
-  { id: "dollies",        label: "Dollies",        category: "Equipment", triggers: [{ type: "packout", value: "Furniture" }, { type: "packout", value: "Appliances" }] },
-  { id: "blankets",       label: "Blankets",       category: "Packing",   triggers: [{ type: "packout", value: "Furniture" }, { type: "packout", value: "Electronics" }] },
-  // Boxes
-  { id: "wardrobe_boxes", label: "Wardrobe Boxes", category: "Packing",   triggers: [{ type: "service", value: "Textiles" }] },
-  { id: "tv_boxes",       label: "TV Boxes",       category: "Packing",   triggers: [{ type: "packout", value: "Electronics" }] },
-  { id: "art_boxes",      label: "Art Boxes",      category: "Packing",   triggers: [{ type: "packout", value: "Art" }] },
-  // Bagging / wet
-  { id: "plastic_bags",   label: "Plastic Bags",   category: "Packing",   triggers: [{ type: "condition", value: "damageWasWet" }, { type: "interview", value: "Still Wet" }] },
-  // PPE / safety
-  { id: "tyvek",          label: "Tyvek",          category: "PPE",       triggers: [{ type: "condition", value: "damageMoldMildew" }, { type: "interview", value: "Visible Mold" }, { type: "loss", value: "Mold" }] },
-  { id: "hard_hats",      label: "Hard Hats",      category: "PPE",       triggers: [{ type: "interview", value: "Structural Damage" }] },
-  { id: "respirators",    label: "Respirators",    category: "PPE",       triggers: [{ type: "loss", value: "Mold" }, { type: "loss", value: "Fire" }] },
-  // Site conditions
-  { id: "lights",         label: "Lights",         category: "Site",      triggers: [{ type: "condition", value: "noLights" }, { type: "condition", value: "boardedUp" }, { type: "interview", value: "No Electricity" }, { type: "interview", value: "Boarded Up" }] },
-  { id: "heater",         label: "Heater",         category: "Site",      triggers: [{ type: "condition", value: "noHeat" }, { type: "interview", value: "No Heat" }] },
-  { id: "floor_protection", label: "Floor Protection", category: "Site",  triggers: [{ type: "packout", value: "Furniture" }] },
-];
+// --- RUSH GUIDE / LOADING LIST ---
+// RUSH_* constants and DEFAULT_LOAD_TARGETS imported from src/config.ts (sourced from /config.json).
+// Helpers below stay in App.tsx for now since they touch runtime state (localStorage, data shape).
 
 // Stored in localStorage under "noe.loadTargets" — merged on top of defaults
 const loadTargetsFromStorage = (): LoadTarget[] => {

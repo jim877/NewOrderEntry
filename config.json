@@ -80,5 +80,64 @@
     "toast.addressPlaceholder": "+ {value} address placeholder",
     "toast.suggestOrderType": "Suggested order type: {value}",
     "toast.openMoldLimit": "Mold limit warning"
-  }
+  },
+  "rushGuide": {
+    "repairTimelines": [
+      { "id": "cleaning",         "label": "Just Cleaning",            "days": 7,   "group": "RFD" },
+      { "id": "paint",            "label": "Painting",                 "days": 21,  "group": "STD" },
+      { "id": "refinish_floors",  "label": "Refinishing Floors",       "days": 28,  "group": "STD" },
+      { "id": "replace_floors",   "label": "Replacing Floors",         "days": 60,  "group": "LTD" },
+      { "id": "cosmetic",         "label": "Cosmetic Repairs",         "days": 90,  "group": "LTD" },
+      { "id": "structural",       "label": "Major Structural Damage",  "days": 365, "group": "LTD" },
+      { "id": "rebuild",          "label": "Complete Rebuild",         "days": 480, "group": "LTFD" }
+    ],
+    "livingSituations": [
+      { "id": "home",   "label": "Staying in my home",   "desc": "Living on-site during repairs" },
+      { "id": "hotel",  "label": "Staying in a hotel",   "desc": "Temporary hotel stay" },
+      { "id": "temp",   "label": "Temporary rental",     "desc": "Furnished apartment or rental home" },
+      { "id": "moving", "label": "Moving to a new home", "desc": "Relocating permanently" }
+    ],
+    "eventTypes": [
+      { "id": "vacation_beach", "label": "Warm Weather / Beach Vacation" },
+      { "id": "vacation_ski",   "label": "Cold Weather / Ski Trip" },
+      { "id": "wedding",        "label": "Wedding / Formal Event" },
+      { "id": "business",       "label": "Business Trip / Conference" },
+      { "id": "sports",         "label": "Sports Tournament" }
+    ],
+    "interests": [
+      { "id": "school",            "label": "School & Kids Sports",     "desc": "Backpacks, uniforms, gear" },
+      { "id": "summer_activities", "label": "Summer & Swim",            "desc": "Swimwear, beach bags, sun hats" },
+      { "id": "winter_sports",     "label": "Winter & Snow",            "desc": "Skiing, heavy outerwear" },
+      { "id": "halloween",         "label": "Halloween",                "desc": "Costumes, decorations" },
+      { "id": "thanksgiving",      "label": "Thanksgiving",             "desc": "Holiday linens, servingware" },
+      { "id": "christmas",         "label": "Christmas / Hanukkah",     "desc": "Holiday clothing, decorations, gifts" },
+      { "id": "easter",            "label": "Easter / Passover",        "desc": "Spring formal, holiday items" },
+      { "id": "religious",         "label": "Religious Services",       "desc": "Formal wear, prayer items" },
+      { "id": "graduation",        "label": "Graduation",               "desc": "Caps, gowns, formal attire" },
+      { "id": "workout",           "label": "Gym & Fitness",            "desc": "Workout clothes, equipment" },
+      { "id": "work_from_home",    "label": "Work from Home",           "desc": "Office supplies, desk items" }
+    ],
+    "seasons": {
+      "SPRING": { "name": "Spring", "months": [2, 3, 4] },
+      "SUMMER": { "name": "Summer", "months": [5, 6, 7] },
+      "FALL":   { "name": "Fall",   "months": [8, 9, 10] },
+      "WINTER": { "name": "Winter", "months": [11, 0, 1] }
+    }
+  },
+  "loadTargets": [
+    { "id": "extra_manpower",   "label": "Extra Manpower",   "category": "Crew",      "triggers": [{ "type": "packout", "value": "Furniture" }, { "type": "packout", "value": "Appliances" }, { "type": "packout", "value": "Rugs" }] },
+    { "id": "tall_ladder",      "label": "Tall Ladder",      "category": "Equipment", "triggers": [{ "type": "packout", "value": "Window Treatments" }] },
+    { "id": "dollies",          "label": "Dollies",          "category": "Equipment", "triggers": [{ "type": "packout", "value": "Furniture" }, { "type": "packout", "value": "Appliances" }] },
+    { "id": "blankets",         "label": "Blankets",         "category": "Packing",   "triggers": [{ "type": "packout", "value": "Furniture" }, { "type": "packout", "value": "Electronics" }] },
+    { "id": "wardrobe_boxes",   "label": "Wardrobe Boxes",   "category": "Packing",   "triggers": [{ "type": "service", "value": "Textiles" }] },
+    { "id": "tv_boxes",         "label": "TV Boxes",         "category": "Packing",   "triggers": [{ "type": "packout", "value": "Electronics" }] },
+    { "id": "art_boxes",        "label": "Art Boxes",        "category": "Packing",   "triggers": [{ "type": "packout", "value": "Art" }] },
+    { "id": "plastic_bags",     "label": "Plastic Bags",     "category": "Packing",   "triggers": [{ "type": "condition", "value": "damageWasWet" }, { "type": "interview", "value": "Still Wet" }] },
+    { "id": "tyvek",            "label": "Tyvek",            "category": "PPE",       "triggers": [{ "type": "condition", "value": "damageMoldMildew" }, { "type": "interview", "value": "Visible Mold" }, { "type": "loss", "value": "Mold" }] },
+    { "id": "hard_hats",        "label": "Hard Hats",        "category": "PPE",       "triggers": [{ "type": "interview", "value": "Structural Damage" }] },
+    { "id": "respirators",      "label": "Respirators",      "category": "PPE",       "triggers": [{ "type": "loss", "value": "Mold" }, { "type": "loss", "value": "Fire" }] },
+    { "id": "lights",           "label": "Lights",           "category": "Site",      "triggers": [{ "type": "condition", "value": "noLights" }, { "type": "condition", "value": "boardedUp" }, { "type": "interview", "value": "No Electricity" }, { "type": "interview", "value": "Boarded Up" }] },
+    { "id": "heater",           "label": "Heater",           "category": "Site",      "triggers": [{ "type": "condition", "value": "noHeat" }, { "type": "interview", "value": "No Heat" }] },
+    { "id": "floor_protection", "label": "Floor Protection", "category": "Site",      "triggers": [{ "type": "packout", "value": "Furniture" }] }
+  ]
 }
