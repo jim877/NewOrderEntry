@@ -9,6 +9,7 @@ import {
   normalizeScopeBridgeState,
   withScopeBridgeSnippet,
 } from './scopeBridgeUtils';
+import { DEFAULT_COACHING } from './config';
 
 // --- STYLES ---
 const STYLES = `
@@ -992,100 +993,9 @@ const EntityPreferencePanel = ({
 
 // --- CONSTANTS FOR SELECTIONS ---
 const LOSS_TYPES = ["Fire", "Water", "Mold", "Dust/Debris", "Puffback", "Oil", "Unknown", "Other"];
-// ═══ CENTRALIZED COACHING CONFIG ═══
-// All coaching/help text in one place. Edit via Settings → Coaching & Help Text.
-// User overrides are stored in localStorage and take precedence over defaults.
-const DEFAULT_COACHING: Record<string, string> = {
-  // Loss Types
-  "loss.Fire": "Includes smoke, soot, protein fires. If water was used to extinguish, add Water as secondary.",
-  "loss.Water": "Verify coverage for groundwater, flood, and sump pump failure — these are often excluded or capped.",
-  "loss.Mold": "Usually has coverage limits. Mold from covered water damage is typically covered in full under water coverage.",
-  "loss.Dust/Debris": "From construction or remediation (flood cuts, charred material). Common secondary contaminant.",
-  "loss.Puffback": "Furnace/fireplace malfunction pushes soot or oily residue into the home. No flames.",
-  "loss.Oil": "Heating oil spill/mist. Requires dry cleaning only — washing won't work. May need to replace non-dry-cleanable items.",
-  "loss.Unknown": "Cause of loss is not yet determined. No sub-type options — update once identified.",
-  "loss.Other": "Windstorms, fallen trees, etc. — perils that don't fit other categories.",
-  "loss.Non-Restoration": "Not an insurance claim — regular residential or commercial cleaning unrelated to a loss event.",
-  // Roles
-  "role.Policyholder": "The person(s) named on the policy who is required to sign our authorization paperwork.",
-  "role.Primary": "The primary contact handling our portion of the project. May or may not be the policyholder or owner — can be a PA, employee, or family member.",
-  "role.Referral": "The first person that called us with the order. When assigned, we have the go-ahead to begin. Note: some referrers may only be giving us a lead.",
-  "role.ExpertStainRemoval": "A per-hour charge for removing complicated loss-related stains from items worth saving.",
-  "role.FindAddress": "Use Google to insert a valid, verified address.",
-  // Delivery Groups
-  "group.RD": "Rush Delivery (within 1 week)",
-  "group.RFD": "Rush Final Delivery (all within 1 week)",
-  "group.STD": "Short Term Delivery (within 1 month)",
-  "group.STFD": "Short Term Final (all within 1 month)",
-  "group.LTD": "Long Term Delivery (greater than 1 month)",
-  "group.LTFD": "Long Term Final Delivery (greater than 1 month)",
-  "group.Inhome": "In-Home-Cleaning",
-  "group.TLI": "Total Loss Inventory of non-salvageable items",
-  "group.Test": "Test cleaning to determine scope (results needed ASAP)",
-  "group.Dispose": "Items that will not be returned",
-  "group.Storage Only": "Items that will be stored and returned without cleaning",
-  // Service Offerings
-  "service.Appliance": "Large items requiring specialized handling (refrigerators, ranges, etc.).",
-  "service.Art": "Items valued for artistic/aesthetic merit.",
-  "service.Consulting": "Expert opinions and guidance.",
-  "service.Contents": "Hard furniture and all possessions.",
-  "service.Furniture": "Upholstered furniture pieces.",
-  "service.Hand Clean": "Delicate shoes, bags, belts etc.",
-  "service.Taxidermy": "Preserved animals, birds, etc.",
-  "service.Pack-out": "Moving and relocation services.",
-  "service.Rugs": "Area rugs and carpets.",
-  "service.Storage Only": "Items stored without cleaning.",
-  "service.Textiles": "Fabric/leather items (clothing, accessories, etc.).",
-  "service.TLI": "Total Loss Inventory - listing/valuing non-restorable items.",
-  "service.Expert Stain Removal": "Specialized stain removal services.",
-  // Section / Field Help
-  "section.interview": "Ask the customer these questions during or before the initial visit.",
-  "section.timeline": "Plan pickups, rush deliveries, in-home events, and final delivery based on the repair schedule and living situation.",
-  "section.eventInstructions": "What scheduling and field team need to know — conditions, access, customer preferences, what to bring.",
-  "section.repairs": "Repair type determines your delivery timeline and potential blockers. Each option auto-suggests a delivery group and adds delivery instructions.",
-  "section.rush": "Rush deliveries get essentials (clothing, bedding, toiletries) to the customer within days. The delivery address will auto-link to their first living situation.",
-  "section.planner": "Select delivery groups and assign dates/addresses. One group must be the Final (F) delivery — this determines storage duration.",
-  "section.finalWarning": "One group should be marked as Final (F) — this determines storage duration.",
-  "section.stayingHome": "Customer is staying in the home. Deliveries will be made to the primary address. Consider a Rush Final Delivery (RFD) if everything can be rushed.",
-  "section.addHome": "Add \"Their Home\" as the last step to mark return after repairs.",
-  "section.events": "Any travel or formal events during the repair period? We'll make sure the right items are pulled and delivered on time.",
-  "section.groups": "Select the delivery groups that apply. These feed into the Rush Guide timeline.",
-  "field.orderName": "Auto-generated from LastName-TownST. Lock to prevent changes.",
-  "field.lossType": "Pick the primary peril — what happened first. Example: kitchen fire put out with water = Fire primary, Water secondary.",
-  "field.contaminants": "e.g. Fire with water damage from firefighting, or water loss leading to mold. Incompatible types are grayed out.",
-  "field.severity": "Typically entered after the site inspection, not during intake.",
-  "field.rejectScale": "Severity reject scale: 1 = None, 2 = Possible, 3 = Many expected, 5 = Extreme.",
-  "field.contaminantLevels": "Rate specific contaminant levels. 0 = None, 3 = Severe. Typically completed after the site inspection — not during intake.",
-  "field.qualityCode": "Customer's quality standard. Q1 = Highest (designer/luxury items), Q5 = Basic (everyday items).",
-  "field.handlingCodes": "Special processing instructions. Hover each code for its meaning.",
-  "field.salesRep": "Employee managing customer relationships/accounts.",
-  "field.referrer": "The referrer reached out with this order. If assigned, we can begin. If only a lead, we cannot contact the customer yet.",
-  "field.autoAssigned": "Auto-assigned from referrer.",
-  // Lead/Order
-  "field.isLead": "A Lead requires selling the customer and getting approvals from the adjuster before we proceed. No billable charges yet — just an opportunity we will pursue.",
-  "field.isOrder": "An Order is a confirmed project ready to be scheduled and worked.",
-  // Step Guidance (Scope Wizard)
-  "step.1": "Select the building type and access details for the property.",
-  "step.2": "Set the property size — floors, bedrooms, and square footage.",
-  "step.3": "Confirm rooms and mark affected areas.",
-  "step.4": "Set severity, handling codes, and instructions per room.",
-  // Work Types
-  "event.scope": "On-site scope / inspection",
-  "event.pickup": "Pack-out, transport, clean, deliver back",
-  "event.inhome": "On-site cleaning or restoration",
-  "event.consult": "On-site consultation",
-  "event.none": "Remote — no on-site event",
-  // Toast Templates — use {value} as placeholder for the action value
-  "toast.loadList": "+ {value} to load",
-  "toast.handlingCode": "+ {value} handling code",
-  "toast.eventInstruction": "+ \"{value}\" to instructions",
-  "toast.sdsObservation": "+ {value} to SDS",
-  "toast.suggestGroup": "Suggested {value} group",
-  "toast.blocker": "Blocker: {value}",
-  "toast.addressPlaceholder": "+ {value} address placeholder",
-  "toast.suggestOrderType": "Suggested order type: {value}",
-  "toast.openMoldLimit": "Mold limit warning",
-};
+// ═══ COACHING CONFIG ═══
+// DEFAULT_COACHING is imported from src/config.ts (sourced from /config.json).
+// User overrides stored in localStorage take precedence at read-time via getCoaching().
 
 // These objects read from DEFAULT_COACHING for single-source-of-truth
 const LOSS_TYPE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("loss.")).map(k => [k.replace("loss.", ""), DEFAULT_COACHING[k]]));
