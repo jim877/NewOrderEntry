@@ -39,6 +39,8 @@ import {
   COMPATIBLE_SECONDARY_LOSS,
   PACKOUT_LOAD_MAP,
   COACHING_CATEGORIES,
+  DEFAULT_BLOCKER_RULES,
+  DEFAULT_INTERVIEW_ACTIONS,
 } from './config';
 import type { LoadTarget, LoadTrigger } from './config';
 
@@ -1666,93 +1668,7 @@ const DEFAULT_FIELD_CONFIG = {
   codes:         { label: "Codes Section",       section: "sec1", category: "codes", requiredInAudit: true, requiredAtStatus: "Pickup Complete", visible: true, checkFn: "codesCompleted" },
 };
 
-const DEFAULT_BLOCKER_RULES = [
-  { id: "auth",         enabled: true, trigger: "No authorization on file",              blockerText: "Won't Sign Authorization" },
-  { id: "custEstimate", enabled: true, trigger: "Customer requests estimate before work", blockerText: "Customer Wants Estimate" },
-  { id: "adjEstimate",  enabled: true, trigger: "Adjuster requests estimate before work", blockerText: "Adjuster Wants Estimate" },
-  { id: "specialDocs",  enabled: true, trigger: "Special paperwork required by carrier",  blockerText: "Special paperwork required" },
-  { id: "unknownIns",   enabled: true, trigger: "Insurance company set to Not Yet Known", blockerText: "Insurance Company Not Yet Known" },
-];
-
-// --- INTERVIEW ANSWER ACTIONS ---
-const DEFAULT_INTERVIEW_ACTIONS = {
-  // Q1: Conditions
-  "Still Wet":          { coaching: "We will need to get out right away, separate the wet items by color and process them immediately using an anti-microbial to prevent mold growth.", actions: [{ type: "loadList", value: "Plastic Bags" }, { type: "handlingCode", value: "Wet" }] },
-  "Visible Mold":       { coaching: "Please don't disturb the mold and consider wearing safety gear. If your Insurance is considering this a 'Mold Claim' it may count against your mold limit.", actions: [{ type: "loadList", value: "Tyvek" }, { type: "handlingCode", value: "PPE" }, { type: "suggestOrderType", value: "Mold" }, { type: "openMoldLimit" }] },
-  "Structural Damage":  { coaching: "Please stay out of any unstable areas. Has there been a safety assessment?", actions: [{ type: "loadList", value: "Hard Hats" }, { type: "sdsObservation", value: "Structural Damage" }, { type: "blocker", value: "Safety Assessment needed" }, { type: "suggestGroup", value: "LTD" }] },
-  "No Electricity":     { coaching: "No problem, our crew will bring portable lights. Will you be able to pull your Rush items?", actions: [{ type: "loadList", value: "Lights" }] },
-  "No Heat":            { coaching: "", actions: [{ type: "loadList", value: "Heater" }] },
-  "Boarded Up":         { coaching: "Please confirm safe entry and available access.", actions: [{ type: "loadList", value: "Lights" }] },
-
-  // Q2: Repairs
-  "Just Cleaning":              { coaching: "Timeline: 1-2 weeks. Customer may stay home or be out briefly. Plan essentials for a quick turnaround — Rush Final Delivery (RFD) where everything goes back at once.", actions: [{ type: "eventInstruction", value: "Repairs: Cleaning only — quick turnaround expected" }, { type: "suggestGroup", value: "RFD" }] },
-  "Paint":                      { coaching: "Timeline: 2-4 weeks. Customer likely out 1-2 weeks for painting + 48hr cure. Consider a Short Term Delivery (STD) — verify hardware is back up and walls are ready before re-hanging window treatments.", actions: [{ type: "sdsObservation", value: "Repairs: Painting scheduled — note window treatments and wall-hung items" }, { type: "eventInstruction", value: "Repairs: Painting in progress — note items near walls, window treatments, and hardware for removal" }, { type: "suggestGroup", value: "STD" }] },
-  "Refinish Floors":            { coaching: "Timeline: 3-6 weeks. Customer out while floors cure — plan Short Term Delivery (STD). Follow contractor's advice on cure times before placing heavy furniture.", actions: [{ type: "eventInstruction", value: "Repairs: Floor refinishing — use protective coverings during pickup, note heavy furniture placement" }, { type: "suggestGroup", value: "STD" }] },
-  "Replace Floors":             { coaching: "Timeline: 1-3 months. Customer likely out for extended period — plan Long Term Delivery (LTD). New floors need full cure before heavy furniture.", actions: [{ type: "eventInstruction", value: "Repairs: Floor replacement — use protective coverings during pickup, note heavy furniture placement" }, { type: "suggestGroup", value: "LTD" }] },
-  "Cosmetic Damage":            { coaching: "Timeline: 2-6 weeks. Customer may be out a few weeks for minor repairs (cabinets, tile, cosmetic). Plan Long Term Delivery (LTD) — confirm all repairs complete before scheduling final.", actions: [{ type: "eventInstruction", value: "Repairs: Cosmetic work in progress — note items near repair areas" }, { type: "suggestGroup", value: "LTD" }] },
-  "Major Structural Damage":    { coaching: "Timeline: 3-9+ months. Customer will be out for an extended period — plan Long Term Delivery (LTD) with long-term storage. Coordinate with contractor for a completion estimate.", actions: [{ type: "suggestGroup", value: "LTD" }, { type: "blocker", value: "Timeline TBD — awaiting contractor estimate" }] },
-  "Complete Rebuild":           { coaching: "Timeline: 6-12+ months. Customer out until certificate of occupancy — plan Long Term Final Delivery (LTFD) with long-term storage. Coordinate with contractor for phased delivery if possible.", actions: [{ type: "suggestGroup", value: "LTFD" }, { type: "blocker", value: "Awaiting certificate of occupancy" }] },
-
-  // Q3: Living Status
-  "Staying in home":    { coaching: "We'll try to work as quietly as possible and expedite your household essentials like bedding, shower curtains and throw rugs. We also have temporary shades if you need privacy on the windows.", actions: [{ type: "eventInstruction", value: "Customer on-site" }] },
-  "Hotel":              { coaching: "We can deliver your rush items straight to the hotel.", actions: [{ type: "addressPlaceholder", value: "Hotel" }] },
-  "Temp":               { coaching: "We can deliver future seasonal items to this address.", actions: [{ type: "addressPlaceholder", value: "Temp" }] },
-  "Rental":             { coaching: "We can deliver future seasonal items to this address.", actions: [{ type: "addressPlaceholder", value: "Rental" }] },
-  "Neighbor":           { coaching: "We can coordinate delivery to their neighbor's address.", actions: [{ type: "addressPlaceholder", value: "Neighbor" }] },
-  "Relative":           { coaching: "We can coordinate delivery to the family member's address.", actions: [{ type: "addressPlaceholder", value: "Relative" }] },
-  "Moving":             { coaching: "We'll update your file so your final delivery goes smoothly to your new permanent address. Will you be moving locally or will we need to coordinate a national move?", actions: [{ type: "addressPlaceholder", value: "Moving" }, { type: "blocker", value: "Final Delivery Date needed" }] },
-
-  // Q3b: Packout Scope
-  "No Packout":              { coaching: "Confirm with the customer — are they certain nothing needs to come out for cleaning?", actions: [{ type: "eventInstruction", value: "No packout — contents stay on-site" }] },
-  "Content Manipulation":    { coaching: "Our team will move and protect items in-place during repairs. No items will leave the home.", actions: [{ type: "eventInstruction", value: "Content manipulation only — no removal" }, { type: "suggestGroup", value: "Inhome" }] },
-  "Partial Packout":         { coaching: "We'll pack out only the affected areas. Which rooms are being packed?", actions: [{ type: "eventInstruction", value: "Partial packout — affected rooms only" }] },
-  "Full Packout":            { coaching: "We'll pack the entire home for full restoration. This is a major project.", actions: [{ type: "eventInstruction", value: "Full packout — entire home" }, { type: "suggestGroup", value: "LTD" }] },
-
-  // Q4: Delivery
-  "Deliver ASAP":           { coaching: "We will prioritize your most important items to get your house feeling like home again as fast as possible.", actions: [{ type: "eventInstruction", value: "Rush processing for essentials" }] },
-  "Deliver to Temp":        { coaching: "We'll coordinate with you to deliver exactly what you need to your temporary residence.", actions: [{ type: "eventInstruction", value: "Deliver to temporary address" }] },
-  "Deliver to New Home":    { coaching: "We will hold onto everything safely and deliver it straight to your new place when you are ready to move in.", actions: [{ type: "eventInstruction", value: "Deliver to new address" }] },
-  "Long-Term Storage":      { coaching: "We can provide safe, secure, long term storage until your home is ready.", actions: [{ type: "eventInstruction", value: "Hold for home completion" }] },
-
-  // Q5: Packout Items — feed into pickup instructions
-  "Rugs":               { coaching: "Ask about size, weight and heavy furniture that may need to be moved. We may need extra manpower.", actions: [{ type: "eventInstruction", value: "Pickup: Rugs" }, { type: "loadList", value: "Extra Manpower" }] },
-  "Window Treatments":  { coaching: "Our team will carefully take down your drapes and blinds for specialized cleaning. Will we need any special ladders or equipment?", actions: [{ type: "eventInstruction", value: "Pickup: Window Treatments" }, { type: "loadList", value: "Tall Ladder" }] },
-  "Clothing":           { coaching: "We'll kindly ask that you prioritize your rush items.", actions: [{ type: "eventInstruction", value: "Pickup: Clothing" }] },
-  "Bedding":            { coaching: "", actions: [{ type: "eventInstruction", value: "Pickup: Bedding" }] },
-  "Furniture":          { coaching: "We'll bring plenty of moving blankets and padding to protect the corners and surfaces of your furniture.", actions: [{ type: "eventInstruction", value: "Pickup: Furniture" }, { type: "loadList", value: "Blankets" }, { type: "loadList", value: "Dollies" }, { type: "loadList", value: "Extra Manpower" }] },
-  "Art":                { coaching: "We'll use specialized picture boxes and packing paper to keep your artwork completely safe.", actions: [{ type: "eventInstruction", value: "Pickup: Art" }, { type: "loadList", value: "Art Boxes" }] },
-  "Electronics":        { coaching: "Consider any rush electronics we may need.", actions: [{ type: "eventInstruction", value: "Pickup: Electronics" }, { type: "loadList", value: "TV Boxes" }, { type: "loadList", value: "Blankets" }] },
-  "Hardware":           { coaching: "", actions: [{ type: "eventInstruction", value: "Pickup: Hardware" }] },
-  "Appliances":         { coaching: "We will send heavy-duty dollies and extra hands to safely move your large appliances.", actions: [{ type: "eventInstruction", value: "Pickup: Appliances" }, { type: "loadList", value: "Dollies" }, { type: "loadList", value: "Extra Manpower" }] },
-
-  // Q7: Considerations
-  "Elderly":                { coaching: "", actions: [{ type: "sdsObservation", value: "Elderly resident" }, { type: "contactNote", value: "Elderly" }] },
-  "Pregnancy":              { coaching: "We will use baby-safe, hypoallergenic cleaning methods.", actions: [{ type: "handlingCode", value: "Det" }, { type: "contactNote", value: "Pregnancy" }] },
-  "Baby":                   { coaching: "We will use baby-safe, hypoallergenic cleaning methods and can rush essential baby items like cribs, strollers, and clothing.", actions: [{ type: "handlingCode", value: "Det" }, { type: "contactNote", value: "Baby in household" }] },
-  "Hearing Impaired":       { coaching: "", actions: [{ type: "contactNote", value: "Hearing Impaired" }] },
-  "Spanish Only":           { coaching: "", actions: [{ type: "eventInstruction", value: "Spanish speaking crew required" }, { type: "contactNote", value: "Spanish Only" }] },
-  "Respiratory Concerns":   { coaching: "We will strictly use mild, fragrance-free cleaning agents to protect your respiratory health.", actions: [{ type: "handlingCode", value: "Det" }, { type: "contactNote", value: "Respiratory Concerns" }] },
-  "Premium Brands":         { coaching: "We will route your high-end designer pieces for delicate hand-cleaning.", actions: [{ type: "sdsObservation", value: "Premium Brands" }] },
-  "Skin Sensitivity":       { coaching: "We will process your garments using 100% dye-free and fragrance-free detergents.", actions: [{ type: "handlingCode", value: "Det" }] },
-  "Pets":                   { coaching: "Please make sure your pets are secured in a safe room. I'll remind the crew to be very careful with open doors.", actions: [{ type: "sdsObservation", value: "Pets on site" }, { type: "eventInstruction", value: "Keep doors closed - pets on site" }] },
-
-  // Q8: Medical
-  "Medical Yes":            { coaching: "We'll make a note for the crew to be aware of medical conditions in the household.", actions: [{ type: "contactNote", value: "Medical issues" }, { type: "eventInstruction", value: "Household has medical considerations" }] },
-
-  // Q9: Allergies
-  "Allergies Yes":          { coaching: "We will use hypoallergenic, fragrance-free cleaning products.", actions: [{ type: "handlingCode", value: "Det" }, { type: "eventInstruction", value: "Use fragrance-free products only" }] },
-
-  // Q10: Self Clean
-  "SelfClean Yes":          { coaching: "We'll set aside those items and return them uncleaned as requested.", actions: [{ type: "eventInstruction", value: "Customer self-cleaning some items" }] },
-
-  // Q12: Laundry
-  "Air-Dry":                { coaching: "We'll air-dry all launderable items — no machine drying.", actions: [{ type: "handlingCode", value: "Low" }, { type: "eventInstruction", value: "Air-dry all items" }] },
-  "Low Heat":               { coaching: "We'll use low heat settings only on all items.", actions: [{ type: "handlingCode", value: "Low" }] },
-  "Dryer":                  { coaching: "", actions: [] },
-
-  // Q13: Storage
-  "Storage Yes":            { coaching: "We'll arrange safe, climate-controlled storage at our facility.", actions: [{ type: "suggestGroup", value: "Storage Only" }, { type: "eventInstruction", value: "Customer needs storage" }] },
-};
+// DEFAULT_BLOCKER_RULES and DEFAULT_INTERVIEW_ACTIONS — imported from ./config
 
 // --- RUSH GUIDE / LOADING LIST ---
 // RUSH_* constants and DEFAULT_LOAD_TARGETS imported from src/config.ts (sourced from /config.json).

@@ -61,3 +61,23 @@ export const COMPATIBLE_SECONDARY_LOSS: Record<string, string[]> = config.lists.
 export const PACKOUT_LOAD_MAP: Record<string, string[]>          = config.lists.packoutLoadMap;
 export type CoachingCategory = { key: string; label: string; prefix: string };
 export const COACHING_CATEGORIES: CoachingCategory[] = config.lists.coachingCategories;
+
+// --- Blockers / rules ---
+export type BlockerRule = { id: string; enabled: boolean; trigger: string; blockerText: string };
+export const DEFAULT_BLOCKER_RULES: BlockerRule[] = config.blockerRules;
+
+// --- Interview answer actions (per-answer coaching + auto-actions) ---
+export type InterviewAction =
+  | { type: "loadList"; value: string }
+  | { type: "handlingCode"; value: string }
+  | { type: "eventInstruction"; value: string }
+  | { type: "sdsObservation"; value: string }
+  | { type: "suggestGroup"; value: string }
+  | { type: "blocker"; value: string }
+  | { type: "contactNote"; value: string }
+  | { type: "addressPlaceholder"; value: string }
+  | { type: "suggestOrderType"; value: string }
+  | { type: "openMoldLimit" };
+
+export type InterviewActionConfig = { coaching: string; actions: InterviewAction[] };
+export const DEFAULT_INTERVIEW_ACTIONS: Record<string, InterviewActionConfig> = config.interviewActions;
