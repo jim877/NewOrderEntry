@@ -356,6 +356,7 @@ const buildEventSystemEntries = (data, conditionSummary) => {
   if ((data as any).packoutScope && (data as any).packoutScope !== "No Packout") entries.push({ label: "Packout", value: (data as any).packoutScope + ((data as any).packoutNote ? ` — ${(data as any).packoutNote}` : "") });
   if ((data.quickInstructionNotes || []).length) entries.push({ label: "Quick Notes", value: (data.quickInstructionNotes || []).join(", ") });
   if ((data.quickScopeNotes || []).length) entries.push({ label: "Scope Notes", value: (data.quickScopeNotes || []).join(", ") });
+  if (data.rushDeliveryNeeded === "N") entries.push({ label: "Rush Service", value: "Declined" + ((data as any).rushDeclinedNote ? ` — ${(data as any).rushDeclinedNote}` : "") });
   if (data.estimateRequested) {
     let value = data.estimateType || "Yes";
     if (data.estimateRequestedBy) value += ` (Requested By: ${data.estimateRequestedBy})`;
@@ -1925,6 +1926,89 @@ const RUSH_SEASONS = {
   WINTER: { name: 'Winter', months: [11, 0, 1] },
 };
 
+// --- LOADING LIST (configurable) ---
+// Each target can be added to the truck. Triggers are rules — if any trigger matches data state,
+// the item is auto-suggested (highlighted orange in the question and added on selection).
+// Triggers reference order data keys with simple matchers.
+type LoadTrigger =
+  | { type: "condition"; value: string }      // matches data.conditions[key] === true (e.g. "damageWasWet")
+  | { type: "loss"; value: string }            // matches data.orderTypes includes value
+  | { type: "packout"; value: string }         // matches data.packoutSummary includes value
+  | { type: "service"; value: string }         // matches data.serviceOfferings includes value
+  | { type: "interview"; value: string };      // matches a condition label (e.g. "Visible Mold")
+
+type LoadTarget = { id: string; label: string; category: string; triggers: LoadTrigger[]; description?: string };
+
+const DEFAULT_LOAD_TARGETS: LoadTarget[] = [
+  // Manpower / capacity
+  { id: "extra_manpower", label: "Extra Manpower", category: "Crew", triggers: [{ type: "packout", value: "Furniture" }, { type: "packout", value: "Appliances" }, { type: "packout", value: "Rugs" }] },
+  // Ladders / heights
+  { id: "tall_ladder",    label: "Tall Ladder",    category: "Equipment", triggers: [{ type: "packout", value: "Window Treatments" }] },
+  // Carrying / moving
+  { id: "dollies",        label: "Dollies",        category: "Equipment", triggers: [{ type: "packout", value: "Furniture" }, { type: "packout", value: "Appliances" }] },
+  { id: "blankets",       label: "Blankets",       category: "Packing",   triggers: [{ type: "packout", value: "Furniture" }, { type: "packout", value: "Electronics" }] },
+  // Boxes
+  { id: "wardrobe_boxes", label: "Wardrobe Boxes", category: "Packing",   triggers: [{ type: "service", value: "Textiles" }] },
+  { id: "tv_boxes",       label: "TV Boxes",       category: "Packing",   triggers: [{ type: "packout", value: "Electronics" }] },
+  { id: "art_boxes",      label: "Art Boxes",      category: "Packing",   triggers: [{ type: "packout", value: "Art" }] },
+  // Bagging / wet
+  { id: "plastic_bags",   label: "Plastic Bags",   category: "Packing",   triggers: [{ type: "condition", value: "damageWasWet" }, { type: "interview", value: "Still Wet" }] },
+  // PPE / safety
+  { id: "tyvek",          label: "Tyvek",          category: "PPE",       triggers: [{ type: "condition", value: "damageMoldMildew" }, { type: "interview", value: "Visible Mold" }, { type: "loss", value: "Mold" }] },
+  { id: "hard_hats",      label: "Hard Hats",      category: "PPE",       triggers: [{ type: "interview", value: "Structural Damage" }] },
+  { id: "respirators",    label: "Respirators",    category: "PPE",       triggers: [{ type: "loss", value: "Mold" }, { type: "loss", value: "Fire" }] },
+  // Site conditions
+  { id: "lights",         label: "Lights",         category: "Site",      triggers: [{ type: "condition", value: "noLights" }, { type: "condition", value: "boardedUp" }, { type: "interview", value: "No Electricity" }, { type: "interview", value: "Boarded Up" }] },
+  { id: "heater",         label: "Heater",         category: "Site",      triggers: [{ type: "condition", value: "noHeat" }, { type: "interview", value: "No Heat" }] },
+  { id: "floor_protection", label: "Floor Protection", category: "Site",  triggers: [{ type: "packout", value: "Furniture" }] },
+];
+
+// Stored in localStorage under "noe.loadTargets" — merged on top of defaults
+const loadTargetsFromStorage = (): LoadTarget[] => {
+  if (typeof window === "undefined") return DEFAULT_LOAD_TARGETS;
+  try {
+    const raw = window.localStorage.getItem("noe.loadTargets");
+    if (!raw) return DEFAULT_LOAD_TARGETS;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed as LoadTarget[];
+    return DEFAULT_LOAD_TARGETS;
+  } catch { return DEFAULT_LOAD_TARGETS; }
+};
+
+// Given current data, return the labels that any rule recommends
+const matchLoadTargets = (data: any, targets: LoadTarget[] = DEFAULT_LOAD_TARGETS): string[] => {
+  const out: string[] = [];
+  const conds = (data && data.conditions) || {};
+  const losses: string[] = (data && data.orderTypes) || [];
+  const packout: string[] = (data && data.packoutSummary) || [];
+  const services: string[] = (data && data.serviceOfferings) || [];
+  // Interview-label triggers fire when the conditions object contains the corresponding flag truthy.
+  // We map a small set of human labels to internal condition keys.
+  const labelToCond: Record<string, string> = {
+    "Still Wet": "damageWasWet",
+    "Visible Mold": "damageMoldMildew",
+    "Structural Damage": "structuralDamage",
+    "No Electricity": "noLights",
+    "No Heat": "noHeat",
+    "Boarded Up": "boardedUp",
+  };
+  for (const t of targets) {
+    let hit = false;
+    for (const tr of (t.triggers || [])) {
+      if (tr.type === "condition" && conds[tr.value]) { hit = true; break; }
+      if (tr.type === "loss" && losses.includes(tr.value)) { hit = true; break; }
+      if (tr.type === "packout" && packout.includes(tr.value)) { hit = true; break; }
+      if (tr.type === "service" && services.includes(tr.value)) { hit = true; break; }
+      if (tr.type === "interview") {
+        const key = labelToCond[tr.value];
+        if (key && conds[key]) { hit = true; break; }
+      }
+    }
+    if (hit) out.push(t.label);
+  }
+  return out;
+};
+
 const rushAddDays = (date, days) => { const r = new Date(date); r.setDate(r.getDate() + days); return r; };
 const parseLocalDate = (value) => {
   if (!value) return null;
@@ -3419,7 +3503,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     { id: "useDryCleaner", title: "Use a dry cleaner?", type: "single" as const, critical: false, timeline: false, options: ["Yes", "No", "Rarely"] },
     { id: "considerations", title: "Special considerations", type: "multi" as const, critical: false, timeline: false, options: ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory", "Skin Sensitivity", "Premium Brands"] },
     { id: "petsInHome", title: "Pets in home?", type: "multi" as const, critical: false, timeline: false, options: ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"] },
-    { id: "loadList", title: "What do we need to bring?", type: "multi" as const, critical: false, timeline: false, options: ["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"] },
+    { id: "loadList", title: "What do we need to bring?", type: "multi" as const, critical: false, timeline: false, options: loadTargetsFromStorage().map(t => t.label) },
     // --- Timeline / Rush Guide questions (unchanged — app interview keeps original order) ---
     { id: "suggestedGroups", title: "Suggested groups", type: "multi" as const, critical: false, timeline: true, options: ["RD", "RFD", "STD", "STFD", "LTD", "LTFD", "Inhome", "TLI", "Test", "Dispose", "Storage Only"] },
     { id: "repairs", title: "What repairs are being done?", type: "multi" as const, critical: true, timeline: true, options: ["Cleaning Exposed", "Cleaning Everywhere", "Clean & Paint", "Plaster/Wall Repairs", "Refinish Floors", "Replace Floors", "Cosmetic (Cabinets/Tile)", "Major Structural/Electrical", "Gut/Rebuild"] },
@@ -3638,7 +3722,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     { id: "mold", label: "Mold", icon: "\u{1F7E2}", color: "bg-green-500", light: "bg-green-50", border: "border-green-300", details: ["Spores", "Visible Mold", "Mildew"] },
     { id: "oil", label: "Oil", icon: "\u{1F6E2}\u{FE0F}", color: "bg-amber-700", light: "bg-amber-50", border: "border-amber-400", details: ["Leak", "Accident", "Soot", "Odor", "Oily Film"] },
     { id: "puffback", label: "Puffback", icon: "\u{1F4A8}", color: "bg-slate-500", light: "bg-slate-50", border: "border-slate-400", details: ["Oil", "Soot", "Odor", "Oily Film"] },
-    { id: "debris", label: "Debris", icon: "\u{1FAA8}", color: "bg-stone-500", light: "bg-stone-50", border: "border-stone-300", details: ["Structural", "Contents", "Other"] },
+    { id: "debris", label: "Debris", icon: "\u{1FAA8}", color: "bg-stone-500", light: "bg-stone-50", border: "border-stone-300", details: ["Structural", "Contents", "Glass", "Other"] },
     { id: "unknown", label: "Unknown", icon: "\u{2753}", color: "bg-gray-500", light: "bg-gray-50", border: "border-gray-300", details: [] },
   ];
   // Compatible secondary types per primary — unlisted pairs are incompatible
@@ -8459,6 +8543,23 @@ export default function App(){
   const [rushGuideData, setRushGuideData] = useState({ interests: [], events: [] });
   const [pendingDeliveryDateChange, setPendingDeliveryDateChange] = useState<any>(null);
   const [draggingDelivery, setDraggingDelivery] = useState<{id: string; pct: number} | null>(null);
+  const [timelineAutoOpened, setTimelineAutoOpened] = useState(false);
+
+  // Auto-show timeline when scrolling to timeline section in interview
+  useEffect(() => {
+    if (!interviewPanelOpen) { if (timelineAutoOpened) { setRushGuideOpen(false); setTimelineAutoOpened(false); } return; }
+    const el = document.getElementById("noe-interview-timeline");
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !rushGuideOpen) {
+        setRushGuideOpen(true); setRushGuideStep(4); setTimelineAutoOpened(true);
+      } else if (!entry.isIntersecting && timelineAutoOpened) {
+        setRushGuideOpen(false); setTimelineAutoOpened(false);
+      }
+    }, { threshold: 0.1 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [interviewPanelOpen, rushGuideOpen, timelineAutoOpened]);
   const [deliveryDateVersion, setDeliveryDateVersion] = useState(0);
 
   // Sync timeline groupOverrides → interview deliveryGroupDetails + estimatedReturnDate
@@ -9994,7 +10095,7 @@ export default function App(){
     setLivingAddressPrompt({ open: false, type: "" });
   }, []);
 
-  const ORDER_ADDRESS_TYPES = ["Primary", "Hotel", "Rental", "Temporary", "Neighbor", "Relative", "Moving", "Secondary Home", "Storage Facility", "Business", "Other"];
+  const ORDER_ADDRESS_TYPES = ["Primary", "Access", "Hotel", "Rental", "Temporary", "Neighbor", "Relative", "Moving", "Secondary Home", "Storage Facility", "Business", "Other"];
   const formatOrderAddressLine = useCallback((addr: any = {}) => {
     return [addr.street, addr.apt, addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
   }, []);
@@ -14914,6 +15015,14 @@ export default function App(){
                             <Input value={data.eventVehicle} onChange={e=>update("eventVehicle", e.target.value)} placeholder="Vehicle" />
                           </Field>
                         </div>
+                        <div className="grid sm:grid-cols-3 gap-4">
+                          <Field label="# People">
+                            <Input type="number" min="1" value={(data as any).eventPeopleCount || ""} onChange={e=>update("eventPeopleCount", e.target.value)} placeholder="# people" />
+                          </Field>
+                          <Field label="Est. Hours">
+                            <Input type="number" min="0.5" step="0.5" value={(data as any).eventHours || ""} onChange={e=>update("eventHours", e.target.value)} placeholder="Hours" />
+                          </Field>
+                        </div>
                         {data.pickupTime === '12:00 AM' && (
                           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 font-semibold">
                             TBD — on the calendar but time not yet confirmed.
@@ -15775,11 +15884,32 @@ export default function App(){
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
                     {expanded && <div className="px-3 pb-3 space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {["Tall Ladder", "Extra Manpower", "Floor Protection", "Dollies", "Wardrobe Boxes", "TV Boxes", "Blankets", "Plastic Bags"].map(s => (
-                          <ToggleMulti key={s} label={s} checked={(data.loadList || []).includes(s)} onChange={() => update("loadList", toggleMulti(data.loadList || [], s))} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
-                        ))}
-                      </div>
+                      {(() => {
+                        const targets: LoadTarget[] = (data as any)._loadTargets || DEFAULT_LOAD_TARGETS;
+                        const autoLabels = new Set(matchLoadTargets(data, targets));
+                        const grouped: Record<string, LoadTarget[]> = {};
+                        targets.forEach(t => { (grouped[t.category] = grouped[t.category] || []).push(t); });
+                        return Object.entries(grouped).map(([cat, items]) => (
+                          <div key={cat}>
+                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">{cat}</div>
+                            <div className="flex flex-wrap gap-2">
+                              {items.map(t => {
+                                const isAuto = autoLabels.has(t.label);
+                                return (
+                                  <ToggleMulti
+                                    key={t.id}
+                                    label={t.label + (isAuto ? " ✦" : "")}
+                                    checked={(data.loadList || []).includes(t.label)}
+                                    onChange={() => update("loadList", toggleMulti(data.loadList || [], t.label))}
+                                    className={`!px-2 !py-1 !text-xs ${isAuto ? "!ring-2 !ring-amber-300" : ""} ${isSearchMatch(t.label) ? "!ring-2 !ring-yellow-400" : ""}`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                      {matchLoadTargets(data).length > 0 && <div className="text-[10px] text-amber-600">✦ Auto-suggested based on conditions/packout/loss type</div>}
                       <Input value={(data as any).loadListNote || ""} onChange={e => update("loadListNote", e.target.value)} placeholder="Additional notes about what to bring..." className="!text-xs" />
                       {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
@@ -16235,6 +16365,12 @@ export default function App(){
                           Rush Delivery (RD) group auto-added{(data.livingTimeline || [])[0]?.type ? ` → delivering to ${(data.livingTimeline || [])[0].type}` : ""}.
                         </div>
                       )}
+                      {data.rushDeliveryNeeded === "N" && (
+                        <div>
+                          <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Notes</div>
+                          <textarea value={(data as any).rushDeclinedNote || ""} onChange={e => update("rushDeclinedNote", e.target.value)} placeholder="Reason or additional context..." className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] outline-none focus:border-sky-300 resize-none" rows={2} />
+                        </div>
+                      )}
                       {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, rushDelivery: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), rushDelivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
                     </div>}
                   </div>;
@@ -16533,6 +16669,31 @@ export default function App(){
                       </div>
                     </div>
                   )}
+                  {/* Order Status Indicators */}
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Status</div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <span className="text-xs font-bold text-slate-600">Order Status</span>
+                        <select value={data.orderStatus || "New"} onChange={e => update("orderStatus", e.target.value)} className="rounded border border-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-700 bg-white outline-none">
+                          {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      {[
+                        { label: "Scheduled", done: !!data.pickupDate, detail: data.pickupDate ? `${data.scheduleType || "Event"} on ${data.pickupDate}` : "" },
+                        { label: "Customer Contacted", done: !!data.eventCustomerContacted, toggle: () => update("eventCustomerContacted", !data.eventCustomerContacted) },
+                        { label: "Bill-To Contacted", done: !!data.eventBillToContacted, toggle: () => update("eventBillToContacted", !data.eventBillToContacted) },
+                        { label: "Authorization", done: !!(data as any).authorizationOnFile, toggle: () => update("authorizationOnFile", !(data as any).authorizationOnFile) },
+                        { label: "Scope Approved", done: !!(data as any).billToApprovalStatus, toggle: () => update("billToApprovalStatus", (data as any).billToApprovalStatus ? "" : "Approved") },
+                      ].map(item => (
+                        <button key={item.label} type="button" onClick={item.toggle} className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 text-xs transition-all ${item.done ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200 bg-white hover:bg-slate-50"}`}>
+                          <span className={`font-bold ${item.done ? "text-emerald-700" : "text-slate-600"}`}>{item.done ? "✓" : "○"} {item.label}</span>
+                          {item.done && item.detail && <span className="text-[10px] text-emerald-500">{item.detail}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Workflow status: Interview + Rush Guide */}
                   {(() => {
                     const interviewAnswered = !!(data.damageWasWet || data.damageMoldMildew || data.repairsSummary || data.livingStatus || (data.livingTimeline || []).length > 0 || (data.packoutSummary || []).length > 0 || data.familyMedicalIssues || data.soapFragAllergies || data.howDryLaundry || data.storageNeeded);
@@ -16777,6 +16938,89 @@ export default function App(){
                       </details>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Loading List Config */}
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-bold text-amber-800">Loading List (What to Bring)</span>
+                    <span className="text-xs text-amber-500 ml-2">{((data as any)._loadTargets || DEFAULT_LOAD_TARGETS).length} targets</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => {
+                      const targets = (data as any)._loadTargets || DEFAULT_LOAD_TARGETS;
+                      const next = [...targets, { id: `lt_${Date.now()}`, label: "New Item", category: "Equipment", triggers: [] }];
+                      setData(p => ({ ...p, _loadTargets: next }));
+                      try { localStorage.setItem("noe.loadTargets", JSON.stringify(next)); } catch { /* ignore */ }
+                    }} className="rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] font-bold text-amber-600 hover:bg-amber-50">+ Add Target</button>
+                    <button onClick={() => {
+                      if (window.confirm("Reset loading list to defaults?")) {
+                        setData(p => { const next = { ...p }; delete (next as any)._loadTargets; return next; });
+                        try { localStorage.removeItem("noe.loadTargets"); } catch { /* ignore */ }
+                        setToast("Loading list reset");
+                      }
+                    }} className="rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] font-bold text-amber-600 hover:bg-amber-50">Reset</button>
+                  </div>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {(() => {
+                    const targets: LoadTarget[] = (data as any)._loadTargets || DEFAULT_LOAD_TARGETS;
+                    const saveTargets = (next: LoadTarget[]) => {
+                      setData(p => ({ ...p, _loadTargets: next }));
+                      try { localStorage.setItem("noe.loadTargets", JSON.stringify(next)); } catch { /* ignore */ }
+                    };
+                    const updateTarget = (id: string, patch: Partial<LoadTarget>) => saveTargets(targets.map(t => t.id === id ? { ...t, ...patch } : t));
+                    const removeTarget = (id: string) => saveTargets(targets.filter(t => t.id !== id));
+                    const categories = Array.from(new Set(targets.map(t => t.category)));
+                    const TRIGGER_TYPES: Array<{ type: LoadTrigger["type"]; label: string }> = [
+                      { type: "condition", label: "Condition flag" },
+                      { type: "loss", label: "Loss type" },
+                      { type: "packout", label: "Packout item" },
+                      { type: "service", label: "Service" },
+                      { type: "interview", label: "Interview answer" },
+                    ];
+                    return categories.map(cat => (
+                      <details key={cat} open>
+                        <summary className="px-4 py-2 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">
+                          {cat} ({targets.filter(t => t.category === cat).length})
+                        </summary>
+                        <div className="divide-y divide-slate-50">
+                          {targets.filter(t => t.category === cat).map(t => {
+                            const auto = matchLoadTargets(data, [t]).length > 0;
+                            return (
+                              <div key={t.id} className="px-4 py-2 space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                  <input value={t.label} onChange={e => updateTarget(t.id, { label: e.target.value })} className="flex-1 rounded border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none focus:border-amber-400" />
+                                  <select value={t.category} onChange={e => updateTarget(t.id, { category: e.target.value })} className="rounded border border-slate-200 px-2 py-1 text-[10px] text-slate-600 bg-white">
+                                    {["Equipment","Packing","PPE","Site","Crew","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                  {auto && <span className="rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[9px] font-bold">Auto-matched</span>}
+                                  <button onClick={() => removeTarget(t.id)} className="text-[10px] font-bold text-rose-400 hover:text-rose-600 px-1">×</button>
+                                </div>
+                                <div className="pl-1">
+                                  <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Triggers ({(t.triggers || []).length})</div>
+                                  <div className="space-y-1">
+                                    {(t.triggers || []).map((tr, idx) => (
+                                      <div key={idx} className="flex items-center gap-1">
+                                        <select value={tr.type} onChange={e => { const next = [...(t.triggers || [])]; next[idx] = { ...tr, type: e.target.value as any }; updateTarget(t.id, { triggers: next }); }} className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600 bg-white">
+                                          {TRIGGER_TYPES.map(tt => <option key={tt.type} value={tt.type}>{tt.label}</option>)}
+                                        </select>
+                                        <input value={tr.value} onChange={e => { const next = [...(t.triggers || [])]; next[idx] = { ...tr, value: e.target.value }; updateTarget(t.id, { triggers: next }); }} placeholder="value" className="flex-1 rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-700 outline-none focus:border-amber-400" />
+                                        <button onClick={() => { const next = (t.triggers || []).filter((_, i) => i !== idx); updateTarget(t.id, { triggers: next }); }} className="text-[10px] text-rose-400 hover:text-rose-600 px-1">×</button>
+                                      </div>
+                                    ))}
+                                    <button onClick={() => updateTarget(t.id, { triggers: [...(t.triggers || []), { type: "packout", value: "" }] })} className="text-[10px] font-bold text-amber-600 hover:text-amber-800">+ Add trigger</button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
+                    ));
+                  })()}
                 </div>
               </div>
 
@@ -17361,6 +17605,175 @@ export default function App(){
                     </div>
 
                     {/* (Timeline overview removed — integrated into Gantt below) */}
+
+                    {/* Timeline Builder — collaborative panel to assemble timeline with the customer */}
+                    {(() => {
+                      const builderOpen = (rushGuideData as any).builderOpen !== false;
+                      const toggleBuilder = () => setRushGuideData((p: any) => ({ ...p, builderOpen: !((p as any).builderOpen !== false) }));
+                      // Build family member list — adults from customers, kids/babies from household, pets too
+                      type Member = { id: string; label: string; kind: "adult" | "child" | "baby" | "pet" };
+                      const members: Member[] = [];
+                      (data.customers || []).forEach((c: any, i: number) => {
+                        const name = [c.first, c.last].filter(Boolean).join(" ") || `Adult ${i + 1}`;
+                        members.push({ id: `cust_${i}`, label: name, kind: "adult" });
+                      });
+                      (data.household || []).forEach((m: any) => {
+                        if (m.category === "pet") {
+                          members.push({ id: `pet_${m.id || m.name || Math.random()}`, label: [m.type, m.name].filter(Boolean).join(" ") || "Pet", kind: "pet" });
+                        } else if (m.category === "person") {
+                          const age = parseInt(m.age);
+                          const kind: Member["kind"] = (/infant|baby/i.test(m.type) || (age >= 0 && age <= 2)) ? "baby" : (/child/i.test(m.type) || (age > 2 && age <= 17)) ? "child" : "adult";
+                          const label = [m.type || (kind === "adult" ? "Adult" : kind === "child" ? "Child" : kind === "baby" ? "Baby" : "Pet"), m.name].filter(Boolean).join(" ");
+                          members.push({ id: `hh_${m.id || m.name || Math.random()}`, label, kind });
+                        }
+                      });
+                      const assignments: Record<string, Record<string, boolean>> = (rushGuideData as any).familyAssignments || {};
+                      const toggleAssign = (memberId: string, groupId: string) => {
+                        setRushGuideData((p: any) => {
+                          const next = { ...(p.familyAssignments || {}) };
+                          next[memberId] = { ...(next[memberId] || {}) };
+                          next[memberId][groupId] = !next[memberId][groupId];
+                          return { ...p, familyAssignments: next };
+                        });
+                      };
+                      const kindIcon = (k: Member["kind"]) => k === "adult" ? "👤" : k === "child" ? "🧒" : k === "baby" ? "👶" : "🐾";
+
+                      // Quick add: interest, event, custom delivery
+                      const addInterestQuick = (label: string) => {
+                        update("rushInterests", Array.from(new Set([...((data as any).rushInterests || []), label])));
+                      };
+                      const addEventQuick = () => {
+                        const today = new Date(); today.setDate(today.getDate() + 14);
+                        const dateStr = today.toISOString().slice(0, 10);
+                        update("upcomingEvents", [...((data as any).upcomingEvents || []), { id: safeUid(), name: "New Event", type: "vacation_beach", date: dateStr }]);
+                      };
+
+                      return (
+                        <div className="rounded-xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/30 to-white overflow-hidden">
+                          <button type="button" onClick={toggleBuilder} className="w-full flex items-center justify-between px-4 py-3 bg-indigo-50 border-b border-indigo-100 hover:bg-indigo-100/70">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">🛠️</span>
+                              <span className="text-sm font-bold text-indigo-800">Timeline Builder</span>
+                              <span className="text-[10px] text-indigo-500">Collaborate with the customer — assign people to deliveries</span>
+                            </div>
+                            <span className="text-indigo-500 text-xs">{builderOpen ? "▾" : "▸"}</span>
+                          </button>
+                          {builderOpen && (
+                            <div className="p-4 space-y-4">
+                              {/* Family × Delivery Group matrix */}
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Who gets what — assign household members to delivery groups</div>
+                                  <span className="text-[10px] text-slate-400">{members.length} member{members.length !== 1 ? "s" : ""} · {deliveryGroups.length} group{deliveryGroups.length !== 1 ? "s" : ""}</span>
+                                </div>
+                                {members.length === 0 ? (
+                                  <div className="text-[11px] text-slate-500 italic">No household members yet. Add customers and household in the order entry to populate this matrix.</div>
+                                ) : deliveryGroups.length === 0 ? (
+                                  <div className="text-[11px] text-slate-500 italic">No delivery groups yet — add a final delivery date or repair type to generate them.</div>
+                                ) : (
+                                  <div className="overflow-x-auto">
+                                    <table className="text-[11px] w-full border-collapse">
+                                      <thead>
+                                        <tr>
+                                          <th className="text-left px-2 py-1.5 font-bold text-slate-500 border-b border-slate-200 sticky left-0 bg-white">Member</th>
+                                          {deliveryGroups.map(dg => (
+                                            <th key={dg.id} className="px-2 py-1.5 font-bold text-slate-600 border-b border-slate-200 text-center whitespace-nowrap">
+                                              <div className="flex flex-col items-center gap-0.5">
+                                                <span className="text-[11px]">{dg.icon} {dg.label.replace(" Delivery", "")}</span>
+                                                <span className="text-[9px] text-slate-400">{rushFormatDate(dg.date)}</span>
+                                              </div>
+                                            </th>
+                                          ))}
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {members.map(m => (
+                                          <tr key={m.id} className="hover:bg-indigo-50/30">
+                                            <td className="px-2 py-1.5 border-b border-slate-100 sticky left-0 bg-white">
+                                              <span className="mr-1">{kindIcon(m.kind)}</span>
+                                              <span className="font-semibold text-slate-700">{m.label}</span>
+                                            </td>
+                                            {deliveryGroups.map(dg => {
+                                              const on = !!(assignments[m.id] || {})[dg.id];
+                                              return (
+                                                <td key={dg.id} className="px-2 py-1.5 border-b border-slate-100 text-center">
+                                                  <button type="button" onClick={() => toggleAssign(m.id, dg.id)} className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${on ? "border-indigo-500 bg-indigo-500 text-white" : "border-slate-200 bg-white hover:border-indigo-300"}`}>
+                                                    {on && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                                                  </button>
+                                                </td>
+                                              );
+                                            })}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Quick inserts */}
+                              <div className="grid sm:grid-cols-2 gap-3">
+                                <div className="rounded-lg border border-slate-200 p-3 bg-white">
+                                  <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Activities & Interests</div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {RUSH_INTERESTS.map(ri => {
+                                      const on = (data.rushInterests || []).includes(ri.label);
+                                      return (
+                                        <button key={ri.id} type="button" onClick={() => on ? update("rushInterests", (data.rushInterests || []).filter((x: string) => x !== ri.label)) : addInterestQuick(ri.label)} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${on ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-500 hover:border-indigo-300"}`}>
+                                          {ri.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 p-3 bg-white">
+                                  <div className="text-[10px] font-bold text-slate-500 uppercase mb-2 flex items-center justify-between">
+                                    <span>Upcoming Trips & Events</span>
+                                    <button type="button" onClick={addEventQuick} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800">+ Add Event</button>
+                                  </div>
+                                  {((data.upcomingEvents || []).length === 0) ? (
+                                    <div className="text-[10px] text-slate-400 italic">None yet — add one to thread it into the timeline.</div>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      {(data.upcomingEvents || []).map((evt: any) => (
+                                        <div key={evt.id} className="flex items-center gap-1.5">
+                                          <input value={evt.name || ""} onChange={e => update("upcomingEvents", (data.upcomingEvents || []).map((ev: any) => ev.id === evt.id ? { ...ev, name: e.target.value } : ev))} placeholder="Event name" className="flex-1 rounded border border-slate-200 px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-indigo-400" />
+                                          <select value={evt.type || "vacation_beach"} onChange={e => update("upcomingEvents", (data.upcomingEvents || []).map((ev: any) => ev.id === evt.id ? { ...ev, type: e.target.value } : ev))} className="rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-600 bg-white">
+                                            {RUSH_EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                          </select>
+                                          <input type="date" value={evt.date || ""} onChange={e => update("upcomingEvents", (data.upcomingEvents || []).map((ev: any) => ev.id === evt.id ? { ...ev, date: e.target.value } : ev))} className="rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-700 outline-none focus:border-indigo-400" />
+                                          <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents || []).filter((ev: any) => ev.id !== evt.id))} className="text-[10px] text-rose-400 hover:text-rose-600 px-1">×</button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Quick add custom delivery */}
+                              <div className="rounded-lg border border-dashed border-indigo-300 p-3 bg-indigo-50/30">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] font-bold text-indigo-700">+ New custom delivery</span>
+                                  <input id="builder-new-delivery-label" placeholder="Label (e.g. Halloween rush)" className="flex-1 rounded border border-slate-200 px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-indigo-400" />
+                                  <input id="builder-new-delivery-date" type="date" className="rounded border border-slate-200 px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-indigo-400" />
+                                  <button type="button" onClick={() => {
+                                    const labelEl = document.getElementById("builder-new-delivery-label") as HTMLInputElement | null;
+                                    const dateEl = document.getElementById("builder-new-delivery-date") as HTMLInputElement | null;
+                                    const label = labelEl?.value?.trim();
+                                    const dateStr = dateEl?.value;
+                                    if (!label || !dateStr) return;
+                                    createCustomDelivery(label, dateStr, `manual_${safeUid()}`);
+                                    if (labelEl) labelEl.value = "";
+                                    if (dateEl) dateEl.value = "";
+                                  }} className="rounded-full bg-indigo-600 px-3 py-1 text-[10px] font-bold text-white hover:bg-indigo-700">Add</button>
+                                </div>
+                                <div className="text-[10px] text-slate-500 mt-1">Inserts a custom delivery group at the selected date. Address auto-resolves from the living timeline.</div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Unified Delivery Timeline */}
                     {(() => {

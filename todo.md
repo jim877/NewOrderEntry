@@ -1,6 +1,6 @@
 # NOE / Scope Prototype — TODO
 
-> Last updated: 2026-05-12
+> Last updated: 2026-05-19
 > Owner: Jim Fenyohazi
 > Status: Active prototype — proving UX for field scoping + order entry
 > Stack: React + TypeScript + Tailwind (Vite), destined for Java app backend
@@ -88,6 +88,13 @@
 
 ---
 
+## From Notes.md (2026-05-19)
+
+- [x] Loading list config with rules — added LOAD_TARGETS_CONFIG (DEFAULT_LOAD_TARGETS) with id/label/category/triggers; triggers support condition/loss/packout/service/interview matchers; matchLoadTargets() returns auto-suggested labels; Settings panel now has "Loading List (What to Bring)" card with categorized list, trigger editor, add/remove, reset; interview loadList question now grouped by category with ✦ auto-suggested ring (2026-05-19)
+- [x] Timeline builder page — added Timeline Builder panel at the top of Rush Guide step 4 result view; family × delivery group checkbox matrix (Adults from customers + household + pets), inline interest pickers, inline event editor (name/type/date), inline custom delivery quick-add; uses existing deliveryGroups + createCustomDelivery; stores selections in rushGuideData.familyAssignments (2026-05-19)
+
+---
+
 ## From Notes.md (2026-05-14)
 
 - [x] Photo cancel/delete/retake on review — renamed "Retake" to "Delete" (red), kept distinct from "Another" (take more in same room); buttons at line 5766 in post-capture overlay (2026-05-14)
@@ -116,10 +123,28 @@
 
 ---
 
+## Architectural Discipline (MANDATORY)
+
+You are a highly disciplined, senior software architect. This project relies on a modular architecture. You must strictly adhere to the following constraints for all code updates:
+
+1. **No Hardcoded Content.** All help text, tooltips, and feature flags must live in `config.json`. The UI must only read from this file. Never inline strings, copy, or flag values into JSX/TSX.
+2. **Extreme Isolation.** Every control, form, or widget must be in its own independent file. **No component file may exceed 150 lines of code.** If a file approaches the limit, split it before adding more.
+3. **Documentation Sync.** Before completing a chat session, you must read `ARCHITECTURE.md` and output any updates to: data flow, active states, and conditional rules. Never break existing UI boundaries or hidden dependencies.
+
+> Note: The current `src/App.tsx` (~20K lines) predates this constraint. All **new** components must be extracted to their own files under the 150-line cap, and all **new** strings/flags must live in `config.json`. Treat App.tsx growth as a code smell — extract before extending.
+
+---
+
 ## System Prompt for Autonomous Agents
 
 ```
 You are working on the NOE/Scope prototype at /Users/jamesfenyohazi/Projects/Codex/NewOrderEntry.
+
+### Architectural Discipline (MANDATORY — applies to every change)
+1. No hardcoded content: all help text, tooltips, feature flags must live in `config.json`. UI reads from this file only.
+2. Extreme isolation: every control/form/widget in its own file, max 150 lines per component file.
+3. Documentation sync: before ending a session, read `ARCHITECTURE.md` and update data flow, active states, and conditional rules. Never break existing UI boundaries or hidden dependencies.
+
 
 ### How to use this file
 
