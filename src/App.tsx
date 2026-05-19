@@ -64,6 +64,15 @@ import {
   Select,
   Textarea,
   AutoGrowTextarea,
+  ToggleMulti,
+  ToggleGroup,
+  SubSection,
+  EditAffordance,
+  AssignmentCueStrip,
+  LinkedAssignmentPanel,
+  pillBase,
+  pillActive,
+  pillInactive,
 } from './components/atoms';
 
 // --- STYLES ---
@@ -2198,22 +2207,8 @@ const SmartNotification = ({ message, onReject, onClose, panelOffset = 0 }) => {
     );
 };
 
-const pillBase = "inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all duration-200 cursor-pointer select-none";
-const pillInactive = "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50";
-const pillActive = "bg-sky-50 border-sky-300 text-sky-700 font-bold shadow-sm"; 
-
-const ToggleGroup = ({ options, value, onChange, noeField }) => (
-  <div className="flex flex-wrap gap-2" data-noe-field={noeField || undefined} data-noe-value={value || undefined}>
-    {options.map(opt => {
-       const label = typeof opt === "string" ? opt : opt.label;
-       const title = typeof opt === "string" ? undefined : opt.title;
-       const isActive = value === label;
-       return (<button key={label} type="button" title={title} aria-pressed={isActive} data-noe-option={label} data-noe-selected={isActive} onClick={() => onChange(isActive ? "" : label)} className={isActive ? `${pillBase} ${pillActive}` : `${pillBase} ${pillInactive}`}>
-         {label}
-       </button>)
-    })}
-  </div>
-);
+// pill styles + ToggleGroup/ToggleMulti/SubSection/EditAffordance/AssignmentCueStrip/LinkedAssignmentPanel
+// imported from ./components/atoms
 
 const RoleBadge = ({ role }) => (
   <span title={role.title} className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
@@ -2221,121 +2216,6 @@ const RoleBadge = ({ role }) => (
     {role.title}
   </span>
 );
-const EditAffordance = ({ title = "Edit" }) => (
-  <span
-    title={title}
-    className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm"
-  >
-    <SquarePen className="h-3.5 w-3.5" aria-hidden="true" />
-  </span>
-);
-const AssignmentCueStrip = ({ items = [] }) => {
-  if (!items.length) return null;
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item) => (
-        <span
-          key={`assignment-cue-${item}`}
-          className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500"
-        >
-          {item}
-        </span>
-      ))}
-    </div>
-  );
-};
-const LinkedAssignmentPanel = ({
-  title = "Linked Assignment",
-  helperText = "",
-  values = [],
-  cues = [],
-  headerBadge = "",
-  locked = true,
-  onToggleLock,
-}) => {
-  const Icon = locked ? Lock : LockOpen;
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-            {locked ? title : `${title} Unlocked`}
-          </div>
-          {locked && headerBadge ? (
-            <div className="mt-2">
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                {headerBadge}
-              </span>
-            </div>
-          ) : null}
-          <div className="mt-1 text-[11px] text-slate-500">
-            {locked
-              ? helperText
-              : "Unlocked for this order. Change these fields only if this section should be different."}
-          </div>
-        </div>
-        {onToggleLock ? (
-          <button
-            type="button"
-            onClick={onToggleLock}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600 hover:border-slate-300 hover:text-slate-800"
-          >
-            {locked ? "Unlock" : "Lock"}
-          </button>
-        ) : null}
-      </div>
-      {cues.length ? (
-        <div className="mt-3">
-          <AssignmentCueStrip items={cues} />
-        </div>
-      ) : null}
-      {values.length ? (
-        <div className={`mt-3 grid gap-3 ${values.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-          {values.map((item) => (
-            <div key={`linked-assignment-${title}-${item.label}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{item.label}</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{item.value || "Not assigned"}</div>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-};
-
-const ToggleMulti = ({ label, checked, onChange, className, colorClass, title, showDot = true, noeField }) => {
-    const activeClass = colorClass || pillActive;
-    return (
-        <button type="button" onClick={onChange} title={title} aria-pressed={checked} data-noe-option={label} data-noe-selected={checked} data-noe-field={noeField || undefined} className={(checked ? `${pillBase} ${activeClass}` : `${pillBase} ${pillInactive}`) + " " + (className||"")}>
-            {label}
-        </button>
-    );
-};
-
-const SubSection = ({ id, title, open, onToggle, children, compact, className, action }) => {
-  const handleToggle = () => onToggle?.(!open);
-  return (
-    <div id={id} data-noe-subsection={id || undefined} data-noe-open={open} className={`rounded-xl border border-slate-200 bg-white ${compact ? "p-3" : "p-5"} shadow-sm scroll-mt-28 ${className || ""}`}>
-      <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={handleToggle}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleToggle();
-          }}
-          className="flex flex-1 items-center justify-between text-left"
-          aria-expanded={open}
-        >
-          <span className="text-xs font-extrabold uppercase tracking-widest text-sky-700">{title}</span>
-          <span className="text-slate-400 text-lg">{open ? "▾" : "›"}</span>
-        </button>
-        {action && <div data-subsection-action="true" onClick={(e) => e.stopPropagation()}>{action}</div>}
-      </div>
-      {open && <div className={`mt-4 ${compact ? "space-y-3" : "space-y-4"} fade-in`}>{children}</div>}
-    </div>
-  );
-};
 
 // --- SHARED FIELD COMPONENTS ---
 
