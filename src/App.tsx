@@ -58,6 +58,13 @@ import {
   ACTUAL_CONTACT_INSTRUCTION_LIBRARY,
   buildSampleContacts,
 } from './data/sampleSeed';
+import {
+  Field,
+  Input,
+  Select,
+  Textarea,
+  AutoGrowTextarea,
+} from './components/atoms';
 
 // --- STYLES ---
 const STYLES = `
@@ -1739,50 +1746,7 @@ const buildNarrativeProse = (narrative = [], data = {}) => {
 };
 
 
-const Field = ({label,children,subtle,missing, className, action, smart, id, noeField}) => (
-  <div id={id} className={`flex flex-col gap-1.5 ${className||""}`} data-noe-field={noeField || undefined} data-noe-label={label || undefined}>
-    <div className="flex items-center justify-between">
-        <label className={`flex items-center text-sm font-semibold tracking-wide ${subtle?"text-slate-500":"text-slate-700"}`}>
-        {label}
-        {missing && <span className="ml-1 text-red-500">*</span>}
-        {smart && <span title={typeof smart === 'string' ? smart : "Automatically updates"} className="ml-1.5 text-orange-500 text-xs cursor-help">⚡</span>}
-        </label>
-        {action}
-    </div>
-    {children}
-  </div>
-);
-
-const Input = React.forwardRef((props, ref) => (
-  <input ref={ref} {...props} className={`w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20 hover:border-slate-300 placeholder:text-slate-400/70 ${props.className||""}`} />
-));
-const Select = React.forwardRef(({children, ...props}, ref) => (
-  <select
-    ref={ref}
-    {...props}
-    className={`w-full min-h-[42px] appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20 hover:border-slate-300 ${props.className||""}`}
-  >
-    {children}
-  </select>
-));
-const Textarea = (props) => <textarea {...props} className={`w-full min-h-[80px] resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20 hover:border-slate-300 placeholder:text-slate-400/70 ${props.className||""}`} />;
-const AutoGrowTextarea = ({ value, onChange, className, ...props }) => {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!ref.current) return;
-    ref.current.style.height = "auto";
-    ref.current.style.height = `${ref.current.scrollHeight}px`;
-  }, [value]);
-  return (
-    <textarea
-      ref={ref}
-      value={value}
-      onChange={onChange}
-      className={`w-full min-h-[120px] resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm transition-all duration-200 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20 hover:border-slate-300 placeholder:text-slate-400/70 ${className||""}`}
-      {...props}
-    />
-  );
-};
+// Field, Input, Select, Textarea, AutoGrowTextarea — imported from ./components/atoms
 
 const normalizeDateInput = (value) => {
   const v = (value || "").trim();
