@@ -128,10 +128,12 @@
 You are a highly disciplined, senior software architect. This project relies on a modular architecture. You must strictly adhere to the following constraints for all code updates:
 
 1. **No Hardcoded Content.** All help text, tooltips, and feature flags must live in `config.json`. The UI must only read from this file. Never inline strings, copy, or flag values into JSX/TSX.
-2. **Extreme Isolation.** Every control, form, or widget must be in its own independent file. **No component file may exceed 150 lines of code.** If a file approaches the limit, split it before adding more.
+2. **Extreme Isolation.** Every control, form, or widget must be in its own independent file.
+   - **Soft cap: 150 LOC** — going over is a "should we split?" signal. Check for a sub-component, data array, or helper that can be extracted before adding more.
+   - **Hard cap: 200 LOC** — must split. No exceptions. Don't compress legitimate code just to squeak under the soft cap; do split when over the hard cap.
 3. **Documentation Sync.** Before completing a chat session, you must read `ARCHITECTURE.md` and output any updates to: data flow, active states, and conditional rules. Never break existing UI boundaries or hidden dependencies.
 
-> Note: The current `src/App.tsx` (~20K lines) predates this constraint. All **new** components must be extracted to their own files under the 150-line cap, and all **new** strings/flags must live in `config.json`. Treat App.tsx growth as a code smell — extract before extending.
+> Note: The current `src/App.tsx` (~19K lines, was ~20K) predates this constraint. All **new** components must be extracted to their own files under the caps above, and all **new** strings/flags must live in `config.json`. Treat App.tsx growth as a code smell — extract before extending.
 
 ---
 
@@ -142,7 +144,7 @@ You are working on the NOE/Scope prototype at /Users/jamesfenyohazi/Projects/Cod
 
 ### Architectural Discipline (MANDATORY — applies to every change)
 1. No hardcoded content: all help text, tooltips, feature flags must live in `config.json`. UI reads from this file only.
-2. Extreme isolation: every control/form/widget in its own file, max 150 lines per component file.
+2. Extreme isolation: every control/form/widget in its own file. Soft cap 150 LOC (a "should we split?" signal — investigate before adding more). Hard cap 200 LOC (must split). Don't compress legitimate code just to squeak under 150.
 3. Documentation sync: before ending a session, read `ARCHITECTURE.md` and update data flow, active states, and conditional rules. Never break existing UI boundaries or hidden dependencies.
 
 

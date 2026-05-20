@@ -4,6 +4,25 @@ Reusable patterns established in the NOE prototype. Reference these when buildin
 
 ---
 
+## Component Size Caps (Two-Tier)
+
+Every control / form / widget lives in its own file under `src/components/`.
+
+- **Soft cap: 150 LOC** — crossing this is a *signal*, not a failure. Ask: is there a sub-component, data array, or helper to extract? If yes, do that. If no (legitimate hook + JSX complexity), proceed.
+- **Hard cap: 200 LOC** — must split. No exceptions.
+
+**Why two tiers:** a single hard limit either gets gamed (cosmetic compression to squeak under) or rejected as unrealistic. The soft/hard pattern catches real growth while not punishing already-clean files at the boundary.
+
+**When to split a component over the soft cap, in order of preference:**
+1. Extract its static data to `config.json` (lists, labels, keywords, icon maps)
+2. Extract sub-components that are independently usable
+3. Extract pure helpers to `src/utils/`
+4. As a last resort, split the JSX tree itself
+
+**When NOT to compress:** if your file is 162 LOC because it has 8 hooks and a real form layout, leave it. Tightening prettier's multi-line useEffects is fine; collapsing readable branches into ternaries to hit a number is not.
+
+---
+
 ## Centralized Coaching / Help Text
 
 Inline guidance shown next to fields and sections, sourced from a single config object.
