@@ -199,6 +199,7 @@ import { safeUid } from './utils/uid';
 import { initAddress, initCustomer, initLossSeverity } from './utils/orderFactories';
 import { DEFAULT_FORM } from './data/defaultForm';
 import { SAMPLE_PRESET_DATA } from './data/samplePreset';
+import { buildNarrativeProse } from './utils/narrativeProse';
 import {
   EVENT_SYSTEM_PREFIXES,
   stripEventSystemLines,
@@ -469,95 +470,7 @@ const getSdsIconImageClass = (item) => SDS_ICON_CLASS_OVERRIDES[item] || "h-full
 // --- UI PRIMITIVES ---
 // Chevron — imported from ./components/atoms
 
-const buildNarrativeProse = (narrative = [], data = {}) => {
-  const g = {};
-  narrative.forEach(l => { if (!g[l.section]) g[l.section] = []; g[l.section].push(l.text); });
-  const p = [];
-
-  // Opening — loss description
-  if (g["Loss"]) {
-    p.push(`This is a ${g["Loss"][0]}`);
-  }
-
-  // Customer + Address
-  const primary = (data.customers || []).find(c => c.isPrimary) || (data.customers || [])[0];
-  const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0];
-  if (primary && (primary.first || primary.last)) {
-    const name = [primary.first, primary.last].filter(Boolean).join(" ");
-    const role = primary.policyHolder ? "The policyholder" : "The customer";
-    let custLine = `${role} is ${name}`;
-    if (primaryAddr && primaryAddr.street) custLine += ` at ${summarizeAddress(primaryAddr)}`;
-    if (primary.phone) custLine += `. They can be reached at ${primary.phone}`;
-    if (primary.email) custLine += ` (${primary.email})`;
-    custLine += ".";
-    p.push(custLine);
-  }
-  // Additional contacts
-  const others = (data.customers || []).filter((c, i) => i > 0 && (c.first || c.last));
-  others.forEach(c => {
-    const name = [c.first, c.last].filter(Boolean).join(" ");
-    const role = c.type || "additional contact";
-    let line = `${name} is ${role === "Husband" || role === "Wife" ? `the ${role.toLowerCase()}` : `an ${role.toLowerCase()}`}`;
-    if (c.email) line += ` (${c.email})`;
-    if (c.phone) line += `, reachable at ${c.phone}`;
-    p.push(line + ".");
-  });
-
-  // Referral + Insurance
-  const refParts = [];
-  if (g["Referral"]) refParts.push(`This order was referred by ${g["Referral"][0]}`);
-  if (g["Sales Rep"]) refParts.push(`assigned to account manager ${g["Sales Rep"][0]}`);
-  if (refParts.length) p.push(refParts.join(", ") + ".");
-
-  if (g["Insurance"]) {
-    let ins = `The insurance carrier is ${g["Insurance"][0]}`;
-    if (g["Claim #"]) ins += `, claim #${g["Claim #"][0]}`;
-    p.push(ins + ".");
-  }
-
-  // Other companies
-  (data.vendors || []).forEach(v => {
-    if (v.company && v.type && !["Insurance"].includes(v.type)) {
-      let line = `${v.company} is the ${v.type.toLowerCase()}`;
-      if (v.contact) line += ` (contact: ${v.contact})`;
-      p.push(line + ".");
-    }
-  });
-
-  // Our services
-  if (g["Services"]) p.push(`Our scope of work includes ${g["Services"][0].toLowerCase()}.`);
-
-  // Conditions
-  if (g["Conditions"]) p.push(`At the home, the site currently has ${g["Conditions"][0]}`);
-
-  // Customer care
-  const careParts = [];
-  if (g["Considerations"]) careParts.push(g["Considerations"][0].toLowerCase());
-  if (g["Pets"]) careParts.push(`has a pet (${g["Pets"][0]})`);
-  if (g["Laundry"]) careParts.push(g["Laundry"][0].toLowerCase());
-  if (careParts.length) p.push(`The customer is ${careParts.join(", ")}.`);
-
-  // Living + Storage
-  if (g["Living"]) {
-    let living = `The customer is currently ${g["Living"][0] === "Staying in home" ? "staying in the home" : g["Living"][0] === "Hotel" ? "staying in a hotel" : g["Living"][0] === "Temp" ? "in a temporary home" : g["Living"][0] === "Moving" ? "permanently relocating" : "in temporary housing"}`;
-    if (g["Storage"]) living += ` and will need ${g["Storage"][0].toLowerCase()}`;
-    p.push(living + ".");
-  }
-
-  // Structural repairs (not our work)
-  if (g["Repairs"]) p.push(`Structural repairs to the home include ${g["Repairs"][0].toLowerCase()} (performed by the contractor, not our team).`);
-
-  // Our packout
-  if (g["Pack-out"]) p.push(`We will be picking up ${g["Pack-out"][0].toLowerCase()}.`);
-
-  // Schedule
-  if (g["Scheduled"]) p.push(`The next appointment is ${g["Scheduled"][0]}.`);
-
-  // Event Instructions
-  if (g["Event Instructions"]) p.push(`Event Instructions for next appointment: ${g["Event Instructions"][0]}`);
-
-  return p;
-};
+// buildNarrativeProse — imported from ./utils/narrativeProse
 
 
 // Field, Input, Select, Textarea, AutoGrowTextarea — imported from ./components/atoms
