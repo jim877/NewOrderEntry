@@ -187,6 +187,7 @@ import {
 } from './utils/order';
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
+import { initAddress, initCustomer, initLossSeverity } from './utils/orderFactories';
 import {
   EVENT_SYSTEM_PREFIXES,
   stripEventSystemLines,
@@ -497,92 +498,9 @@ const HANDLING_META=[
   ["Wet","still wet, tag/treat asap"],
 ];
 
-function initAddress(overrides={}){
-  return { id:safeUid(), type:"", isPrimary:true, isLossSite:true,
-    name:"", googleQuery:"", street:"", apt:"", city:"", state:"", zip:"", lng:"", lat:"",
-    beds:"", baths:"", sqft:"", people:"", infants:"", otherUnitsAffected:"", otherUnitsNote:"",
-    coiRequired:"", coiRequestedAt:"", coiRequestedBy:"", coiProvidedAt:"", coiProvidedBy:"", coiContactNote:"",
-    // Building & access — persists across orders at this address
-    buildingType:"", // trailer, house, largehouse, estate, townhouse, lowrise, highrise, storefront, commercial
-    buildingWorkScope:"", // building, unit, partial
-    buildingParking:{} as Record<string,boolean>, // Driveway, Street, Parking Garage, etc.
-    buildingAccess:{} as Record<string,boolean>, // Elevator, Stairs, COI Required, etc.
-    buildingUnitNumber:"",
-    buildingUnitFloor:"" as number | "",
-    buildingFloors:"" as number | "",
-    placeholder: null,
-    ...overrides };
-}
-
+// initAddress, initCustomer, initLossSeverity — imported from ./utils/orderFactories
 // isAddressPlaceholder — imported from ./utils/order
-
 // company-entry helpers — imported from ./utils/companyEntry
-
-function initCustomer(overrides={}){ 
-  return { 
-    id:safeUid(), type:"", selfPay:false, policyHolder:false, 
-    last:"", first:"", 
-    phone:"", phoneType:"Mobile", phoneExt:"", 
-    phone2:"", phone2Type:"Mobile", phone2Ext:"", 
-    email:"", email2:"", 
-    doNotContact: false,
-    preferredContact: "", 
-    note:"", isPrimary:false,
-    showExtraContact: false,
-    sendWelcomeText: false, welcomeCampaigns: [],
-    sendBrochure: false,
-    sendRushGuide: false,
-    sendAuthLink: false,
-    sendCosLink: false,
-    sendGoogleReviewLink: false,
-    quickNotes: [],
-    showQuickNotes: false,
-    showWelcomePanel: false,
-    householdCount: "",
-    householdAnimals: "",
-    householdMembers: [],
-    placeholder: null,
-    ...overrides 
-  }; 
-}
-
-function initLossSeverity(overrides = {}) {
-  return {
-    touched: false,
-    fire: {
-      enabled: false,
-      values: {
-        "Heat": 0,
-        "Soot": 0,
-        "Odor": 0,
-        "Extinguisher Powder": 0,
-        "Remediation Debris": 0
-      }
-    },
-    water: {
-      enabled: false,
-      values: {
-        "Water": 0,
-        "Humidity": 0,
-        "Musty Smell": 0,
-        "Visible Mildew": 0,
-        "Visible Mold": 0,
-        "Sprinkler Chemical": 0,
-        "Flood Cut Debris": 0
-      }
-    },
-    puffback: {
-      enabled: false,
-      values: {
-        "Oil": 0,
-        "Soot": 0,
-        "Odor": 0,
-        "Oily Film": 0
-      }
-    },
-    ...overrides
-  };
-}
 
 // stringListMatches — imported from ./utils/strings
 
