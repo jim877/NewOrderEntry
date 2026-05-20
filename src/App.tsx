@@ -179,6 +179,13 @@ import {
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
 import {
+  EVENT_SYSTEM_PREFIXES,
+  stripEventSystemLines,
+  buildEventSystemEntries,
+  buildEventSystemLines,
+  composeEventInstructions,
+} from './utils/eventInstructions';
+import {
   normalizeDateInput,
   formatDateLabel,
   getNowDateIso,
@@ -361,52 +368,8 @@ const STYLES = `
 // shouldAutoFirm, toIcsDate, parseTimeTo24h, formatIcsDateTime, addHours, escapeRegExp
 // — all imported from ./utils/{uid,order,strings,format,dateTime}
 
-const EVENT_SYSTEM_PREFIXES = ["Conditions:", "Bring:", "Service Offerings:", "Services:", "Picking Up:", "Quick Notes:", "Scope Notes:", "Estimate Required:"];
-const stripEventSystemLines = (text = "") =>
-  text
-    .split("\n")
-    .filter(line => !EVENT_SYSTEM_PREFIXES.some(prefix => line.trim().startsWith(prefix)))
-    .join("\n");
-
-const buildEventSystemEntries = (data, conditionSummary) => {
-  const entries = [];
-  if (conditionSummary) entries.push({ label: "Conditions", value: conditionSummary });
-  if ((data.loadList || []).length) entries.push({ label: "Bring", value: (data.loadList || []).join(", ") + ((data as any).loadListNote ? ` — ${(data as any).loadListNote}` : "") });
-  if ((data.serviceOfferings || []).length) {
-    const subs = data.serviceSubCategories || [];
-    const serviceDetails = (data.serviceOfferings || []).map(s => {
-      const subItems = subs.filter(x => x.startsWith(`${s}: `)).map(x => x.replace(`${s}: `, ""));
-      return subItems.length > 0 ? `${s} (${subItems.join(", ")})` : s;
-    });
-    entries.push({ label: "Services", value: serviceDetails.join(", ") });
-  }
-  if ((data.packoutSummary || []).length) entries.push({ label: "Picking Up", value: (data.packoutSummary || []).join(", ") });
-  if ((data as any).packoutScope && (data as any).packoutScope !== "No Packout") entries.push({ label: "Packout", value: (data as any).packoutScope + ((data as any).packoutNote ? ` — ${(data as any).packoutNote}` : "") });
-  if ((data.quickInstructionNotes || []).length) entries.push({ label: "Quick Notes", value: (data.quickInstructionNotes || []).join(", ") });
-  if ((data.quickScopeNotes || []).length) entries.push({ label: "Scope Notes", value: (data.quickScopeNotes || []).join(", ") });
-  if (data.rushDeliveryNeeded === "N") entries.push({ label: "Rush Service", value: "Declined" + ((data as any).rushDeclinedNote ? ` — ${(data as any).rushDeclinedNote}` : "") });
-  if (data.estimateRequested) {
-    let value = data.estimateType || "Yes";
-    if (data.estimateRequestedBy) value += ` (Requested By: ${data.estimateRequestedBy})`;
-    entries.push({ label: "Estimate Required", value });
-  }
-  return entries;
-};
-
-const buildEventSystemLines = (data, conditionSummary) => {
-  const override = (data?.eventSystemOverride || "").trim();
-  if (override) return override;
-  return buildEventSystemEntries(data, conditionSummary)
-    .map(entry => `${entry.label}: ${entry.value}`)
-    .join("\n");
-};
-
-const composeEventInstructions = (base, data, conditionSummary) => {
-  const cleaned = base || "";
-  const system = buildEventSystemLines(data, conditionSummary);
-  if (!system) return cleaned;
-  return cleaned ? `${cleaned}\n${system}` : system;
-};
+// EVENT_SYSTEM_PREFIXES, stripEventSystemLines, buildEventSystemEntries, buildEventSystemLines,
+// composeEventInstructions — imported from ./utils/eventInstructions
 
 
 
