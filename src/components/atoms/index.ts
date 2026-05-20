@@ -30,3 +30,7 @@ export { Header } from "./Header";
 export { EntityPreferencePanel } from "./EntityPreferencePanel";
 export { RoleIcon } from "./RoleIcon";
 export { RoleBadge } from "./RoleBadge";
+export { CustomerActionMenu } from "./CustomerActionMenu";
+export { CustomerWelcomePanel } from "./CustomerWelcomePanel";
+export { CustomerQuickNotes } from "./CustomerQuickNotes";
+export { CustomerItem } from "./CustomerItem";
