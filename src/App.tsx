@@ -73,6 +73,11 @@ import {
   pillBase,
   pillActive,
   pillInactive,
+  Chevron,
+  Switch,
+  ToastItem,
+  ToastStack,
+  SmartNotification,
 } from './components/atoms';
 
 // --- STYLES ---
@@ -1662,7 +1667,7 @@ const DEFAULT_FORM={
 };
 
 // --- UI PRIMITIVES ---
-const Chevron = ({open}) => <span className={`text-slate-400 transition-transform duration-200 ${open?"rotate-90":""}`}>›</span>;
+// Chevron — imported from ./components/atoms
 
 const buildNarrativeProse = (narrative = [], data = {}) => {
   const g = {};
@@ -2169,43 +2174,7 @@ const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, cl
   );
 };
 
-const ToastItem = ({message, onClose, style}: {message: string; onClose: () => void; style?: React.CSSProperties})=>{
-  useEffect(()=>{ const id=setTimeout(onClose,3500); return ()=>clearTimeout(id);},[onClose]);
-  return(<div className="fade-in rounded-2xl bg-slate-800/95 backdrop-blur px-5 py-2.5 text-[12px] font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2 w-fit" style={style}><span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white text-[8px] shrink-0">✓</span>{message}</div>)
-};
-const ToastStack = ({toasts, onRemove, panelOffset=0}: {toasts: {id: number; message: string}[]; onRemove: (id: number) => void; panelOffset?: number})=>{
-  if (!toasts.length) return null;
-  return(<div className="fixed bottom-28 z-[90] flex flex-col-reverse items-center gap-1.5" style={{ left: '0', right: `${panelOffset}px`, margin: '0 auto', width: 'fit-content' }}>
-    {toasts.map(t => <ToastItem key={t.id} message={t.message} onClose={() => onRemove(t.id)} />)}
-  </div>);
-};
-
-const Switch = ({ checked, onChange }) => (
-    <button 
-        onClick={() => onChange(!checked)} 
-        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${checked ? 'bg-sky-500' : 'bg-slate-200'}`}
-    >
-        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
-    </button>
-);
-
-const SmartNotification = ({ message, onReject, onClose, panelOffset = 0 }) => {
-    useEffect(() => {
-        const timer = setTimeout(onClose, 4000);
-        return () => clearTimeout(timer);
-    }, [onClose]);
-
-    return (
-        <div className="fixed bottom-24 z-[90] flex items-center gap-4 rounded-lg bg-slate-900 px-4 py-3 text-white shadow-2xl slide-up border border-slate-700" style={{ left: '0', right: `${panelOffset}px`, margin: '0 auto', width: 'fit-content' }}>
-            <div className="flex items-center gap-3">
-                <div className="text-orange-500 font-bold text-lg">⚡</div>
-                <span className="text-sm font-medium">{message}</span>
-            </div>
-            <div className="h-4 w-px bg-slate-700"></div>
-            <button onClick={onReject} className="rounded px-2 py-1 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors uppercase tracking-wider">Reject</button>
-        </div>
-    );
-};
+// ToastItem, ToastStack, Switch, SmartNotification — imported from ./components/atoms
 
 // pill styles + ToggleGroup/ToggleMulti/SubSection/EditAffordance/AssignmentCueStrip/LinkedAssignmentPanel
 // imported from ./components/atoms
