@@ -143,7 +143,15 @@ import {
   resolveCompanyProfile,
   resolveContactProfile,
   isInsuranceCarrierCompany,
+  inferRoleCapabilities,
 } from './utils/companyProfiles';
+import {
+  entryContactList,
+  isCompanyPlaceholder,
+  isContactPlaceholder,
+  companyTypeRequiresContact,
+  syncCompanyEntryPlaceholders,
+} from './utils/companyEntry';
 import { INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS } from './config';
 import {
   getInstructionTypeTextKey,
@@ -165,6 +173,7 @@ import {
   sameNormalizedCompany,
   sameNormalizedContact,
   normalizePlaceholderKeyPart,
+  stringListMatches,
 } from './utils/strings';
 import {
   isPlaceholderFlagActive,
@@ -411,23 +420,7 @@ const getCoaching = (key: string, overrides?: Record<string, string>): string =>
 // VEHICLES, LEAD_SOURCES, CONTACT_METHODS, MARKETING_SOURCES, INTERNAL_TYPES,
 // CUSTOMER_QUICK_NOTES, NATIONAL_CARRIERS — imported from ./config
 
-const inferRoleCapabilities = (companyType = "", companyName = "") => {
-  const type = (companyType || "").toString().trim().toLowerCase();
-  const normalizedCompany = normalizeCompany(companyName || "");
-  const insuranceLikeType =
-    type.includes("insurance") ||
-    type.includes("adjust") ||
-    type.includes("tpa") ||
-    type.includes("broker") ||
-    type.includes("agent");
-  const insuranceLikeName = NATIONAL_CARRIERS.some(c => normalizeCompany(c) === normalizedCompany);
-  const canInsure = insuranceLikeType || insuranceLikeName;
-  return {
-    canRefer: true,
-    canBill: canInsure,
-    canInsure
-  };
-};
+// inferRoleCapabilities — imported from ./utils/companyProfiles
 
 // SAMPLE_CONTACTS — imported from ./data/sampleSeed
 
@@ -523,57 +516,7 @@ function initAddress(overrides={}){
 
 // isAddressPlaceholder — imported from ./utils/order
 
-const entryContactList = (entry = {}) => {
-  const fromContacts = Array.isArray(entry?.contacts) ? entry.contacts : [];
-  if (fromContacts.length) return fromContacts;
-  if (hasMeaningfulValue(entry?.contact)) return [{ name: entry.contact, inactive: false, placeholder: entry?.contactPlaceholder || null }];
-  return [];
-};
-
-const isCompanyPlaceholder = (entry = {}) => {
-  if (isPlaceholderFlagActive(entry?.placeholder)) return true;
-  return !hasMeaningfulValue(entry?.company);
-};
-
-const isContactPlaceholder = (entry = {}) => {
-  if (isPlaceholderFlagActive(entry?.contactPlaceholder)) return true;
-  const contacts = entryContactList(entry);
-  if (!contacts.length) return true;
-  return contacts.some(c => isPlaceholderFlagActive(c?.placeholder) || !hasMeaningfulValue(c?.name));
-};
-const CONTACT_OPTIONAL_COMPANY_TYPES = new Set(["tpa"]);
-const companyTypeRequiresContact = (type = "") =>
-  !CONTACT_OPTIONAL_COMPANY_TYPES.has(normalizePlaceholderKeyPart(type));
-
-const syncCompanyEntryPlaceholders = (entry = {}) => {
-  const normalized = { ...(entry || {}) };
-  const hasCompany = hasMeaningfulValue(normalized.company);
-  const contacts = entryContactList(normalized).map(contact => ({
-    ...(contact || {}),
-    name: (contact?.name || "").trim(),
-    inactive: !!contact?.inactive,
-    placeholder: isPlaceholderFlagActive(contact?.placeholder) ? contact.placeholder : null
-  }));
-  const hasNamedContact = contacts.some(c => hasMeaningfulValue(c.name));
-  if (hasCompany) {
-    normalized.placeholder = null;
-  } else if (!isPlaceholderFlagActive(normalized.placeholder)) {
-    normalized.placeholder = createPlaceholderFlag("company", "Company needed");
-  }
-  if (hasNamedContact) {
-    normalized.contactPlaceholder = null;
-  } else if (!isPlaceholderFlagActive(normalized.contactPlaceholder)) {
-    normalized.contactPlaceholder = createPlaceholderFlag("contact", "Contact needed");
-  }
-  normalized.company = hasCompany ? normalized.company : "";
-  normalized.contacts = contacts;
-  if (!hasNamedContact) {
-    normalized.contact = "";
-  } else if (!hasMeaningfulValue(normalized.contact)) {
-    normalized.contact = contacts.find(c => hasMeaningfulValue(c.name))?.name || "";
-  }
-  return normalized;
-};
+// company-entry helpers — imported from ./utils/companyEntry
 
 function initCustomer(overrides={}){ 
   return { 
@@ -641,12 +584,7 @@ function initLossSeverity(overrides = {}) {
   };
 }
 
-const stringListMatches = (a = [], b = []) => {
-  if (!Array.isArray(a) || !Array.isArray(b)) return false;
-  if (a.length !== b.length) return false;
-  const right = new Set(b.map((item) => `${item}`));
-  return a.every((item) => right.has(`${item}`));
-};
+// stringListMatches — imported from ./utils/strings
 
 // --- FIELD CONFIGURATION ---
 const FIELD_CONFIG_SECTIONS = [

@@ -66,6 +66,22 @@ export const DEFAULT_CONTACT_PROFILES: Record<string, any> = {};
 
 // --- Predicates / inference ---
 
+// inferRoleCapabilities — given a company's type + name, what roles can it play?
+// canRefer is always true (anyone can refer); canBill / canInsure require insurance-like signals.
+export const inferRoleCapabilities = (companyType = "", companyName = "") => {
+  const type = (companyType || "").toString().trim().toLowerCase();
+  const normalizedCompany = normalizeCompany(companyName || "");
+  const insuranceLikeType =
+    type.includes("insurance") ||
+    type.includes("adjust") ||
+    type.includes("tpa") ||
+    type.includes("broker") ||
+    type.includes("agent");
+  const insuranceLikeName = NATIONAL_CARRIERS.some((c) => normalizeCompany(c) === normalizedCompany);
+  const canInsure = insuranceLikeType || insuranceLikeName;
+  return { canRefer: true, canBill: canInsure, canInsure };
+};
+
 export const isInsuranceShortcutCompany = (companyName = "") =>
   INSURANCE_COMPANY_SHORTCUT_SET.has(normalizeCompany(companyName || ""));
 

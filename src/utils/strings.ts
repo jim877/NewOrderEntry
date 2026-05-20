@@ -35,6 +35,15 @@ export const sameNormalizedContact = (left = "", right = "") => {
   return !!a && !!b && a === b;
 };
 
+// stringListMatches — true iff `a` and `b` are arrays of the same length with the same string
+// contents (order-independent). Treats values as strings via interpolation.
+export const stringListMatches = (a: any[] = [], b: any[] = []) => {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  const right = new Set(b.map((item) => `${item}`));
+  return a.every((item) => right.has(`${item}`));
+};
+
 // normalizePlaceholderKeyPart — slug-ify any value into a dash-joined token suitable for a key.
 // "Bill To Address" → "bill-to-address". Empty input returns "item".
 export const normalizePlaceholderKeyPart = (value: string = "") =>
