@@ -21,3 +21,6 @@ export { SmartNotification } from "./SmartNotification";
 export { DatePicker } from "./DatePicker";
 export { TimePicker } from "./TimePicker";
 export { SearchSelect } from "./SearchSelect";
+export { GlobalSearch } from "./GlobalSearch";
+export { FloatingCapsule } from "./FloatingCapsule";
+export { Section } from "./Section";

@@ -107,3 +107,14 @@ export const LEAD_SOURCE_HELP: Record<string, string> = config.lists.leadSourceH
 // --- AI usage guidance ---
 export const AI_USAGE_GUIDELINES: string[] = config.lists.aiUsageGuidelines;
 export const AI_TIME_SAVING_TIPS: string[]  = config.lists.aiTimeSavingTips;
+
+// --- Global search items (used by GlobalSearch) ---
+export type GlobalSearchItem = {
+  id: string;
+  sub?: string;
+  label: string;
+  keywords: string;
+  navAction?: string;
+  actionHit?: string;
+};
+export const GLOBAL_SEARCH_ITEMS: GlobalSearchItem[] = config.lists.globalSearchItems;
