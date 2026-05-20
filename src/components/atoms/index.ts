@@ -27,3 +27,4 @@ export { Section } from "./Section";
 export { StepNav } from "./StepNav";
 export { SettingsMenu } from "./SettingsMenu";
 export { Header } from "./Header";
+export { EntityPreferencePanel } from "./EntityPreferencePanel";

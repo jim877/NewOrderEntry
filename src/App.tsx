@@ -86,7 +86,14 @@ import {
   FloatingCapsule,
   Section,
   Header,
+  EntityPreferencePanel,
 } from './components/atoms';
+import {
+  normalizeContact,
+  normalizeCompany,
+  normalizeStringList,
+  mergeUniqueStrings,
+} from './utils/strings';
 import {
   normalizeDateInput,
   formatDateLabel,
@@ -483,19 +490,7 @@ const getBestMatch = (options = [], query) => {
   return includes ? getOptionText(includes) : "";
 };
 
-const normalizeContact = (value) => value.trim().toLowerCase();
-const normalizeCompany = (value) => value.trim().toLowerCase();
-const normalizeStringList = (value) => {
-  const raw = Array.isArray(value) ? value : value ? [value] : [];
-  return Array.from(
-    new Set(
-      raw
-        .map((item) => (item || "").toString().trim())
-        .filter(Boolean)
-    )
-  );
-};
-const mergeUniqueStrings = (...lists) => normalizeStringList(lists.flat());
+// normalizeContact, normalizeCompany, normalizeStringList, mergeUniqueStrings — imported from ./utils/strings
 
 // --- CONSTANTS ---
 const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -915,141 +910,7 @@ const isInsuranceCarrierCompany = (companyName = "", sampleContacts = []) => {
   const type = normalizeCompany(profile.companyType || "");
   return type === "insurance" || type.includes("insurance");
 };
-const EntityPreferencePanel = ({
-  company = "",
-  contact = "",
-  getCompanyProfile,
-  getContactProfile,
-  onOpenCustomerText,
-  sessionInstructionKeys,
-  onMarkInstructionKeysSeen,
-  className = "",
-}) => {
-  const companyProfile = company ? getCompanyProfile?.(company) : null;
-  const contactProfile = contact ? getContactProfile?.(contact) : null;
-  const companyInstructions = companyProfile?.companyInstructions || [];
-  const contactInstructions = contactProfile?.contactInstructions || [];
-  const companySpecialDocuments = companyProfile?.specialDocuments || [];
-  const contactSpecialDocuments = contactProfile?.specialDocuments || [];
-  const specialDocuments = mergeUniqueStrings(
-    companySpecialDocuments,
-    contactSpecialDocuments
-  );
-  const customerTextForms = mergeUniqueStrings(
-    companyProfile?.customerTextForms || [],
-    contactProfile?.customerTextForms || [],
-    specialDocuments
-  );
-  const companyLabel = (companyProfile?.companyName || company || "").trim();
-  const contactLabel = (contactProfile?.contactName || contact || "").trim();
-  const companyKey =
-    (companyInstructions.length || companyProfile?.specialDocuments?.length) && companyLabel
-      ? `company:${normalizeCompany(companyLabel)}`
-      : "";
-  const contactKey =
-    (contactInstructions.length || contactProfile?.specialDocuments?.length) && contactLabel
-      ? `contact:${normalizeContact(contactLabel)}`
-      : "";
-  const relevantKeys = [companyKey, contactKey].filter(Boolean);
-  const panelIdentity = relevantKeys.join("|") || `${normalizeCompany(companyLabel)}|${normalizeContact(contactLabel)}`;
-  const companyCollapsedByDefault = !!companyKey && sessionInstructionKeys?.has?.(companyKey);
-  const contactCollapsedByDefault = !!contactKey && sessionInstructionKeys?.has?.(contactKey);
-  const [collapsedState, setCollapsedState] = useState({
-    company: companyCollapsedByDefault,
-    contact: contactCollapsedByDefault,
-  });
-
-  useEffect(() => {
-    setCollapsedState({
-      company: companyCollapsedByDefault,
-      contact: contactCollapsedByDefault,
-    });
-  }, [panelIdentity]);
-
-  if (!companyInstructions.length && !contactInstructions.length && !specialDocuments.length) return null;
-
-  const companyEntries = [
-    ...companyInstructions,
-    ...specialDocuments.map((item) => ({ type: "Paperwork", text: item, isPaperwork: true })),
-  ];
-  const contactEntries = [...contactInstructions];
-
-  const toggleGroup = (group, keys = []) => {
-    setCollapsedState((prev) => {
-      const nextCollapsed = !prev[group];
-      if (prev[group] && !nextCollapsed && keys.length) {
-        onMarkInstructionKeysSeen?.(keys);
-      }
-      return { ...prev, [group]: nextCollapsed };
-    });
-  };
-
-  const renderInstructionGroup = ({ groupKey, title, entries, seenKey }) => {
-    if (!entries.length) return null;
-    const collapsed = collapsedState[groupKey];
-    return (
-      <div key={`instruction-group-${groupKey}`} className="rounded-lg border border-slate-100 bg-slate-50/50">
-        <button
-          type="button"
-          onClick={() => toggleGroup(groupKey, seenKey ? [seenKey] : [])}
-          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50 transition-colors rounded-lg"
-        >
-          <span className="text-[11px] font-bold text-slate-500">{title}</span>
-          <Chevron open={!collapsed} />
-        </button>
-        {!collapsed ? (
-          <div className="px-3 py-2 border-t border-slate-100">
-            <div className="space-y-1">
-              {entries.map((item) => (
-                item.isPaperwork ? (
-                  <div
-                    key={`${groupKey}-${item.type}-${item.text}`}
-                    className="flex items-start gap-2 text-xs text-slate-700"
-                  >
-                    <span className="text-amber-600 shrink-0">📄</span>
-                    <span><span className="font-bold text-slate-800">Paperwork:</span> {item.text}</span>
-                  </div>
-                ) : (
-                  <div key={`${groupKey}-${item.type}-${item.text}`} className="text-xs text-slate-600">
-                    <span className="font-bold text-slate-700">{item.type}:</span> {item.text}
-                  </div>
-                )
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </div>
-    );
-  };
-
-  return (
-    <div className={`space-y-2 ${className || ""}`}>
-      {renderInstructionGroup({
-        groupKey: "company",
-        title: companyLabel ? `${companyLabel} Instructions` : "Company Instructions",
-        entries: companyEntries,
-        seenKey: companyKey,
-      })}
-      {renderInstructionGroup({
-        groupKey: "contact",
-        title: contactLabel ? `${contactLabel} Instructions` : "Contact Instructions",
-        entries: contactEntries,
-        seenKey: contactKey,
-      })}
-      {customerTextForms.length > 0 && onOpenCustomerText ? (
-        <div className="flex justify-start">
-          <button
-            type="button"
-            onClick={() => onOpenCustomerText(customerTextForms)}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600 hover:border-slate-300 hover:text-slate-800"
-          >
-            Text customer with form
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-};
+// EntityPreferencePanel — imported from ./components/atoms
 
 // --- CONSTANTS FOR SELECTIONS ---
 // All pick-list constants (LOSS_TYPES, ESTIMATE_TYPES, VEHICLES, etc.) and coaching text
