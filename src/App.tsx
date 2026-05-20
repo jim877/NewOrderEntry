@@ -11,6 +11,11 @@ import {
 } from './scopeBridgeUtils';
 import {
   DEFAULT_COACHING,
+  LOSS_TYPE_COACHING,
+  ROLE_COACHING,
+  SUGGESTED_GROUP_HELP,
+  SERVICE_OFFERING_HELP,
+  getCoaching,
   DEFAULT_LOAD_TARGETS,
   RUSH_REPAIR_TIMELINES,
   RUSH_LIVING_SITUATIONS,
@@ -412,17 +417,7 @@ const STYLES = `
 // are imported from src/config.ts (sourced from /config.json).
 // User overrides for coaching stored in localStorage take precedence at read-time via getCoaching().
 
-// These objects read from DEFAULT_COACHING for single-source-of-truth
-const LOSS_TYPE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("loss.")).map(k => [k.replace("loss.", ""), DEFAULT_COACHING[k]]));
-const ROLE_COACHING = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("role.")).map(k => [k.replace("role.", ""), DEFAULT_COACHING[k]]));
-const SUGGESTED_GROUP_HELP = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("group.")).map(k => [k.replace("group.", ""), DEFAULT_COACHING[k]]));
-const SERVICE_OFFERING_HELP = Object.fromEntries(Object.keys(DEFAULT_COACHING).filter(k => k.startsWith("service.")).map(k => [k.replace("service.", ""), DEFAULT_COACHING[k]]));
-
-// Coaching accessor — checks user overrides (localStorage) then defaults
-const getCoaching = (key: string, overrides?: Record<string, string>): string => {
-  if (overrides?.[key] !== undefined) return overrides[key];
-  return DEFAULT_COACHING[key] || "";
-};
+// LOSS_TYPE_COACHING, ROLE_COACHING, SUGGESTED_GROUP_HELP, SERVICE_OFFERING_HELP, getCoaching — imported from ./config
 
 // order-type helpers — imported from ./utils/orderType
 

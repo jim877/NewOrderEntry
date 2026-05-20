@@ -6,6 +6,24 @@ import config from "../config.json";
 // --- Help / coaching text ---
 export const DEFAULT_COACHING: Record<string, string> = config.coaching;
 
+// Derived views over DEFAULT_COACHING — strip the prefix so callers can look up by bare key.
+const stripPrefix = (prefix: string): Record<string, string> =>
+  Object.fromEntries(
+    Object.keys(DEFAULT_COACHING)
+      .filter((k) => k.startsWith(prefix))
+      .map((k) => [k.replace(prefix, ""), DEFAULT_COACHING[k]]),
+  );
+export const LOSS_TYPE_COACHING:    Record<string, string> = stripPrefix("loss.");
+export const ROLE_COACHING:         Record<string, string> = stripPrefix("role.");
+export const SUGGESTED_GROUP_HELP:  Record<string, string> = stripPrefix("group.");
+export const SERVICE_OFFERING_HELP: Record<string, string> = stripPrefix("service.");
+
+// Coaching accessor — checks user overrides (localStorage) then defaults.
+export const getCoaching = (key: string, overrides?: Record<string, string>): string => {
+  if (overrides?.[key] !== undefined) return overrides[key];
+  return DEFAULT_COACHING[key] || "";
+};
+
 // --- Loading list (what to bring) ---
 export type LoadTrigger =
   | { type: "condition"; value: string }
