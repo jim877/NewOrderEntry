@@ -120,6 +120,18 @@ import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
 import { canonicalBridgeIssue, bridgeStageToneClass } from './utils/bridge';
 import {
+  getNonRestorationSubtype,
+  isNonRestorationSelected,
+  hasRestorationOrderType,
+  projectTypeFromOrderTypes,
+  hasPrimaryOrderTypeDecision,
+  hasRequiredNonRestorationSubtype,
+  normalizeOrderTypes,
+  toggleNonRestorationPrimarySelection,
+  toggleRestorationTypeSelection,
+  selectNonRestorationSubtypeSelection,
+} from './utils/orderType';
+import {
   INSURANCE_COMPANY_SHORTCUTS,
   INSURANCE_COMPANY_SHORTCUT_SET,
   NATIONAL_CARRIER_LINKS,
@@ -509,49 +521,7 @@ const getCoaching = (key: string, overrides?: Record<string, string>): string =>
   return DEFAULT_COACHING[key] || "";
 };
 
-// COACHING_CATEGORIES, NON_RESTORATION_PRIMARY, NON_RESTORATION_SUBTYPES — imported from ./config
-const getNonRestorationSubtype = (orderTypes = []) =>
-  NON_RESTORATION_SUBTYPES.find((type) => (orderTypes || []).includes(type)) || "";
-const isNonRestorationSelected = (orderTypes = []) =>
-  (orderTypes || []).includes(NON_RESTORATION_PRIMARY) || !!getNonRestorationSubtype(orderTypes);
-const hasRestorationOrderType = (orderTypes = []) =>
-  (orderTypes || []).some((type) => LOSS_TYPES.includes(type));
-const projectTypeFromOrderTypes = (orderTypes = []) => {
-  if (isNonRestorationSelected(orderTypes)) return "Non-Restoration Project";
-  if (hasRestorationOrderType(orderTypes)) return "Restoration Project";
-  return "";
-};
-const hasPrimaryOrderTypeDecision = (orderTypes = []) =>
-  isNonRestorationSelected(orderTypes) || hasRestorationOrderType(orderTypes);
-const hasRequiredNonRestorationSubtype = (orderTypes = []) =>
-  !isNonRestorationSelected(orderTypes) || !!getNonRestorationSubtype(orderTypes);
-const normalizeOrderTypes = (orderTypes = []) => {
-  const unique = Array.from(new Set((orderTypes || []).filter(Boolean)));
-  const subtype = getNonRestorationSubtype(unique);
-  const nonRestoration = unique.includes(NON_RESTORATION_PRIMARY) || !!subtype;
-  const restoration = unique.filter((type) => LOSS_TYPES.includes(type));
-  if (nonRestoration) return [NON_RESTORATION_PRIMARY, ...(subtype ? [subtype] : [])];
-  if (restoration.length) return restoration;
-  return unique;
-};
-const toggleNonRestorationPrimarySelection = (orderTypes = []) => {
-  const normalized = normalizeOrderTypes(orderTypes);
-  if (isNonRestorationSelected(normalized)) return [];
-  return [NON_RESTORATION_PRIMARY];
-};
-const toggleRestorationTypeSelection = (orderTypes = [], type = "") => {
-  if (!LOSS_TYPES.includes(type)) return normalizeOrderTypes(orderTypes);
-  const normalized = normalizeOrderTypes(orderTypes);
-  const activeRestoration = normalized.filter((item) => LOSS_TYPES.includes(item));
-  if (activeRestoration.includes(type)) {
-    return activeRestoration.filter((item) => item !== type);
-  }
-  return [...activeRestoration, type];
-};
-const selectNonRestorationSubtypeSelection = (orderTypes = [], subtype = "") => {
-  if (!NON_RESTORATION_SUBTYPES.includes(subtype)) return normalizeOrderTypes(orderTypes);
-  return [NON_RESTORATION_PRIMARY, subtype];
-};
+// order-type helpers — imported from ./utils/orderType
 
 // CAUSES, ORIGINS, COMPATIBLE_SECONDARY_LOSS, ESTIMATE_TYPES, PRICING_PLATFORMS, TECHS,
 // VEHICLES, LEAD_SOURCES, CONTACT_METHODS, MARKETING_SOURCES, INTERNAL_TYPES,
