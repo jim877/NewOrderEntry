@@ -121,6 +121,32 @@ export const SERVICE_SUB_CATEGORIES: Record<string, string[]> = config.lists.ser
 export const SUGGESTED_GROUPS: string[]      = config.lists.suggestedGroups;
 export const LIVING_STATUS_ADDRESS_TYPES: string[] = config.lists.livingStatusAddressTypes;
 
+// --- Bridge (Scope Update / Blockers) ---
+export type BridgeStepOption = { id: string; label: string; tone: string };
+export type BridgeMilestoneField = { id: string; atId: string; byId: string; label: string };
+export type BridgeBlockerGroup = { id: string; label: string; issues: string[] };
+
+export const SPECIAL_PAPERWORK_BLOCKER: string  = config.lists.bridge.specialPaperworkBlocker;
+export const UNKNOWN_INSURANCE_BLOCKER: string  = config.lists.bridge.unknownInsuranceBlocker;
+export const BRIDGE_CUSTOMER_BLOCKERS: string[] = config.lists.bridge.customerBlockers;
+export const BRIDGE_INSURANCE_BLOCKERS: string[] = config.lists.bridge.insuranceBlockers;
+export const BRIDGE_BLOCKER_ALIASES: Record<string, string> = config.lists.bridge.blockerAliases;
+export const BRIDGE_AUTO_MANAGED_BLOCKERS: string[] = config.lists.bridge.autoManagedBlockers;
+export const BRIDGE_PICKUP_STEP_OPTIONS: BridgeStepOption[]   = config.lists.bridge.pickupStepOptions;
+export const BRIDGE_PROCESS_STEP_OPTIONS: BridgeStepOption[]  = config.lists.bridge.processStepOptions;
+export const BRIDGE_DELIVERY_STEP_OPTIONS: BridgeStepOption[] = config.lists.bridge.deliveryStepOptions;
+export const BRIDGE_MILESTONE_FIELDS: BridgeMilestoneField[]  = config.lists.bridge.milestoneFields;
+
+// Derived view: blocker groups by category. Built once at module load.
+export const BRIDGE_BLOCKER_GROUPS: BridgeBlockerGroup[] = [
+  { id: "customer",            label: "Customer",            issues: BRIDGE_CUSTOMER_BLOCKERS },
+  { id: "insurance_adjuster",  label: "Insurance/Adjuster",  issues: BRIDGE_INSURANCE_BLOCKERS },
+];
+export const BRIDGE_BLOCKER_ITEMS: string[] = [
+  ...BRIDGE_CUSTOMER_BLOCKERS,
+  ...BRIDGE_INSURANCE_BLOCKERS,
+];
+
 // --- Header progress nav ---
 export type HeaderSubsection = { id: string; label: string };
 export type HeaderStep = { id: string; label: string; subsections: HeaderSubsection[] };

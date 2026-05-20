@@ -309,6 +309,60 @@
     },
     "suggestedGroups": ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"],
     "livingStatusAddressTypes": ["Moving","Hotel","Temp","Neighbor","Relative","Rental","Other Home"],
+    "bridge": {
+      "specialPaperworkBlocker": "Special paperwork required",
+      "unknownInsuranceBlocker": "Insurance Company Not Yet Known",
+      "customerBlockers": [
+        "Wants Everything Replaced",
+        "Not sure if submitting a claim",
+        "Customer Wants Estimate",
+        "Won't Sign Authorization",
+        "Wants a cash-out",
+        "May clean themselves"
+      ],
+      "insuranceBlockers": [
+        "Limit Issue",
+        "Hasn't approved scope",
+        "Adjuster Wants Estimate",
+        "Hasn't determined coverage",
+        "Pushing another vendor",
+        "Waiting on Hygienist Results",
+        "Special paperwork required",
+        "Insurance Company Not Yet Known"
+      ],
+      "blockerAliases": {
+        "Contacting Customer": "Wants Everything Replaced",
+        "Authorization": "Won't Sign Authorization",
+        "Scope Approval": "Hasn't approved scope",
+        "Estimate Approval": "Adjuster Wants Estimate",
+        "Coverage Determination": "Hasn't determined coverage",
+        "IH Results": "Waiting on Hygienist Results",
+        "Awaiting Signed Authorization": "Won't Sign Authorization",
+        "Awaiting Estimate Approval": "Adjuster Wants Estimate",
+        "Awaiting Hygienist Results": "Waiting on Hygienist Results",
+        "Awaiting Coverage Determination": "Hasn't determined coverage",
+        "Awaiting Test Group Results": "Waiting on Hygienist Results",
+        "Deciding Who Will Pay": "Not sure if submitting a claim",
+        "Customer might clean it themselves": "May clean themselves",
+        "Unsure if submitting a claim": "Not sure if submitting a claim",
+        "Limit Issues": "Limit Issue"
+      },
+      "autoManagedBlockers": [
+        "Won't Sign Authorization",
+        "Customer Wants Estimate",
+        "Adjuster Wants Estimate",
+        "Special paperwork required",
+        "Insurance Company Not Yet Known"
+      ],
+      "pickupStepOptions":   [{ "id": "schedule",  "label": "Schedule",                  "tone": "green" }, { "id": "priority", "label": "Priority Groups Only", "tone": "yellow" }, { "id": "hold",     "label": "Hold",                "tone": "red" }],
+      "processStepOptions":  [{ "id": "yes",       "label": "Yes",                       "tone": "green" }, { "id": "priority", "label": "Priority Only",        "tone": "yellow" }, { "id": "hold",     "label": "Hold (Tag and Hold)", "tone": "red" }],
+      "deliveryStepOptions": [{ "id": "ok",        "label": "OK to deliver",             "tone": "green" }, { "id": "priority", "label": "Priority Groups Only", "tone": "yellow" }, { "id": "hold_cod", "label": "Hold (COD)",          "tone": "red" }],
+      "milestoneFields": [
+        { "id": "authorizationOnFile", "atId": "authorizationOnFileAt", "byId": "authorizationOnFileBy", "label": "Authorization Signed" },
+        { "id": "scopeApproved",       "atId": "scopeApprovedAt",       "byId": "scopeApprovedBy",       "label": "Scope Pre-Approved" },
+        { "id": "estimateApproved",    "atId": "estimateApprovedAt",    "byId": "estimateApprovedBy",    "label": "Adjuster Approval" }
+      ]
+    },
     "headerSteps": [
       { "id": "sec1", "label": "Order",    "subsections": [{ "id": "order",     "label": "Order" }, { "id": "source",   "label": "Source" }] },
       { "id": "sec2", "label": "Customer", "subsections": [{ "id": "customer",  "label": "Customer Details" }, { "id": "interview", "label": "Interview" }] },

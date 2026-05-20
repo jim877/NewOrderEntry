@@ -55,6 +55,18 @@ import {
   SERVICE_SUB_CATEGORIES,
   SUGGESTED_GROUPS,
   LIVING_STATUS_ADDRESS_TYPES,
+  SPECIAL_PAPERWORK_BLOCKER,
+  UNKNOWN_INSURANCE_BLOCKER,
+  BRIDGE_CUSTOMER_BLOCKERS,
+  BRIDGE_INSURANCE_BLOCKERS,
+  BRIDGE_BLOCKER_GROUPS,
+  BRIDGE_BLOCKER_ITEMS,
+  BRIDGE_BLOCKER_ALIASES,
+  BRIDGE_AUTO_MANAGED_BLOCKERS,
+  BRIDGE_PICKUP_STEP_OPTIONS,
+  BRIDGE_PROCESS_STEP_OPTIONS,
+  BRIDGE_DELIVERY_STEP_OPTIONS,
+  BRIDGE_MILESTONE_FIELDS,
   SDS_CONSIDERATIONS,
   SDS_OBSERVATIONS,
   SDS_SERVICES,
@@ -106,6 +118,7 @@ import {
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
+import { canonicalBridgeIssue, bridgeStageToneClass } from './utils/bridge';
 import {
   normalizeContact,
   normalizeCompany,
@@ -447,85 +460,7 @@ const composeEventInstructions = (base, data, conditionSummary) => {
 // SALES_REPS, SERVICE_OFFERINGS, SERVICE_SUB_CATEGORIES, SUGGESTED_GROUPS,
 // LIVING_STATUS_ADDRESS_TYPES — imported from ./config
 
-const BRIDGE_CUSTOMER_BLOCKERS = [
-  "Wants Everything Replaced",
-  "Not sure if submitting a claim",
-  "Customer Wants Estimate",
-  "Won't Sign Authorization",
-  "Wants a cash-out",
-  "May clean themselves",
-];
-const SPECIAL_PAPERWORK_BLOCKER = "Special paperwork required";
-const UNKNOWN_INSURANCE_BLOCKER = "Insurance Company Not Yet Known";
-const BRIDGE_INSURANCE_BLOCKERS = [
-  "Limit Issue",
-  "Hasn't approved scope",
-  "Adjuster Wants Estimate",
-  "Hasn't determined coverage",
-  "Pushing another vendor",
-  "Waiting on Hygienist Results",
-  SPECIAL_PAPERWORK_BLOCKER,
-  UNKNOWN_INSURANCE_BLOCKER,
-];
-const BRIDGE_BLOCKER_GROUPS = [
-  { id: "customer", label: "Customer", issues: BRIDGE_CUSTOMER_BLOCKERS },
-  { id: "insurance_adjuster", label: "Insurance/Adjuster", issues: BRIDGE_INSURANCE_BLOCKERS },
-];
-const BRIDGE_BLOCKER_ITEMS = [
-  ...BRIDGE_CUSTOMER_BLOCKERS,
-  ...BRIDGE_INSURANCE_BLOCKERS,
-];
-const BRIDGE_BLOCKER_ALIASES = {
-  "Contacting Customer": "Wants Everything Replaced",
-  "Authorization": "Won't Sign Authorization",
-  "Scope Approval": "Hasn't approved scope",
-  "Estimate Approval": "Adjuster Wants Estimate",
-  "Coverage Determination": "Hasn't determined coverage",
-  "IH Results": "Waiting on Hygienist Results",
-  "Awaiting Signed Authorization": "Won't Sign Authorization",
-  "Awaiting Estimate Approval": "Adjuster Wants Estimate",
-  "Awaiting Hygienist Results": "Waiting on Hygienist Results",
-  "Awaiting Coverage Determination": "Hasn't determined coverage",
-  "Awaiting Test Group Results": "Waiting on Hygienist Results",
-  "Deciding Who Will Pay": "Not sure if submitting a claim",
-  "Customer might clean it themselves": "May clean themselves",
-  "Unsure if submitting a claim": "Not sure if submitting a claim",
-  "Limit Issues": "Limit Issue",
-};
-const BRIDGE_AUTO_MANAGED_BLOCKERS = [
-  "Won't Sign Authorization",
-  "Customer Wants Estimate",
-  "Adjuster Wants Estimate",
-  SPECIAL_PAPERWORK_BLOCKER,
-  UNKNOWN_INSURANCE_BLOCKER,
-];
-const BRIDGE_PICKUP_STEP_OPTIONS = [
-  { id: "schedule", label: "Schedule", tone: "green" },
-  { id: "priority", label: "Priority Groups Only", tone: "yellow" },
-  { id: "hold", label: "Hold", tone: "red" },
-];
-const BRIDGE_PROCESS_STEP_OPTIONS = [
-  { id: "yes", label: "Yes", tone: "green" },
-  { id: "priority", label: "Priority Only", tone: "yellow" },
-  { id: "hold", label: "Hold (Tag and Hold)", tone: "red" },
-];
-const BRIDGE_DELIVERY_STEP_OPTIONS = [
-  { id: "ok", label: "OK to deliver", tone: "green" },
-  { id: "priority", label: "Priority Groups Only", tone: "yellow" },
-  { id: "hold_cod", label: "Hold (COD)", tone: "red" },
-];
-const BRIDGE_MILESTONE_FIELDS = [
-  { id: "authorizationOnFile", atId: "authorizationOnFileAt", byId: "authorizationOnFileBy", label: "Authorization Signed" },
-  { id: "scopeApproved", atId: "scopeApprovedAt", byId: "scopeApprovedBy", label: "Scope Pre-Approved" },
-  { id: "estimateApproved", atId: "estimateApprovedAt", byId: "estimateApprovedBy", label: "Adjuster Approval" },
-];
-const canonicalBridgeIssue = (issue = "") => BRIDGE_BLOCKER_ALIASES[issue] || issue;
-const bridgeStageToneClass = (tone, active) => {
-  if (tone === "green") return active ? "border-emerald-300 bg-emerald-100 text-emerald-800" : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300";
-  if (tone === "yellow") return active ? "border-amber-300 bg-amber-100 text-amber-800" : "border-slate-200 bg-white text-slate-700 hover:border-amber-300";
-  if (tone === "red") return active ? "border-rose-300 bg-rose-100 text-rose-800" : "border-slate-200 bg-white text-slate-700 hover:border-rose-300";
-  return active ? "border-sky-300 bg-sky-100 text-sky-800" : "border-slate-200 bg-white text-slate-600 hover:border-sky-300";
-};
+// BRIDGE_* constants + canonicalBridgeIssue + bridgeStageToneClass — imported from ./config and ./utils/bridge
 const INSURANCE_COMPANY_SHORTCUTS = [
   {
     company: "Not Yet Known",
