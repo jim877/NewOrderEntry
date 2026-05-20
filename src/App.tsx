@@ -79,7 +79,7 @@ import type { LoadTarget, LoadTrigger } from './config';
 import {
   ACTUAL_COMPANY_INSTRUCTION_LIBRARY,
   ACTUAL_CONTACT_INSTRUCTION_LIBRARY,
-  buildSampleContacts,
+  SAMPLE_CONTACTS,
 } from './data/sampleSeed';
 import { StartScreen } from './components/screens/StartScreen';
 import {
@@ -119,6 +119,18 @@ import {
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
 import { canonicalBridgeIssue, bridgeStageToneClass } from './utils/bridge';
+import { INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS } from './config';
+import {
+  getInstructionTypeTextKey,
+  inferInstructionType,
+  normalizeInstructionEntry,
+  normalizeInstructionEntries,
+  hashInstructionSeed,
+  pickSeededInstructionEntries,
+  dedupeInstructionEntries,
+  mergeInstructionEntries,
+  getInstructionIdentity,
+} from './utils/instructions';
 import {
   normalizeContact,
   normalizeCompany,
@@ -490,139 +502,8 @@ const NATIONAL_CARRIER_LINKS = {
   [normalizeCompany("American Family")]: "American Family",
   [normalizeCompany("Pure Insurance")]: "Pure Insurance",
 };
-const INSTRUCTION_TYPES = [
-  "Tagging",
-  "Cleaning",
-  "Packing",
-  "Delivery",
-  "Communication",
-  "Scheduling",
-  "Pickup",
-  "Billing",
-  "Collections",
-];
-const ORDER_INSTRUCTION_PRESETS = {
-  Tagging: [
-    "A) TAG: Room By Room",
-  ],
-  Cleaning: [
-    "Allergies",
-  ],
-  Packing: [
-    "Bag Individually",
-  ],
-  Delivery: [
-    "COD you MUST PICK UP A CHECK",
-  ],
-  Communication: [
-    "Prefers Text",
-  ],
-  Scheduling: [
-    "Send Customer Inventory",
-  ],
-  Pickup: [
-    "Cost-conscious: VERY",
-  ],
-  Billing: [
-    "Must Run Thru TPA",
-  ],
-  Collections: [
-    "Pays Us Electronically",
-  ],
-};
-// ACTUAL_COMPANY_INSTRUCTION_LIBRARY, ACTUAL_CONTACT_INSTRUCTION_LIBRARY — imported from ./data/sampleSeed
-const INSTRUCTION_TYPE_SET = new Set(INSTRUCTION_TYPES.map((type) => type.toLowerCase()));
-const getInstructionTypeTextKey = (type = "", text = "") =>
-  `${(type || "").toString().trim().toLowerCase()}|${(text || "").toString().trim().toLowerCase()}`;
-const inferInstructionType = (text = "", fallbackType = "Communication") => {
-  const normalized = (text || "").toString().trim().toLowerCase();
-  if (!normalized) return fallbackType;
-  if (/\b(tag|hanger|bins?)\b/.test(normalized)) return "Tagging";
-  if (/\b(clean|press|starch|dc\b|machine clean|free & clear|allerg|pets?|reject)\b/.test(normalized)) return "Cleaning";
-  if (/\b(box|bag|poly|pack|hanger)\b/.test(normalized)) return "Packing";
-  if (/\b(deliver|delivery|cos\b|check\b)\b/.test(normalized)) return "Delivery";
-  if (/\b(call|email|text|contact|update|spanish|english|hearing|elderly|primary contact|prefers)\b/.test(normalized)) return "Communication";
-  if (/\b(schedule|appointment|send customer|photos?)\b/.test(normalized)) return "Scheduling";
-  if (/\b(pickup|pick up|room by room|cost-conscious|rush|ballpark|inventory|required|appliance|electronics|take)\b/.test(normalized)) return "Pickup";
-  if (/\b(invoice|bill|estimate|fpp|simbility|xactimate|esx|mika|m i c a|portal|vendor)\b/.test(normalized)) return "Billing";
-  if (/\b(payment|pay us|pays us|pay customer|deductible|electronically|direct payment|2-party|1-party|collections?)\b/.test(normalized)) return "Collections";
-  return fallbackType;
-};
-const normalizeInstructionEntry = (entry, fallbackType = "Communication") => {
-  if (!entry) return null;
-  if (typeof entry === "string") {
-    const text = entry.trim();
-    if (!text) return null;
-    return {
-      id: "",
-      type: inferInstructionType(text, fallbackType),
-      text,
-    };
-  }
-  const text = (entry.text || entry.label || entry.value || "").toString().trim();
-  if (!text) return null;
-  const rawType = (entry.type || "").toString().trim();
-  const normalizedType = rawType && INSTRUCTION_TYPE_SET.has(rawType.toLowerCase())
-    ? INSTRUCTION_TYPES.find((type) => type.toLowerCase() === rawType.toLowerCase()) || rawType
-    : inferInstructionType(text, fallbackType);
-  return {
-    id: (entry.id || "").toString(),
-    type: normalizedType,
-    text,
-  };
-};
-const normalizeInstructionEntries = (entries = [], fallbackType = "Communication") =>
-  (Array.isArray(entries) ? entries : [entries])
-    .map((entry) => normalizeInstructionEntry(entry, fallbackType))
-    .filter(Boolean);
-const hashInstructionSeed = (value = "") =>
-  Array.from((value || "").toString()).reduce(
-    (acc, char, index) => (acc + (char.charCodeAt(0) * (index + 1))) % 1000003,
-    0
-  );
-const pickSeededInstructionEntries = (seedKey = "", pool = [], count = 1) => {
-  const normalizedPool = normalizeInstructionEntries(pool);
-  if (!normalizedPool.length || count <= 0) return [];
-  const targetCount = Math.min(count, normalizedPool.length);
-  const seed = hashInstructionSeed(seedKey);
-  const start = seed % normalizedPool.length;
-  const step = normalizedPool.length > 1 ? ((seed % (normalizedPool.length - 1)) + 1) : 1;
-  const picks = [];
-  const seen = new Set();
-  let cursor = start;
-  let attempts = 0;
-  while (picks.length < targetCount && attempts < normalizedPool.length * 2) {
-    const candidate = normalizedPool[cursor % normalizedPool.length];
-    const key = getInstructionTypeTextKey(candidate.type, candidate.text);
-    if (!seen.has(key)) {
-      seen.add(key);
-      picks.push({ ...candidate, id: "" });
-    }
-    cursor += step;
-    attempts += 1;
-  }
-  return picks;
-};
-const dedupeInstructionEntries = (entries = []) => {
-  const seen = new Set();
-  return (entries || []).filter((entry) => {
-    const key = [
-      (entry.type || "").toLowerCase(),
-      (entry.text || "").toLowerCase(),
-      (entry.sourceKind || "").toLowerCase(),
-      (entry.sourceName || "").toLowerCase(),
-    ].join("|");
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-};
-const mergeInstructionEntries = (...groups) =>
-  dedupeInstructionEntries(
-    groups.flatMap((group) => normalizeInstructionEntries(group || []))
-  );
-const getInstructionIdentity = (entry = {}) =>
-  (entry.id || `${(entry.type || "").toString().trim().toLowerCase()}|${(entry.text || "").toString().trim().toLowerCase()}`).toString();
+// INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS — imported from ./config
+// instruction helpers — imported from ./utils/instructions
 const DEFAULT_COMPANY_PROFILES = {
   [normalizeCompany("Allstate Insurance Co.")]: {
     nationalCarrier: "Allstate",
@@ -841,7 +722,7 @@ const inferRoleCapabilities = (companyType = "", companyName = "") => {
   };
 };
 
-const SAMPLE_CONTACTS = buildSampleContacts(pickSeededInstructionEntries);
+// SAMPLE_CONTACTS — imported from ./data/sampleSeed
 
 const SAMPLE_PRESET_DATA = () => ({
   ...DEFAULT_FORM,

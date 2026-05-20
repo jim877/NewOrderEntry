@@ -1,7 +1,10 @@
 // @ts-nocheck
 // Sample seed data — instruction libraries + sample contact list.
-// SAMPLE_CONTACTS is built via a factory that receives the picker function from App.tsx
-// (the picker depends on normalizeInstructionEntries, which depends on the wider App module).
+// SAMPLE_CONTACTS is now a plain const (was a factory in step 6, since the picker
+// depended on App-scope helpers). After step 21, the picker lives in utils/instructions
+// so we can import it directly here.
+
+import { pickSeededInstructionEntries } from "../utils/instructions";
 
 export const ACTUAL_COMPANY_INSTRUCTION_LIBRARY = [
   { type: "Pickup",        text: "Cost-conscious: VERY" },
@@ -31,9 +34,7 @@ export const ACTUAL_CONTACT_INSTRUCTION_LIBRARY = [
   { type: "Collections",   text: "Confirm direct payment" },
 ];
 
-type InstructionPicker = (seedKey: string, pool: any[], count: number) => any[];
-
-export const buildSampleContacts = (pickSeededInstructionEntries: InstructionPicker) => [
+export const SAMPLE_CONTACTS = [
   {
     name: "Alex Morgan",
     company: "Allstate",

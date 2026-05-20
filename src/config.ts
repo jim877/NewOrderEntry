@@ -121,6 +121,10 @@ export const SERVICE_SUB_CATEGORIES: Record<string, string[]> = config.lists.ser
 export const SUGGESTED_GROUPS: string[]      = config.lists.suggestedGroups;
 export const LIVING_STATUS_ADDRESS_TYPES: string[] = config.lists.livingStatusAddressTypes;
 
+// --- Order instructions ---
+export const INSTRUCTION_TYPES: string[] = config.lists.instructionTypes;
+export const ORDER_INSTRUCTION_PRESETS: Record<string, string[]> = config.lists.orderInstructionPresets;
+
 // --- Bridge (Scope Update / Blockers) ---
 export type BridgeStepOption = { id: string; label: string; tone: string };
 export type BridgeMilestoneField = { id: string; atId: string; byId: string; label: string };

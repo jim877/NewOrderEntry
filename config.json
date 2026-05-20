@@ -309,6 +309,18 @@
     },
     "suggestedGroups": ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"],
     "livingStatusAddressTypes": ["Moving","Hotel","Temp","Neighbor","Relative","Rental","Other Home"],
+    "instructionTypes": ["Tagging","Cleaning","Packing","Delivery","Communication","Scheduling","Pickup","Billing","Collections"],
+    "orderInstructionPresets": {
+      "Tagging":       ["A) TAG: Room By Room"],
+      "Cleaning":      ["Allergies"],
+      "Packing":       ["Bag Individually"],
+      "Delivery":      ["COD you MUST PICK UP A CHECK"],
+      "Communication": ["Prefers Text"],
+      "Scheduling":    ["Send Customer Inventory"],
+      "Pickup":        ["Cost-conscious: VERY"],
+      "Billing":       ["Must Run Thru TPA"],
+      "Collections":   ["Pays Us Electronically"]
+    },
     "bridge": {
       "specialPaperworkBlocker": "Special paperwork required",
       "unknownInsuranceBlocker": "Insurance Company Not Yet Known",
