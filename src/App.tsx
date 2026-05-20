@@ -209,7 +209,13 @@ import {
   parseTimeTo24h,
   formatIcsDateTime,
   addHours,
+  rushAddDays,
+  parseLocalDate,
+  formatDateInputValue,
+  rushFormatDate,
+  rushGetSeasons,
 } from './utils/dateTime';
+import { loadTargetsFromStorage, matchLoadTargets } from './utils/loadTargets';
 
 // --- STYLES ---
 const STYLES = `
@@ -579,79 +585,8 @@ const DEFAULT_FIELD_CONFIG = {
 
 // DEFAULT_BLOCKER_RULES and DEFAULT_INTERVIEW_ACTIONS — imported from ./config
 
-// --- RUSH GUIDE / LOADING LIST ---
-// RUSH_* constants and DEFAULT_LOAD_TARGETS imported from src/config.ts (sourced from /config.json).
-// Helpers below stay in App.tsx for now since they touch runtime state (localStorage, data shape).
-
-// Stored in localStorage under "noe.loadTargets" — merged on top of defaults
-const loadTargetsFromStorage = (): LoadTarget[] => {
-  if (typeof window === "undefined") return DEFAULT_LOAD_TARGETS;
-  try {
-    const raw = window.localStorage.getItem("noe.loadTargets");
-    if (!raw) return DEFAULT_LOAD_TARGETS;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed as LoadTarget[];
-    return DEFAULT_LOAD_TARGETS;
-  } catch { return DEFAULT_LOAD_TARGETS; }
-};
-
-// Given current data, return the labels that any rule recommends
-const matchLoadTargets = (data: any, targets: LoadTarget[] = DEFAULT_LOAD_TARGETS): string[] => {
-  const out: string[] = [];
-  const conds = (data && data.conditions) || {};
-  const losses: string[] = (data && data.orderTypes) || [];
-  const packout: string[] = (data && data.packoutSummary) || [];
-  const services: string[] = (data && data.serviceOfferings) || [];
-  // Interview-label triggers fire when the conditions object contains the corresponding flag truthy.
-  // We map a small set of human labels to internal condition keys.
-  const labelToCond: Record<string, string> = {
-    "Still Wet": "damageWasWet",
-    "Visible Mold": "damageMoldMildew",
-    "Structural Damage": "structuralDamage",
-    "No Electricity": "noLights",
-    "No Heat": "noHeat",
-    "Boarded Up": "boardedUp",
-  };
-  for (const t of targets) {
-    let hit = false;
-    for (const tr of (t.triggers || [])) {
-      if (tr.type === "condition" && conds[tr.value]) { hit = true; break; }
-      if (tr.type === "loss" && losses.includes(tr.value)) { hit = true; break; }
-      if (tr.type === "packout" && packout.includes(tr.value)) { hit = true; break; }
-      if (tr.type === "service" && services.includes(tr.value)) { hit = true; break; }
-      if (tr.type === "interview") {
-        const key = labelToCond[tr.value];
-        if (key && conds[key]) { hit = true; break; }
-      }
-    }
-    if (hit) out.push(t.label);
-  }
-  return out;
-};
-
-const rushAddDays = (date, days) => { const r = new Date(date); r.setDate(r.getDate() + days); return r; };
-const parseLocalDate = (value) => {
-  if (!value) return null;
-  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
-  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  const d = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(value);
-  return isNaN(d.getTime()) ? null : d;
-};
-const formatDateInputValue = (value) => {
-  const d = parseLocalDate(value);
-  if (!d) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-};
-const rushFormatDate = (d) => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-const rushGetSeasons = (start, end) => {
-  const found = new Set();
-  const cur = new Date(start);
-  while (cur <= end) { const m = cur.getMonth(); Object.values(RUSH_SEASONS).forEach(s => { if (s.months.includes(m)) found.add(s); }); cur.setMonth(cur.getMonth() + 1); }
-  return Array.from(found);
-};
+// loadTargetsFromStorage, matchLoadTargets — imported from ./utils/loadTargets
+// rushAddDays, parseLocalDate, formatDateInputValue, rushFormatDate, rushGetSeasons — imported from ./utils/dateTime
 
 const DEFAULT_FORM={
   isLead: null,

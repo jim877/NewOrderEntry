@@ -2,6 +2,8 @@
 // Pure date/time helpers used by pickers + scheduling code.
 // No React, no external state — safe to import anywhere.
 
+import { RUSH_SEASONS } from "../config";
+
 export const normalizeDateInput = (value) => {
   const v = (value || "").trim();
   if (!v) return "";
@@ -103,6 +105,49 @@ export const addHours = (timeStr = "", hours = 1) => {
   const hh = String(nextHour).padStart(2, "0");
   const mm = String(time.minute).padStart(2, "0");
   return `${hh}:${mm}`;
+};
+
+// rushAddDays — return a NEW date shifted by `days` (positive or negative).
+export const rushAddDays = (date: Date, days: number) => {
+  const r = new Date(date);
+  r.setDate(r.getDate() + days);
+  return r;
+};
+
+// parseLocalDate — coerce a value into a Date. Accepts Date, ISO yyyy-mm-dd, or anything
+// `new Date()` can parse. Returns null for invalid input.
+export const parseLocalDate = (value: any) => {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const d = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+// formatDateInputValue — coerce a value to yyyy-mm-dd. Empty string for invalid input.
+export const formatDateInputValue = (value: any) => {
+  const d = parseLocalDate(value);
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+// rushFormatDate — "Jan 5, 2026" style.
+export const rushFormatDate = (d: any) =>
+  d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+
+// rushGetSeasons — return the set of RUSH_SEASONS entries that overlap [start, end].
+export const rushGetSeasons = (start: Date, end: Date) => {
+  const found = new Set();
+  const cur = new Date(start);
+  while (cur <= end) {
+    const m = cur.getMonth();
+    Object.values(RUSH_SEASONS).forEach((s: any) => { if (s.months.includes(m)) found.add(s); });
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return Array.from(found);
 };
 
 // TIME_SLOTS — 6 AM to 8 PM in 30-min increments (RCS business hours).

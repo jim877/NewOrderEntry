@@ -1,0 +1,55 @@
+// @ts-nocheck
+// Load-list (what to bring) runtime helpers. The static DEFAULT_LOAD_TARGETS list
+// lives in config; this file holds the localStorage hydration + rule-matching logic.
+
+import { DEFAULT_LOAD_TARGETS } from "../config";
+import type { LoadTarget } from "../config";
+
+// loadTargetsFromStorage — read user-customized list from localStorage, fall back to defaults.
+// SSR-safe via the `typeof window` check.
+export const loadTargetsFromStorage = (): LoadTarget[] => {
+  if (typeof window === "undefined") return DEFAULT_LOAD_TARGETS;
+  try {
+    const raw = window.localStorage.getItem("noe.loadTargets");
+    if (!raw) return DEFAULT_LOAD_TARGETS;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed as LoadTarget[];
+    return DEFAULT_LOAD_TARGETS;
+  } catch { return DEFAULT_LOAD_TARGETS; }
+};
+
+// Mapping from a few human-readable interview labels to internal condition flag keys.
+// Used by matchLoadTargets to resolve "interview"-type triggers.
+const LABEL_TO_COND: Record<string, string> = {
+  "Still Wet": "damageWasWet",
+  "Visible Mold": "damageMoldMildew",
+  "Structural Damage": "structuralDamage",
+  "No Electricity": "noLights",
+  "No Heat": "noHeat",
+  "Boarded Up": "boardedUp",
+};
+
+// matchLoadTargets — given current order data, return the labels of any targets
+// whose triggers match. A target is matched if ANY of its triggers fires.
+export const matchLoadTargets = (data: any, targets: LoadTarget[] = DEFAULT_LOAD_TARGETS): string[] => {
+  const out: string[] = [];
+  const conds = (data && data.conditions) || {};
+  const losses: string[] = (data && data.orderTypes) || [];
+  const packout: string[] = (data && data.packoutSummary) || [];
+  const services: string[] = (data && data.serviceOfferings) || [];
+  for (const t of targets) {
+    let hit = false;
+    for (const tr of (t.triggers || [])) {
+      if (tr.type === "condition" && conds[tr.value]) { hit = true; break; }
+      if (tr.type === "loss" && losses.includes(tr.value)) { hit = true; break; }
+      if (tr.type === "packout" && packout.includes(tr.value)) { hit = true; break; }
+      if (tr.type === "service" && services.includes(tr.value)) { hit = true; break; }
+      if (tr.type === "interview") {
+        const key = LABEL_TO_COND[tr.value];
+        if (key && conds[key]) { hit = true; break; }
+      }
+    }
+    if (hit) out.push(t.label);
+  }
+  return out;
+};
