@@ -103,3 +103,7 @@ export const SDS_ICON_MAP: Record<string, string>            = config.lists.sdsI
 export const SDS_ICON_CLASS_OVERRIDES: Record<string, string> = config.lists.sdsIconClassOverrides;
 export const QUICK_INSTRUCTION_NOTES: string[]       = config.lists.quickInstructionNotes;
 export const LEAD_SOURCE_HELP: Record<string, string> = config.lists.leadSourceHelp;
+
+// --- AI usage guidance ---
+export const AI_USAGE_GUIDELINES: string[] = config.lists.aiUsageGuidelines;
+export const AI_TIME_SAVING_TIPS: string[]  = config.lists.aiTimeSavingTips;

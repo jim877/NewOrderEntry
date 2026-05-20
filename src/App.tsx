@@ -58,6 +58,7 @@ import {
   ACTUAL_CONTACT_INSTRUCTION_LIBRARY,
   buildSampleContacts,
 } from './data/sampleSeed';
+import { StartScreen } from './components/screens/StartScreen';
 import {
   Field,
   Input,
@@ -80,6 +81,7 @@ import {
   SmartNotification,
   DatePicker,
   TimePicker,
+  SearchSelect,
 } from './components/atoms';
 import {
   normalizeDateInput,
@@ -1770,143 +1772,7 @@ const buildNarrativeProse = (narrative = [], data = {}) => {
 
 // DatePicker, TimePicker — imported from ./components/atoms
 
-const normalizeOption = (opt) => {
-  if (typeof opt === "string") return { label: opt, value: opt, type: "generic" };
-  const label = String(opt?.label ?? opt?.value ?? "");
-  const value = String(opt?.value ?? opt?.label ?? "");
-  return { label, value, type: opt?.type || "generic" };
-};
-
-const SearchSelect = ({ value, onChange, onQueryChange, options, placeholder, className, onKeyDown, onBlur, clearOnCommit, inputRef, onEmptyEnter, onAddNew, maxResults = 8, uppercase = false, menuClassName = "", ...props }) => {
-  const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
-  const [query, setQuery] = useState(value || "");
-  const listRef = useRef(null);
-  const itemRefs = useRef([]);
-
-  useEffect(() => {
-    setQuery(value || "");
-  }, [value]);
-
-  const normalizedOptions = useMemo(() => (options || []).map(normalizeOption), [options]);
-
-  const filtered = useMemo(() => {
-    const q = (query || "").trim().toLowerCase();
-    if (!q) return normalizedOptions.slice(0, maxResults);
-    const starts = normalizedOptions.filter(o => o.label.toLowerCase().startsWith(q) || o.value.toLowerCase().startsWith(q));
-    const includes = normalizedOptions.filter(o => !starts.includes(o) && (o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q)));
-    return [...starts, ...includes].slice(0, maxResults);
-  }, [query, normalizedOptions]);
-
-  useEffect(() => {
-    if (highlight >= filtered.length) setHighlight(0);
-  }, [filtered.length, highlight]);
-
-  useEffect(() => {
-    setHighlight(0);
-  }, [query]);
-
-  useEffect(() => {
-    if (open) setHighlight(0);
-  }, [open]);
-
-  useEffect(() => {
-    const el = itemRefs.current[highlight];
-    if (el && listRef.current) {
-      el.scrollIntoView({ block: "nearest" });
-    }
-  }, [highlight, filtered.length]);
-
-  const commit = (val) => {
-    const nextVal = uppercase ? String(val || "").toUpperCase() : val;
-    onChange(nextVal);
-    if (clearOnCommit) {
-      setQuery("");
-      onQueryChange?.("");
-    } else {
-      setQuery(nextVal);
-      onQueryChange?.(nextVal);
-    }
-    setOpen(false);
-  };
-
-  return (
-    <div className={`relative ${className||""}`}>
-      <Input
-        ref={inputRef}
-        value={query}
-        onChange={e => {
-          const raw = e.target.value;
-          const next = uppercase ? raw.toUpperCase() : raw;
-          setQuery(next);
-          setOpen(true);
-          onQueryChange?.(next);
-        }}
-        onFocus={() => setOpen(true)}
-        placeholder={placeholder || "Type to search..."}
-        className={`pr-10 ${className||""}`}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && onEmptyEnter && !query.trim()) {
-            e.preventDefault();
-            onEmptyEnter();
-            setOpen(false);
-            return;
-          }
-          if (e.key === "ArrowDown") { e.preventDefault(); setHighlight(h => Math.min(h + 1, filtered.length - 1)); }
-          if (e.key === "ArrowUp") { e.preventDefault(); setHighlight(h => Math.max(h - 1, 0)); }
-          if (e.key === "Enter") {
-            e.preventDefault();
-            if (filtered[highlight]) commit(filtered[highlight].value);
-            else if (query.trim()) commit(query.trim());
-          }
-          if (e.key === "Tab") {
-            if (filtered[highlight]) commit(filtered[highlight].value);
-            else if (query.trim()) commit(query.trim());
-          }
-          if (e.key === "Escape") setOpen(false);
-          onKeyDown?.(e);
-        }}
-        onBlur={(e) => { setOpen(false); onBlur?.(e); }}
-        {...props}
-      />
-      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-300">▾</span>
-      {open && (filtered.length > 0 || (query.trim() && onAddNew)) && (
-        <div ref={listRef} className={`absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg overflow-auto ${menuClassName || "max-h-60"}`}>
-          {filtered.map((opt, idx) => (
-            <button
-              type="button"
-              key={`${opt.type}-${opt.value}-${idx}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => commit(opt.value)}
-              ref={(el) => { itemRefs.current[idx] = el; }}
-              className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between ${
-                idx === highlight
-                  ? "bg-sky-50 text-sky-700"
-                  : "text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <span>{opt.label}</span>
-              {opt.type !== "generic" && (
-                <span className="text-[10px] font-bold text-slate-400 uppercase">{opt.type}</span>
-              )}
-            </button>
-          ))}
-          {query.trim() && onAddNew && filtered.length === 0 && (
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onAddNew(query.trim()); setQuery(""); setOpen(false); }}
-              className="w-full text-left px-3 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-50 border-t border-slate-100 flex items-center gap-2"
-            >
-              <span className="text-base">+</span>
-              <span>Add "{query.trim()}" as new</span>
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+// SearchSelect — imported from ./components/atoms (with its own normalizeOption helper)
 
 // ToastItem, ToastStack, Switch, SmartNotification — imported from ./components/atoms
 
@@ -2328,26 +2194,7 @@ const LeadInfoFields = memo(({ data, update, updateMany, companies, setModal, to
 
 
 
-const AI_USAGE_GUIDELINES = [
-  "Choose the right entry mode: Use Detailed Entry when you have a lot of information (e.g., multiple contacts, insurance details, scheduling) to capture. Use Quick Entry for basic details, location, and scheduling when the information is minimal.",
-  "Recommended AI workflow: In Detailed Entry, tab through the entire form and use Enter as needed to move forward field by field. If a correction is needed, use Shift + Enter to move backward.",
-  "Always specify a referrer: The referrer is the person or company that provided the job or assignment. Use the quick entry search—type in the name and select the correct contact/company from the suggestions.",
-  "Ensure a Bill‑To is entered: Identify who will pay for the services. If an insurance company is the referrer, that company typically serves as both the Bill‑To and the insurance provider.",
-  "Provide an order name: An order name helps identify the job. It will auto‑populate when you enter the customer's name and address, but verify it before saving.",
-  "Capture contact information: Make sure at least one phone number or email is recorded for the primary customer. Include additional contacts (spouse, adjuster, mover) if relevant.",
-  "Fill in the Interview section: Open the Interview section and answer as many questions as you can (e.g., project type, severity, origin, cause). Smart fields marked with a lightning‑bolt icon will automatically fill related fields and display a confirmation toast.",
-  "Scheduling appointments: In the Schedule section you can either type directly over the date and time or use the calendar and clock icons to pick them. Indicate whether the event is firm or tentative, select the correct service offerings, and provide clear event instructions.",
-  "Refinements for insurance claims: When entering insurance details, indicate whether it's an insurance claim, select the insurance company, and add the adjuster's contact via the quick‑add menu. Use the same menu to add other companies (e.g., movers, contractors).",
-  "Review before saving: Check that all required fields (Referrer, Bill‑To, order name, schedule date/time) are completed. Missing required fields may trigger a warning before submission. Once complete, click Save, review the summary, and then choose Continue Save to submit the order."
-];
-
-const AI_TIME_SAVING_TIPS = [
-  "Use “quick add” wherever possible: The quick‑add menu is the fastest way to assign roles like adjuster, mover or contractors. Begin typing a name or company and select the correct match from the drop‑down instead of creating contacts from scratch.",
-  "Type times directly into the schedule: If the time picker is hard to use, double‑click in the time field, press Ctrl + A to highlight the existing entry and type the desired time (e.g., 12:00 PM). Press Enter to confirm.",
-  "Look for auto‑fill hints: When you enter a customer's name and address, the order name and other fields may auto‑populate. Accept these suggestions to save time and ensure consistency.",
-  "Document thoroughly in notes: Use the Interview and Event Instructions fields to capture details about the job (e.g., site conditions, special handling instructions, pets on site). Detailed notes reduce follow‑up questions later.",
-  "Use keyboard shortcuts: Press Tab or Enter to move forward, and Shift + Tab or Shift + Enter to move backward through fields. Keyboard navigation can speed up data entry and reduce reliance on the mouse."
-];
+// AI_USAGE_GUIDELINES, AI_TIME_SAVING_TIPS — imported from ./config (used by StartScreen)
 
 // --- SCOPE WIZARD — Guided scoping flow ---
 const PICKUP_DEPARTMENTS: Record<string, string[]> = { "Textile": ["Rugs", "Clothing", "Bedding", "Draperies", "Linens"], "Hard Goods": ["Furniture", "Art", "Electronics", "Appliances", "Hardware"] };
@@ -5422,91 +5269,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
 
 // --- Scope Wizard end ---
 
-const StartScreen = ({ onSelect }) => {
-  const [showGuidelines, setShowGuidelines] = useState(false);
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 fade-in scale-in">
-      <div className="text-center mb-10">
-        <h1 className="text-5xl font-extrabold text-slate-900 mb-2 tracking-tight">New Order Entry</h1>
-        <p className="text-lg text-slate-500">How much detail do you have right now?</p>
-        <p className="mt-2 text-sm text-slate-400">You can switch between modes at any time — nothing is lost.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
-      <button
-        onClick={() => onSelect('quick')}
-        className="group relative flex flex-col items-center p-10 rounded-3xl bg-white border border-slate-200 shadow-xl hover:shadow-2xl hover:border-sky-300 hover:-translate-y-1 transition-all duration-300"
-      >
-        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">⚡</div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Quick Entry</h2>
-        <p className="text-center text-slate-500 text-sm">Get it on the calendar fast. Name, address, date — just the essentials.</p>
-        <div className="mt-4 text-xs text-slate-400 text-center">Best for: sales reps, leads, partial info, mobile</div>
-        <div className="mt-5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Start Fast →</div>
-      </button>
-      <button
-        onClick={() => onSelect('detailed')}
-        className="group relative flex flex-col items-center p-10 rounded-3xl bg-white border-2 border-sky-200 shadow-xl hover:shadow-2xl hover:border-sky-400 hover:-translate-y-1 transition-all duration-300"
-      >
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-sky-500 px-3 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">Most Common</div>
-        <div className="h-20 w-20 mb-6 rounded-full bg-sky-50 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">📝</div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Detailed Entry</h2>
-        <p className="text-center text-slate-500 text-sm">Guided workflow for the full order. Insurance, billing, conditions, contacts, scope — a complete interview.</p>
-        <div className="mt-4 text-xs text-slate-400 text-center">Best for: office team, live conversations, computer</div>
-        <div className="mt-5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-600 font-bold text-sm">Start Detailed →</div>
-      </button>
-      <div className="flex flex-col items-center p-10 rounded-3xl bg-white border-2 border-blue-200 shadow-xl">
-        <div className="h-20 w-20 mb-6 rounded-full bg-blue-50 flex items-center justify-center overflow-hidden"><img src="/Scope_Icon.svg" alt="Scope" className="h-14 w-14" /></div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Scope & SDS</h2>
-        <p className="text-center text-slate-500 text-sm mb-2">Room-by-room scope for pack-out instructions or photo documentation.</p>
-        <div className="mt-2 text-xs text-slate-400 text-center mb-5">Best for: on-site at the home, field work</div>
-        <div className="flex flex-col gap-3 w-full">
-          <button
-            onClick={() => onSelect('scope')}
-            className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700 transition-all shadow-md"
-          >
-            Start Scope
-            <div className="text-[10px] font-normal text-blue-200 mt-0.5">Room-by-room walkthrough with photo tagging</div>
-          </button>
-          <button
-            onClick={() => onSelect('sds-preview')}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 transition-all"
-          >
-            SDS Document
-            <div className="text-[10px] font-normal text-slate-400 mt-0.5">Generate the Same Day Service PDF</div>
-          </button>
-        </div>
-      </div>
-      </div>
-
-      <div className="flex gap-4 mt-10">
-        <button
-          type="button"
-          onClick={() => setShowGuidelines(v => !v)}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-600"
-        >
-          Usage guidelines {showGuidelines ? "▾" : "▸"}
-        </button>
-      </div>
-      {showGuidelines && (
-        <div className="mt-4 w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="text-sm font-bold uppercase tracking-widest text-sky-600">AI App Usage Guidelines</div>
-          <ul className="mt-4 list-disc space-y-2 pl-6 text-sm text-slate-700">
-            {AI_USAGE_GUIDELINES.map(line => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-          <div className="mt-6 text-sm font-bold uppercase tracking-widest text-slate-500">Additional Time-Saving Tips</div>
-          <ul className="mt-3 list-disc space-y-2 pl-6 text-sm text-slate-700">
-            {AI_TIME_SAVING_TIPS.map(line => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
+// StartScreen — imported from ./components/screens/StartScreen
 
 // --- SEARCH COMPONENT ---
 const GlobalSearch = ({ show, onClose, onNavigate, onSearchHit }) => {

@@ -20,3 +20,4 @@ export { ToastStack } from "./ToastStack";
 export { SmartNotification } from "./SmartNotification";
 export { DatePicker } from "./DatePicker";
 export { TimePicker } from "./TimePicker";
+export { SearchSelect } from "./SearchSelect";
