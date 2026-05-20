@@ -119,6 +119,19 @@ import {
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
 import { canonicalBridgeIssue, bridgeStageToneClass } from './utils/bridge';
+import {
+  INSURANCE_COMPANY_SHORTCUTS,
+  INSURANCE_COMPANY_SHORTCUT_SET,
+  NATIONAL_CARRIER_LINKS,
+  DEFAULT_COMPANY_PROFILES,
+  DEFAULT_CONTACT_PROFILES,
+  isInsuranceShortcutCompany,
+  inferCompanyTypeFromName,
+  resolveLinkedNationalCarrierName,
+  resolveCompanyProfile,
+  resolveContactProfile,
+  isInsuranceCarrierCompany,
+} from './utils/companyProfiles';
 import { INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS } from './config';
 import {
   getInstructionTypeTextKey,
@@ -473,170 +486,10 @@ const composeEventInstructions = (base, data, conditionSummary) => {
 // LIVING_STATUS_ADDRESS_TYPES — imported from ./config
 
 // BRIDGE_* constants + canonicalBridgeIssue + bridgeStageToneClass — imported from ./config and ./utils/bridge
-const INSURANCE_COMPANY_SHORTCUTS = [
-  {
-    company: "Not Yet Known",
-    helpText: "You will enter the company info later.",
-    createsBlocker: true,
-  },
-  {
-    company: "Not Provided",
-    helpText: "You will not be able to find out.",
-    createsBlocker: false,
-  },
-];
-const INSURANCE_COMPANY_SHORTCUT_SET = new Set(
-  INSURANCE_COMPANY_SHORTCUTS.map((item) => normalizeCompany(item.company))
-);
-const NATIONAL_CARRIER_LINKS = {
-  [normalizeCompany("Allstate")]: "Allstate",
-  [normalizeCompany("Allstate Insurance Co.")]: "Allstate",
-  [normalizeCompany("State Farm")]: "State Farm",
-  [normalizeCompany("Nationwide")]: "Nationwide",
-  [normalizeCompany("Farmers")]: "Farmers",
-  [normalizeCompany("USAA")]: "USAA",
-  [normalizeCompany("Liberty Mutual")]: "Liberty Mutual",
-  [normalizeCompany("Progressive")]: "Progressive",
-  [normalizeCompany("Travelers")]: "Travelers",
-  [normalizeCompany("Chubb")]: "Chubb",
-  [normalizeCompany("American Family")]: "American Family",
-  [normalizeCompany("Pure Insurance")]: "Pure Insurance",
-};
+// INSURANCE_COMPANY_SHORTCUTS, NATIONAL_CARRIER_LINKS — imported from ./utils/companyProfiles
 // INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS — imported from ./config
 // instruction helpers — imported from ./utils/instructions
-const DEFAULT_COMPANY_PROFILES = {
-  [normalizeCompany("Allstate Insurance Co.")]: {
-    nationalCarrier: "Allstate",
-  },
-  [normalizeCompany("Contractor Connection")]: {
-    companyType: "TPA",
-    companyInstructions: [
-      { type: "Billing", text: "Tell Adjuster When to Run thru TPA" },
-      { type: "Billing", text: "Must Run Thru TPA" },
-      { type: "Billing", text: "Send Photos Separate from Invoice" },
-    ],
-    specialDocuments: ["Contractor Connection specialty form"],
-    customerTextForms: ["Contractor Connection specialty form"],
-  },
-  [normalizeCompany("Not Yet Known")]: {
-    companyInstructions: [{ type: "Communication", text: "Insurance carrier details will be added later." }],
-    reportingPlaceholder: true,
-  },
-  [normalizeCompany("Not Provided")]: {
-    companyInstructions: [{ type: "Communication", text: "Insurance carrier details are unavailable for this order." }],
-    reportingPlaceholder: true,
-  },
-};
-const DEFAULT_CONTACT_PROFILES = {};
-const isInsuranceShortcutCompany = (companyName = "") =>
-  INSURANCE_COMPANY_SHORTCUT_SET.has(normalizeCompany(companyName || ""));
-const inferCompanyTypeFromName = (company = "") => {
-  if (!company) return "Other";
-  const c = company.toLowerCase();
-  const isCarrier = NATIONAL_CARRIERS.some(n => normalizeCompany(n) === normalizeCompany(company));
-  if (isCarrier) return "Insurance";
-  if (c.includes("contractor connection") || c.includes("tpa")) return "TPA";
-  if (c.includes("insurance")) return "Insurance";
-  if (c.includes("adjusting") || c.includes("claims")) return "Public Adjusting";
-  if (c.includes("moving")) return "Moving";
-  if (c.includes("restoration") || c.includes("dki") || c.includes("servpro")) return "Restoration Company";
-  return "Other";
-};
-const resolveLinkedNationalCarrierName = (companyName = "", sampleContacts = []) => {
-  const normalized = normalizeCompany(companyName || "");
-  if (!normalized || isInsuranceShortcutCompany(companyName)) return "";
-  if (NATIONAL_CARRIER_LINKS[normalized]) return NATIONAL_CARRIER_LINKS[normalized];
-  const directCarrier = NATIONAL_CARRIERS.find((carrier) => normalizeCompany(carrier) === normalized);
-  if (directCarrier) return directCarrier;
-  const profileCarrier = DEFAULT_COMPANY_PROFILES[normalized]?.nationalCarrier;
-  if (profileCarrier) return profileCarrier;
-  const sampleCarrier = sampleContacts.find((row) => normalizeCompany(row.company || "") === normalized)?.nationalCarrier;
-  return sampleCarrier || "";
-};
-const resolveCompanyProfile = (companyName = "", sampleContacts = []) => {
-  const normalized = normalizeCompany(companyName || "");
-  if (!normalized) {
-    return {
-      companyName: "",
-      companyType: "",
-      nationalCarrier: "",
-      companyInstructions: [],
-      companyPreferences: [],
-      specialDocuments: [],
-      customerTextForms: [],
-      reportingPlaceholder: false,
-    };
-  }
-  const defaults = DEFAULT_COMPANY_PROFILES[normalized] || {};
-  const matchingRows = (sampleContacts || []).filter(
-    (row) => normalizeCompany(row.company || "") === normalized
-  );
-  const companyInstructions = mergeInstructionEntries(
-    defaults.companyInstructions || defaults.companyPreferences || [],
-    matchingRows.flatMap((row) => row.companyInstructions || row.companyPreferences || [])
-  );
-  return {
-    companyName,
-    companyType:
-      defaults.companyType ||
-      matchingRows.find((row) => row.companyType)?.companyType ||
-      inferCompanyTypeFromName(companyName),
-    nationalCarrier: resolveLinkedNationalCarrierName(companyName, sampleContacts),
-    companyInstructions,
-    companyPreferences: companyInstructions.map((entry) => entry.text),
-    specialDocuments: mergeUniqueStrings(
-      defaults.specialDocuments || [],
-      matchingRows.flatMap((row) => row.specialDocuments || [])
-    ),
-    customerTextForms: mergeUniqueStrings(
-      defaults.customerTextForms || [],
-      matchingRows.flatMap((row) => row.customerTextForms || [])
-    ),
-    reportingPlaceholder: !!defaults.reportingPlaceholder,
-  };
-};
-const resolveContactProfile = (contactName = "", sampleContacts = []) => {
-  const normalized = normalizeContact(contactName || "");
-  if (!normalized) {
-    return {
-      contactName: "",
-      contactInstructions: [],
-      contactPreferences: [],
-      specialDocuments: [],
-      customerTextForms: [],
-    };
-  }
-  const defaults = DEFAULT_CONTACT_PROFILES[normalized] || {};
-  const row = (sampleContacts || []).find(
-    (item) => normalizeContact(item.name || "") === normalized
-  );
-  const contactInstructions = mergeInstructionEntries(
-    defaults.contactInstructions || defaults.contactPreferences || [],
-    row?.contactInstructions || row?.contactPreferences || []
-  );
-  return {
-    contactName,
-    contactInstructions,
-    contactPreferences: contactInstructions.map((entry) => entry.text),
-    specialDocuments: mergeUniqueStrings(
-      defaults.specialDocuments || [],
-      row?.specialDocuments || []
-    ),
-    customerTextForms: mergeUniqueStrings(
-      defaults.customerTextForms || [],
-      row?.customerTextForms || []
-    ),
-  };
-};
-const isInsuranceCarrierCompany = (companyName = "", sampleContacts = []) => {
-  const normalized = normalizeCompany(companyName || "");
-  if (!normalized) return false;
-  if (isInsuranceShortcutCompany(companyName)) return true;
-  if (resolveLinkedNationalCarrierName(companyName, sampleContacts)) return true;
-  const profile = resolveCompanyProfile(companyName, sampleContacts);
-  const type = normalizeCompany(profile.companyType || "");
-  return type === "insurance" || type.includes("insurance");
-};
+// DEFAULT_COMPANY_PROFILES, DEFAULT_CONTACT_PROFILES + 6 resolver/predicate helpers — imported from ./utils/companyProfiles
 // EntityPreferencePanel — imported from ./components/atoms
 
 // --- CONSTANTS FOR SELECTIONS ---
