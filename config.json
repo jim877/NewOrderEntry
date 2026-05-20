@@ -292,6 +292,23 @@
       { "id": "insurance", "title": "Insurance" },
       { "id": "billto",    "title": "Bill To" }
     ],
+    "states": ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"],
+    "customerTypes": ["Primary","Secondary","Point of Contact","Assistant","Employee","Husband","Wife","Father","Mother","Brother","Sister","Son","Daughter","Relative","Boyfriend","Girlfriend","Housekeeper","Neighbor","Owner","Partner","Policyholder","Attorney","Manager","Other"],
+    "orderStatuses": ["New","Intake Complete","Pickup Complete","Tagging Complete","Ready to Bill"],
+    "meetingTypes": ["Scope","Pickup","In-Home","Meeting"],
+    "defaultCompanies": ["Allstate","Allstate Insurance Co.","State Farm","Chubb","Servpro of Anytown","Metro Claims","Pure Insurance","DKI FastDry","United Claims","Croziers Moving","Contractor Connection","Not Yet Known","Not Provided","Company 1","Company 2"],
+    "defaultContacts": ["Alex Morgan","Jamie Lee","Pat Adjuster","Ronzel Simmons","Zack Barsack","Sim Fern","Steven Earthman","Casey Assignment","Contact 1","Contact 2"],
+    "salesReps": ["Dave Fenyo, Sales Rep","Jim Fenyo","Josh Cintron, Sales Rep"],
+    "serviceOfferings": ["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Taxidermy","Textiles","TLI","Expert Stain Removal"],
+    "serviceSubCategories": {
+      "Art":        ["Fine","Decorative","Personal"],
+      "Appliance":  ["Installed","Uninstalled"],
+      "Consulting": ["Estimates","Expert Opinion","TLI"],
+      "Furniture":  ["Upholstered","Hard"],
+      "Textiles":   ["Clothing","Blinds","Hand Cleaning","Household","Rugs","Window Treatments"]
+    },
+    "suggestedGroups": ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"],
+    "livingStatusAddressTypes": ["Moving","Hotel","Temp","Neighbor","Relative","Rental","Other Home"],
     "headerSteps": [
       { "id": "sec1", "label": "Order",    "subsections": [{ "id": "order",     "label": "Order" }, { "id": "source",   "label": "Source" }] },
       { "id": "sec2", "label": "Customer", "subsections": [{ "id": "customer",  "label": "Customer Details" }, { "id": "interview", "label": "Interview" }] },

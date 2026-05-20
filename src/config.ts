@@ -108,6 +108,19 @@ export const LEAD_SOURCE_HELP: Record<string, string> = config.lists.leadSourceH
 export const AI_USAGE_GUIDELINES: string[] = config.lists.aiUsageGuidelines;
 export const AI_TIME_SAVING_TIPS: string[]  = config.lists.aiTimeSavingTips;
 
+// --- Order pick-lists (states, types, statuses, vendor seeds) ---
+export const STATES: string[]                = config.lists.states;
+export const CUSTOMER_TYPES: string[]        = config.lists.customerTypes;
+export const ORDER_STATUSES: string[]        = config.lists.orderStatuses;
+export const MEETING_TYPES: string[]         = config.lists.meetingTypes;
+export const DEFAULT_COMPANIES: string[]     = config.lists.defaultCompanies;
+export const DEFAULT_CONTACTS: string[]      = config.lists.defaultContacts;
+export const SALES_REPS: string[]            = config.lists.salesReps;
+export const SERVICE_OFFERINGS: string[]     = config.lists.serviceOfferings;
+export const SERVICE_SUB_CATEGORIES: Record<string, string[]> = config.lists.serviceSubCategories;
+export const SUGGESTED_GROUPS: string[]      = config.lists.suggestedGroups;
+export const LIVING_STATUS_ADDRESS_TYPES: string[] = config.lists.livingStatusAddressTypes;
+
 // --- Header progress nav ---
 export type HeaderSubsection = { id: string; label: string };
 export type HeaderStep = { id: string; label: string; subsections: HeaderSubsection[] };

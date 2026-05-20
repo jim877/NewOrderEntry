@@ -44,6 +44,17 @@ import {
   COMPANY_TYPES,
   COMPANY_ROLE_DEFS,
   CONTACT_ROLE_BADGES,
+  STATES,
+  CUSTOMER_TYPES,
+  ORDER_STATUSES,
+  MEETING_TYPES,
+  DEFAULT_COMPANIES,
+  DEFAULT_CONTACTS,
+  SALES_REPS,
+  SERVICE_OFFERINGS,
+  SERVICE_SUB_CATEGORIES,
+  SUGGESTED_GROUPS,
+  LIVING_STATUS_ADDRESS_TYPES,
   SDS_CONSIDERATIONS,
   SDS_OBSERVATIONS,
   SDS_SERVICES,
@@ -96,6 +107,13 @@ import {
   normalizeStringList,
   mergeUniqueStrings,
 } from './utils/strings';
+import {
+  isPlaceholderFlagActive,
+  hasMeaningfulValue,
+  hasCustomerDetails,
+  isHeaderToggleIgnoredTarget,
+} from './utils/order';
+import { formatPhoneNumber, formatCurrencyInput } from './utils/format';
 import {
   normalizeDateInput,
   formatDateLabel,
@@ -281,23 +299,7 @@ const createPlaceholderFlag = (kind, reason = "") => ({
   createdAt: new Date().toISOString()
 });
 
-const isPlaceholderFlagActive = (flag) => !!flag && flag.active !== false;
-
-const hasMeaningfulValue = (value) => !!(value || "").toString().trim();
-
-const hasCustomerDetails = (customer = {}) =>
-  [
-    customer.first,
-    customer.last,
-    customer.phone,
-    customer.email,
-    customer.type
-  ].some(hasMeaningfulValue);
-
-const isHeaderToggleIgnoredTarget = (target) => {
-  if (!(target instanceof Element)) return false;
-  return !!target.closest('button, input, select, textarea, a, [role="button"], [data-header-toggle-ignore="true"]');
-};
+// isPlaceholderFlagActive, hasMeaningfulValue, hasCustomerDetails, isHeaderToggleIgnoredTarget — imported from ./utils/order
 
 
 const normalizePlaceholderKeyPart = (value = "") =>
@@ -353,27 +355,7 @@ const useCurrentLocation = (onResult: (coords: { lat: number; lng: number }) => 
 const getStaticMapUrl = (lat: string | number, lng: string | number) =>
   `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=300x120&scale=2&markers=color:red|${lat},${lng}&key=YOUR_API_KEY`;
 
-const formatPhoneNumber = (value) => {
-  if (!value) return value;
-  const phoneNumber = value.replace(/[^\d]/g, '');
-  const phoneNumberLength = phoneNumber.length;
-  if (phoneNumberLength < 4) return phoneNumber;
-  if (phoneNumberLength < 7) {
-    return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`;
-  }
-  return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
-};
-
-const formatCurrencyInput = (value) => {
-  if (value === null || value === undefined) return "";
-  const cleaned = value.toString().replace(/[^\d.]/g, "");
-  if (!cleaned) return "";
-  const [intPartRaw, decPartRaw] = cleaned.split(".");
-  const intPart = intPartRaw ? intPartRaw.replace(/^0+(?=\d)/, "") : "0";
-  const intFormatted = Number(intPart || 0).toLocaleString("en-US");
-  const decPart = decPartRaw ? decPartRaw.slice(0, 2) : "";
-  return `$${intFormatted}${decPart ? "." + decPart : ""}`;
-};
+// formatPhoneNumber, formatCurrencyInput — imported from ./utils/format
 
 const formatShortTimestamp = (date = new Date()) => {
   try {
@@ -494,49 +476,9 @@ const getBestMatch = (options = [], query) => {
 
 // normalizeContact, normalizeCompany, normalizeStringList, mergeUniqueStrings — imported from ./utils/strings
 
-// --- CONSTANTS ---
-const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
-const CUSTOMER_TYPES=[
-  "Primary",
-  "Secondary",
-  "Point of Contact",
-  "Assistant",
-  "Employee",
-  "Husband",
-  "Wife",
-  "Father",
-  "Mother",
-  "Brother",
-  "Sister",
-  "Son",
-  "Daughter",
-  "Relative",
-  "Boyfriend",
-  "Girlfriend",
-  "Housekeeper",
-  "Neighbor",
-  "Owner",
-  "Partner",
-  "Policyholder",
-  "Attorney",
-  "Manager",
-  "Other"
-];
-const ORDER_STATUSES=["New","Intake Complete","Pickup Complete","Tagging Complete","Ready to Bill"];
-const MEETING_TYPES = ["Scope", "Pickup", "In-Home", "Meeting"];
-const DEFAULT_COMPANIES=["Allstate", "Allstate Insurance Co.", "State Farm", "Chubb", "Servpro of Anytown", "Metro Claims", "Pure Insurance", "DKI FastDry", "United Claims", "Croziers Moving", "Contractor Connection", "Not Yet Known", "Not Provided", "Company 1", "Company 2"];
-const DEFAULT_CONTACTS=["Alex Morgan", "Jamie Lee", "Pat Adjuster", "Ronzel Simmons", "Zack Barsack", "Sim Fern", "Steven Earthman", "Casey Assignment", "Contact 1", "Contact 2"];
-const SALES_REPS=["Dave Fenyo, Sales Rep","Jim Fenyo","Josh Cintron, Sales Rep"];
-const SERVICE_OFFERINGS=["Appliance","Art","Consulting","Contents","Furniture","Hand Clean","Pack-out","Rugs","Storage Only","Taxidermy","Textiles","TLI","Expert Stain Removal"];
-const SERVICE_SUB_CATEGORIES: Record<string, string[]> = {
-  "Art": ["Fine", "Decorative", "Personal"],
-  "Appliance": ["Installed", "Uninstalled"],
-  "Consulting": ["Estimates", "Expert Opinion", "TLI"],
-  "Furniture": ["Upholstered", "Hard"],
-  "Textiles": ["Clothing", "Blinds", "Hand Cleaning", "Household", "Rugs", "Window Treatments"],
-};
-const SUGGESTED_GROUPS = ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"];
-const LIVING_STATUS_ADDRESS_TYPES = ["Moving", "Hotel", "Temp", "Neighbor", "Relative", "Rental", "Other Home"];
+// STATES, CUSTOMER_TYPES, ORDER_STATUSES, MEETING_TYPES, DEFAULT_COMPANIES, DEFAULT_CONTACTS,
+// SALES_REPS, SERVICE_OFFERINGS, SERVICE_SUB_CATEGORIES, SUGGESTED_GROUPS,
+// LIVING_STATUS_ADDRESS_TYPES — imported from ./config
 
 const BRIDGE_CUSTOMER_BLOCKERS = [
   "Wants Everything Replaced",
