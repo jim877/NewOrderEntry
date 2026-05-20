@@ -57,6 +57,54 @@ export const getNextHalfHourLabel = () => {
   return `${hr}:${mm} ${ampm}`;
 };
 
+// formatShortTimestamp — locale "MM/DD/YY, h:mm" for audit logs. Falls back to ISO on error.
+export const formatShortTimestamp = (date: Date = new Date()) => {
+  try {
+    return date.toLocaleString("en-US", {
+      month: "numeric", day: "numeric", year: "2-digit",
+      hour: "numeric", minute: "2-digit",
+    });
+  } catch { return date.toISOString(); }
+};
+
+// 12:XX AM is treated as "no time set yet" elsewhere (default placeholder).
+export const isTimeIn12AmHour = (timeStr = "") => /12:\d{2}\s*AM/i.test((timeStr || "").trim());
+
+// shouldAutoFirm — a non-empty time that isn't 12 AM is intentional → auto-mark schedule as firm.
+export const shouldAutoFirm = (timeStr = "") => !!(timeStr || "").trim() && !isTimeIn12AmHour(timeStr);
+
+export const toIcsDate = (dateStr = "") => (!dateStr ? "" : dateStr.replace(/-/g, ""));
+
+export const parseTimeTo24h = (timeStr = "") => {
+  const match = (timeStr || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+  if (ampm === "PM" && hour !== 12) hour += 12;
+  if (ampm === "AM" && hour === 12) hour = 0;
+  return { hour, minute };
+};
+
+export const formatIcsDateTime = (dateStr = "", timeStr = "") => {
+  if (!dateStr) return "";
+  const time = parseTimeTo24h(timeStr);
+  if (!time) return toIcsDate(dateStr);
+  const hh = String(time.hour).padStart(2, "0");
+  const mm = String(time.minute).padStart(2, "0");
+  return `${toIcsDate(dateStr)}T${hh}${mm}00`;
+};
+
+// addHours — bump a 12-hour-formatted time string by N hours; wraps at 24h. Returns 24h "HH:MM".
+export const addHours = (timeStr = "", hours = 1) => {
+  const time = parseTimeTo24h(timeStr);
+  if (!time) return timeStr;
+  const nextHour = (time.hour + hours) % 24;
+  const hh = String(nextHour).padStart(2, "0");
+  const mm = String(time.minute).padStart(2, "0");
+  return `${hh}:${mm}`;
+};
+
 // TIME_SLOTS — 6 AM to 8 PM in 30-min increments (RCS business hours).
 export const TIME_SLOTS: string[] = (() => {
   const slots: string[] = [];

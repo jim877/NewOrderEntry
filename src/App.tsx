@@ -161,6 +161,10 @@ import {
   normalizeCompany,
   normalizeStringList,
   mergeUniqueStrings,
+  escapeRegExp,
+  sameNormalizedCompany,
+  sameNormalizedContact,
+  normalizePlaceholderKeyPart,
 } from './utils/strings';
 import {
   isPlaceholderFlagActive,
@@ -170,8 +174,10 @@ import {
   summarizeAddress,
   isAddressPlaceholder,
   useCurrentLocation,
+  createPlaceholderFlag,
 } from './utils/order';
-import { formatPhoneNumber, formatCurrencyInput } from './utils/format';
+import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
+import { safeUid } from './utils/uid';
 import {
   normalizeDateInput,
   formatDateLabel,
@@ -179,6 +185,13 @@ import {
   getNowTimeLabel,
   getNextHalfHourLabel,
   TIME_SLOTS,
+  formatShortTimestamp,
+  isTimeIn12AmHour,
+  shouldAutoFirm,
+  toIcsDate,
+  parseTimeTo24h,
+  formatIcsDateTime,
+  addHours,
 } from './utils/dateTime';
 
 // --- STYLES ---
@@ -343,102 +356,10 @@ const STYLES = `
 `;
 
 // --- UTILS ---
-function safeUid(){ 
-  try {
-    if(typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  } catch { /* fallback */ }
-  return "id-" + Date.now().toString(36) + Math.random().toString(36).slice(2);
-}
-
-const createPlaceholderFlag = (kind, reason = "") => ({
-  active: true,
-  kind,
-  reason,
-  createdAt: new Date().toISOString()
-});
-
-// isPlaceholderFlagActive, hasMeaningfulValue, hasCustomerDetails, isHeaderToggleIgnoredTarget — imported from ./utils/order
-
-
-const normalizePlaceholderKeyPart = (value = "") =>
-  (value || "")
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "item";
-const sameNormalizedCompany = (left = "", right = "") => {
-  const a = normalizeCompany(left || "");
-  const b = normalizeCompany(right || "");
-  return !!a && !!b && a === b;
-};
-const sameNormalizedContact = (left = "", right = "") => {
-  const a = normalizeContact(left || "");
-  const b = normalizeContact(right || "");
-  return !!a && !!b && a === b;
-};
-
-// getInitials, splitName, getRepInitials — imported from ./utils/names
-
-// useCurrentLocation — imported from ./utils/order
-
-const getStaticMapUrl = (lat: string | number, lng: string | number) =>
-  `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=300x120&scale=2&markers=color:red|${lat},${lng}&key=YOUR_API_KEY`;
-
-// formatPhoneNumber, formatCurrencyInput — imported from ./utils/format
-
-const formatShortTimestamp = (date = new Date()) => {
-  try {
-    return date.toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: '2-digit',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  } catch {
-    return date.toISOString();
-  }
-};
-
-const isTimeIn12AmHour = (timeStr = "") => /12:\d{2}\s*AM/i.test((timeStr || "").trim());
-const shouldAutoFirm = (timeStr = "") => !!(timeStr || "").trim() && !isTimeIn12AmHour(timeStr);
-
-const toIcsDate = (dateStr = "") => {
-  if (!dateStr) return "";
-  return dateStr.replace(/-/g, "");
-};
-
-const parseTimeTo24h = (timeStr = "") => {
-  const match = (timeStr || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!match) return null;
-  let hour = parseInt(match[1], 10);
-  const minute = parseInt(match[2], 10);
-  const ampm = match[3].toUpperCase();
-  if (ampm === "PM" && hour !== 12) hour += 12;
-  if (ampm === "AM" && hour === 12) hour = 0;
-  return { hour, minute };
-};
-
-const formatIcsDateTime = (dateStr = "", timeStr = "") => {
-  if (!dateStr) return "";
-  const time = parseTimeTo24h(timeStr);
-  if (!time) return toIcsDate(dateStr);
-  const hh = String(time.hour).padStart(2, "0");
-  const mm = String(time.minute).padStart(2, "0");
-  return `${toIcsDate(dateStr)}T${hh}${mm}00`;
-};
-
-const addHours = (timeStr = "", hours = 1) => {
-  const time = parseTimeTo24h(timeStr);
-  if (!time) return timeStr;
-  const nextHour = (time.hour + hours) % 24;
-  const hh = String(nextHour).padStart(2, "0");
-  const mm = String(time.minute).padStart(2, "0");
-  return `${hh}:${mm}`;
-};
-
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// safeUid, createPlaceholderFlag, normalizePlaceholderKeyPart, sameNormalizedCompany,
+// sameNormalizedContact, getStaticMapUrl, formatShortTimestamp, isTimeIn12AmHour,
+// shouldAutoFirm, toIcsDate, parseTimeTo24h, formatIcsDateTime, addHours, escapeRegExp
+// — all imported from ./utils/{uid,order,strings,format,dateTime}
 
 const EVENT_SYSTEM_PREFIXES = ["Conditions:", "Bring:", "Service Offerings:", "Services:", "Picking Up:", "Quick Notes:", "Scope Notes:", "Estimate Required:"];
 const stripEventSystemLines = (text = "") =>

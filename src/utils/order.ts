@@ -2,6 +2,14 @@
 // Lightweight order-shape helpers: presence checks, placeholder flags, header-toggle DOM helper.
 // Pure (modulo `Element` for DOM matching). No React, no setState.
 
+// createPlaceholderFlag — construct a fresh placeholder marker { active, kind, reason, createdAt }.
+export const createPlaceholderFlag = (kind: string, reason = "") => ({
+  active: true,
+  kind,
+  reason,
+  createdAt: new Date().toISOString(),
+});
+
 export const isPlaceholderFlagActive = (flag: any) => !!flag && flag.active !== false;
 
 export const hasMeaningfulValue = (value: any) => !!(value || "").toString().trim();

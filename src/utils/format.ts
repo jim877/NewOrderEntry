@@ -11,6 +11,10 @@ export const formatPhoneNumber = (value: string) => {
   return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
 };
 
+// getStaticMapUrl — placeholder Google Static Maps URL builder. Replace YOUR_API_KEY in prod.
+export const getStaticMapUrl = (lat: string | number, lng: string | number) =>
+  `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=300x120&scale=2&markers=color:red|${lat},${lng}&key=YOUR_API_KEY`;
+
 // formatCurrencyInput — render a value as a currency string with thousands separators.
 // Strips non-digits/decimals, normalizes leading zeros, clips decimals to 2 digits.
 export const formatCurrencyInput = (value: any) => {
