@@ -67,6 +67,8 @@ import {
   BRIDGE_PROCESS_STEP_OPTIONS,
   BRIDGE_DELIVERY_STEP_OPTIONS,
   BRIDGE_MILESTONE_FIELDS,
+  FIELD_CONFIG_SECTIONS,
+  DEFAULT_FIELD_CONFIG,
   SDS_CONSIDERATIONS,
   SDS_OBSERVATIONS,
   SDS_SERVICES,
@@ -511,77 +513,7 @@ const HANDLING_META=[
 // stringListMatches — imported from ./utils/strings
 
 // --- FIELD CONFIGURATION ---
-const FIELD_CONFIG_SECTIONS = [
-  { id: "order", label: "Order" },
-  { id: "source", label: "Source" },
-  { id: "interview", label: "Interview" },
-  { id: "customer", label: "Customer" },
-  { id: "address", label: "Address" },
-  { id: "billing", label: "Billing & Insurance" },
-  { id: "schedule", label: "Schedule" },
-  { id: "codes", label: "Codes & Processing" },
-];
-
-const DEFAULT_FIELD_CONFIG = {
-  // --- Order ---
-  orderName:              { label: "Order Name",           section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, coaching: "Auto-generated from LastName-TownST. Lock to prevent changes." },
-  orderTypes:             { label: "Order Type",           section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, checkFn: "hasPrimaryOrderTypeDecision", coaching: "Pick the primary peril — what happened first." },
-  nonRestorationSubtype:  { label: "Non-Restoration Type", section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "primaryLossType", equals: "Non-Restoration" }, checkFn: "hasRequiredNonRestorationSubtype" },
-  leadSourceCategory:     { label: "Lead Source",          section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true },
-  referringCompany:       { label: "Referring Company",    section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "leadSourceCategory", equals: "Referral" } },
-  referrer:               { label: "Referrer",             section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "leadSourceCategory", equals: "Referral" } },
-  leadSourceDetail:       { label: "Lead Source Detail",   section: "sec1", category: "source",    requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "leadSourceCategory", oneOf: ["Marketing", "Internal"] } },
-  moldCoverageConfirm:    { label: "Mold Coverage",        section: "sec1", category: "order",     requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "orderTypes", includes: "Mold" } },
-
-  // --- Customer ---
-  custFirst:  { label: "Customer First Name", section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].first" },
-  custLast:   { label: "Customer Last Name",  section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].last" },
-  custPhone:  { label: "Customer Phone",      section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].phone" },
-  custEmail:  { label: "Customer Email",      section: "sec2", category: "customer", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "customers[0].email" },
-
-  // --- Address ---
-  addrStreet: { label: "Street Address", section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].street" },
-  addrCity:   { label: "City",           section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].city" },
-  addrState:  { label: "State",          section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].state" },
-  addrZip:    { label: "Zip",            section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].zip" },
-  addrLat:    { label: "Latitude",       section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].lat" },
-  addrLng:    { label: "Longitude",      section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, dataPath: "addresses[0].lng" },
-  rentCoverageLimit: { label: "Rent Coverage", section: "sec3", category: "address", requiredInAudit: true, requiredAtStatus: "always", visible: true, condition: { field: "rentOrOwn", equals: "Rent" } },
-
-  // --- Billing & Insurance ---
-  billingPayer:      { label: "Bill To (Payer)",   section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "always", visible: true },
-  pricePlatform:     { label: "Pricing Platform",  section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
-  priceList:         { label: "Price List",         section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
-  multiplier:        { label: "Price Multiplier",   section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
-  estimateRequested: { label: "Estimate Requested", section: "sec4", category: "billing",  requiredInAudit: true, requiredAtStatus: "Intake Complete", visible: true },
-
-  // --- Interview Questions ---
-  damageWasWet:              { label: "Still Wet?",                section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Urgent — untreated wet items develop mold." },
-  damageMoldMildew:          { label: "Visible Mold?",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Ask about respiratory issues. Our team needs PPE." },
-  structuralElectricDamage:  { label: "Structural Damage?",       section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
-  noLights:                  { label: "No Electricity?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Bring portable lighting." },
-  noHeat:                    { label: "No Heat?",                 section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
-  boardedUp:                 { label: "Boarded Up?",              section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi", coaching: "Confirm access — who has the key or code?" },
-  repairsSummary:            { label: "Repairs",                  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
-  livingStatus:              { label: "Living Situation",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "single" },
-  processType:               { label: "Delivery Destination",     section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "single" },
-  packoutSummary:            { label: "What Are We Picking Up?",  section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "Pickup Complete", visible: true, selectType: "multi" },
-  loadList:                  { label: "What To Bring",            section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
-  sdsConsiderations:         { label: "Special Considerations",   section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
-  familyMedicalIssues:       { label: "Medical Issues?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
-  soapFragAllergies:         { label: "Soap/Fragrance Allergies?",section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
-  selfCleaning:              { label: "Self-Cleaning?",           section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
-  useDryCleaner:             { label: "Use Dry Cleaner?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
-  howDryLaundry:             { label: "How Dry Laundry?",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
-  storageNeeded:             { label: "Storage Needed?",          section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
-  finalDeliveryQualifier:    { label: "Final Delivery Date",      section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
-  rushDeliveryNeeded:        { label: "Rush Delivery Needed",     section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "single" },
-  suggestedGroups:           { label: "Suggested Groups",         section: "sec1", category: "interview", requiredInAudit: false, requiredAtStatus: "never",           visible: true, selectType: "multi" },
-
-  // --- Codes (post-inspection) ---
-  interview:     { label: "Interview Section",  section: "sec1", category: "codes", requiredInAudit: true, requiredAtStatus: "Pickup Complete", visible: true, checkFn: "interviewCompleted" },
-  codes:         { label: "Codes Section",       section: "sec1", category: "codes", requiredInAudit: true, requiredAtStatus: "Pickup Complete", visible: true, checkFn: "codesCompleted" },
-};
+// FIELD_CONFIG_SECTIONS, DEFAULT_FIELD_CONFIG — imported from ./config
 
 // DEFAULT_BLOCKER_RULES and DEFAULT_INTERVIEW_ACTIONS — imported from ./config
 

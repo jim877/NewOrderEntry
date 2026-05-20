@@ -121,6 +121,24 @@ export const SERVICE_SUB_CATEGORIES: Record<string, string[]> = config.lists.ser
 export const SUGGESTED_GROUPS: string[]      = config.lists.suggestedGroups;
 export const LIVING_STATUS_ADDRESS_TYPES: string[] = config.lists.livingStatusAddressTypes;
 
+// --- Field config (sections + per-field defaults) ---
+export type FieldConfigSection = { id: string; label: string };
+export type FieldConfigEntry = {
+  label: string;
+  section: string;
+  category: string;
+  requiredInAudit: boolean;
+  requiredAtStatus: string;
+  visible: boolean;
+  coaching?: string;
+  selectType?: string;
+  checkFn?: string;
+  dataPath?: string;
+  condition?: { field: string; equals?: string; oneOf?: string[]; includes?: string };
+};
+export const FIELD_CONFIG_SECTIONS: FieldConfigSection[] = config.lists.fieldConfigSections;
+export const DEFAULT_FIELD_CONFIG: Record<string, FieldConfigEntry> = config.lists.defaultFieldConfig;
+
 // --- Order instructions ---
 export const INSTRUCTION_TYPES: string[] = config.lists.instructionTypes;
 export const ORDER_INSTRUCTION_PRESETS: Record<string, string[]> = config.lists.orderInstructionPresets;
