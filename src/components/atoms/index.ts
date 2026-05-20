@@ -28,3 +28,5 @@ export { StepNav } from "./StepNav";
 export { SettingsMenu } from "./SettingsMenu";
 export { Header } from "./Header";
 export { EntityPreferencePanel } from "./EntityPreferencePanel";
+export { RoleIcon } from "./RoleIcon";
+export { RoleBadge } from "./RoleBadge";

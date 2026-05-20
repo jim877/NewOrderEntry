@@ -87,6 +87,8 @@ import {
   Section,
   Header,
   EntityPreferencePanel,
+  RoleIcon,
+  RoleBadge,
 } from './components/atoms';
 import {
   normalizeContact,
@@ -1053,38 +1055,7 @@ const summarizeAddress = (addr = {}) => {
 // QUALITY_CODES, SEVERITY_GROUPS, SEVERITY_LEVELS — imported from ./config
 
 // COMPANY_ROLE_DEFS, CONTACT_ROLE_BADGES — imported from ./config
-const ROLE_ICON_COMPONENTS = {
-  referrer: Tag,
-  insurance: Shield,
-  billto: CreditCard,
-  billing: CreditCard,
-  adjuster: UserRound,
-  national: Globe,
-};
-const resolveRoleIconKey = (role = {}) => {
-  if (role.iconKey && ROLE_ICON_COMPONENTS[role.iconKey]) return role.iconKey;
-  const id = (role.id || "").toLowerCase();
-  if (ROLE_ICON_COMPONENTS[id]) return id;
-  const icon = (role.icon || "").trim();
-  if (icon === "🏷️") return "referrer";
-  if (icon === "🛡️") return "insurance";
-  if (icon === "💳") return "billto";
-  if (icon === "🧑‍💼") return "adjuster";
-  if (icon === "🌐") return "national";
-  const title = (role.title || role.label || "").toLowerCase();
-  if (title.includes("referrer")) return "referrer";
-  if (title.includes("insurance")) return "insurance";
-  if (title.includes("bill")) return "billto";
-  if (title.includes("adjuster")) return "adjuster";
-  if (title.includes("national")) return "national";
-  return "";
-};
-const RoleIcon = ({ role, className = "h-3.5 w-3.5", strokeWidth = 2.1 }) => {
-  const iconKey = resolveRoleIconKey(role);
-  const Icon = ROLE_ICON_COMPONENTS[iconKey];
-  if (!Icon) return null;
-  return <Icon className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
-};
+// ROLE_ICON_COMPONENTS, resolveRoleIconKey, RoleIcon — imported from ./components/atoms
 
 const INSURANCE_ELIGIBLE_COMPANY_TYPES = new Set([
   "insurance",
@@ -1644,12 +1615,7 @@ const buildNarrativeProse = (narrative = [], data = {}) => {
 // pill styles + ToggleGroup/ToggleMulti/SubSection/EditAffordance/AssignmentCueStrip/LinkedAssignmentPanel
 // imported from ./components/atoms
 
-const RoleBadge = ({ role }) => (
-  <span title={role.title} className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
-    <RoleIcon role={role} className="h-3 w-3" />
-    {role.title}
-  </span>
-);
+// RoleBadge — imported from ./components/atoms
 
 // --- SHARED FIELD COMPONENTS ---
 
