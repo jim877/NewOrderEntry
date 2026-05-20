@@ -139,6 +139,10 @@ export const SERVICE_SUB_CATEGORIES: Record<string, string[]> = config.lists.ser
 export const SUGGESTED_GROUPS: string[]      = config.lists.suggestedGroups;
 export const LIVING_STATUS_ADDRESS_TYPES: string[] = config.lists.livingStatusAddressTypes;
 
+// --- Handling-code meta + insurance-eligible types ---
+export const HANDLING_META: [string, string][] = config.lists.handlingMeta;
+export const INSURANCE_ELIGIBLE_COMPANY_TYPES: Set<string> = new Set(config.lists.insuranceEligibleCompanyTypes);
+
 // --- Field config (sections + per-field defaults) ---
 export type FieldConfigSection = { id: string; label: string };
 export type FieldConfigEntry = {

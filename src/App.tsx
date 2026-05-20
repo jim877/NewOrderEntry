@@ -74,6 +74,8 @@ import {
   BRIDGE_MILESTONE_FIELDS,
   FIELD_CONFIG_SECTIONS,
   DEFAULT_FIELD_CONFIG,
+  HANDLING_META,
+  INSURANCE_ELIGIBLE_COMPANY_TYPES,
   SDS_CONSIDERATIONS,
   SDS_OBSERVATIONS,
   SDS_SERVICES,
@@ -196,6 +198,7 @@ import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils
 import { safeUid } from './utils/uid';
 import { initAddress, initCustomer, initLossSeverity } from './utils/orderFactories';
 import { DEFAULT_FORM } from './data/defaultForm';
+import { SAMPLE_PRESET_DATA } from './data/samplePreset';
 import {
   EVENT_SYSTEM_PREFIXES,
   stripEventSystemLines,
@@ -429,46 +432,7 @@ const STYLES = `
 
 // SAMPLE_CONTACTS — imported from ./data/sampleSeed
 
-const SAMPLE_PRESET_DATA = () => ({
-  ...DEFAULT_FORM,
-  orderName: "Sample Water Loss - Smith",
-  orderNameAuto: false,
-  recordType: "Order",
-  leadSourceCategory: "Referral",
-  referringCompany: "Pure Insurance",
-  referrer: "Ronzel Simmons",
-  billingCompany: "Pure Insurance",
-  billingContact: "Ronzel Simmons",
-  insuranceClaim: "Yes",
-  insuranceCompany: "Pure Insurance",
-  insuranceAdjuster: "Ronzel Simmons",
-  orderInstructions: [
-    { id: "sample-order-instruction", type: "Communication", text: "Customer asked for evening updates when possible." }
-  ],
-  claimNumber: "CLM-1001",
-  dateOfLoss: "2026-02-14",
-  serviceOfferings: ["Textiles", "Art"],
-  suggestedGroups: ["RD", "TLI"],
-  eventInstructions: "Bring: Heater\nConditions: Still Wet\nQuick Notes: Everything Affected",
-  customers: [
-    initCustomer({ isPrimary: true, firstName: "Mary", lastName: "Smith", type: "Primary", phone: "(555) 555-0101" })
-  ],
-  addresses: [
-    initAddress({
-      isPrimary: true,
-      street: "123 Main St",
-      city: "Houston",
-      state: "TX",
-      zip: "77002",
-      type: "Primary"
-    })
-  ],
-  sdsInitialInstructions: [
-    { id: "inst-1", person: "Ronzel Simmons", role: "Adjuster", instruction: "Please secure all contents before pickup." }
-  ],
-  sdsInstructionAgreement: "agree",
-  sdsDisagreementNote: "",
-});
+// SAMPLE_PRESET_DATA — imported from ./data/samplePreset
 
 // LEAD_SOURCE_HELP, COMPANY_TYPES, SDS_*, QUICK_INSTRUCTION_NOTES — imported from ./config
 const getSdsIconImageClass = (item) => SDS_ICON_CLASS_OVERRIDES[item] || "h-full w-full object-contain object-center";
@@ -484,23 +448,7 @@ const getSdsIconImageClass = (item) => SDS_ICON_CLASS_OVERRIDES[item] || "h-full
 // COMPANY_ROLE_DEFS, CONTACT_ROLE_BADGES — imported from ./config
 // ROLE_ICON_COMPONENTS, resolveRoleIconKey, RoleIcon — imported from ./components/atoms
 
-const INSURANCE_ELIGIBLE_COMPANY_TYPES = new Set([
-  "insurance",
-  "independent adjusting",
-  "public adjusting",
-  "tpa",
-  "broker",
-  "agent",
-]);
-
-const HANDLING_META=[
-  ["Box","return items in boxes"], ["Damp","tag within 5 days"], ["DC","try to Dry Clean all items"],
-  ["DNR","do not reject"], ["Det","special detergent requested"], ["FMP","fold as much as possible"],
-  ["Hand","hand finish pressed items"], ["Hang","use customers hangers"], ["Low","dry on low heat"],
-  ["NoDC","Do not Dry Clean"], ["NoDry","cannot be dried in dryer"], ["PPC","Potential Problem Claim"],
-  ["PPE","wear PPE when handling"], ["STAR","premium items, special hangers"], ["VIC","Very Important Claim"],
-  ["Wet","still wet, tag/treat asap"],
-];
+// INSURANCE_ELIGIBLE_COMPANY_TYPES, HANDLING_META — imported from ./config
 
 // initAddress, initCustomer, initLossSeverity — imported from ./utils/orderFactories
 // isAddressPlaceholder — imported from ./utils/order
