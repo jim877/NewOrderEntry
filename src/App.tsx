@@ -101,6 +101,7 @@ import {
   RoleIcon,
   RoleBadge,
   CustomerItem,
+  AddressItem,
 } from './components/atoms';
 import {
   normalizeContact,
@@ -113,6 +114,9 @@ import {
   hasMeaningfulValue,
   hasCustomerDetails,
   isHeaderToggleIgnoredTarget,
+  summarizeAddress,
+  isAddressPlaceholder,
+  useCurrentLocation,
 } from './utils/order';
 import { formatPhoneNumber, formatCurrencyInput } from './utils/format';
 import {
@@ -344,14 +348,7 @@ const getRepInitials = (name = "") => {
   return getInitials(base);
 };
 
-const useCurrentLocation = (onResult: (coords: { lat: number; lng: number }) => void, onError?: (msg: string) => void) => {
-  if (!navigator.geolocation) { onError?.("Geolocation not supported"); return; }
-  navigator.geolocation.getCurrentPosition(
-    pos => onResult({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-    err => onError?.(err.message || "Location unavailable"),
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
-};
+// useCurrentLocation — imported from ./utils/order
 
 const getStaticMapUrl = (lat: string | number, lng: string | number) =>
   `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=300x120&scale=2&markers=color:red|${lat},${lng}&key=YOUR_API_KEY`;
@@ -988,10 +985,7 @@ const getSdsIconImageClass = (item) => SDS_ICON_CLASS_OVERRIDES[item] || "h-full
 
 // LOAD_ITEMS, PACKOUT_LOAD_MAP — imported from ./config
 
-const summarizeAddress = (addr = {}) => {
-  const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
-  return parts.length ? parts.join(", ") : "No address yet";
-};
+// summarizeAddress — imported from ./utils/order
 
 // TIME_SLOTS — imported from ./utils/dateTime
 
@@ -1035,13 +1029,7 @@ function initAddress(overrides={}){
     ...overrides };
 }
 
-const isAddressPlaceholder = (addr = {}) => {
-  if (isPlaceholderFlagActive(addr?.placeholder)) return true;
-  const street = (addr?.street || "").trim();
-  const type = (addr?.type || "").trim().toLowerCase();
-  if (!street) return true;
-  return street.toUpperCase() === "TBD" || type.includes("placeholder");
-};
+// isAddressPlaceholder — imported from ./utils/order
 
 const entryContactList = (entry = {}) => {
   const fromContacts = Array.isArray(entry?.contacts) ? entry.contacts : [];
@@ -5054,287 +5042,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
 // --- SUB-COMPONENTS ---
 // CustomerItem — imported from ./components/atoms
 
-const AddressItem = memo(({ addr, total, updateAddr, onRemove, highlightMissing, index, onVerify, auditOn, rentOrOwn, rentCoverageLimit, onRentOrOwnChange, onRentCoverageChange, forceShowCoords, autoOpenForTypePrompt, autoFocusTypePrompt, onTypePromptFocused }) => {
-  const [coordsOpen, setCoordsOpen] = useState(false);
-  const [open, setOpen] = useState(false);
-  const prevOpenRef = useRef(false);
-  useEffect(() => {
-    if (open && !prevOpenRef.current) {
-      setTimeout(() => {
-        const card = document.querySelector(`[data-address-item-id="${addr.id}"]`);
-        if (!card) return;
-        const wrapper = card.querySelector('.google-address-search');
-        const searchInput = wrapper?.querySelector('input');
-        if (searchInput) {
-          searchInput.focus();
-          searchInput.style.borderColor = "#0ea5e9";
-          searchInput.style.outline = "none";
-          searchInput.style.boxShadow = "none";
-          setTimeout(() => { searchInput.style.borderColor = ""; }, 2500);
-        }
-      }, 150);
-    }
-    prevOpenRef.current = open;
-  }, [open]);
-  useEffect(() => {
-    if (addr._forceOpen) {
-      setOpen(true);
-      updateAddr(addr.id, { _forceOpen: false });
-    }
-  }, [addr._forceOpen]);
-  const typeSelectRef = useRef(null);
-  const placeholder = isAddressPlaceholder(addr);
-  useEffect(() => {
-    if (forceShowCoords) setCoordsOpen(true);
-  }, [forceShowCoords]);
-  useEffect(() => {
-    if (autoOpenForTypePrompt) setOpen(true);
-  }, [autoOpenForTypePrompt]);
-  useEffect(() => {
-    if (!autoFocusTypePrompt) return;
-    if (!open) {
-      setOpen(true);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      const el = typeSelectRef.current;
-      if (el instanceof HTMLElement) {
-        el.focus();
-        el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-      }
-      onTypePromptFocused?.(addr.id);
-    }, 100);
-    return () => window.clearTimeout(timer);
-  }, [autoFocusTypePrompt, open, onTypePromptFocused, addr.id]);
-  const verified = !!addr.lat && !!addr.lng;
-  return (
-    <div
-      data-address-item-id={addr.id}
-      data-audit-key={placeholder ? `placeholder-address-${addr.id}` : undefined}
-      className={`group relative overflow-hidden rounded-lg sm:rounded-xl border ${open ? 'p-3 sm:p-5' : 'px-3 py-2 sm:px-4 sm:py-2.5'} shadow-sm transition-all hover:shadow-md ${addr.inactive ? "bg-slate-50 opacity-60 border-slate-200" : placeholder ? "placeholder-shell bg-white" : addr.isPrimary ? "bg-white border-sky-400 ring-1 ring-sky-50" : "bg-white border-slate-200"}`}
-    >
-      {addr.isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500 rounded-l-lg"></div>}
-      {total > 1 && !addr.inactive && (
-        <button
-          onClick={() => updateAddr(addr.id, { _showMenu: true })}
-          className={`absolute ${open ? 'right-3 top-3 h-7 w-7' : 'right-2 top-2 h-5 w-5 text-xs'} grid place-items-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors`}
-          title="Remove or deactivate address"
-        >×</button>
-      )}
-      {addr._showMenu && (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => updateAddr(addr.id, { _showMenu: false })}>
-          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-slate-100">
-              <div className="text-sm font-bold text-slate-800">{addr.type || "Address"}</div>
-              <div className="text-xs text-slate-500">{summarizeAddress(addr)}</div>
-            </div>
-            <div className="p-3 space-y-1">
-              <button onClick={() => updateAddr(addr.id, { _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
-              {hasMeaningfulValue(addr.street) && (
-                <button onClick={() => updateAddr(addr.id, { inactive: true, isPrimary: false, isLossSite: false, _showMenu: false })} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50">Make Inactive</button>
-              )}
-              <button onClick={() => { if (hasMeaningfulValue(addr.street) ? window.confirm("Permanently delete this address?") : true) onRemove(addr.id); else updateAddr(addr.id, { _showMenu: false }); }} className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {addr.inactive && (
-        <button
-          onClick={() => updateAddr(addr.id, { inactive: false })}
-          className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-sky-600 hover:bg-sky-50"
-          title="Reactivate this address"
-        >Reactivate</button>
-      )}
-      <div
-        className="pl-1 sm:pl-2 flex items-center gap-2 cursor-pointer"
-        onClick={(e) => {
-          if (isHeaderToggleIgnoredTarget(e.target)) return;
-          setOpen(v => !v);
-        }}
-      >
-         <button
-           type="button"
-           onClick={(e) => {
-             e.stopPropagation();
-             setOpen(v => !v);
-           }}
-           className="text-slate-400 hover:text-slate-600"
-           title={open ? "Collapse" : "Expand"}
-         >
-           <Chevron open={open} />
-         </button>
-         <div className="flex flex-col min-w-0">
-           <div className="flex items-center gap-2">
-             <span className={`${open ? 'text-base' : 'text-sm'} font-bold truncate ${placeholder ? "placeholder-text" : "text-slate-800"}`}>{addr.label || addr.purpose || addr.type || "Address"}</span>
-             {verified
-               ? <span title="This address was found and confirmed via Google Maps." className="rounded-full bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700 cursor-help shrink-0">✓</span>
-               : null
-             }
-           </div>
-           <span className="text-xs text-slate-500 truncate">{summarizeAddress(addr)}</span>
-         </div>
-         <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-           {addr.inactive && <span className="rounded-full bg-slate-200 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-500">Inactive</span>}
-           {placeholder && !addr.inactive && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>}
-           {!placeholder && <button type="button" onClick={() => updateAddr(addr.id, { isPrimary: !addr.isPrimary })} className={`rounded-full ${open ? 'px-2 py-0.5' : 'px-1.5 py-0.5'} text-[10px] font-bold border ${addr.isPrimary ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-sky-300'}`}>Primary</button>}
-           {(addr.isPrimary || addr.isLossSite || open) && (
-             <button type="button" onClick={() => updateAddr(addr.id, { isLossSite: !addr.isLossSite })} className={`rounded-full ${open ? 'px-2 py-0.5' : 'px-1.5 py-0.5'} text-[10px] font-bold border ${addr.isLossSite ? 'bg-rose-100 border-rose-300 text-rose-700' : 'bg-white border-slate-200 text-slate-400 hover:border-rose-300'}`}>Loss Site</button>
-           )}
-         </div>
-      </div>
-      {open && (
-      <div className="space-y-4 pl-1 sm:pl-2 mt-3">
-        {/* Core Address — always visible */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-          {/* Google search inside the address card */}
-          {(() => {
-            const DEMO_RESULTS = [
-              { street: "148 Amsterdam Ave", city: "Hawthorne", state: "NY", zip: "10532", display: "148 Amsterdam Ave, Hawthorne, NY 10532" },
-              { street: "25 Main St", city: "Bloomingdale", state: "NJ", zip: "07403", display: "25 Main St, Bloomingdale, NJ 07403" },
-              { street: "1616 Springfield Ave", city: "Pennsauken", state: "NJ", zip: "08110", display: "1616 Springfield Ave, Pennsauken, NJ 08110" },
-              { street: "17 Wausau St", city: "Ogdensburg", state: "NJ", zip: "07439", display: "17 Wausau St, Ogdensburg, NJ 07439" },
-              { street: "42 Park Ave", apt: "4B", city: "New York", state: "NY", zip: "10016", display: "42 Park Ave #4B, New York, NY 10016" },
-            ];
-            return (
-              <SearchSelect
-                value=""
-                onChange={v => {
-                  const match = DEMO_RESULTS.find(r => r.display === v);
-                  if (match) updateAddr(addr.id, { street: match.street, apt: match.apt || "", city: match.city, state: match.state, zip: match.zip, lat: "40.0", lng: "-74.0" });
-                }}
-                options={DEMO_RESULTS.map(r => ({ label: r.display, value: r.display, type: "address" }))}
-                placeholder="🔍  Find address on Google..."
-                clearOnCommit
-                maxResults={5}
-                autoComplete="off"
-                className="google-address-search !border-sky-300 !rounded-lg !py-3 !shadow-none !ring-0"
-              />
-            );
-          })()}
-          <button type="button" onClick={() => useCurrentLocation(
-            coords => updateAddr(addr.id, { lat: String(coords.lat), lng: String(coords.lng) }),
-            msg => setToast?.(`Location error: ${msg}`)
-          )} className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-600 hover:bg-sky-100 flex items-center gap-1.5 w-fit">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
-            Use Current Location
-          </button>
-          {addr.street && (
-            <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-100 mt-2">
-              <iframe title="Map" width="100%" height="140" frameBorder="0" style={{ border: 0 }} src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent([addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(", "))}&zoom=16`} allowFullScreen />
-            </div>
-          )}
-          <div className="grid grid-cols-4 gap-3">
-            <div className="col-span-3"><Field label="Street"><Input data-audit-key="addrStreet" className={index===0 && auditOn && highlightMissing?.addrStreet ? "audit-missing" : ""} value={addr.street} onChange={e=>updateAddr(addr.id,{street:e.target.value})} /></Field></div>
-            <div className="col-span-1"><Field label="Apt / Unit"><Input value={addr.apt} onChange={e=>updateAddr(addr.id,{apt:e.target.value})} placeholder="Apt #" /></Field></div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="City"><Input data-audit-key="addrCity" className={index===0 && auditOn && highlightMissing?.addrCity ? "audit-missing" : ""} value={addr.city} onChange={e=>updateAddr(addr.id,{city:e.target.value})} /></Field>
-            <Field label="State">
-              <SearchSelect value={addr.state} onChange={(v)=>updateAddr(addr.id,{state:v})} options={STATES} placeholder="State" className={index===0 && auditOn && highlightMissing?.addrState ? "audit-missing" : ""} maxResults={STATES.length} uppercase />
-            </Field>
-            <Field label="Zip"><Input data-audit-key="addrZip" className={index===0 && auditOn && highlightMissing?.addrZip ? "audit-missing" : ""} value={addr.zip} onChange={e=>updateAddr(addr.id,{zip:e.target.value})} inputMode="numeric" /></Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Address Type">
-              <Select ref={typeSelectRef} value={addr.type || ""} onChange={e=>updateAddr(addr.id,{type:e.target.value})}>
-                <option value="">Select type...</option>
-                {["Primary", "Business", "Neighbor", "Hotel", "Rental", "Secondary Home", "Temporary", "Moving", "Relative", "Storage Facility", "Other"].map(t=><option key={t} value={t}>{t}</option>)}
-              </Select>
-            </Field>
-            <Field label="Address Note">
-              <Input value={addr.note || ""} onChange={e=>updateAddr(addr.id,{note:e.target.value})} placeholder="e.g. Long driveway on left, gate code 1234" />
-            </Field>
-          </div>
-        </div>
-
-        {/* Property Details — collapsible */}
-        <div className="rounded-xl border border-slate-200 bg-white">
-          <button type="button" onClick={() => setCoordsOpen(v => !v)} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 rounded-xl">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Property Details</span>
-              {(() => {
-                const fields = [addr.lat, addr.lng, (addr as any).buildingType, addr.beds, addr.sqft, (addr as any).buildingFloors, addr.apt];
-                const filled = fields.filter(f => f && String(f).trim()).length;
-                return filled > 0 ? <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filled >= 5 ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"}`}>{filled}/{fields.length}</span> : null;
-              })()}
-            </div>
-            <span className={`text-slate-400 text-xs transition-transform ${coordsOpen ? "rotate-90" : ""}`}>›</span>
-          </button>
-          {coordsOpen && (
-            <div className="px-4 pb-4 space-y-4 border-t border-slate-100">
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block h-2 w-2 rounded-full ${verified ? "bg-emerald-500" : "bg-slate-300"}`} />
-                  <span className="text-sm text-slate-700">{verified ? "Address verified" : "Verify address"}</span>
-                </div>
-                <button onClick={() => onVerify?.(addr.id)} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Verify</button>
-              </div>
-              {index === 0 && (<><span data-audit-key="addrLat" className="block h-[1px] w-[1px] opacity-0" /><span data-audit-key="addrLng" className="block h-[1px] w-[1px] opacity-0" /></>)}
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Latitude"><Input className={index===0 && auditOn && highlightMissing?.addrLat ? "audit-missing" : ""} value={addr.lat} onChange={e=>updateAddr(addr.id,{lat:e.target.value})} placeholder="e.g. 40.8874" /></Field>
-                <Field label="Longitude"><Input className={index===0 && auditOn && highlightMissing?.addrLng ? "audit-missing" : ""} value={addr.lng} onChange={e=>updateAddr(addr.id,{lng:e.target.value})} placeholder="e.g. -74.0291" /></Field>
-              </div>
-              {index === 0 && (
-                <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-                  <span className="text-sm text-slate-700">Rent or own?</span>
-                  <ToggleGroup options={["Rent","Own"]} value={rentOrOwn} onChange={onRentOrOwnChange} />
-                </div>
-              )}
-              {index === 0 && rentOrOwn === "Rent" && (
-                <div className="rounded-lg border border-orange-300 bg-orange-50 p-3">
-                  <div className="text-sm font-bold text-orange-800 mb-2">Confirm Coverage</div>
-                  <Input data-audit-key="rentCoverageLimit" className={auditOn && highlightMissing?.rentCoverageLimit ? "audit-missing" : ""} value={rentCoverageLimit || ""} onChange={e=>onRentCoverageChange(e.target.value)} placeholder="Coverage amount ($)" />
-                </div>
-              )}
-              {/* Building details — feeds V2 scope wizard */}
-              {index === 0 && (
-                <div className="space-y-3 pt-2 border-t border-slate-100">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Building Info</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Building Type">
-                      <div className="flex flex-wrap gap-1.5">
-                        {[{id:"trailer",label:"Trailer"},{id:"house",label:"House"},{id:"largehouse",label:"Large House"},{id:"estate",label:"Estate"},{id:"townhouse",label:"Townhome"},{id:"lowrise",label:"Low-Rise"},{id:"highrise",label:"High-Rise"},{id:"storefront",label:"Storefront"},{id:"commercial",label:"Commercial"}].map(bt => (
-                          <button key={bt.id} type="button" onClick={() => updateAddr(addr.id, { buildingType: bt.id })} className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-[12px] font-bold transition-all ${(addr as any).buildingType === bt.id ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
-                            <img src={`/icons/${bt.id}.png`} alt={bt.label} className="w-8 h-8 object-contain" />
-                            {bt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </Field>
-                    <Field label="Unit / Suite">
-                      <Input value={addr.apt || ""} onChange={e => updateAddr(addr.id, { apt: e.target.value })} placeholder="e.g. 4B, Suite 200" />
-                    </Field>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <Field label="Floors">
-                      <Input inputMode="numeric" value={(addr as any).buildingFloors || ""} onChange={e => updateAddr(addr.id, { buildingFloors: e.target.value ? Number(e.target.value) : "" })} placeholder="e.g. 2" />
-                    </Field>
-                    <Field label="Bedrooms">
-                      <Input inputMode="numeric" value={addr.beds || ""} onChange={e => updateAddr(addr.id, { beds: e.target.value })} placeholder="e.g. 3" />
-                    </Field>
-                    <Field label="Sq Ft">
-                      <Input inputMode="numeric" value={addr.sqft || ""} onChange={e => updateAddr(addr.id, { sqft: e.target.value })} placeholder="e.g. 2400" />
-                    </Field>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="rounded-full bg-sky-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
-          >
-            Done
-          </button>
-        </div>
-      </div>
-      )}
-    </div>
-  );
-});
+// AddressItem — imported from ./components/atoms
 
 // --- QUICK ENTRY COMPONENT ---
 const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment, toggleNonRestorationPrimary, toggleRestorationType, selectNonRestorationSubtype, onSwitchToDetailed }) => {

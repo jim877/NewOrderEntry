@@ -34,3 +34,7 @@ export { CustomerActionMenu } from "./CustomerActionMenu";
 export { CustomerWelcomePanel } from "./CustomerWelcomePanel";
 export { CustomerQuickNotes } from "./CustomerQuickNotes";
 export { CustomerItem } from "./CustomerItem";
+export { AddressActionMenu } from "./AddressActionMenu";
+export { AddressCoreFields } from "./AddressCoreFields";
+export { AddressPropertyDetails } from "./AddressPropertyDetails";
+export { AddressItem } from "./AddressItem";
