@@ -24,3 +24,6 @@ export { SearchSelect } from "./SearchSelect";
 export { GlobalSearch } from "./GlobalSearch";
 export { FloatingCapsule } from "./FloatingCapsule";
 export { Section } from "./Section";
+export { StepNav } from "./StepNav";
+export { SettingsMenu } from "./SettingsMenu";
+export { Header } from "./Header";

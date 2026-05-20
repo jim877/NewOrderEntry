@@ -108,6 +108,11 @@ export const LEAD_SOURCE_HELP: Record<string, string> = config.lists.leadSourceH
 export const AI_USAGE_GUIDELINES: string[] = config.lists.aiUsageGuidelines;
 export const AI_TIME_SAVING_TIPS: string[]  = config.lists.aiTimeSavingTips;
 
+// --- Header progress nav ---
+export type HeaderSubsection = { id: string; label: string };
+export type HeaderStep = { id: string; label: string; subsections: HeaderSubsection[] };
+export const HEADER_STEPS: HeaderStep[] = config.lists.headerSteps;
+
 // --- Global search items (used by GlobalSearch) ---
 export type GlobalSearchItem = {
   id: string;

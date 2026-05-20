@@ -292,6 +292,13 @@
       { "id": "insurance", "title": "Insurance" },
       { "id": "billto",    "title": "Bill To" }
     ],
+    "headerSteps": [
+      { "id": "sec1", "label": "Order",    "subsections": [{ "id": "order",     "label": "Order" }, { "id": "source",   "label": "Source" }] },
+      { "id": "sec2", "label": "Customer", "subsections": [{ "id": "customer",  "label": "Customer Details" }, { "id": "interview", "label": "Interview" }] },
+      { "id": "sec3", "label": "Address",  "subsections": [{ "id": "address",   "label": "Addresses" }] },
+      { "id": "sec4", "label": "Billing",  "subsections": [{ "id": "companies", "label": "Companies and Contacts" }, { "id": "billing",   "label": "Billing" }, { "id": "finance", "label": "Finance" }, { "id": "insurance", "label": "Insurance" }] },
+      { "id": "sec5", "label": "Schedule", "subsections": [{ "id": "schedule",  "label": "Schedule" }, { "id": "bridge",    "label": "Scope Update and Blockers" }] }
+    ],
     "aiUsageGuidelines": [
       "Choose the right entry mode: Use Detailed Entry when you have a lot of information (e.g., multiple contacts, insurance details, scheduling) to capture. Use Quick Entry for basic details, location, and scheduling when the information is minimal.",
       "Recommended AI workflow: In Detailed Entry, tab through the entire form and use Enter as needed to move forward field by field. If a correction is needed, use Shift + Enter to move backward.",
