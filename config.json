@@ -309,6 +309,10 @@
     },
     "suggestedGroups": ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"],
     "livingStatusAddressTypes": ["Moving","Hotel","Temp","Neighbor","Relative","Rental","Other Home"],
+    "pickupDepartments": {
+      "Textile":    ["Rugs", "Clothing", "Bedding", "Draperies", "Linens"],
+      "Hard Goods": ["Furniture", "Art", "Electronics", "Appliances", "Hardware"]
+    },
     "handlingMeta": [
       ["Box",  "return items in boxes"],
       ["Damp", "tag within 5 days"],

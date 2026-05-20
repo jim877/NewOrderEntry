@@ -142,6 +142,7 @@ export const LIVING_STATUS_ADDRESS_TYPES: string[] = config.lists.livingStatusAd
 // --- Handling-code meta + insurance-eligible types ---
 export const HANDLING_META: [string, string][] = config.lists.handlingMeta;
 export const INSURANCE_ELIGIBLE_COMPANY_TYPES: Set<string> = new Set(config.lists.insuranceEligibleCompanyTypes);
+export const PICKUP_DEPARTMENTS: Record<string, string[]> = config.lists.pickupDepartments;
 
 // --- Field config (sections + per-field defaults) ---
 export type FieldConfigSection = { id: string; label: string };

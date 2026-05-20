@@ -76,6 +76,7 @@ import {
   DEFAULT_FIELD_CONFIG,
   HANDLING_META,
   INSURANCE_ELIGIBLE_COMPANY_TYPES,
+  PICKUP_DEPARTMENTS,
   SDS_CONSIDERATIONS,
   SDS_OBSERVATIONS,
   SDS_SERVICES,
@@ -497,7 +498,7 @@ const getSdsIconImageClass = (item) => SDS_ICON_CLASS_OVERRIDES[item] || "h-full
 // AI_USAGE_GUIDELINES, AI_TIME_SAVING_TIPS — imported from ./config (used by StartScreen)
 
 // --- SCOPE WIZARD — Guided scoping flow ---
-const PICKUP_DEPARTMENTS: Record<string, string[]> = { "Textile": ["Rugs", "Clothing", "Bedding", "Draperies", "Linens"], "Hard Goods": ["Furniture", "Art", "Electronics", "Appliances", "Hardware"] };
+// PICKUP_DEPARTMENTS — imported from ./config
 
 const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds, showCoaching: parentShowCoaching = true, onToggleCoaching }: { onClose: () => void; orderData?: typeof DEFAULT_FORM; onOrderUpdate?: (updates: Partial<typeof DEFAULT_FORM>) => void; onShowOrder?: () => void; onShowSds?: () => void; showCoaching?: boolean; onToggleCoaching?: () => void }) => {
   const [activeTab, setActiveTab] = useState<"order" | "interview" | "scope" | "photos" | "report">("scope");
