@@ -201,6 +201,8 @@ import { initAddress, initCustomer, initLossSeverity } from './utils/orderFactor
 import { DEFAULT_FORM } from './data/defaultForm';
 import { SAMPLE_PRESET_DATA } from './data/samplePreset';
 import { buildNarrativeProse } from './utils/narrativeProse';
+import { compressImage, captureFrameFromVideo } from './utils/image';
+import { useCamera } from './hooks/useCamera';
 import {
   EVENT_SYSTEM_PREFIXES,
   stripEventSystemLines,
@@ -528,13 +530,14 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const voiceRecRef = useRef<any>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const scopeContentRef = useRef<HTMLDivElement>(null);
   // Scroll content to top when step or tab changes
   useEffect(() => { scopeContentRef.current?.scrollTo(0, 0); }, [step, activeTab, roomPass]);
-  const camStreamRef = useRef<MediaStream | null>(null);
-  const [cameraActive, setCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState("");
+
+  // Camera lifecycle (start/stop/auto-cleanup) is in useCamera; we just compose UX on top.
+  const { videoRef, camStreamRef, cameraActive, cameraError, setCameraError, startCamera, stopCamera } = useCamera();
+  const captureFromCamera = useCallback(() => captureFrameFromVideo(videoRef.current), [videoRef]);
+
   const stopVoiceRecording = useCallback(() => {
     const rec = voiceRecRef.current;
     if (rec) {
@@ -544,85 +547,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
     setVoiceTarget(null);
   }, []);
 
-  const startCamera = useCallback(async (fallbackInput?: HTMLInputElement | null) => {
-    setCameraError("");
-    try {
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
-      } catch {
-        // Fallback: environment camera unavailable (e.g. desktop Mac), try any camera
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
-      }
-      camStreamRef.current = stream;
-      setCameraActive(true);
-      // Defer srcObject assignment — video element mounts after setCameraActive triggers render
-      const connectStream = () => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
-      };
-      // Try immediately, then retry after render
-      requestAnimationFrame(connectStream);
-      setTimeout(connectStream, 100);
-      setTimeout(connectStream, 500);
-      // Fallback after 3 seconds: if video still has no data, show file picker option
-      setTimeout(() => {
-        if (videoRef.current && !videoRef.current.videoWidth && camStreamRef.current) {
-          setCameraError("Camera stream not rendering. Choose a photo from files instead.");
-        }
-      }, 3000);
-	    } catch {
-	      setCameraError("Camera unavailable in this browser. Choose a photo instead.");
-	      setCameraActive(false);
-	      (fallbackInput || cameraInputRef.current)?.click();
-	    }
-  }, []);
-
-  const stopCamera = useCallback(() => {
-    if (camStreamRef.current) { camStreamRef.current.getTracks().forEach(t => t.stop()); camStreamRef.current = null; }
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setCameraActive(false);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      stopCamera();
-      stopVoiceRecording();
-    };
-  }, [stopCamera, stopVoiceRecording]);
-
-  const compressImage = useCallback((src: string, maxWidth = 1200): Promise<string> => {
-    return new Promise(resolve => {
-      const img = new Image();
-      img.onload = () => {
-        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { resolve(src); return; }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
-      };
-      img.onerror = () => resolve(src);
-      img.src = src;
-    });
-  }, []);
-
-  const captureFromCamera = useCallback(() => {
-    const vid = videoRef.current;
-    if (!vid || !vid.videoWidth) return;
-    const canvas = document.createElement("canvas");
-    const scale = vid.videoWidth > 1200 ? 1200 / vid.videoWidth : 1;
-    canvas.width = Math.round(vid.videoWidth * scale);
-    canvas.height = Math.round(vid.videoHeight * scale);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.85);
-  }, []);
+  useEffect(() => () => { stopVoiceRecording(); }, [stopVoiceRecording]);
 
   const saveCoverPhotoFile = useCallback((file: File | undefined | null) => {
     if (!file) return;
