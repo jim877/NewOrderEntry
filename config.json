@@ -309,6 +309,16 @@
     },
     "suggestedGroups": ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"],
     "livingStatusAddressTypes": ["Moving","Hotel","Temp","Neighbor","Relative","Rental","Other Home"],
+    "photoReasons": ["Pickup", "InHome", "Before", "Services", "Total Loss", "Not Affected", "Customer Cleaning", "Do Not Touch", "Nothing for Us", "Undecided"],
+    "photoSubMap": {
+      "Before":      ["Sun Damage", "Existing Conditions", "Pet Stains", "Worn", "Clutter"],
+      "Pickup":      ["Rush", "Short Term", "Long Term", "Test", "Storage Only", "Donate/Dispose"],
+      "InHome":      ["Upholstery", "Drapes", "Rugs", "Electronics"],
+      "Services":    ["Unpacking", "Stain Removal", "Fold AMAP", "Photo Inventory", "Re-hanging", "Scaffolding", "Dispose", "PPE", "Content Manip", "Moving"],
+      "Total Loss":  ["We are writing"],
+      "Do Not Touch":["Dispose", "Donate"]
+    },
+    "quickCompanyTypes": ["Insurance", "TPA", "Restoration Company", "Moving", "Public Adjusting", "Independent Adjusting", "Contractor", "Hygienist", "Art", "Other"],
     "scopeWizardStepToasts": {
       "1":   "Select the building type and access details for the property.",
       "2":   "Set the property size — floors, bedrooms, and square footage.",

@@ -78,6 +78,9 @@ import {
   INSURANCE_ELIGIBLE_COMPANY_TYPES,
   PICKUP_DEPARTMENTS,
   SCOPE_WIZARD_STEP_TOASTS,
+  PHOTO_REASONS,
+  PHOTO_SUB_MAP,
+  QUICK_COMPANY_TYPES,
   SDS_CONSIDERATIONS,
   SDS_OBSERVATIONS,
   SDS_SERVICES,
@@ -2932,15 +2935,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
         if (!room) return null;
         const rKey = `${fi}-${ri}`;
         const photos = roomPhotos[rKey] || [];
-        const PHOTO_REASONS = ["Pickup", "InHome", "Before", "Services", "Total Loss", "Not Affected", "Customer Cleaning", "Do Not Touch", "Nothing for Us", "Undecided"];
-        const PHOTO_SUB_MAP: Record<string, string[]> = {
-          "Before": ["Sun Damage", "Existing Conditions", "Pet Stains", "Worn", "Clutter"],
-          "Pickup": ["Rush", "Short Term", "Long Term", "Test", "Storage Only", "Donate/Dispose"],
-          "InHome": ["Upholstery", "Drapes", "Rugs", "Electronics"],
-          "Services": ["Unpacking", "Stain Removal", "Fold AMAP", "Photo Inventory", "Re-hanging", "Scaffolding", "Dispose", "PPE", "Content Manip", "Moving"],
-          "Total Loss": ["We are writing"],
-          "Do Not Touch": ["Dispose", "Donate"],
-        };
+        // PHOTO_REASONS, PHOTO_SUB_MAP — imported from ./config
         // Find next/prev affected rooms for navigation
         const allAffected: { fi: number; ri: number; name: string }[] = [];
         homeRooms.forEach((f, fIdx) => f.rooms.forEach((r, rIdx) => { if (r.affected) allAffected.push({ fi: fIdx, ri: rIdx, name: r.name }); }));
@@ -3471,7 +3466,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
       }
     }, [vendorCount]);
 
-    const QUICK_COMPANY_TYPES = ["Insurance", "TPA", "Restoration Company", "Moving", "Public Adjusting", "Independent Adjusting", "Contractor", "Hygienist", "Art", "Other"];
+    // QUICK_COMPANY_TYPES — imported from ./config
 
     const quickAddedCompanies = data.vendors || [];
     const dateRef = useRef(null);

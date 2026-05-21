@@ -144,6 +144,9 @@ export const HANDLING_META: [string, string][] = config.lists.handlingMeta;
 export const INSURANCE_ELIGIBLE_COMPANY_TYPES: Set<string> = new Set(config.lists.insuranceEligibleCompanyTypes);
 export const PICKUP_DEPARTMENTS: Record<string, string[]> = config.lists.pickupDepartments;
 export const SCOPE_WIZARD_STEP_TOASTS: Record<string, string> = config.lists.scopeWizardStepToasts;
+export const PHOTO_REASONS: string[] = config.lists.photoReasons;
+export const PHOTO_SUB_MAP: Record<string, string[]> = config.lists.photoSubMap;
+export const QUICK_COMPANY_TYPES: string[] = config.lists.quickCompanyTypes;
 
 // --- Field config (sections + per-field defaults) ---
 export type FieldConfigSection = { id: string; label: string };
