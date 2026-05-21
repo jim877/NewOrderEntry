@@ -309,6 +309,14 @@
     },
     "suggestedGroups": ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"],
     "livingStatusAddressTypes": ["Moving","Hotel","Temp","Neighbor","Relative","Rental","Other Home"],
+    "scopeWizardStepToasts": {
+      "1":   "Select the building type and access details for the property.",
+      "2":   "Set the property size — floors, bedrooms, and square footage.",
+      "3":   "Confirm your rooms. Add, delete, rename, or drag to the correct floor.",
+      "4-1": "Select damage types and set severity levels. First type added becomes primary.",
+      "4-2": "Mark which rooms were affected. Tap a floor header to set floor-level severity.",
+      "4-3": "Select rooms to apply handling codes, instructions, and notes."
+    },
     "pickupDepartments": {
       "Textile":    ["Rugs", "Clothing", "Bedding", "Draperies", "Linens"],
       "Hard Goods": ["Furniture", "Art", "Electronics", "Appliances", "Hardware"]
