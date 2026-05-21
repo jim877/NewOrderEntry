@@ -147,6 +147,7 @@ export const SCOPE_WIZARD_STEP_TOASTS: Record<string, string> = config.lists.sco
 export const PHOTO_REASONS: string[] = config.lists.photoReasons;
 export const PHOTO_SUB_MAP: Record<string, string[]> = config.lists.photoSubMap;
 export const QUICK_COMPANY_TYPES: string[] = config.lists.quickCompanyTypes;
+export const SECTION_ORDER: string[] = config.lists.sectionOrder;
 
 // --- Field config (sections + per-field defaults) ---
 export type FieldConfigSection = { id: string; label: string };

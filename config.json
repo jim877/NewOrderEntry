@@ -309,6 +309,7 @@
     },
     "suggestedGroups": ["RD","RFD","STD","STFD","LTD","LTFD","Inhome","TLI","Test","Dispose","Storage Only"],
     "livingStatusAddressTypes": ["Moving","Hotel","Temp","Neighbor","Relative","Rental","Other Home"],
+    "sectionOrder": ["sec1", "sec2", "sec3", "sec4", "sec5"],
     "photoReasons": ["Pickup", "InHome", "Before", "Services", "Total Loss", "Not Affected", "Customer Cleaning", "Do Not Touch", "Nothing for Us", "Undecided"],
     "photoSubMap": {
       "Before":      ["Sun Damage", "Existing Conditions", "Pet Stains", "Worn", "Clutter"],

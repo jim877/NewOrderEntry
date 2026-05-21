@@ -81,6 +81,7 @@ import {
   PHOTO_REASONS,
   PHOTO_SUB_MAP,
   QUICK_COMPANY_TYPES,
+  SECTION_ORDER,
   SDS_CONSIDERATIONS,
   SDS_OBSERVATIONS,
   SDS_SERVICES,
@@ -201,7 +202,7 @@ import {
 } from './utils/order';
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
-import { initAddress, initCustomer, initLossSeverity } from './utils/orderFactories';
+import { initAddress, initCustomer, initLossSeverity, createOrderInstructionDraft } from './utils/orderFactories';
 import { DEFAULT_FORM } from './data/defaultForm';
 import { SAMPLE_PRESET_DATA } from './data/samplePreset';
 import { buildNarrativeProse } from './utils/narrativeProse';
@@ -4275,15 +4276,10 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
 // --- MAIN APP ---
 
-const createOrderInstructionDraft = (overrides = {}) => ({
-  id: "",
-  type: "Communication",
-  text: "",
-  ...overrides,
-});
+// createOrderInstructionDraft — imported from ./utils/orderFactories
 
 export default function App(){
-  const SECTION_ORDER = ["sec1","sec2","sec3","sec4","sec5"];
+  // SECTION_ORDER — imported from ./config
   const createAlertModalState = () => ({
     isOpen: false,
     title: "",

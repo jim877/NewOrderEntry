@@ -52,6 +52,14 @@ export function initCustomer(overrides: any = {}) {
   };
 }
 
+// createOrderInstructionDraft — fresh blank order-instruction row. Overrides merge over the defaults.
+export const createOrderInstructionDraft = (overrides: any = {}) => ({
+  id: "",
+  type: "Communication",
+  text: "",
+  ...overrides,
+});
+
 // initLossSeverity — per-peril severity scoring grid. Each peril has its own observation keys.
 // `touched` flips to true after the user has reviewed it once (used to suppress nag prompts).
 export function initLossSeverity(overrides: any = {}) {
