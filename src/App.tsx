@@ -203,6 +203,7 @@ import { SAMPLE_PRESET_DATA } from './data/samplePreset';
 import { buildNarrativeProse } from './utils/narrativeProse';
 import { compressImage, captureFrameFromVideo } from './utils/image';
 import { useCamera } from './hooks/useCamera';
+import { useVoiceNote } from './hooks/useVoiceNote';
 import {
   EVENT_SYSTEM_PREFIXES,
   stripEventSystemLines,
@@ -526,8 +527,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [walkthroughExitWarning, setWalkthroughExitWarning] = useState<{ missing: { room: string; fi: number; ri: number; issues: string[] }[] } | null>(null);
   const [photoCoverPrompt, setPhotoCoverPrompt] = useState<{ rKey: string; index: number } | null>(null);
   const [coverCameraOpen, setCoverCameraOpen] = useState(false);
-  const [voiceTarget, setVoiceTarget] = useState<{ rKey: string; index: number } | null>(null);
-  const voiceRecRef = useRef<any>(null);
+  const { voiceTarget, isRecording: isVoiceRecording, toggle: toggleVoice, stop: stopVoiceRecording } = useVoiceNote();
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const scopeContentRef = useRef<HTMLDivElement>(null);
@@ -538,16 +538,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const { videoRef, camStreamRef, cameraActive, cameraError, setCameraError, startCamera, stopCamera } = useCamera();
   const captureFromCamera = useCallback(() => captureFrameFromVideo(videoRef.current), [videoRef]);
 
-  const stopVoiceRecording = useCallback(() => {
-    const rec = voiceRecRef.current;
-    if (rec) {
-      try { rec.onend = null; rec.onerror = null; rec.stop(); } catch { /* ignore */ }
-      voiceRecRef.current = null;
-    }
-    setVoiceTarget(null);
-  }, []);
-
-  useEffect(() => () => { stopVoiceRecording(); }, [stopVoiceRecording]);
+  // voice-recording lifecycle is auto-managed by useVoiceNote (unmount cleanup included)
 
   const saveCoverPhotoFile = useCallback((file: File | undefined | null) => {
     if (!file) return;
@@ -3160,29 +3151,15 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                           onChange={e => updatePhoto(lastCapturedIdx, "note", e.target.value)}
                           className="flex-1 rounded-lg bg-white/10 border border-white/20 px-2.5 py-1.5 text-[11px] text-white placeholder-white/40 outline-none focus:border-white/50"
                         />
-                        <button onClick={() => {
-	                          const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-	                          if (!SR) return;
-	                          if (voiceTarget?.rKey === rKey && voiceTarget?.index === lastCapturedIdx) {
-	                            stopVoiceRecording();
-	                          } else {
-	                            stopVoiceRecording();
-	                            const rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
-                            const base = capturedPhoto.note || "";
-                            rec.onresult = (e: any) => {
-                              let text = base;
-                              for (let i = e.resultIndex; i < e.results.length; i++) {
-                                if (e.results[i].isFinal) text += (text ? " " : "") + e.results[i][0].transcript.trim();
-                              }
-                              updatePhoto(lastCapturedIdx, "note", text);
-                            };
-                            rec.onerror = () => { voiceRecRef.current = null; setVoiceTarget(null); };
-                            rec.onend = () => { voiceRecRef.current = null; setVoiceTarget(null); };
-                            rec.start();
-                            voiceRecRef.current = rec;
-                            setVoiceTarget({ rKey, index: lastCapturedIdx });
-                          }
-                        }} className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${voiceTarget?.rKey === rKey && voiceTarget?.index === lastCapturedIdx ? "bg-red-500 text-white animate-pulse" : "bg-white/20 text-white/70 hover:bg-white/30"}`} title="Voice note">
+                        <button
+                          onClick={() => toggleVoice(
+                            { rKey, index: lastCapturedIdx },
+                            capturedPhoto.note || "",
+                            (text) => updatePhoto(lastCapturedIdx, "note", text),
+                          )}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${isVoiceRecording({ rKey, index: lastCapturedIdx }) ? "bg-red-500 text-white animate-pulse" : "bg-white/20 text-white/70 hover:bg-white/30"}`}
+                          title="Voice note"
+                        >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>
                         </button>
                       </div>
@@ -3388,28 +3365,15 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                     {photo.reason !== "Pickup" && !PHOTO_SUB_MAP[photo.reason] && (
                       <div className="flex items-center gap-1.5">
                         <input value={photo.note} onChange={e => updatePhoto(pi, "note", e.target.value)} placeholder={room.affected ? "Add note..." : "Additional notes..."} className="flex-1 rounded-[8px] border border-slate-200 px-3 py-1.5 text-[12px] text-slate-700 outline-none focus:border-blue-400" />
-                        <button onClick={() => {
-	                          const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-	                          if (!SR) return;
-	                          if (voiceTarget?.rKey === rKey && voiceTarget?.index === pi) {
-	                            stopVoiceRecording();
-	                          } else {
-	                            stopVoiceRecording();
-	                            const rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
-                            const base = photo.note || "";
-                            rec.onresult = (e: any) => {
-                              let text = base;
-                              for (let i = e.resultIndex; i < e.results.length; i++) {
-                                if (e.results[i].isFinal) text += (text ? " " : "") + e.results[i][0].transcript.trim();
-                              }
-                              updatePhoto(pi, "note", text);
-                            };
-	                            rec.onerror = () => { voiceRecRef.current = null; setVoiceTarget(null); };
-	                            rec.onend = () => { voiceRecRef.current = null; setVoiceTarget(null); };
-                            rec.start(); voiceRecRef.current = rec; setVoiceTarget({ rKey, index: pi });
-                          }
-                        }} className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[14px] ${voiceTarget?.rKey === rKey && voiceTarget?.index === pi ? "bg-red-100 text-red-600 animate-pulse" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
-                          {voiceTarget?.rKey === rKey && voiceTarget?.index === pi ? "⏹" : "🎙"}
+                        <button
+                          onClick={() => toggleVoice(
+                            { rKey, index: pi },
+                            photo.note || "",
+                            (text) => updatePhoto(pi, "note", text),
+                          )}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[14px] ${isVoiceRecording({ rKey, index: pi }) ? "bg-red-100 text-red-600 animate-pulse" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                        >
+                          {isVoiceRecording({ rKey, index: pi }) ? "⏹" : "🎙"}
                         </button>
                       </div>
                     )}
