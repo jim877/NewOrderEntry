@@ -29,6 +29,27 @@ const LABEL_TO_COND: Record<string, string> = {
   "Boarded Up": "boardedUp",
 };
 
+// SMART_TRIGGER_LABELS — friendly labels for the condition flags that drive auto-load-list updates.
+// Used by smart-update confirmations to explain "we added X because you turned on Y".
+export const SMART_TRIGGER_LABELS: Record<string, string> = {
+  noHeat: "No Heat",
+  noLights: "No Electricity",
+  boardedUp: "Boarded Up",
+  damageWasWet: "Still Wet",
+  damageMoldMildew: "Visible Mold",
+};
+
+// shouldRetainSharedLoadItem — when a condition flag goes OFF, decide whether to keep the
+// shared load item that was added by another still-active flag. Today only "Lights" is shared
+// (between noLights and boardedUp); turning one off should NOT remove Lights if the other is on.
+export const shouldRetainSharedLoadItem = (fieldKey: string, item: string, nextValue: any, currentData: any) => {
+  const nextOn = nextValue === true || nextValue === "Y";
+  if (item !== "Lights") return false;
+  if (fieldKey === "noLights")  return !nextOn && !!currentData.boardedUp;
+  if (fieldKey === "boardedUp") return !nextOn && !!currentData.noLights;
+  return false;
+};
+
 // matchLoadTargets — given current order data, return the labels of any targets
 // whose triggers match. A target is matched if ANY of its triggers fires.
 export const matchLoadTargets = (data: any, targets: LoadTarget[] = DEFAULT_LOAD_TARGETS): string[] => {

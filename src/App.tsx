@@ -242,7 +242,7 @@ import {
   rushGetSeasons,
   computeStorageEstimate,
 } from './utils/dateTime';
-import { loadTargetsFromStorage, matchLoadTargets } from './utils/loadTargets';
+import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldRetainSharedLoadItem } from './utils/loadTargets';
 
 // --- STYLES ---
 const STYLES = `
@@ -5603,25 +5603,7 @@ export default function App(){
       setMinimizedLossTypes(prev => ({ ...prev, [type]: !prev[type] }));
   };
 
-  const SMART_TRIGGER_LABELS = {
-    noHeat: "No Heat",
-    noLights: "No Electricity",
-    boardedUp: "Boarded Up",
-    damageWasWet: "Still Wet",
-    damageMoldMildew: "Visible Mold",
-  };
-
-  const shouldRetainSharedLoadItem = (fieldKey, item, nextValue, currentData) => {
-    const nextOn = nextValue === true || nextValue === "Y";
-    if (item !== "Lights") return false;
-    if (fieldKey === "noLights") {
-      return !nextOn && !!currentData.boardedUp;
-    }
-    if (fieldKey === "boardedUp") {
-      return !nextOn && !!currentData.noLights;
-    }
-    return false;
-  };
+  // SMART_TRIGGER_LABELS, shouldRetainSharedLoadItem — imported from ./utils/loadTargets
 
   const openSmartConfirm = useCallback((config = {}) => {
     setSmartConfirm({
