@@ -189,6 +189,7 @@ import {
   sameNormalizedContact,
   normalizePlaceholderKeyPart,
   stringListMatches,
+  toggleMulti,
 } from './utils/strings';
 import {
   isPlaceholderFlagActive,
@@ -5322,7 +5323,7 @@ export default function App(){
     URL.revokeObjectURL(url);
   }, [data]);
 
-  const toggleMulti=(list,value)=> list.includes(value)? list.filter(v=>v!==value): [...list,value];
+  // toggleMulti — imported from ./utils/strings
   const toggleHandling=(code)=> update("handlingCodes", toggleMulti(data.handlingCodes, code));
 
   const focusFirstFieldInSection = (sectionKey) => {

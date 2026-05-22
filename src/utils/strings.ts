@@ -35,6 +35,11 @@ export const sameNormalizedContact = (left = "", right = "") => {
   return !!a && !!b && a === b;
 };
 
+// toggleMulti — add `value` to `list` if absent, otherwise remove it. Returns a NEW array.
+// Used in countless multi-select toggle handlers (loss types, handling codes, considerations…).
+export const toggleMulti = <T,>(list: T[], value: T): T[] =>
+  list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+
 // stringListMatches — true iff `a` and `b` are arrays of the same length with the same string
 // contents (order-independent). Treats values as strings via interpolation.
 export const stringListMatches = (a: any[] = [], b: any[] = []) => {
