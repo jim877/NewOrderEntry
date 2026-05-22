@@ -206,6 +206,7 @@ import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils
 import { safeUid } from './utils/uid';
 import { initAddress, initCustomer, initLossSeverity, createOrderInstructionDraft } from './utils/orderFactories';
 import { createAlertModalState, createSmartConfirmState } from './utils/modalState';
+import { normalizeSampleContacts } from './utils/normalizeSampleContacts';
 import { DEFAULT_FORM } from './data/defaultForm';
 import { SAMPLE_PRESET_DATA } from './data/samplePreset';
 import { buildNarrativeProse } from './utils/narrativeProse';
@@ -4277,52 +4278,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 export default function App(){
   // SECTION_ORDER — imported from ./config
   // createAlertModalState, createSmartConfirmState — imported from ./utils/modalState
-  const normalizeSampleContacts = (rows = []) => {
-    const mergedRows = [...(rows || [])];
-    SAMPLE_CONTACTS.forEach((required) => {
-      const exists = mergedRows.some(
-        (row) =>
-          normalizeContact(row.name || "") === normalizeContact(required.name || "") &&
-          normalizeCompany(row.company || "") === normalizeCompany(required.company || "")
-      );
-      if (!exists) mergedRows.push(required);
-    });
-    return mergedRows.map(r => {
-      const defaults = inferRoleCapabilities(r.companyType || "", r.company || "");
-      const seededRow = SAMPLE_CONTACTS.find(
-        (required) =>
-          normalizeContact(required.name || "") === normalizeContact(r.name || "") &&
-          normalizeCompany(required.company || "") === normalizeCompany(r.company || "")
-      );
-      const companyInstructions = mergeInstructionEntries(
-        seededRow?.companyInstructions || seededRow?.companyPreferences || [],
-        r.companyInstructions || r.companyPreferences || []
-      );
-      const contactInstructions = mergeInstructionEntries(
-        seededRow?.contactInstructions || seededRow?.contactPreferences || [],
-        r.contactInstructions || r.contactPreferences || []
-      );
-      return {
-        id: r.id || safeUid(),
-        name: r.name || "",
-        company: r.company || "",
-        companyType: r.companyType || "",
-        title: r.title || "",
-        salesRep: r.salesRep || "",
-        isAdjuster: !!r.isAdjuster,
-        canRefer: typeof r.canRefer === "boolean" ? r.canRefer : defaults.canRefer,
-        canBill: typeof r.canBill === "boolean" ? r.canBill : defaults.canBill,
-        canInsure: typeof r.canInsure === "boolean" ? r.canInsure : defaults.canInsure,
-        companyInstructions,
-        contactInstructions,
-        companyPreferences: companyInstructions.map((entry) => entry.text),
-        contactPreferences: contactInstructions.map((entry) => entry.text),
-        specialDocuments: mergeUniqueStrings(seededRow?.specialDocuments || [], r.specialDocuments || []),
-        customerTextForms: mergeUniqueStrings(seededRow?.customerTextForms || [], r.customerTextForms || []),
-        nationalCarrier: (r.nationalCarrier || seededRow?.nationalCarrier || "").toString(),
-      };
-    });
-  };
+  // normalizeSampleContacts — imported from ./utils/normalizeSampleContacts
   const [entryMode, setEntryMode] = useState("start"); 
   const [showCoaching, setShowCoaching] = useState(true);
   const showInlineHelp = showCoaching;
