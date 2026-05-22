@@ -4609,7 +4609,13 @@ export default function App(){
     const q = interviewSearch.trim().toLowerCase();
     if (!q) return true;
     if (title.toLowerCase().includes(q)) return true;
-    return extras.some(e => (e || "").toLowerCase().includes(q));
+    // extras may contain strings, arrays of strings, or null/undefined.
+    // Arrays are joined so each element is searchable individually.
+    return extras.some(e => {
+      if (e == null) return false;
+      const text = Array.isArray(e) ? e.join(" ") : String(e);
+      return text.toLowerCase().includes(q);
+    });
   };
   const isSearchMatch = (text) => {
     const q = interviewSearch.trim().toLowerCase();
@@ -9495,16 +9501,33 @@ export default function App(){
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <span className={`inline-block h-2.5 w-2.5 rounded-full ${
-                            scopeBridgeState.projectStatus === "green" ? "bg-emerald-500" :
-                            scopeBridgeState.projectStatus === "yellow" ? "bg-amber-500" :
-                            scopeBridgeState.projectStatus === "red" ? "bg-rose-500" : "bg-slate-300"
-                          }`} />
-                          <span className="text-xs font-bold uppercase tracking-wider">
-                            Scope Bridge{scopeBridgeState.projectStatus ? `: ${scopeBridgeState.projectStatus.toUpperCase()}` : ""}
-                          </span>
+                          {(() => {
+                            const status = scopeBridgeState.projectStatus;
+                            const statusExplain = status === "green" ? "Green: ready to proceed — pickup, processing, and delivery are clear to go."
+                              : status === "yellow" ? "Yellow: in progress with at least one open blocker — resolve before final delivery."
+                              : status === "red" ? "Red: blocked — work cannot start or continue until the issues below are resolved."
+                              : "Status not set yet — open this section to mark Pickup / Processing / Delivery readiness.";
+                            const issuesText = scopeBridgeState.pendingIssues.length
+                              ? "\n\nOpen blockers:\n• " + scopeBridgeState.pendingIssues.join("\n• ")
+                              : "";
+                            return (
+                              <span title={statusExplain + issuesText} className="inline-flex items-center gap-3 cursor-help">
+                                <span className={`inline-block h-2.5 w-2.5 rounded-full ${
+                                  status === "green" ? "bg-emerald-500" :
+                                  status === "yellow" ? "bg-amber-500" :
+                                  status === "red" ? "bg-rose-500" : "bg-slate-300"
+                                }`} />
+                                <span className="text-xs font-bold uppercase tracking-wider">
+                                  Scope Status{status ? `: ${status.toUpperCase()}` : ""}
+                                </span>
+                              </span>
+                            );
+                          })()}
                           {scopeBridgeState.pendingIssues.length > 0 && (
-                            <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                            <span
+                              title={"Blockers stopping work:\n• " + scopeBridgeState.pendingIssues.join("\n• ")}
+                              className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-800 cursor-help"
+                            >
                               {scopeBridgeState.pendingIssues.length} blocker{scopeBridgeState.pendingIssues.length !== 1 ? "s" : ""}
                             </span>
                           )}
@@ -10708,6 +10731,29 @@ export default function App(){
                     <Section id="sec5" noeSection="schedule" title="5. Schedule & Blockers" helpText="Set the next appointment. Put everything the field team needs in Event Instructions." isOpen={openSections.sec5} onHeaderClick={()=>handleToggleSection('sec5')} onCaretClick={()=>handleToggleSection('sec5')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec5") ? "audit-outline" : ""}
                     >
                       <div className="space-y-6">
+                        {(() => {
+                          const primary = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0];
+                          const verified = !!(primary && primary.lat && primary.lng);
+                          if (verified) return null;
+                          return (
+                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-3" role="alert">
+                              <span className="text-amber-600 text-lg shrink-0">⚠</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-bold text-amber-800">Unconfirmed address</div>
+                                <div className="text-[12px] text-amber-700 mt-0.5">
+                                  The primary address hasn't been verified via Google Maps. The field team needs a confirmed address to schedule.
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => { setOpenSections(prev => ({ ...prev, sec3: true })); setTimeout(() => document.getElementById("sec3")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
+                                className="shrink-0 rounded-full border border-amber-300 bg-white px-3 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100"
+                              >
+                                Fix in Address →
+                              </button>
+                            </div>
+                          );
+                        })()}
                         <SubSection id="sec5-schedule" title="Schedule" open={scheduleSubOpen} onToggle={(nextOpen) => setScheduleSubOpen(!!nextOpen)} compact={compactMode}>
                         <Field label="Event Type">
                           <ToggleGroup options={["Scope","Pickup","In-Home","Meeting"]} value={data.scheduleType} onChange={v => update("scheduleType", v)} />
@@ -11330,9 +11376,9 @@ export default function App(){
                             </div>
 
                             <div className="rounded-lg border border-slate-200 bg-slate-900 px-3 py-3">
-                              <div className="text-[12px] font-bold uppercase tracking-widest text-sky-200 mb-2">Bridge Summary</div>
+                              <div className="text-[12px] font-bold uppercase tracking-widest text-sky-200 mb-2">Scope Update Summary</div>
                               <div className="rounded-md border border-white/15 bg-white/5 px-2 py-2 text-xs leading-relaxed text-slate-100">
-                                {scopeBridgeSnippet || "Set status and blockers to generate the bridge summary."}
+                                {scopeBridgeSnippet || "Set status and blockers to generate the scope update summary."}
                               </div>
                             </div>
                           </div>
@@ -11483,7 +11529,7 @@ export default function App(){
                   </div>
                 )}
 
-                {isFieldVisible("damageWasWet") && matchesInterviewSearch("Is anything still wet or damaged", "Still Wet Visible Mold Structural Damage No Electricity No Heat Boarded Up") && (() => {
+                {isFieldVisible("damageWasWet") && matchesInterviewSearch("Is anything still wet or damaged", "Still Wet Visible Mold Structural Damage No Electricity No Heat Boarded Up", [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural Damage" : "", data.noLights ? "No Electricity" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""]) && (() => {
                   const log = (data.interviewLog || {}).conditions;
                   const hasAnswers = data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp;
                   const answered = hasAnswers || !!log;
@@ -11527,7 +11573,7 @@ export default function App(){
                 })()}
 
                 {/* Repairs (Q2) */}
-                {isFieldVisible("repairsSummary") && matchesInterviewSearch("repairs contractor", "Just Cleaning Paint Refinish Floors Replace Floors Cosmetic Damage Major Structural Complete Rebuild") && (() => {
+                {isFieldVisible("repairsSummary") && matchesInterviewSearch("repairs contractor", "Just Cleaning Paint Refinish Floors Replace Floors Cosmetic Damage Major Structural Complete Rebuild", data.repairsSummary) && (() => {
                   const log = (data.interviewLog || {}).repairs;
                   const hasAnswers = !!data.repairsSummary;
                   const answered = hasAnswers || !!log;
@@ -11565,7 +11611,7 @@ export default function App(){
                 })()}
 
                 {/* Packout Scope (Q3) */}
-                {matchesInterviewSearch("packout packing", "No Packout Content Manipulation Partial Packout Full Packout packing furniture") && (() => {
+                {matchesInterviewSearch("packout packing", "No Packout Content Manipulation Partial Packout Full Packout packing furniture", (data as any).packoutScope, (data as any).packoutNote) && (() => {
                   const log = (data.interviewLog || {}).packoutScope; const hasAnswers = !!(data as any).packoutScope; const answered = hasAnswers || !!log; const summary = (data as any).packoutScope || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packoutScope !== false;
                   const PACKOUT_SCOPES = ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout", "TBD"];
                   return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden`}>
@@ -11599,7 +11645,7 @@ export default function App(){
                 })()}
 
                 {/* Packout Items (Q4) */}
-                {isFieldVisible("packoutSummary") && matchesInterviewSearch("picking up", "Rugs Window Treatments Clothing Bedding Furniture Art Electronics Hardware Appliances") && (() => {
+                {isFieldVisible("packoutSummary") && matchesInterviewSearch("picking up", "Rugs Window Treatments Clothing Bedding Furniture Art Electronics Hardware Appliances", data.packoutSummary) && (() => {
                   const log = (data.interviewLog || {}).packout; const hasAnswers = (data.packoutSummary || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.packoutSummary || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packout !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
@@ -11625,7 +11671,7 @@ export default function App(){
                 })()}
 
                 {/* Load List */}
-                {isFieldVisible("loadList") && matchesInterviewSearch("need to bring", "Tall Ladder Extra Manpower Floor Protection Dollies Wardrobe Boxes TV Boxes Blankets Plastic Bags") && (() => {
+                {isFieldVisible("loadList") && matchesInterviewSearch("need to bring", "Tall Ladder Extra Manpower Floor Protection Dollies Wardrobe Boxes TV Boxes Blankets Plastic Bags", data.loadList, (data as any).loadListNote) && (() => {
                   const log = (data.interviewLog || {}).loadList; const hasAnswers = (data.loadList || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.loadList || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.loadList !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
@@ -11667,7 +11713,7 @@ export default function App(){
                 })()}
 
                 {/* Considerations */}
-                {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity") && (() => {
+                {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity", data.sdsConsiderations) && (() => {
                   const log = (data.interviewLog || {}).considerations; const hasAnswers = (data.sdsConsiderations || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.sdsConsiderations || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.considerations !== false;
                   return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
@@ -11704,7 +11750,7 @@ export default function App(){
                 })()}
 
                 {/* Pets in Home */}
-                {matchesInterviewSearch("pets animals dog cat", "dog cat bird fish rabbit hamster pet") && (() => {
+                {matchesInterviewSearch("pets animals dog cat", "dog cat bird fish rabbit hamster pet", data.householdAnimals, (data.household || []).map(m => `${m.type || ""} ${m.name || ""}`)) && (() => {
                   const pets = (data.household || []).filter(m => m.category === "pet");
                   const log = (data.interviewLog || {}).pets;
                   const hasAnswers = pets.length > 0;
@@ -11883,7 +11929,7 @@ export default function App(){
                 </div>
 
                 {/* Living Timeline */}
-                {isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving Neighbor Relative Rental") && (() => {
+                {isFieldVisible("livingStatus") && matchesInterviewSearch("customer live during repairs", "Staying in home Hotel Temp Moving Neighbor Relative Rental", data.livingStatus, (data.livingTimeline || []).map(s => `${s.type || ""} ${s.address || ""}`)) && (() => {
                   const timeline = data.livingTimeline || [];
                   const log = (data.interviewLog || {}).living;
                   const hasAnswers = timeline.length > 0 || !!data.livingStatus;
@@ -12073,7 +12119,7 @@ export default function App(){
                 })()}
 
                 {/* Rush Delivery Needed? (NEW Q14) */}
-                {isFieldVisible("rushDeliveryNeeded") && matchesInterviewSearch("rush delivery needed urgent ASAP", "rush immediate") && (() => {
+                {isFieldVisible("rushDeliveryNeeded") && matchesInterviewSearch("rush delivery needed urgent ASAP", "rush immediate", data.rushDeliveryNeeded === "Y" ? "Rush yes" : data.rushDeliveryNeeded === "N" ? "Rush no" : "", (data as any).rushDeclinedNote) && (() => {
                   const log = (data.interviewLog || {}).rushDelivery;
                   const hasAnswers = !!data.rushDeliveryNeeded;
                   const answered = hasAnswers || !!log;
@@ -12206,7 +12252,7 @@ export default function App(){
                   </div>;
                 })()}
                 {/* Delivery Group Builder */}
-                {matchesInterviewSearch("delivery group builder final suggested", "RD RFD STD STFD LTD LTFD Inhome TLI Test Dispose Storage Only final months date") && (() => {
+                {matchesInterviewSearch("delivery group builder final suggested", "RD RFD STD STFD LTD LTFD Inhome TLI Test Dispose Storage Only final months date", data.suggestedGroups, data.estimatedReturnDate, data.storageMonths) && (() => {
                   const log = (data.interviewLog || {}).suggestedGroups || (data.interviewLog || {}).finalDeliveryDate;
                   const selectedGroups = data.suggestedGroups || [];
                   const groupDetails = (data as any).deliveryGroupDetails || {};
@@ -12419,6 +12465,70 @@ export default function App(){
                       </div>
                     </div>
                   )}
+                  {/* Milestones — full controls for the 3 scope-bridge milestones */}
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Milestones</div>
+                    <div className="space-y-1.5">
+                      {BRIDGE_MILESTONE_FIELDS.map((field) => {
+                        const milestone = scopeBridgeState.milestones || {};
+                        const active = !!milestone[field.id];
+                        const isAdjusterApproval = field.id === "estimateApproved";
+                        const proceedWithoutApproval = !!milestone.proceedWithoutApproval;
+                        return (
+                          <div key={field.id} className={`rounded-lg border px-3 py-2 ${active ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200 bg-white"}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`text-xs font-bold ${active ? "text-emerald-700" : "text-slate-700"}`}>{active ? "✓" : "○"} {field.label}</span>
+                              <Switch checked={active} onChange={() => toggleScopeBridgeMilestone(field.id, field.atId)} />
+                            </div>
+                            {active && (
+                              <div className="mt-2 space-y-1">
+                                <Input value={milestone[field.byId] || ""} onChange={(e) => updateScopeBridgeMilestone(field.byId, e.target.value)} placeholder="Completed by" className="!py-1 !text-xs" />
+                                <div className="text-[10px] text-emerald-600">{milestone[field.atId] ? `Completed ${formatShortTimestamp(new Date(milestone[field.atId]))}` : "Completed now"}</div>
+                              </div>
+                            )}
+                            {isAdjusterApproval && (
+                              <button
+                                type="button"
+                                onClick={toggleProceedWithoutApproval}
+                                className={`mt-2 w-full rounded-lg border px-2 py-1 text-left text-[10px] font-bold transition ${proceedWithoutApproval ? "border-amber-300 bg-amber-100 text-amber-800" : "border-slate-200 bg-white text-slate-500 hover:border-amber-300"}`}
+                              >
+                                {proceedWithoutApproval ? "✓ Proceeding without approval" : "Proceed without approval"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Next Steps — pickup / process / delivery stage tones */}
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Next Steps</div>
+                    <div className="space-y-2">
+                      {[
+                        { id: "pickup", label: "Pickup", selected: selectedBridgePickupStep, options: BRIDGE_PICKUP_STEP_OPTIONS, onSelect: setBridgePickupStep },
+                        { id: "process", label: "Process", selected: selectedBridgeProcessStep, options: BRIDGE_PROCESS_STEP_OPTIONS, onSelect: setBridgeProcessStep },
+                        { id: "delivery", label: "Delivery", selected: selectedBridgeDeliveryStep, options: BRIDGE_DELIVERY_STEP_OPTIONS, onSelect: setBridgeDeliveryStep },
+                      ].map(stage => (
+                        <div key={stage.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                          <div className="text-[10px] font-bold text-slate-500 uppercase mb-1.5">{stage.label}</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {stage.options.map(opt => (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => stage.onSelect(opt.id)}
+                                className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-all ${bridgeStageToneClass(opt.tone, stage.selected === opt.id)}`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Order Status Indicators */}
                   <div>
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Status</div>
@@ -13890,7 +14000,7 @@ export default function App(){
 		                                      </label>
 	                                    </div>
 	                                  </div>
-                                  {(() => { const GROUP_MAP: Record<string,string[]> = { rush: ["RD","RFD"], rental: ["STD","STFD"], "short-term": ["STD","STFD"], final: ["LTD","LTFD","RFD","STFD","LTFD"] }; const matched = (GROUP_MAP[dg.id] || []).filter(g => interviewGroups.includes(g)); return matched.length > 0 ? <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold">{matched.join("/")}</span> : null; })()}
+                                  {(() => { const GROUP_MAP: Record<string,string[]> = { rush: ["RD","RFD"], rental: ["STD","STFD"], "short-term": ["STD","STFD"], final: ["LTD","LTFD","RFD","STFD","LTFD"] }; const matched = (GROUP_MAP[dg.id] || []).filter(g => interviewGroups.includes(g)); const tip = matched.map(g => `${g}: ${SUGGESTED_GROUP_HELP[g] || g}`).join("\n"); return matched.length > 0 ? <span title={tip} className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold cursor-help">{matched.join("/")}</span> : null; })()}
                                   {(mergedSeasons.length > 0 || mergedEvents.length > 0) && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold">+{mergedSeasons.length + mergedEvents.length} added</span>}
                                   {dg.id.startsWith("custom_") && <button type="button" onClick={() => removeCustomDelivery(dg.id)} className="rounded-full bg-white/20 hover:bg-white/30 px-2 py-0.5 text-[9px] font-bold text-white" title="Delete this delivery group">Delete</button>}
                                 </div>
