@@ -205,6 +205,7 @@ import {
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
 import { initAddress, initCustomer, initLossSeverity, createOrderInstructionDraft } from './utils/orderFactories';
+import { createAlertModalState, createSmartConfirmState } from './utils/modalState';
 import { DEFAULT_FORM } from './data/defaultForm';
 import { SAMPLE_PRESET_DATA } from './data/samplePreset';
 import { buildNarrativeProse } from './utils/narrativeProse';
@@ -4275,25 +4276,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
 
 export default function App(){
   // SECTION_ORDER — imported from ./config
-  const createAlertModalState = () => ({
-    isOpen: false,
-    title: "",
-    message: "",
-    details: [],
-    confirmLabel: "Confirm",
-    dismissLabel: "Close",
-    onConfirm: null,
-  });
-  const createSmartConfirmState = () => ({
-    isOpen: false,
-    title: "",
-    message: "",
-    details: [],
-    confirmLabel: "Remove",
-    cancelLabel: "Keep",
-    onConfirm: null,
-    onCancel: null,
-  });
+  // createAlertModalState, createSmartConfirmState — imported from ./utils/modalState
   const normalizeSampleContacts = (rows = []) => {
     const mergedRows = [...(rows || [])];
     SAMPLE_CONTACTS.forEach((required) => {
