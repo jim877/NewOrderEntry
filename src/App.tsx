@@ -240,6 +240,7 @@ import {
   formatDateInputValue,
   rushFormatDate,
   rushGetSeasons,
+  computeStorageEstimate,
 } from './utils/dateTime';
 import { loadTargetsFromStorage, matchLoadTargets } from './utils/loadTargets';
 
@@ -4406,11 +4407,7 @@ export default function App(){
   }, [(data as any).deliveryGroupDetails]);
 
   // Delivery Planner helpers
-  const computeStorageEstimate = (startDate: string, endDate: string) => {
-    if (!startDate || !endDate) return 0;
-    const s = new Date(startDate); const e = new Date(endDate);
-    return Math.max(0, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-  };
+  // computeStorageEstimate — imported from ./utils/dateTime
   const computeAutoAddress = (groupId: string) => {
     const tl = data.livingTimeline || [];
     if (!tl.length) return null;

@@ -107,6 +107,15 @@ export const addHours = (timeStr = "", hours = 1) => {
   return `${hh}:${mm}`;
 };
 
+// computeStorageEstimate — months between two ISO yyyy-mm-dd dates, rounded up.
+// Used to derive `storageMonths` from a Final delivery date.
+export const computeStorageEstimate = (startDate: string, endDate: string) => {
+  if (!startDate || !endDate) return 0;
+  const s = new Date(startDate);
+  const e = new Date(endDate);
+  return Math.max(0, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+};
+
 // rushAddDays — return a NEW date shifted by `days` (positive or negative).
 export const rushAddDays = (date: Date, days: number) => {
   const r = new Date(date);
