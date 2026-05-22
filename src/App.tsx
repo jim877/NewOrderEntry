@@ -82,6 +82,7 @@ import {
   PHOTO_SUB_MAP,
   QUICK_COMPANY_TYPES,
   SECTION_ORDER,
+  ORDER_ADDRESS_TYPES,
   SDS_CONSIDERATIONS,
   SDS_OBSERVATIONS,
   SDS_SERVICES,
@@ -201,6 +202,8 @@ import {
   useCurrentLocation,
   createPlaceholderFlag,
   summarizeConditions,
+  formatOrderAddressLine,
+  formatOrderAddressChoiceLabel,
 } from './utils/order';
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
@@ -5855,15 +5858,8 @@ export default function App(){
     setLivingAddressPrompt({ open: false, type: "" });
   }, []);
 
-  const ORDER_ADDRESS_TYPES = ["Primary", "Access", "Hotel", "Rental", "Temporary", "Neighbor", "Relative", "Moving", "Secondary Home", "Storage Facility", "Business", "Other"];
-  const formatOrderAddressLine = useCallback((addr: any = {}) => {
-    return [addr.street, addr.apt, addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
-  }, []);
-  const formatOrderAddressChoiceLabel = useCallback((addr: any = {}, idx = 0) => {
-    const type = addr.type || `Address ${idx + 1}`;
-    const line = formatOrderAddressLine(addr);
-    return `${type} — ${line || "TBD"}`;
-  }, [formatOrderAddressLine]);
+  // ORDER_ADDRESS_TYPES — imported from ./config
+  // formatOrderAddressLine, formatOrderAddressChoiceLabel — imported from ./utils/order
   const orderAddressChoices = useMemo(() => {
     const activeAddresses = (data.addresses || []).filter((addr: any) => !addr.inactive);
     const known = activeAddresses.map((addr: any, idx: number) => ({

@@ -148,6 +148,7 @@ export const PHOTO_REASONS: string[] = config.lists.photoReasons;
 export const PHOTO_SUB_MAP: Record<string, string[]> = config.lists.photoSubMap;
 export const QUICK_COMPANY_TYPES: string[] = config.lists.quickCompanyTypes;
 export const SECTION_ORDER: string[] = config.lists.sectionOrder;
+export const ORDER_ADDRESS_TYPES: string[] = config.lists.orderAddressTypes;
 
 // --- Field config (sections + per-field defaults) ---
 export type FieldConfigSection = { id: string; label: string };

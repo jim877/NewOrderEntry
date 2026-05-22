@@ -44,6 +44,18 @@ export const summarizeAddress = (addr: any = {}) => {
   return parts.length ? parts.join(", ") : "No address yet";
 };
 
+// formatOrderAddressLine — same idea but includes `apt`. Returns "" (not "No address yet")
+// when nothing's filled in — callers expect to test for truthiness.
+export const formatOrderAddressLine = (addr: any = {}) =>
+  [addr.street, addr.apt, addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
+
+// formatOrderAddressChoiceLabel — "Primary — 123 Main St, ...". Falls back to "TBD" when blank.
+export const formatOrderAddressChoiceLabel = (addr: any = {}, idx = 0) => {
+  const type = addr.type || `Address ${idx + 1}`;
+  const line = formatOrderAddressLine(addr);
+  return `${type} — ${line || "TBD"}`;
+};
+
 // isAddressPlaceholder — address is a placeholder if its placeholder flag is on,
 // street is empty, street says "TBD", or type contains "placeholder".
 export const isAddressPlaceholder = (addr: any = {}) => {
