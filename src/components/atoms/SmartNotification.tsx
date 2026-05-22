@@ -1,13 +1,16 @@
 // @ts-nocheck
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 
 // SmartNotification — bottom-of-screen banner for auto-actions the user can reject.
-// Auto-dismisses after 4s.
+// Auto-dismisses after 4s. Uses an onClose ref so a fresh arrow at the call site
+// doesn't reset the timer on every render.
 export const SmartNotification = ({ message, onReject, onClose, panelOffset = 0 }) => {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
-    const timer = setTimeout(onClose, 4000);
+    const timer = setTimeout(() => onCloseRef.current(), 4000);
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, []);
 
   return (
     <div

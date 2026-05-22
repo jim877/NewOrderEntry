@@ -3,8 +3,8 @@
 // the auto-generated lines like "Conditions: ...", "Bring: ...", "Services: ...".
 
 export const EVENT_SYSTEM_PREFIXES = [
-  "Conditions:", "Bring:", "Service Offerings:", "Services:", "Picking Up:",
-  "Quick Notes:", "Scope Notes:", "Estimate Required:",
+  "Conditions:", "Bring:", "Service Offerings:", "Services:", "Picking Up:", "Packout:",
+  "Quick Notes:", "Scope Notes:", "Rush Service:", "Estimate Required:",
 ];
 
 // stripEventSystemLines — remove any line that begins with a known system prefix.

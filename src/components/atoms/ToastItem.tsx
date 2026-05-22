@@ -1,15 +1,19 @@
 // @ts-nocheck
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 
 type Props = { message: string; onClose: () => void; style?: React.CSSProperties };
 
 // ToastItem — single toast that auto-dismisses after 3.5s.
 // Render inside a ToastStack; container handles positioning.
+// We hold onClose in a ref so the parent passing a fresh arrow `() => onRemove(t.id)`
+// on every render doesn't reset the timer. Mount-once timer; closure reads latest onClose.
 export const ToastItem = ({ message, onClose, style }: Props) => {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
-    const id = setTimeout(onClose, 3500);
+    const id = setTimeout(() => onCloseRef.current(), 3500);
     return () => clearTimeout(id);
-  }, [onClose]);
+  }, []);
   return (
     <div
       className="fade-in rounded-2xl bg-slate-800/95 backdrop-blur px-5 py-2.5 text-[12px] font-semibold text-white shadow-xl shadow-slate-500/20 flex items-center gap-2 w-fit"
