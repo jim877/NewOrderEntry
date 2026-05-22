@@ -2,6 +2,19 @@
 // Lightweight order-shape helpers: presence checks, placeholder flags, header-toggle DOM helper.
 // Pure (modulo `Element` for DOM matching). No React, no setState.
 
+// summarizeConditions — comma-joined list of currently-active condition flags from the order data.
+// Used as the "Conditions: ..." line in event instructions and as a small badge elsewhere.
+export const summarizeConditions = (data: any) => {
+  const items: string[] = [];
+  if (data?.damageWasWet === "Y" || data?.damageWasWet === true) items.push("Still Wet");
+  if (data?.damageMoldMildew) items.push("Visible Mold");
+  if (data?.structuralElectricDamage === "Y") items.push("Structural Damage");
+  if (data?.noLights) items.push("No Electricity");
+  if (data?.noHeat) items.push("No Heat");
+  if (data?.boardedUp) items.push("Boarded Up");
+  return items.join(", ");
+};
+
 // createPlaceholderFlag — construct a fresh placeholder marker { active, kind, reason, createdAt }.
 export const createPlaceholderFlag = (kind: string, reason = "") => ({
   active: true,

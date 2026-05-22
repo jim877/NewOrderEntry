@@ -199,6 +199,7 @@ import {
   isAddressPlaceholder,
   useCurrentLocation,
   createPlaceholderFlag,
+  summarizeConditions,
 } from './utils/order';
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
@@ -3474,14 +3475,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
     const timeRef = useRef(null);
     const noteInputRef = useRef(null);
     const primaryAddr = data.addresses && data.addresses.length > 0 ? data.addresses[0] : {};
-    const conditionSummary = [
-      (data.damageWasWet === "Y" || data.damageWasWet === true) ? "Still Wet" : "",
-      data.damageMoldMildew ? "Visible Mold" : "",
-      data.structuralElectricDamage === "Y" ? "Structural Damage" : "",
-      data.noLights ? "No Electricity" : "",
-      data.noHeat ? "No Heat" : "",
-      data.boardedUp ? "Boarded Up" : ""
-    ].filter(Boolean).join(", ");
+    const conditionSummary = summarizeConditions(data);
     const quickNotes = QUICK_INSTRUCTION_NOTES;
     const eventSystemLines = buildEventSystemLines(data, conditionSummary);
     const eventSystemEntries = buildEventSystemEntries(data, conditionSummary);
@@ -7567,16 +7561,10 @@ export default function App(){
   }, [auditOn]);
 
   const codeSummary = [...(data.severityCodes||[]), data.qualityCode||"", ...(data.handlingCodes||[])].filter(Boolean).join(" • ") || "None";
-  const conditionSummary = useMemo(() => {
-    const items = [];
-    if (data.damageWasWet === "Y" || data.damageWasWet === true) items.push("Still Wet");
-    if (data.damageMoldMildew) items.push("Visible Mold");
-    if (data.structuralElectricDamage === "Y") items.push("Structural Damage");
-    if (data.noLights) items.push("No Electricity");
-    if (data.noHeat) items.push("No Heat");
-    if (data.boardedUp) items.push("Boarded Up");
-    return items.join(", ");
-  }, [data.damageWasWet, data.damageMoldMildew, data.structuralElectricDamage, data.noLights, data.noHeat, data.boardedUp]);
+  const conditionSummary = useMemo(
+    () => summarizeConditions(data),
+    [data.damageWasWet, data.damageMoldMildew, data.structuralElectricDamage, data.noLights, data.noHeat, data.boardedUp],
+  );
   const eventSystemLines = useMemo(() => buildEventSystemLines(data, conditionSummary), [data, conditionSummary]);
   const eventSystemEntries = useMemo(() => buildEventSystemEntries(data, conditionSummary), [data, conditionSummary]);
   const hasEventInstructions = useMemo(() => {
