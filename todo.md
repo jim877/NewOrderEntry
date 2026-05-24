@@ -255,6 +255,24 @@ When you skip an item (e.g. "already matches behavior — no code change"), the 
 
 This rule exists because past loops have shipped "obviously simple" items that turned out to be design mismatches (e.g. POC implemented as free-text fields instead of as a link to an existing vendor). The audit step exists to catch exactly this; it only works if it is non-optional.
 
+### Coverage-gap rule (no "acceptable for now" disposals)
+
+If the reviewer's report mentions a **coverage gap** — i.e. the feature works in one mode / one component / one section but not in another where the task wording implies it should — the task CANNOT be marked `[x]` by your own judgment. You have exactly two options:
+
+1. **Close the gap.** Implement the missing coverage, then re-run the reviewer.
+2. **Ask the user to approve leaving the gap open.** Quote the reviewer's exact coverage-gap sentence to them, propose closing it vs. leaving it, and wait for an explicit answer.
+
+Disposals like "acceptable for now", "follow-up", "minor info gap", or "user can use the other path" are FORBIDDEN. Past loops shipped a POC feature that worked in Quick Entry but not Detailed — the reviewer flagged it on the first audit, I judged it "acceptable for now", and the user immediately reported the missing affordance on the very next interaction. Coverage-gap calls from the reviewer are a hard stop, not a hint.
+
+Signals that the reviewer is reporting a coverage gap (treat any of these as a stop):
+- "no X in [mode/section/path]"
+- "only [mode] exposes…"
+- "[other mode] users have no way to…"
+- "may be acceptable if…" — almost always a coverage gap dressed up as a question
+- "minor [info/coverage] gap"
+- "this diff doesn't cover…"
+- "still needs [extension/follow-up]"
+
 ### Lint baseline
 - Current lint: ~390 errors (mostly `no-explicit-any` and `no-unused-vars` from prototype code)
 - **Rule**: new code must not add new lint errors. If you add `as any`, note it. Remove unused vars/imports.
