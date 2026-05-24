@@ -168,7 +168,15 @@ import {
   companyTypeRequiresContact,
   syncCompanyEntryPlaceholders,
 } from './utils/companyEntry';
-import { INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS, DAMAGE_TYPES, COMPATIBLE_SECONDARIES, PROPERTY_TYPES, ACCESS_FOR_TYPE, ACCESS_DEFAULTS } from './config';
+import {
+  INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS,
+  DAMAGE_TYPES, COMPATIBLE_SECONDARIES,
+  PROPERTY_TYPES, ACCESS_FOR_TYPE, ACCESS_DEFAULTS,
+  SCOPE_ROOM_LIST as ROOM_LIST,
+  SCOPE_REASON_CODES as REASON_CODES,
+  SCOPE_DEPARTMENTS as DEPARTMENTS,
+  SCOPE_HANDLING_CODES as HANDLING_CODES_SCOPE,
+} from './config';
 import {
   getInstructionTypeTextKey,
   inferInstructionType,
@@ -772,45 +780,9 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [renameText, setRenameText] = useState("");
   const [addingToFloor, setAddingToFloor] = useState<number | null>(null);
   const [addSearch, setAddSearch] = useState("");
-  const ROOM_LIST = ["Master", "Bedroom", "Guest Room", "Nursery", "Master Bath", "Bathroom", "Half Bath", "Hall Bath", "Living", "Family", "Great Room", "Den", "Office", "Study", "Kitchen", "Kitchenette", "Dining", "Pantry", "Bar", "Hallway", "Foyer", "Entry", "Closet", "Walk-in Closet", "Storage", "Laundry", "Utility", "Garage", "Porch", "Patio", "Rec", "Playroom", "Game", "Gym", "Media", "Theater", "Attic"];
-  // Photo Scope reason codes — what are we doing with this room's contents
-  const REASON_CODES = [
-    { code: "BEF", label: "Before", desc: "Before photos only", primary: true },
-    { code: "PU", label: "Pick Up", desc: "Pack and remove", primary: true },
-    { code: "CC", label: "Customer Cleaning", desc: "Customer will clean", primary: true },
-    { code: "IH", label: "InHome", desc: "Clean on-site", primary: true },
-    { code: "SVC", label: "Services", desc: "Special services needed", primary: true },
-    { code: "TLI", label: "Total Loss", desc: "Total loss inventory", primary: true },
-    { code: "COE", label: "Cash Out Estimate", desc: "Estimate for cash-out", primary: false },
-    { code: "CTW", label: "Throwing Out", desc: "Items to discard", primary: false },
-    { code: "DNT", label: "Do Not Touch", desc: "Leave as-is", primary: false },
-    { code: "NWC", label: "Not Worth Cleaning", desc: "Cost exceeds value", primary: false },
-    { code: "OV", label: "Other Vendor", desc: "Another vendor handling", primary: false },
-    { code: "UND", label: "Undecided", desc: "TBD", primary: false },
-  ];
-  const DEPARTMENTS = ["All", "Window Treats", "Rugs", "Bedding", "Exposed", "Clothes", "Closets", "Drawers"];
+  // ROOM_LIST, REASON_CODES, DEPARTMENTS, HANDLING_CODES_SCOPE, QUALITY_CODES — imported from ./config
   const [roomReasonCodes, setRoomReasonCodes] = useState<Record<string, string[]>>({});
   const [roomDepartments, setRoomDepartments] = useState<Record<string, string[]>>({});
-
-  const HANDLING_CODES_SCOPE = [
-    { code: "Box", desc: "Return items in boxes" },
-    { code: "Damp", desc: "Tag within 5 days" },
-    { code: "DC", desc: "Dry clean all items" },
-    { code: "DNR", desc: "Do not reject" },
-    { code: "Det", desc: "Special detergent" },
-    { code: "FMP", desc: "Fold as much as possible" },
-    { code: "Hand", desc: "Hand finish pressed items" },
-    { code: "Hang", desc: "Use customer's hangers" },
-    { code: "Low", desc: "Dry on low heat" },
-    { code: "NoDC", desc: "Do not dry clean" },
-    { code: "NoDry", desc: "Cannot be dried in dryer" },
-    { code: "PPC", desc: "Potential problem claim" },
-    { code: "PPE", desc: "Wear PPE when handling" },
-    { code: "STAR", desc: "Premium items, special hangers" },
-    { code: "VIC", desc: "Very important claim" },
-    { code: "Wet", desc: "Still wet, tag/treat ASAP" },
-  ];
-  const QUALITY_CODES = ["Q1", "Q2", "Q3", "Q5"];
   const [impactMode, setImpactMode] = useState<"all" | "floors" | "rooms" | "">("");
   const [expandedFloor, setExpandedFloor] = useState<number | null>(null);
 
