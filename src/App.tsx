@@ -3449,7 +3449,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
 // AddressItem — imported from ./components/atoms
 
 // --- QUICK ENTRY COMPONENT ---
-const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment, toggleNonRestorationPrimary, toggleRestorationType, selectNonRestorationSubtype, onSwitchToDetailed }) => {
+const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment, toggleNonRestorationPrimary, toggleRestorationType, selectNonRestorationSubtype, onSwitchToDetailed, orderPoc, setOrderPoc }) => {
     const recordWord = data.isLead === true ? "Lead" : "Order";
     const [eventNoteDraft, setEventNoteDraft] = useState("");
     const [showQuickInstructions, setShowQuickInstructions] = useState(false);
@@ -3632,7 +3632,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                   <div>
                     <div className="text-[11px] font-bold text-slate-700 mb-1">Companies & Contacts</div>
                     <SearchSelect value="" onChange={v => { const parsed = parseCombinedContact?.(v) || { contact: "", company: "" }; const entry = { company: parsed.company || v, contact: parsed.contact || "", type: "", id: safeUid(), incomplete: !combinedContactOptions.some(o => o.value === v) }; update("vendors", [...(data.vendors || []), entry]); setToast?.(`Added ${entry.company || entry.contact}`); }} options={combinedContactOptions} placeholder="Search to add..." clearOnCommit onAddNew={v => { update("vendors", [...(data.vendors || []), { company: "", contact: v, type: "", id: safeUid(), incomplete: true }]); setToast?.(`Added "${v}" as placeholder`); }} className="!border-sky-300 !rounded-lg" />
-                    {(data.vendors || []).length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{(data.vendors || []).map((v, i) => <span key={v.id || i} className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${v.incomplete ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-600"}`}>{v.company || v.contact} <button type="button" onClick={() => update("vendors", (data.vendors||[]).filter((_,j)=>j!==i))} className="ml-1 text-slate-400 hover:text-rose-500">×</button></span>)}</div>}
+                    {(data.vendors || []).length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{(data.vendors || []).map((v, i) => <span key={v.id || i} className={`rounded-full border px-2 py-0.5 text-[11px] font-bold inline-flex items-center gap-1 ${v.isPoc ? "border-violet-300 bg-violet-50 text-violet-700" : v.incomplete ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-600"}`}>{v.isPoc && <span className="text-violet-600">👤</span>}{v.company || v.contact}<button type="button" onClick={() => setOrderPoc(v.isPoc ? null : { kind: "vendor", id: v.id })} title={v.isPoc ? "Clear as Order POC" : "Flag as Order POC (only one POC per order)"} className={`ml-1 text-[10px] ${v.isPoc ? "text-violet-700 hover:text-violet-900" : "text-slate-400 hover:text-violet-600"}`}>{v.isPoc ? "✓POC" : "POC"}</button><button type="button" onClick={() => update("vendors", (data.vendors||[]).filter((_,j)=>j!==i))} className="ml-1 text-slate-400 hover:text-rose-500">×</button></span>)}</div>}
                   </div>
                 </div>
               </div>
@@ -5157,6 +5157,49 @@ export default function App(){
       return next;
     })
   })), []);
+
+  // --- Order POC (Point of Contact) ---
+  // Resolves the single POC for this order, searching customers first, then vendors.
+  // Exactly one entity (across both lists) carries isPoc:true at any time.
+  const orderPoc = useMemo(() => {
+    const pocCust = (data.customers || []).find(c => c.isPoc);
+    if (pocCust) {
+      return {
+        kind: "customer", id: pocCust.id,
+        name: [pocCust.first, pocCust.last].filter(Boolean).join(" ") || "(unnamed)",
+        company: "",
+        phone: pocCust.phone || "",
+        role: pocCust.type || "",
+      };
+    }
+    const pocVend = (data.vendors || []).find(v => v.isPoc);
+    if (pocVend) {
+      return {
+        kind: "vendor", id: pocVend.id,
+        name: pocVend.contact || "",
+        company: pocVend.company || "",
+        phone: pocVend.phone || "",
+        role: pocVend.type || "",
+      };
+    }
+    return null;
+  }, [data.customers, data.vendors]);
+
+  // setOrderPoc — exclusive: clears every existing isPoc flag, then sets the chosen one.
+  // Pass null to clear without setting a new POC.
+  const setOrderPoc = useCallback((target) => {
+    setData(prev => {
+      const customers = (prev.customers || []).map(c => {
+        const want = target?.kind === "customer" && target.id === c.id;
+        return c.isPoc === want ? c : { ...c, isPoc: want };
+      });
+      const vendors = (prev.vendors || []).map(v => {
+        const want = target?.kind === "vendor" && target.id === v.id;
+        return v.isPoc === want ? v : { ...v, isPoc: want };
+      });
+      return { ...prev, customers, vendors };
+    });
+  }, []);
 
   useEffect(() => {
     try {
@@ -10059,7 +10102,7 @@ export default function App(){
                     <Section id="sec2" noeSection="customer" title="2. Customer" helpText="The primary person(s) we are performing work for and their contacts or representatives." isOpen={openSections.sec2} onHeaderClick={()=>handleToggleSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}
                     >
                       <div className="space-y-4">
-                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} onUpdatePets={(animals, considerations) => { update("householdAnimals", animals); update("sdsConsiderations", considerations); }} household={data.household || []} />)}
+                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} onUpdatePets={(animals, considerations) => { update("householdAnimals", animals); update("sdsConsiderations", considerations); }} household={data.household || []} orderPoc={orderPoc} onSetOrderPoc={setOrderPoc} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
                         {/* Household — people + pets at the household level */}
                         {(() => {
@@ -11429,6 +11472,8 @@ export default function App(){
                     toggleRestorationType={toggleRestorationType}
                     selectNonRestorationSubtype={selectNonRestorationSubtype}
                     onSwitchToDetailed={() => setEntryMode('detailed')}
+                    orderPoc={orderPoc}
+                    setOrderPoc={setOrderPoc}
                 />
               )}
 

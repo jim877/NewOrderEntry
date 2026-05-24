@@ -16,7 +16,7 @@ import { formatPhoneNumber } from "../../utils/format";
 // or when `c._forceOpen` flips. Renders action menu, welcome panel, quick-notes panel
 // as separate atoms gated by `c._showMenu` / `c.showWelcomePanel` / `c.showQuickNotes`.
 export const CustomerItem = memo(
-  ({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onSendWelcome }) => {
+  ({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onSendWelcome, orderPoc, onSetOrderPoc }) => {
     const toggleList = (list, value) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
     const customerDisplayName = [c.first, c.last].filter(hasMeaningfulValue).join(" ").trim();
     const [open, setOpen] = useState(!customerDisplayName);
@@ -107,11 +107,7 @@ export const CustomerItem = memo(
             {customerPlaceholder && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>}
             {c.contacted && <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Contacted</span>}
             {c.doNotContact && <span className="rounded-full bg-rose-100 border border-rose-300 px-2 py-0.5 text-[10px] font-bold text-rose-700">Do Not Contact</span>}
-            {c.usePocOnly && (
-              <span className="rounded-full bg-violet-100 border border-violet-300 px-2 py-0.5 text-[10px] font-bold text-violet-700" title={c.pocName ? `POC: ${[c.pocName, c.pocCompany].filter(Boolean).join(" — ")}${c.pocPhone ? ` (${c.pocPhone})` : ""}` : "POC not yet named"}>
-                POC{c.pocName ? `: ${c.pocName}` : ""}
-              </span>
-            )}
+            {c.isPoc && <span className="rounded-full bg-violet-100 border border-violet-300 px-2 py-0.5 text-[10px] font-bold text-violet-700">POC</span>}
             {c.useSalesRepOnly && <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700">Sales Rep Only</span>}
             {c.contactViaRep && !c.useSalesRepOnly && <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700">Via Rep</span>}
           </div>
@@ -120,12 +116,34 @@ export const CustomerItem = memo(
               <ToggleMulti className={open ? "" : "!py-1 !px-2"} label="Primary" title={DEFAULT_COACHING["role.Primary"]} checked={!!c.isPrimary} onChange={() => updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
               <ToggleMulti className={open ? "" : "!py-1 !px-2"} label="Policy Holder" title={DEFAULT_COACHING["role.Policyholder"]} checked={!!c.policyHolder} onChange={() => updateCust(c.id, { policyHolder: !c.policyHolder })} />
               <ToggleMulti className={open ? "" : "!py-1 !px-2"} label="Self Pay" checked={!!c.selfPay} onChange={() => updateCust(c.id, { selfPay: !c.selfPay })} />
+              <ToggleMulti
+                className={open ? "" : "!py-1 !px-2"}
+                label="POC"
+                title="Mark this customer as the Order Point of Contact. Only one POC per order."
+                checked={!!c.isPoc}
+                onChange={() => onSetOrderPoc?.(c.isPoc ? null : { kind: "customer", id: c.id })}
+                colorClass="!bg-violet-50 !border-violet-300 !text-violet-700"
+              />
             </div>
           )}
         </div>
 
         {open && (
           <div className="grid gap-4 pl-1 sm:pl-2">
+            {/* Order POC reference — surfaces the linked POC without retyping. */}
+            {orderPoc && (orderPoc.kind !== "customer" || orderPoc.id !== c.id) && (
+              <div className="rounded-lg border-2 border-violet-200 bg-violet-50/40 px-3 py-2 flex items-start gap-2">
+                <span className="text-violet-600 text-base shrink-0">👤</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">Order POC — contact via this person, not the customer</div>
+                  <div className="text-sm font-bold text-violet-900 mt-0.5">{orderPoc.name || "(unnamed)"}{orderPoc.company ? ` — ${orderPoc.company}` : ""}</div>
+                  {(orderPoc.phone || orderPoc.role) && (
+                    <div className="text-[11px] text-violet-700 mt-0.5">{[orderPoc.role, orderPoc.phone].filter(Boolean).join(" · ")}</div>
+                  )}
+                </div>
+                <button type="button" onClick={() => onSetOrderPoc?.(null)} className="shrink-0 text-[10px] font-bold text-violet-500 hover:text-violet-800 px-2">Clear POC</button>
+              </div>
+            )}
             <div className="grid grid-cols-5 gap-3">
               <div className="col-span-1">
                 <Field label="Type">
@@ -151,21 +169,9 @@ export const CustomerItem = memo(
               <ToggleMulti label="Contact via Rep" checked={!!c.contactViaRep} onChange={() => updateCust(c.id, { contactViaRep: !c.contactViaRep, doNotContact: false, preferredContact: "" })} colorClass="!bg-amber-50 !border-amber-300 !text-amber-700" />
               <ToggleMulti label="Do Not Contact" checked={!!c.doNotContact} onChange={() => updateCust(c.id, { doNotContact: !c.doNotContact, contactViaRep: false, usePocOnly: false, useSalesRepOnly: false, preferredContact: "" })} colorClass="!bg-rose-50 !border-rose-300 !text-rose-700" />
             </div>
-            {c.usePocOnly && (
-              <div className="rounded-lg border border-violet-200 bg-violet-50/40 px-3 py-2 space-y-1.5">
-                <div className="text-[10px] font-bold text-violet-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>👤</span> Point of Contact
-                  <span className="text-[9px] font-normal text-violet-500/80 normal-case tracking-normal">— a non-customer (e.g. public adjuster) acting on the customer's behalf</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input value={c.pocName || ""} onChange={(e) => updateCust(c.id, { pocName: e.target.value })} placeholder="POC name" className="!py-1.5 !text-xs" />
-                  <Input value={c.pocCompany || ""} onChange={(e) => updateCust(c.id, { pocCompany: e.target.value })} placeholder="POC company (e.g. Metro Claims)" className="!py-1.5 !text-xs" />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input value={c.pocPhone || ""} onChange={(e) => updateCust(c.id, { pocPhone: formatPhoneNumber(e.target.value) })} placeholder="POC phone" maxLength={14} className="!py-1.5 !text-xs" />
-                  <Input value={c.pocRole || ""} onChange={(e) => updateCust(c.id, { pocRole: e.target.value })} placeholder="POC role (e.g. Public Adjuster)" className="!py-1.5 !text-xs" />
-                </div>
-                <div className="text-[10px] text-violet-600">All communication for this customer should go through the POC above.</div>
+            {c.usePocOnly && !orderPoc && (
+              <div className="rounded-lg border border-violet-200 bg-violet-50/40 px-3 py-2 text-[11px] text-violet-700">
+                "Use POC Only" is on but no order POC is set yet. Flag a customer or contact as POC below or in Billing &amp; Companies.
               </div>
             )}
             {c.useSalesRepOnly && <div className="text-[10px] text-amber-600 pl-1">All communication for this customer should go through the assigned sales rep.</div>}

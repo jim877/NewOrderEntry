@@ -194,27 +194,45 @@ After implementing, run these checks BEFORE marking [x]:
 3. **Check for duplicates** — if the same pattern exists in multiple places (e.g., room name renders in both camera overlay AND room header), apply the change to ALL relevant locations.
 4. **Report the exact line number and parent context** — when marking complete, state where the code was added and what conditional path reaches it.
 
+### Pre-flight ambiguity check (MANDATORY — comes BEFORE writing any code)
+
+Before you implement any task, list every design question the task wording leaves open. If the count is greater than zero, **ask the user before writing code.**
+
+Trigger words that almost always require clarification (do NOT guess on these):
+- "flag X as Y", "point to", "reference", "link to", "tie to", "connect to" — implies the target is an EXISTING entity, not new free-text data
+- "from the X list", "from existing", "the contact/company", "the adjuster" — implies a picker, not a text input
+- "as a Y for Z" — implies a relationship between two existing things
+- "display in [other section]" — implies cross-section rendering, ask which section
+- "default", "by default" — ask whether they want to change initial-mount behavior or also reset existing data
+
+If the wording uses any of these and there are multiple plausible designs, **ask first.** Thirty seconds of clarification beats an hour of rework.
+
+When you do ask, frame it as concrete options: "Should X be (a) a free-text field, or (b) a picker that selects from existing Y?" — never an open-ended question.
+
 ### Independent review (MANDATORY before marking [x])
+
 After implementing a task, spawn a **separate reviewer agent** to independently verify the work before marking it complete. The reviewer has NOT seen your implementation process — it only sees the result.
 
 **Reviewer checklist:**
 1. **Read the task description** — understand what was requested.
-2. **Read the diff** — `git diff` to see exactly what changed.
-3. **Verify intent match** — does the implementation actually do what the task asked? Not just "does it build" but "does it solve the problem."
-4. **Check for regressions** — look for unintended side effects:
+2. **Quote the task wording back** in the report. Then explain how the diff matches that wording. If the reviewer cannot quote-and-match, that's a FAIL.
+3. **Read the diff** — `git diff` to see exactly what changed.
+4. **Verify intent match** — does the implementation actually do what the task asked? Not just "does it build" but "does it solve the problem."
+5. **Watch for the trigger words above** — if the task said "flag X as Y" and the diff added new free-text fields instead of linking to an existing Y, that's a FAIL.
+6. **Check for regressions** — look for unintended side effects:
    - Were any existing features broken by the change?
    - Were any variables referenced that don't exist in scope (e.g., `data` in ScopeWizard)?
    - Are there dangling references to removed code?
-5. **Verify render path** — confirm the new/changed code is reachable at runtime (correct component, correct conditional branch, correct view state).
-6. **Check for consistency** — if the change applies a pattern (e.g., color change), verify it was applied everywhere (not just one instance).
-7. **Report PASS or FAIL** — if FAIL, list specific issues. The implementing agent must fix all issues before re-submitting for review.
+7. **Verify render path** — confirm the new/changed code is reachable at runtime (correct component, correct conditional branch, correct view state).
+8. **Check for consistency** — if the change applies a pattern (e.g., color change), verify it was applied everywhere (not just one instance).
+9. **Report PASS or FAIL** — if FAIL, list specific issues. The implementing agent must fix all issues before re-submitting for review.
 
 **How to run:**
 ```
 Agent({
   description: "Review task implementation",
   subagent_type: "general-purpose",
-  prompt: "You are a code reviewer. Read the task: [TASK DESCRIPTION]. Then run `git diff` to see the changes. Verify: (1) the changes match the task intent, (2) no regressions or scope errors, (3) render path is correct, (4) patterns applied consistently. Report PASS or FAIL with specific issues."
+  prompt: "You are a code reviewer. Read the task: [TASK DESCRIPTION]. Then run `git diff` to see the changes. Quote the task wording verbatim and explain how the diff implements it. Watch especially for 'flag X as Y' / 'point to' / 'link to' / 'the contact/company' wording — those imply links to existing entities, not new free-text fields. Verify: (1) wording-vs-diff match, (2) no regressions or scope errors, (3) render path is correct, (4) patterns applied consistently. Report PASS or FAIL with specific issues."
 })
 ```
 
@@ -222,6 +240,20 @@ Agent({
 - Do NOT mark a task `[x]` until the reviewer reports PASS.
 - If the reviewer reports FAIL, fix the issues and re-run the review.
 - The reviewer is a fresh agent with no memory of the implementation — this is intentional. It catches assumptions the implementer missed.
+
+### Hard-gate enforcement (so the audit can't be skipped)
+
+The loop is not done until the loop summary lists, **per task**, a one-line quoted PASS from the reviewer agent. The format must be:
+
+```
+#NN <title>: ✓ Reviewer PASS — "<one-line quote from reviewer report>"
+```
+
+If you cannot produce that quote, the task is NOT complete. No matter how green the build is, no matter how "obviously simple" the change feels. The build-passing-and-dev-200 signal does NOT cover intent match — only the reviewer does.
+
+When you skip an item (e.g. "already matches behavior — no code change"), the loop summary must STILL include a one-line reviewer quote confirming the skip is correct. The reviewer must check that no code change was actually needed, not just take your word for it.
+
+This rule exists because past loops have shipped "obviously simple" items that turned out to be design mismatches (e.g. POC implemented as free-text fields instead of as a link to an existing vendor). The audit step exists to catch exactly this; it only works if it is non-optional.
 
 ### Lint baseline
 - Current lint: ~390 errors (mostly `no-explicit-any` and `no-unused-vars` from prototype code)
