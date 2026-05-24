@@ -1,6 +1,6 @@
 # NOE / Scope Prototype — TODO
 
-> Last updated: 2026-05-19
+> Last updated: 2026-05-24
 > Owner: Jim Fenyohazi
 > Status: Active prototype — proving UX for field scoping + order entry
 > Stack: React + TypeScript + Tailwind (Vite), destined for Java app backend
@@ -92,6 +92,80 @@
 
 - [x] Loading list config with rules — added LOAD_TARGETS_CONFIG (DEFAULT_LOAD_TARGETS) with id/label/category/triggers; triggers support condition/loss/packout/service/interview matchers; matchLoadTargets() returns auto-suggested labels; Settings panel now has "Loading List (What to Bring)" card with categorized list, trigger editor, add/remove, reset; interview loadList question now grouped by category with ✦ auto-suggested ring (2026-05-19)
 - [x] Timeline builder page — added Timeline Builder panel at the top of Rush Guide step 4 result view; family × delivery group checkbox matrix (Adults from customers + household + pets), inline interest pickers, inline event editor (name/type/date), inline custom delivery quick-add; uses existing deliveryGroups + createCustomDelivery; stores selections in rushGuideData.familyAssignments (2026-05-19)
+
+---
+
+## From Notes.md (2026-05-24)
+
+- [x] Auto-set POC flag when customer type = "Point of Contact" — Select onChange in CustomerItem now calls onSetOrderPoc when next value is "Point of Contact" and customer not already POC. Reviewer PASS — "if (next === \"Point of Contact\" && !c.isPoc) { onSetOrderPoc?.({ kind: \"customer\", id: c.id }); }" (2026-05-24)
+- [x] Customer type field dropdown only, no free-text — replaced SearchSelect with native `Select` + strict `<option>` list. Reviewer PASS — "<Select value={c.type || \"\"} onChange={(e) => { const next = e.target.value; ... }}>" (2026-05-24)
+- [x] POC type/flag asymmetric coupling — setting type→POC auto-flags POC; clearing flag does NOT clear type, and vice-versa. Reviewer PASS — "// Asymmetric coupling: setting type→Point of Contact auto-flags POC. Clearing the flag or changing the type later does NOT undo this." (2026-05-24)
+- [x] Show sales rep on customer record when Use Sales Rep Only is on — new amber banner with rep name + chip "Sales Rep Only: <name>". Reviewer PASS — "<div className=\"text-sm font-bold text-amber-900 mt-0.5\">{salesRep || \"(no sales rep assigned)\"}</div>" (2026-05-24)
+- [x] Remove "Contact via Rep" option — toggle + chip removed from CustomerItem (superseded by Use Sales Rep Only). Reviewer PASS — "contactViaRep toggle deleted from method row" (2026-05-24)
+- [x] Fix: adding 2nd public adjuster overwrote 1st contact's company — upsertAdditionalCompany now blocks via confirm() and clears stale contacts on confirmed replace. Reviewer PASS — "if (existingForType?.company && incomingCompany && normalizeCompany(existingForType.company) !== normalizeCompany(incomingCompany)) { const ok = window.confirm(...); if (!ok) return; }" (2026-05-24)
+- [x] Warn on 2nd different public adjusting firm (block-by-default, allow override) — confirm() dialog explains "you only have one X firm per order" before replacement. Reviewer PASS — "Replacing with \"${incomingCompany}\" is unusual — typically you only have one ${nextType.toLowerCase()} firm per order" (2026-05-24)
+- [x] Hover help text on POC + related flag chips — title= attrs on POC, Use POC Only, Use Sales Rep Only, Contacted, Do Not Contact. Reviewer PASS — "title=\"Order Point of Contact — only one POC per order...\" / title=\"Mark when this customer has been reached for this order\" / title=\"Block all outreach...\"" (2026-05-24)
+- [x] Sim Fern displayed as Insurance — autoTypeForCompany now prefers sampleContacts.companyType over name inference. Reviewer PASS — "const sampleMatch = sampleContacts.find((row) => normalizeCompany(row.company || \"\") === normalizeCompany(c) && !!row.companyType); if (sampleMatch?.companyType) return sampleMatch.companyType;" (2026-05-24)
+- [x] Action Items: Customer + Insurance/Adjuster missing-field groups collapsible, default collapsed — added groupMeta with defaultOpen:false for both groups; new actionItemsGroupOpen state. Reviewer PASS — "{ id: \"customer\", label: \"Customer\", defaultOpen: false, ... }, { id: \"insurance\", label: \"Insurance / Adjuster\", defaultOpen: false, ... }" (2026-05-24)
+- [x] Add Blocker button opens picker on demand (existing-blockers + missing data on initial view) — already implemented in live code: actionItemsBlockerOpen defaults false; initial branch renders existing blockers + Add Blocker button only. Reviewer PASS — "skip is correct — no code change needed; the task is already implemented in the live render path." (2026-05-24)
+- [x] Fix nested-button DOM warning — outer `<button>`s in Detailed mode company/contact columns converted to `<div role="button">` with tabIndex/onKeyDown; inner role-toggle gets e.stopPropagation(). Reviewer PASS — "<div role=\"button\" tabIndex={0} onClick={() => openCompanyRolePicker(role)} onKeyDown={...} className=\"md:col-span-5 w-full text-left rounded-lg ...\">" (2026-05-24)
+
+---
+
+## From Notes.md (2026-05-24 session 2)
+
+- [x] Fix Select undefined ReferenceError in CustomerItem.tsx — Select was used at line 149 (customer type dropdown) but not imported, crashing the customer section at runtime. Added `import { Select } from "./Select"` and updated the force-open focus selector to target the new native select. Reviewer PASS — "import { Select } from \"./Select\";" (2026-05-24)
+- [x] Interview search auto-opened timeline + couldn't close — IntersectionObserver on `#noe-interview-timeline` re-opened Rush Guide whenever the anchor came into view; search filtering collapses the layout and brought it into view, and the close button was overridden by the same observer. Added (a) `if (interviewSearch.trim()) return;` to skip auto-open during search, (b) `timelineUserDismissed` flag set when user clicks × or presses Escape, reset only when the anchor leaves the viewport. Reviewer PASS — "if (interviewSearch.trim()) return;" (2026-05-24)
+- [x] Right-justify + shade interview Collapse buttons — fixed className concatenation bug (`}ml-auto ` produced the non-Tailwind class `hover:bg-slate-50ml-auto`, breaking both ml-auto AND the hover style on 10 buttons). New className: `ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ...`. Reviewer PASS — "ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100" (2026-05-24)
+- [x] Replace interview Done with Collapse everywhere — silent-N bug: pressing Done on unanswered Y/N wrote an interviewLog entry that made `answered = hasAnswers || !!log` true, which rendered summary "No" via `data === "Y" ? Yes : No`. Renamed Done→Collapse, removed setData log writes from all 12 Collapse handlers (initially missed `repairs`+`packoutScope`; reviewer flagged the coverage gap; closed). Changed `answered = hasAnswers || !!log` → `answered = hasAnswers` in all 13 call sites. Reviewer PASS — "onClick={() => setInterviewExpanded(p => ({...p, repairs: false}))}" (2026-05-24)
+
+---
+
+## From Notes.md (2026-05-24 session 3)
+
+- [x] Add POC to contact role badges — added `{id:"poc", title:"POC"}` to contactRoleBadges in config.json; mapped poc→Star icon in RoleIcon; wired option through getRolePromptOptions, applyRoleAssignments (selects → flagContactAsPoc), toggleRoleForContact. Reviewer PASS — "{ \"id\": \"poc\", \"title\": \"POC\" }" (2026-05-24)
+- [x] Soften PA second-firm warning to confirm-warning — wording changed from "Replacing... is unusual" block-style to "Are you sure you want to add another active <type> firm to this order?" Reviewer PASS — "Are you sure you want to add another active ${nextType.toLowerCase()} firm to this order?" (2026-05-24)
+- [x] Hide Insurance badge for Public Adjuster contacts — getRolePromptOptions filters out the insurance role when companyTypeHint includes "public adjust"; toggleRoleForContact rejects insurance for PA with a toast. Reviewer PASS — "if (companyTypeHint.includes(\"public adjust\")) { setToast(\"Public Adjuster contacts cannot be assigned the Insurance role.\"); return; }" (2026-05-24)
+- [x] POC button in referrer entry utility — satisfied by adding POC to the role-assignment prompt that fires when adding any contact (referrer included). Reviewer PASS — "if (role.id === \"poc\") return true;" (2026-05-24)
+- [x] Red-color the Add Blocker picker — wrapped picker in `border-2 border-rose-300 bg-rose-50/40` container with "Assign a Blocker" header, × close, rose-200 group cards, and replaced Done with "Close Add Blocker". Reviewer PASS — "<div className=\"rounded-2xl border-2 border-rose-300 bg-rose-50/40 p-3 space-y-3\">" (2026-05-24)
+- [x] Bug: timeline × button not closing — root cause was the IntersectionObserver auto-reopening Rush Guide after × because the timeline anchor was still in view. Removed the auto-open IntersectionObserver entirely (plus the related state). Rush Guide now opens only via explicit user action (View Timeline button, Action Items "Rush Guide not ready" link). Reviewer PASS — "Timeline (Rush Guide) is opened only by explicit user action ... Manual only." (2026-05-24)
+- [x] Order-level POC/sales-rep apply to all customers — moved `useSalesRepOnly` from per-customer (c.useSalesRepOnly) to order-level (data.useSalesRepOnly). CustomerItem receives new orderUseSalesRepOnly prop. Removed per-customer "Use POC Only" / "Use Sales Rep Only" toggles. Added order-level toggle in Source subsection (shown when data.salesRep is set). Reviewer PASS — "onClick={() => update(\"useSalesRepOnly\", !(data as any).useSalesRepOnly)}" (2026-05-24)
+- [x] Simplify POC display on customer record — removed the violet POC banner, the amber sales-rep banner, the "Use POC Only" warning, and the per-row Mark-POC ToggleMulti. Kept the chip + new "Contact via …" routing chip. Phone/email inputs get `!text-slate-500 line-through decoration-amber-500/70 decoration-[1.5px]` when contactRestricted, so contact info is visible but visually marked as not for direct use. Reviewer PASS — "const restrictedInputClass = contactRestricted ? \"!text-slate-500 line-through decoration-amber-500/70 decoration-[1.5px]\" : \"\";" (2026-05-24)
+- [x] Y/N Collapse doesn't toggle when unanswered — changed expanded computation: explicit user preference (Collapse click) wins, falls back to `!answered || needsFollowUp` only when unset. Reviewer PASS — "const expanded = userPref !== undefined ? !!userPref : (!answered || needsFollowUp);" (2026-05-24)
+- [x] Last interview Q auto-opens timeline; Open Full Interview broken — same root cause as the × bug; removing the auto-open IntersectionObserver fixes both. Reviewer PASS — "Timeline (Rush Guide) is opened only by explicit user action" (2026-05-24)
+- [x] Interview search RFD doesn't scroll to match — added useEffect on interviewSearch that scrolls the first `<mark>` element inside `#noe-interview-scroll` into view with smooth/center 60ms after typing. Reviewer PASS — "const firstMark = container.querySelector(\"mark\"); if (firstMark) firstMark.scrollIntoView({ behavior: \"smooth\", block: \"center\" });" (2026-05-24)
+
+---
+
+## From Notes.md (2026-05-24 session 4)
+
+- [x] Surface POC inline in referrer source workflow — added a POC ToggleMulti chip to ReferrerRoleAssignment alongside Referrer/Bill To/Insurance; wired orderPoc + flagContactAsPoc through LeadInfoFields and through both Quick (line ~3764) and Detailed (line ~9965) call sites. Reviewer PASS — "orderPoc={orderPoc} flagContactAsPoc={flagContactAsPoc}" (2026-05-24)
+- [x] Coordinate POC chip colors — CustomerItem's routing chip is violet when reason is "Contact via Order POC" (matches POC chip), amber when reason is "Contact via Sales Rep"; strike-through decoration color matches. Reviewer PASS — "const routingDecorationColor = restrictedByPoc ? \"decoration-violet-500/70\" : \"decoration-amber-500/70\";" (2026-05-24)
+- [x] Don't default-select POC for Public Adjuster — openRoleAssignmentPrompt's single-option fallback skips POC; selectedDefaults filters POC. Reviewer PASS — "if (!suggested.length && options.length === 1 && options[0].id !== \"poc\") suggested.push(options[0].id);" plus filter (2026-05-24)
+- [x] Confirm when reassigning POC — both setOrderPoc and flagContactAsPoc show "POC is presently <name>, are you sure you want to change it?" before replacing. Reviewer PASS — "if (!window.confirm(\`POC is presently ${orderPoc.name || \"set\"}, are you sure you want to change it?\`)) return;" (2026-05-24)
+- [x] Remove red border on blocker choice buttons — choice button border now neutral slate-200/300; outer container's rose-300 border + bg-rose-50/40 unchanged. Reviewer PASS — "w-full text-left rounded-lg border px-3 py-2.5 ... ${active ? \"border-slate-300 bg-rose-100 text-rose-800\" : \"border-slate-200 bg-white text-slate-700 hover:bg-rose-50\"}" (2026-05-24)
+- [x] Rename interview question titles — medical→"Medical Issues", allergies→"Allergies", selfClean→"Self-Cleaning", dryCleaner→"Dry Cleaner", laundry→"Drying Preference", living→"Staying in Home", events→"Trips / Events", considerations→"Considerations". Reviewer PASS — "{ key: \"medical\", ... title: \"Medical Issues\" }, { key: \"allergies\", ... title: \"Allergies\" }, ..." (2026-05-24)
+- [x] Default all interview questions to collapsed — changed every `interviewExpanded.X !== false` to `=== true` (12 static questions) and the dynamic Y/N section to `const expanded = userPref === true;`. Reviewer PASS — "const userPref = interviewExpanded[q.key]; const expanded = userPref === true;" (grep `!== false` returns zero matches) (2026-05-24)
+- [x] Interview search not scrolling to match — added `noe-iq` class to all 13 question outer wrappers; search effect now does `container.querySelector(\".noe-iq\")?.scrollIntoView({block:\"start\"})` first, then mark fallback, then top. Reviewer PASS — "const firstQuestion = container.querySelector(\".noe-iq\"); if (firstQuestion) { firstQuestion.scrollIntoView({ behavior: \"smooth\", block: \"start\" }); return; }" (2026-05-24)
+
+---
+
+## From Notes.md (2026-05-24 session 5)
+
+- [x] Fix referrer POC chip selectability — ReferrerRoleAssignment compared `orderPoc?.contact === data.referrer`, but orderPoc.name holds the contact (no `contact` field exists). Toggling worked but the chip never appeared checked. Fixed to `orderPoc?.name`. Reviewer PASS — "orderPoc?.company === data.referringCompany && orderPoc?.name === data.referrer;" (2026-05-24)
+- [x] Replace strikethrough with inline chip — Phone/Email fields no longer strike through values when contact is restricted. Instead, Field's `action` prop renders a small "via Order POC" (violet) or "via Sales Rep" (amber) chip beside the field label. Value text stays plain. Reviewer PASS — "<Field label=\"Phone\" action={contactRestricted ? <span ...>{routingShortChip}</span> : null}>" (2026-05-24)
+- [x] Shorten PA second-firm warning + flip default — message reduced to two sentences; Cancel is framed as the safe path ("Cancel to keep it (and mark it inactive separately before switching)") and OK only fires when user explicitly means to replace. Reviewer PASS — "Cancel to keep it (and mark it inactive separately before switching). Click OK only if you mean to replace it now with \"${incomingCompany}\"." (2026-05-24)
+- [x] Cancel PA warning suppresses role-assign prompt — upsertAdditionalCompany now returns true (applied) or false (user canceled). Both addCompanyFromSearch and addCompanyDirect check the return value and short-circuit before openRoleAssignmentPrompt + flash/toggles. Reviewer PASS — "const applied = upsertAdditionalCompany(...); if (!applied) return;" (2026-05-24)
+- [x] Living question default to collapsed — replaced the hard-coded `const expanded = true; // Always open` with `interviewExpanded.living === true` (and the search override). Reviewer PASS — "const expanded = !!interviewSearch.trim() || interviewExpanded.living === true;" (2026-05-24)
+- [x] Auto-expand matched questions on search — every `const expanded = ...` computation now prefixed with `!!interviewSearch.trim() ||` so matching questions auto-expand when the search filter is active. Reviewer PASS — "const userPref = interviewExpanded[q.key]; const expanded = !!interviewSearch.trim() || userPref === true;" (2026-05-24)
+
+---
+
+## From Notes.md (2026-05-24 session 6)
+
+- [x] Remove Scope Status banner from top of Detailed — the "Scope Status: YELLOW/RED/GREEN" + blockers chip + Auth/Scope milestones row at App.tsx ~9651-9699 was confusing ("yellow" had no inline meaning, info already in Action Items). Replaced with a one-line comment marker. Reviewer PASS — "{/* Scope Status banner and Contact-instructions inline alert removed — blockers" (2026-05-24)
+- [x] Remove Contact-instructions inline alert — dropped the inlineAlert renderer, the useEffect that fired it on unseen orderAttentionAlerts, the orderAttentionAlerts useMemo, the inlineAlert state, and the unused seenAttentionAlertKeysRef. `markInstructionKeysSeen` kept (still used by company/contact children). Reviewer PASS — "Grep for `inlineAlert`, `setInlineAlert`, `orderAttentionAlerts`, `seenAttentionAlertKeysRef` in src/App.tsx returned zero matches" (2026-05-24)
+- [x] Add Open Blockers section to Save Summary — rose-themed list above Missing Fields shows `scopeBridgeState.pendingIssues` with count; only renders when blockers exist. Action Items panel already exposed them, this gives the save-flow parity. Reviewer PASS — "{(scopeBridgeState.pendingIssues || []).length > 0 && (" (2026-05-24)
 
 ---
 

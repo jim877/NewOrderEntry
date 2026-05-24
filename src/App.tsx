@@ -3449,7 +3449,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
 // AddressItem — imported from ./components/atoms
 
 // --- QUICK ENTRY COMPONENT ---
-const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment, toggleNonRestorationPrimary, toggleRestorationType, selectNonRestorationSubtype, onSwitchToDetailed, orderPoc, setOrderPoc }) => {
+const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companies, setModal, toggleMulti, handleConfirmClick, setToast, showInlineHelp, auditOn, onApplyReferrerRoles, suggestedReferrerRoles, combinedContactOptions, parseCombinedContact, getFlashClass, triggerAutoFlash, quickQuestionsCollapsed, setQuickQuestionsCollapsed, compactMode, recordTypeLabel, getSalesRepForContact, onOpenCrmLog, onOpenReminder, knownPeople, onSetNowDate, onSetNowTime, dateCloseSignal, timeCloseSignal, onPromptRoleAssignment, toggleNonRestorationPrimary, toggleRestorationType, selectNonRestorationSubtype, onSwitchToDetailed, orderPoc, setOrderPoc, flagContactAsPoc }) => {
     const recordWord = data.isLead === true ? "Lead" : "Order";
     const [eventNoteDraft, setEventNoteDraft] = useState("");
     const [showQuickInstructions, setShowQuickInstructions] = useState(false);
@@ -3761,7 +3761,7 @@ const QuickEntry = ({ data, update, updateMany, updateAddr, updateCust, companie
                     )}
                   </Field>
                   <div className="border-t border-slate-100 pt-4">
-                    <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={onApplyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={onOpenCrmLog} onPromptRoleAssignment={onPromptRoleAssignment} onAddNewToSystem={(info) => {
+                    <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showInlineHelp} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={onApplyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={onOpenCrmLog} onPromptRoleAssignment={onPromptRoleAssignment} orderPoc={orderPoc} flagContactAsPoc={flagContactAsPoc} onAddNewToSystem={(info) => {
                       setAddNewModal({
                         firstName: info.firstName || "",
                         lastName: info.lastName || "",
@@ -4328,23 +4328,29 @@ export default function App(){
   const [rushGuideData, setRushGuideData] = useState({ interests: [], events: [] });
   const [pendingDeliveryDateChange, setPendingDeliveryDateChange] = useState<any>(null);
   const [draggingDelivery, setDraggingDelivery] = useState<{id: string; pct: number} | null>(null);
-  const [timelineAutoOpened, setTimelineAutoOpened] = useState(false);
+  // Timeline (Rush Guide) is opened only by explicit user action — the View Timeline
+  // button in the interview footer or the "Rush Guide not ready" Action Items link.
+  // The previous auto-open-on-scroll behavior fought with search filtering and made
+  // the close × feel broken (closing then immediately reopening). Manual only.
 
-  // Auto-show timeline when scrolling to timeline section in interview
+  // When the user types in interview search, scroll the panel to the first matched
+  // question container so they don't have to manually scroll. The first .noe-iq
+  // element in the scroll container IS the first matching question (filtered ones
+  // don't render). Fall back to first <mark> highlight, then to top.
   useEffect(() => {
-    if (!interviewPanelOpen) { if (timelineAutoOpened) { setRushGuideOpen(false); setTimelineAutoOpened(false); } return; }
-    const el = document.getElementById("noe-interview-timeline");
-    if (!el) return;
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !rushGuideOpen) {
-        setRushGuideOpen(true); setRushGuideStep(4); setTimelineAutoOpened(true);
-      } else if (!entry.isIntersecting && timelineAutoOpened) {
-        setRushGuideOpen(false); setTimelineAutoOpened(false);
-      }
-    }, { threshold: 0.1 });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [interviewPanelOpen, rushGuideOpen, timelineAutoOpened]);
+    if (!interviewPanelOpen) return;
+    if (!interviewSearch.trim()) return;
+    const t = setTimeout(() => {
+      const container = document.getElementById("noe-interview-scroll");
+      if (!container) return;
+      const firstQuestion = container.querySelector(".noe-iq");
+      if (firstQuestion) { firstQuestion.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+      const firstMark = container.querySelector("mark");
+      if (firstMark) firstMark.scrollIntoView({ behavior: "smooth", block: "center" });
+      else container.scrollTo({ top: 0, behavior: "smooth" });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [interviewSearch, interviewPanelOpen]);
   const [deliveryDateVersion, setDeliveryDateVersion] = useState(0);
 
   // Sync timeline groupOverrides → interview deliveryGroupDetails + estimatedReturnDate
@@ -4451,6 +4457,7 @@ export default function App(){
 
   const [actionItemsOpen, setActionItemsOpen] = useState(false);
   const [actionItemsBlockerOpen, setActionItemsBlockerOpen] = useState(false);
+  const [actionItemsGroupOpen, setActionItemsGroupOpen] = useState<Record<string, boolean>>({});
   const [toastQueue, setToastQueue] = useState<{id: number; message: string}[]>([]);
   const toastIdRef = useRef(0);
   const setToast = useCallback((msg: string) => {
@@ -4645,7 +4652,6 @@ export default function App(){
   const [visitedSections, setVisitedSections] = useState(new Set(['sec1']));
 
   const [alertModal, setAlertModal] = useState(createAlertModalState);
-  const [inlineAlert, setInlineAlert] = useState(null);
   const [smartNotification, setSmartNotification] = useState(null);
   const [conditionAutoFillHints, setConditionAutoFillHints] = useState({});
   const [smartConfirm, setSmartConfirm] = useState(createSmartConfirmState);
@@ -4724,7 +4730,6 @@ export default function App(){
   const addCompanyInputRef = useRef(null);
   const [autoFlash, setAutoFlash] = useState({ key: "", ts: 0 });
   const [sessionInstructionKeys, setSessionInstructionKeys] = useState(() => new Set());
-  const seenAttentionAlertKeysRef = useRef(new Set());
   const lastNonRestorationToastRef = useRef("");
   const lastCarrierAlertKeyRef = useRef("");
   const tpaAssignmentPromptedRef = useRef(false);
@@ -5186,8 +5191,15 @@ export default function App(){
   }, [data.customers, data.vendors]);
 
   // setOrderPoc — exclusive: clears every existing isPoc flag, then sets the chosen one.
-  // Pass null to clear without setting a new POC.
+  // Pass null to clear without setting a new POC. When changing from one POC to a
+  // different one, confirm with the user first ("POC is presently X, are you sure...").
   const setOrderPoc = useCallback((target) => {
+    if (orderPoc && target) {
+      const sameTarget = orderPoc.kind === target.kind && orderPoc.id === target.id;
+      if (!sameTarget) {
+        if (!window.confirm(`POC is presently ${orderPoc.name || "set"}, are you sure you want to change it?`)) return;
+      }
+    }
     setData(prev => {
       const customers = (prev.customers || []).map(c => {
         const want = target?.kind === "customer" && target.id === c.id;
@@ -5199,7 +5211,7 @@ export default function App(){
       });
       return { ...prev, customers, vendors };
     });
-  }, []);
+  }, [orderPoc]);
 
   // flagContactAsPoc — flag a contact from Detailed mode (insurance adjuster, public adjuster,
   // additional companies, etc.) as the order POC. Finds the contact in data.vendors if present;
@@ -5207,6 +5219,15 @@ export default function App(){
   // Pass empty company+contact to clear the POC.
   const flagContactAsPoc = useCallback((companyName, contactName, contactType = "") => {
     if (!companyName && !contactName) { setOrderPoc(null); return; }
+    if (orderPoc) {
+      const sameTarget =
+        orderPoc.kind === "vendor" &&
+        normalizeCompany(orderPoc.company || "") === normalizeCompany(companyName || "") &&
+        normalizeContact(orderPoc.name || "") === normalizeContact(contactName || "");
+      if (!sameTarget) {
+        if (!window.confirm(`POC is presently ${orderPoc.name || "set"}, are you sure you want to change it?`)) return;
+      }
+    }
     setData(prev => {
       const existingIdx = (prev.vendors || []).findIndex(v =>
         normalizeCompany(v.company || "") === normalizeCompany(companyName || "") &&
@@ -5227,7 +5248,7 @@ export default function App(){
       const customers = (prev.customers || []).map(c => c.isPoc ? { ...c, isPoc: false } : c);
       return { ...prev, vendors, customers };
     });
-  }, [setOrderPoc]);
+  }, [setOrderPoc, orderPoc]);
 
   // isPocContact — true when the given company+contact pair is the active order POC.
   // Compares by normalized name + company against the resolved orderPoc.
@@ -7352,55 +7373,6 @@ export default function App(){
     });
   }, []);
 
-  const orderAttentionAlerts = useMemo(() => {
-    const items = [];
-    orderCompanyNames.forEach((companyName) => {
-      const profile = getCompanyProfile(companyName);
-      const details = [
-        ...profile.companyInstructions.map((item) => `${item.type}: ${item.text}`),
-        ...profile.specialDocuments.map((item) => `Paperwork: ${item}`),
-      ];
-      if (!details.length) return;
-      items.push({
-        key: `company:${normalizeCompany(companyName)}:${details.join("|")}`,
-        entityKey: `company:${normalizeCompany(companyName)}`,
-        title: profile.specialDocuments.length ? "Special requirements found" : "Company instructions found",
-        message: `${companyName} has saved guidance for this order.`,
-        details,
-      });
-    });
-    orderContactNames.forEach((contactName) => {
-      const profile = getContactProfile(contactName);
-      const details = [
-        ...profile.contactInstructions.map((item) => `${item.type}: ${item.text}`),
-        ...profile.specialDocuments.map((item) => `Paperwork: ${item}`),
-      ];
-      if (!details.length) return;
-      items.push({
-        key: `contact:${normalizeContact(contactName)}:${details.join("|")}`,
-        entityKey: `contact:${normalizeContact(contactName)}`,
-        title: profile.specialDocuments.length ? "Special requirements found" : "Contact instructions found",
-        message: `${contactName} has saved guidance for this order.`,
-        details,
-      });
-    });
-    return items;
-  }, [orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile]);
-
-  useEffect(() => {
-    const unseen = orderAttentionAlerts.find(
-      (item) => !seenAttentionAlertKeysRef.current.has(item.key)
-    );
-    if (!unseen) return;
-    seenAttentionAlertKeysRef.current.add(unseen.key);
-    markInstructionKeysSeen(unseen.entityKey ? [unseen.entityKey] : []);
-    setInlineAlert({
-      title: unseen.title,
-      message: unseen.message,
-      details: unseen.details,
-    });
-  }, [orderAttentionAlerts, markInstructionKeysSeen]);
-
   useEffect(() => {
     const key = insuranceCarrierLinkMissing ? normalizeCompany(data.insuranceCompany || "") : "";
     if (!key) {
@@ -8307,13 +8279,19 @@ export default function App(){
     const sameBillTo =
       (!!normalizedCompany && normalizeCompany(data.billingCompany || "") === normalizedCompany) ||
       (!!normalizedContact && normalizeContact(data.billingContact || "") === normalizedContact);
+    const companyTypeHint = normalizeCompanyType(getCompanyTypeForRoles(company || ""));
+    const isPublicAdjuster = companyTypeHint.includes("public adjust");
     return CONTACT_ROLE_BADGES.filter(role => {
       if (blocked.has(role.id) && !forced.has(role.id)) return false;
       if (forced.has(role.id)) return isRoleEligibleForCompany(role.id, company);
       if (!isRoleEligibleForCompany(role.id, company)) return false;
       if (role.id === "referrer") return !referrerAssigned || sameReferrer;
-      if (role.id === "insurance") return !insuranceAssigned || sameInsurance;
+      if (role.id === "insurance") {
+        if (isPublicAdjuster) return false;
+        return !insuranceAssigned || sameInsurance;
+      }
       if (role.id === "billto") return !billToAssigned || sameBillTo;
+      if (role.id === "poc") return true;
       return false;
     });
   }, [
@@ -8323,7 +8301,9 @@ export default function App(){
     data.insuranceAdjuster,
     data.billingCompany,
     data.billingContact,
-    isRoleEligibleForCompany
+    isRoleEligibleForCompany,
+    getCompanyTypeForRoles,
+    normalizeCompanyType
   ]);
 
   const openRoleAssignmentPrompt = useCallback(({ company, contact, source = "", skipRoles = [], preferredRoles = [], forceRoles = [] }) => {
@@ -8354,8 +8334,10 @@ export default function App(){
     if (preferredFromSource && optionIds.has(preferredFromSource)) suggested.push(preferredFromSource);
     if (titleHint.includes("adjuster") && optionIds.has("insurance")) suggested.push("insurance");
     if (companyTypeHint.includes("insurance") && optionIds.has("insurance")) suggested.push("insurance");
-    if (!suggested.length && options.length === 1) suggested.push(options[0].id);
-    const selectedDefaults = Array.from(new Set(suggested));
+    // Never auto-suggest POC — user must opt in explicitly. If POC is the only available
+    // role (e.g., Public Adjuster with Insurance hidden), leave the prompt with nothing selected.
+    if (!suggested.length && options.length === 1 && options[0].id !== "poc") suggested.push(options[0].id);
+    const selectedDefaults = Array.from(new Set(suggested)).filter((id) => id !== "poc");
     setRoleAssignModal({
       isOpen: true,
       source,
@@ -8395,6 +8377,9 @@ export default function App(){
       }
       return next;
     });
+    if (selected.has("poc") && (hasCompany || hasContact)) {
+      flagContactAsPoc(company, contact, "Order POC");
+    }
     if (hasContact || hasCompany) {
       const roleNames = CONTACT_ROLE_BADGES
         .filter(role => selected.has(role.id))
@@ -8403,7 +8388,7 @@ export default function App(){
         setToast(`Assigned ${roleNames.join(", ")} role${roleNames.length > 1 ? "s" : ""}.`);
       }
     }
-  }, [setToast, isRoleEligibleForCompany]);
+  }, [setToast, isRoleEligibleForCompany, flagContactAsPoc]);
 
   const toggleRoleAssignmentSelection = useCallback((roleId) => {
     setRoleAssignModal(prev => {
@@ -8622,7 +8607,8 @@ export default function App(){
       triggerAutoFlash(`company-${exists[0]}`);
       return;
     }
-    upsertAdditionalCompany(type, { contact: parsed.contact || "", company: parsed.company || "" });
+    const applied = upsertAdditionalCompany(type, { contact: parsed.contact || "", company: parsed.company || "" });
+    if (!applied) return;
     registerContactCompany(parsed.contact, parsed.company);
     triggerAutoFlash(`company-${type}`);
     setCompanyEdit(prev => ({ ...prev, [type]: false }));
@@ -8650,7 +8636,8 @@ export default function App(){
       triggerAutoFlash(`company-${exists[0]}`);
       return;
     }
-    upsertAdditionalCompany(nextType, { contact: contact || "", company: company || "" });
+    const applied = upsertAdditionalCompany(nextType, { contact: contact || "", company: company || "" });
+    if (!applied) return;
     registerContactCompany(contact, company);
     triggerAutoFlash(`company-${nextType}`);
     setCompanyEdit(prev => ({ ...prev, [nextType]: false }));
@@ -8898,11 +8885,34 @@ export default function App(){
   }, [data.additionalCompanies]);
 
   const autoTypeForCompany = (company) => {
+    // Prefer an explicit companyType on the matching sample row when one exists —
+    // name inference can misclassify edge cases (e.g. "United Claims" matches the
+    // "claims" rule, which is right for PAs but doesn't beat an explicit "Public Adjusting"
+    // on the sample row when one is provided).
+    const c = (company || "").trim();
+    if (!c) return inferCompanyTypeFromName(company);
+    const sampleMatch = sampleContacts.find(
+      (row) => normalizeCompany(row.company || "") === normalizeCompany(c) && !!row.companyType,
+    );
+    if (sampleMatch?.companyType) return sampleMatch.companyType;
     return inferCompanyTypeFromName(company);
   };
 
+  // Returns true when the company was applied, false when the user canceled the
+  // duplicate-firm warning. Callers gate follow-up prompts (role assignment, flash)
+  // on the return value so canceling truly cancels.
   const upsertAdditionalCompany = (type, entry) => {
     const nextType = type || autoTypeForCompany(entry?.company || "");
+    const incoming = entry || {};
+    const incomingCompany = (incoming.company || "").trim();
+    const existingForType = (data.additionalCompanies || {})[nextType];
+    if (existingForType?.company && incomingCompany && normalizeCompany(existingForType.company) !== normalizeCompany(incomingCompany)) {
+      const ok = window.confirm(
+        `Another active ${nextType.toLowerCase()} firm — "${existingForType.company}" — is already on this order.\n\n` +
+        `Cancel to keep it (and mark it inactive separately before switching). Click OK only if you mean to replace it now with "${incomingCompany}".`
+      );
+      if (!ok) return false;
+    }
     setData(prev => {
       const types = new Set(prev.additionalCompanyTypes || []);
       const entries = { ...(prev.additionalCompanies || {}) };
@@ -8920,6 +8930,11 @@ export default function App(){
         return sameContact || sameContactInList || sameCompany;
       })?.[0];
       const targetType = existingType || nextType;
+      // If user confirmed a different-company replacement, clear the old contacts so the new
+      // company gets a fresh contact slot (otherwise the old contact stays attached to the new company).
+      if (!existingType && targetType === nextType && existingForType?.company && normalizeCompany(existingForType.company) !== normalizeCompany(incomingCompany)) {
+        entries[targetType] = { ...(entries[targetType] || {}), contacts: [], contact: "" };
+      }
       if (existingType && existingType !== targetType) {
         delete entries[existingType];
         types.delete(existingType);
@@ -8951,6 +8966,7 @@ export default function App(){
       setCompanyEdit(prev => ({ ...prev, [targetType]: false }));
       return { ...prev, additionalCompanyTypes: Array.from(types), additionalCompanies: entries };
     });
+    return true;
   };
 
   useEffect(() => {
@@ -9402,7 +9418,16 @@ export default function App(){
         if (contact) patch.billingContact = contact;
       }
     }
+    if (id === "poc") {
+      flagContactAsPoc(company || "", contact || "", "Order POC");
+      return;
+    }
     if (id === "insurance") {
+      const companyTypeHint = normalizeCompanyType(getCompanyTypeForRoles(company || ""));
+      if (companyTypeHint.includes("public adjust")) {
+        setToast("Public Adjuster contacts cannot be assigned the Insurance role.");
+        return;
+      }
       if (!insuranceActive && !isRoleEligibleForCompany("insurance", company)) {
         setToast("Insurance role is not eligible for this company type.");
         return;
@@ -9572,72 +9597,9 @@ export default function App(){
               
               {entryMode === 'detailed' ? (
                 <>
-                  {(scopeBridgeState.projectStatus || scopeBridgeState.pendingIssues.length > 0) && (
-                    <button
-                      type="button"
-                      onClick={() => { jumpToSection("sec5"); setTimeout(() => setScheduleBridgeOpen(true), 150); }}
-                      className={`mb-3 w-full rounded-xl border px-4 py-2.5 text-left transition-all hover:shadow-sm ${bridgeStatusClass}`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          {(() => {
-                            const status = scopeBridgeState.projectStatus;
-                            const statusExplain = status === "green" ? "Green: ready to proceed — pickup, processing, and delivery are clear to go."
-                              : status === "yellow" ? "Yellow: in progress with at least one open blocker — resolve before final delivery."
-                              : status === "red" ? "Red: blocked — work cannot start or continue until the issues below are resolved."
-                              : "Status not set yet — open this section to mark Pickup / Processing / Delivery readiness.";
-                            const issuesText = scopeBridgeState.pendingIssues.length
-                              ? "\n\nOpen blockers:\n• " + scopeBridgeState.pendingIssues.join("\n• ")
-                              : "";
-                            return (
-                              <span title={statusExplain + issuesText} className="inline-flex items-center gap-3 cursor-help">
-                                <span className={`inline-block h-2.5 w-2.5 rounded-full ${
-                                  status === "green" ? "bg-emerald-500" :
-                                  status === "yellow" ? "bg-amber-500" :
-                                  status === "red" ? "bg-rose-500" : "bg-slate-300"
-                                }`} />
-                                <span className="text-xs font-bold uppercase tracking-wider">
-                                  Scope Status{status ? `: ${status.toUpperCase()}` : ""}
-                                </span>
-                              </span>
-                            );
-                          })()}
-                          {scopeBridgeState.pendingIssues.length > 0 && (
-                            <span
-                              title={"Blockers stopping work:\n• " + scopeBridgeState.pendingIssues.join("\n• ")}
-                              className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-800 cursor-help"
-                            >
-                              {scopeBridgeState.pendingIssues.length} blocker{scopeBridgeState.pendingIssues.length !== 1 ? "s" : ""}
-                            </span>
-                          )}
-                          {scopeBridgeState.milestones?.authorizationOnFile && (
-                            <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-800">Auth on file</span>
-                          )}
-                          {scopeBridgeState.milestones?.scopeApproved && (
-                            <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-800">Scope approved</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-400">Open</span>
-                      </div>
-                    </button>
-                  )}
-                  {/* Placeholder strip removed — now in Action Items panel */}
-                  {inlineAlert && (
-                    <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3 fade-in">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-bold text-amber-800">{inlineAlert.title}</div>
-                          <div className="text-xs text-amber-700 mt-0.5">{inlineAlert.message}</div>
-                          {inlineAlert.details?.length > 0 && (
-                            <ul className="mt-1.5 space-y-0.5">
-                              {inlineAlert.details.map((d, i) => <li key={i} className="text-[11px] text-amber-700">• {d}</li>)}
-                            </ul>
-                          )}
-                        </div>
-                        <button type="button" onClick={() => setInlineAlert(null)} className="text-amber-400 hover:text-amber-600 font-bold text-sm shrink-0">×</button>
-                      </div>
-                    </div>
-                  )}
+                  {/* Scope Status banner and Contact-instructions inline alert removed — blockers
+                      live in the Action Items panel and Save Summary; saved contact guidance is
+                      visible directly in the contact area. */}
                   <div className={compactMode ? "space-y-3" : "space-y-4"}>
 
                     <Section
@@ -9908,7 +9870,16 @@ export default function App(){
                             </SubSection>
 
                             <SubSection id="sec1-source" title="Source" open={sourceSubOpen} onToggle={(nextOpen) => setSourceSubOpen(!!nextOpen)} compact={compactMode} className={auditOn && auditTargets.subsections.has("source") ? "audit-outline" : ""}>
-                            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showCoaching} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} onPromptRoleAssignment={openRoleAssignmentPrompt} />
+                            <LeadInfoFields data={data} update={update} updateMany={updateMany} companies={companies} setModal={setModal} toggleMulti={toggleMulti} showInlineHelp={showCoaching} auditOn={auditOn} salesRep={data.salesRep} setSalesRep={(v)=>update("salesRep", v)} onApplyReferrerRoles={applyReferrerRoles} suggestedReferrerRoles={suggestedReferrerRoles} combinedContactOptions={combinedContactOptions} parseCombinedContact={parseCombinedContact} getFlashClass={getFlashClass} triggerAutoFlash={triggerAutoFlash} setToast={setToast} getSalesRepForContact={getSalesRepForContact} onOpenCrmLog={openCrmModal} onPromptRoleAssignment={openRoleAssignmentPrompt} orderPoc={orderPoc} flagContactAsPoc={flagContactAsPoc} />
+                            {data.salesRep && (
+                              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2 flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Route all customer contact via this sales rep (order-wide)</div>
+                                  <div className="text-[11px] text-amber-700/80">When on, every customer on this order shows phone/email struck-through with a "Contact via Sales Rep" note.</div>
+                                </div>
+                                <button type="button" onClick={() => update("useSalesRepOnly", !(data as any).useSalesRepOnly)} className={`shrink-0 rounded-full border-2 px-3 py-1 text-[11px] font-bold transition-all ${(data as any).useSalesRepOnly ? "border-amber-500 bg-amber-100 text-amber-800" : "border-amber-300 bg-white text-amber-700 hover:bg-amber-50"}`}>{(data as any).useSalesRepOnly ? "On ✓" : "Off"}</button>
+                              </div>
+                            )}
                             </SubSection>
 
                             {/* Interview moved to slide-out panel — accessible from floating pill */}
@@ -10138,7 +10109,7 @@ export default function App(){
                     <Section id="sec2" noeSection="customer" title="2. Customer" helpText="The primary person(s) we are performing work for and their contacts or representatives." isOpen={openSections.sec2} onHeaderClick={()=>handleToggleSection('sec2')} onCaretClick={()=>handleToggleSection('sec2')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec2") ? "audit-outline" : ""}
                     >
                       <div className="space-y-4">
-                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} onUpdatePets={(animals, considerations) => { update("householdAnimals", animals); update("sdsConsiderations", considerations); }} household={data.household || []} orderPoc={orderPoc} onSetOrderPoc={setOrderPoc} />)}
+                        {data.customers.map((c,i)=><CustomerItem key={c.id} c={c} index={i} total={data.customers.length} updateCust={updateCust} onRemove={removeCust} highlightMissing={data.highlightMissing} auditOn={auditOn} onAddHousehold={addHouseholdMember} onSendWelcome={handleSendWelcome} contacts={contacts} sdsConsiderations={data.sdsConsiderations || []} householdAnimals={data.householdAnimals || ""} onUpdatePets={(animals, considerations) => { update("householdAnimals", animals); update("sdsConsiderations", considerations); }} household={data.household || []} orderPoc={orderPoc} onSetOrderPoc={setOrderPoc} salesRep={data.salesRep || ""} orderUseSalesRepOnly={!!(data as any).useSalesRepOnly} />)}
                         <div className="pt-2"><button onClick={addNewCustomer} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Customer</button></div>
                         {/* Household — people + pets at the household level */}
                         {(() => {
@@ -10432,10 +10403,12 @@ export default function App(){
                                             </div>
                                           )}
                                         </button>
-                                        <button
-                                          type="button"
+                                        <div
+                                          role="button"
+                                          tabIndex={0}
                                           onClick={() => openCompanyRolePicker(role)}
-                                          className={`md:col-span-5 w-full text-left rounded-lg px-2 py-1 text-sm transition hover:bg-slate-50`}
+                                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCompanyRolePicker(role); } }}
+                                          className={`md:col-span-5 w-full text-left rounded-lg px-2 py-1 text-sm transition hover:bg-slate-50 cursor-pointer`}
                                           title="Edit company"
                                         >
                                           {idx === 0 && (
@@ -10459,7 +10432,7 @@ export default function App(){
                                                       <button
                                                         key={`${role.id}-${r.title}`}
                                                         type="button"
-                                                        onClick={() => toggleRoleForContact(role.companyName, "", r.id || r.title?.toLowerCase())}
+                                                        onClick={(e) => { e.stopPropagation(); toggleRoleForContact(role.companyName, "", r.id || r.title?.toLowerCase()); }}
                                                         className="rounded-full"
                                                         title="Click to toggle role"
                                                       >
@@ -10474,11 +10447,13 @@ export default function App(){
                                               })()}
                                             </div>
                                           )}
-                                        </button>
-                                        <button
-                                          type="button"
+                                        </div>
+                                        <div
+                                          role="button"
+                                          tabIndex={0}
                                           onClick={() => openCompanyRolePicker(role)}
-                                          className={`md:col-span-4 w-full text-left rounded-lg px-2 py-1 text-sm transition hover:bg-slate-50`}
+                                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCompanyRolePicker(role); } }}
+                                          className={`md:col-span-4 w-full text-left rounded-lg px-2 py-1 text-sm transition hover:bg-slate-50 cursor-pointer`}
                                           title="Edit contact"
                                         >
                                           {c?.name ? (
@@ -10531,7 +10506,7 @@ export default function App(){
                                               <EditAffordance title="Add contact" />
                                             </div>
                                           )}
-                                        </button>
+                                        </div>
                                       </div>
                                       <div className="mt-2 md:grid md:grid-cols-12 md:gap-2">
                                         <div className="hidden md:block md:col-span-3" />
@@ -11525,6 +11500,7 @@ export default function App(){
                     onSwitchToDetailed={() => setEntryMode('detailed')}
                     orderPoc={orderPoc}
                     setOrderPoc={setOrderPoc}
+                    flagContactAsPoc={flagContactAsPoc}
                 />
               )}
 
@@ -11618,7 +11594,7 @@ export default function App(){
                   </div>
                   </> );
               })()}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <div id="noe-interview-scroll" className="flex-1 overflow-y-auto p-3 space-y-2">
                 {!interviewSearch && showCoaching && !dismissedCoaching.has("interview-header") && (
                   <div className="mb-2">
                     <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.interview")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "interview-header"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>
@@ -11628,10 +11604,10 @@ export default function App(){
                 {isFieldVisible("damageWasWet") && matchesInterviewSearch("Is anything still wet or damaged", "Still Wet Visible Mold Structural Damage No Electricity No Heat Boarded Up", [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural Damage" : "", data.noLights ? "No Electricity" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""]) && (() => {
                   const log = (data.interviewLog || {}).conditions;
                   const hasAnswers = data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp;
-                  const answered = hasAnswers || !!log;
+                  const answered = hasAnswers;
                   const summary = [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural" : "", data.noLights ? "No Power" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""].filter(Boolean).join(", ") || (!!log && !hasAnswers ? "None" : "");
-                  const expanded = interviewExpanded.conditions !== false;
-                  return <div className={`rounded-xl border ${answered ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  const expanded = !!interviewSearch.trim() || interviewExpanded.conditions === true;
+                  return <div className={`noe-iq rounded-xl border ${answered ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                   <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: !p.conditions})); if (!log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                     <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">1</span>{highlightSearch(expanded ? "Is anything still wet or damaged?" : "Conditions")}</div>
                     {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
@@ -11663,7 +11639,7 @@ export default function App(){
                       <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${i.label}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                     </div>
                   ))}
-                  {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                  {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, conditions: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                   </div>}
                 </div>;
                 })()}
@@ -11672,10 +11648,10 @@ export default function App(){
                 {isFieldVisible("repairsSummary") && matchesInterviewSearch("repairs contractor", "Just Cleaning Paint Refinish Floors Replace Floors Cosmetic Damage Major Structural Complete Rebuild", data.repairsSummary) && (() => {
                   const log = (data.interviewLog || {}).repairs;
                   const hasAnswers = !!data.repairsSummary;
-                  const answered = hasAnswers || !!log;
+                  const answered = hasAnswers;
                   const summary = data.repairsSummary || (!!log && !hasAnswers ? "None" : "");
-                  const expanded = interviewExpanded.repairs !== false;
-                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden`}>
+                  const expanded = !!interviewSearch.trim() || interviewExpanded.repairs === true;
+                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden`}>
                     <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: !p.repairs})); if (!log && answered) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">2</span>{highlightSearch(expanded ? "What repairs are being done by the contractor?" : "Repairs")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
@@ -11701,16 +11677,16 @@ export default function App(){
                           <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
                         </div>
                       ))}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, repairs: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), repairs: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ml-auto border-slate-200 text-slate-500 hover:bg-slate-50`}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, repairs: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all border-slate-300 text-slate-500`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
 
                 {/* Packout Scope (Q3) */}
                 {matchesInterviewSearch("packout packing", "No Packout Content Manipulation Partial Packout Full Packout packing furniture", (data as any).packoutScope, (data as any).packoutNote) && (() => {
-                  const log = (data.interviewLog || {}).packoutScope; const hasAnswers = !!(data as any).packoutScope; const answered = hasAnswers || !!log; const summary = (data as any).packoutScope || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packoutScope !== false;
+                  const log = (data.interviewLog || {}).packoutScope; const hasAnswers = !!(data as any).packoutScope; const answered = hasAnswers; const summary = (data as any).packoutScope || (!!log && !hasAnswers ? "None" : ""); const expanded = !!interviewSearch.trim() || interviewExpanded.packoutScope === true;
                   const PACKOUT_SCOPES = ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout", "TBD"];
-                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden`}>
+                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packoutScope: !p.packoutScope}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">3</span>{highlightSearch(expanded ? "Will packing out of hard furnishings be necessary?" : "Packout")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
@@ -11735,15 +11711,15 @@ export default function App(){
                           <textarea value={(data as any).packoutNote || ""} onChange={e => update("packoutNote", e.target.value)} placeholder="e.g. Heavy furniture on 2nd floor, fragile china cabinet..." className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] outline-none focus:border-sky-300 resize-none" rows={2} />
                         </div>
                       )}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packoutScope: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packoutScope: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ml-auto border-slate-200 text-slate-500 hover:bg-slate-50`}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, packoutScope: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all border-slate-300 text-slate-500`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
 
                 {/* Packout Items (Q4) */}
                 {isFieldVisible("packoutSummary") && matchesInterviewSearch("picking up", "Rugs Window Treatments Clothing Bedding Furniture Art Electronics Hardware Appliances", data.packoutSummary) && (() => {
-                  const log = (data.interviewLog || {}).packout; const hasAnswers = (data.packoutSummary || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.packoutSummary || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.packout !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  const log = (data.interviewLog || {}).packout; const hasAnswers = (data.packoutSummary || []).length > 0; const answered = hasAnswers; const summary = (data.packoutSummary || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = !!interviewSearch.trim() || interviewExpanded.packout === true;
+                  return <div className={`noe-iq rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: !p.packout}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">4</span>{highlightSearch(expanded ? "What type of items will we be cleaning?" : "Cleaning")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
@@ -11761,15 +11737,15 @@ export default function App(){
                           <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                         </div>
                       ))}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, packout: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), packout: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, packout: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
 
                 {/* Load List */}
                 {isFieldVisible("loadList") && matchesInterviewSearch("need to bring", "Tall Ladder Extra Manpower Floor Protection Dollies Wardrobe Boxes TV Boxes Blankets Plastic Bags", data.loadList, (data as any).loadListNote) && (() => {
-                  const log = (data.interviewLog || {}).loadList; const hasAnswers = (data.loadList || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.loadList || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.loadList !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  const log = (data.interviewLog || {}).loadList; const hasAnswers = (data.loadList || []).length > 0; const answered = hasAnswers; const summary = (data.loadList || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = !!interviewSearch.trim() || interviewExpanded.loadList === true;
+                  return <div className={`noe-iq rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">5</span>{highlightSearch(expanded ? "What do we need to bring?" : "Bring")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
@@ -11803,17 +11779,17 @@ export default function App(){
                       })()}
                       {matchLoadTargets(data).length > 0 && <div className="text-[10px] text-amber-600">✦ Auto-suggested based on conditions/packout/loss type</div>}
                       <Input value={(data as any).loadListNote || ""} onChange={e => update("loadListNote", e.target.value)} placeholder="Additional notes about what to bring..." className="!text-xs" />
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, loadList: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), loadList: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
 
                 {/* Considerations */}
                 {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity", data.sdsConsiderations) && (() => {
-                  const log = (data.interviewLog || {}).considerations; const hasAnswers = (data.sdsConsiderations || []).length > 0; const answered = hasAnswers || !!log; const summary = (data.sdsConsiderations || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = interviewExpanded.considerations !== false;
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  const log = (data.interviewLog || {}).considerations; const hasAnswers = (data.sdsConsiderations || []).length > 0; const answered = hasAnswers; const summary = (data.sdsConsiderations || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = !!interviewSearch.trim() || interviewExpanded.considerations === true;
+                  return <div className={`noe-iq rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">6</span>{highlightSearch(expanded ? "Special considerations" : "Special")}</div>
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">6</span>{highlightSearch("Considerations")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
                     </button>
                     {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
@@ -11840,7 +11816,7 @@ export default function App(){
                           <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                         </div>
                       ))}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, considerations: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), considerations: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -11850,11 +11826,11 @@ export default function App(){
                   const pets = (data.household || []).filter(m => m.category === "pet");
                   const log = (data.interviewLog || {}).pets;
                   const hasAnswers = pets.length > 0;
-                  const answered = hasAnswers || !!log;
+                  const answered = hasAnswers;
                   const summary = pets.map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ") || (!!log && !hasAnswers ? "None" : "");
-                  const expanded = interviewExpanded.pets !== false;
+                  const expanded = !!interviewSearch.trim() || interviewExpanded.pets === true;
                   const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"];
-                  return <div className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                  return <div className={`noe-iq rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: !p.pets}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">7</span>{highlightSearch(expanded ? "Pets in home?" : "Pets")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
@@ -11921,24 +11897,25 @@ export default function App(){
                         <div className="flex-1">🎓 <span className="font-bold">Pets:</span> {interviewActions["Pets"]?.coaching || "Please make sure your pets are secured in a safe room."}</div>
                         <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-Pets"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
                       </div>}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, pets: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
 
                 {/* Customer Preferences — individual Y/N questions */}
                 {[
-                  { key: "medical", configKey: "familyMedicalIssues", title: "Any medical issues?", searchTerms: "medical health asthma", isAnswered: () => !!data.familyMedicalIssues, summary: () => data.familyMedicalIssues === "Y" ? `Yes${data.familyMedicalNote ? ": " + data.familyMedicalNote : ""}` : "No" },
-                  { key: "allergies", configKey: "soapFragAllergies", title: "Soap or fragrance allergies?", searchTerms: "allergy allergies detergent soap fragrance sensitive", isAnswered: () => !!data.soapFragAllergies, summary: () => data.soapFragAllergies === "Y" ? `Yes${data.soapFragNote ? ": " + data.soapFragNote : ""}` : "No" },
-                  { key: "selfClean", configKey: "selfCleaning", title: "Self-clean anything?", searchTerms: "drawers undergarments linens towels baby items clean themselves", isAnswered: () => !!data.selfCleaning, summary: () => data.selfCleaning === "Y" ? `Yes${data.selfCleaningNote ? ": " + data.selfCleaningNote : ""}` : "No" },
-                  { key: "dryCleaner", configKey: "useDryCleaner", title: "Use a dry cleaner?", searchTerms: "dry cleaner dry cleaning", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
-                  { key: "laundry", configKey: "howDryLaundry", title: "How do they dry laundry?", searchTerms: "air dry low heat dryer machine", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
+                  { key: "medical", configKey: "familyMedicalIssues", title: "Medical Issues", searchTerms: "medical health asthma", isAnswered: () => !!data.familyMedicalIssues, summary: () => data.familyMedicalIssues === "Y" ? `Yes${data.familyMedicalNote ? ": " + data.familyMedicalNote : ""}` : "No" },
+                  { key: "allergies", configKey: "soapFragAllergies", title: "Allergies", searchTerms: "allergy allergies detergent soap fragrance sensitive", isAnswered: () => !!data.soapFragAllergies, summary: () => data.soapFragAllergies === "Y" ? `Yes${data.soapFragNote ? ": " + data.soapFragNote : ""}` : "No" },
+                  { key: "selfClean", configKey: "selfCleaning", title: "Self-Cleaning", searchTerms: "drawers undergarments linens towels baby items clean themselves", isAnswered: () => !!data.selfCleaning, summary: () => data.selfCleaning === "Y" ? `Yes${data.selfCleaningNote ? ": " + data.selfCleaningNote : ""}` : "No" },
+                  { key: "dryCleaner", configKey: "useDryCleaner", title: "Dry Cleaner", searchTerms: "dry cleaner dry cleaning", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
+                  { key: "laundry", configKey: "howDryLaundry", title: "Drying Preference", searchTerms: "air dry low heat dryer machine", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
                 ].filter(q => isFieldVisible(q.configKey) && matchesInterviewSearch(q.title, q.searchTerms || "")).map((q, qi) => {
-                  const log = (data.interviewLog || {})[q.key]; const hasAnswers = q.isAnswered(); const answered = hasAnswers || !!log;
+                  const log = (data.interviewLog || {})[q.key]; const hasAnswers = q.isAnswered(); const answered = hasAnswers;
                   const needsFollowUp = (q.key === "medical" && data.familyMedicalIssues === "Y") || (q.key === "allergies" && data.soapFragAllergies === "Y") || (q.key === "selfClean" && data.selfCleaning === "Y");
-                  const expanded = !answered || interviewExpanded[q.key] || (needsFollowUp && interviewExpanded[q.key] !== false);
+                  const userPref = interviewExpanded[q.key];
+                  const expanded = !!interviewSearch.trim() || userPref === true;
                   return (
-                    <div key={q.key} className={`rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                    <div key={q.key} className={`noe-iq rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
                       <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: !p[q.key]})); if (answered && !log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                         <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">{8 + qi}</span>{highlightSearch(q.title)}</div>
                         {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{q.summary()}</span>}
@@ -11972,7 +11949,7 @@ export default function App(){
                             <Input value={data.howDryNote || ""} onChange={e => update("howDryNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
                           </div>}
                         </>}
-                        <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`block w-fit ml-auto rounded-md px-3 py-1.5 text-xs font-bold text-white mt-2 ${hasAnswers ? "bg-sky-500 hover:bg-sky-600" : "bg-slate-400 hover:bg-slate-500"}`}>Done</button>
+                        <button type="button" onClick={() => setInterviewExpanded(p => ({...p, [q.key]: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"} block`}>Collapse</button>
                       </div>}
                     </div>
                   );
@@ -12029,9 +12006,9 @@ export default function App(){
                   const timeline = data.livingTimeline || [];
                   const log = (data.interviewLog || {}).living;
                   const hasAnswers = timeline.length > 0 || !!data.livingStatus;
-                  const answered = hasAnswers || !!log;
+                  const answered = hasAnswers;
 	                  const summary = timeline.length > 0 ? timeline.map(s => s.type).join(" → ") : data.livingStatus || (!!log && !hasAnswers ? "N/A" : "");
-	                  const expanded = true; // Always open so user can enter address details
+	                  const expanded = !!interviewSearch.trim() || interviewExpanded.living === true;
                   const STAY_TYPES = [
                     { id: "Neighbor", desc: "Staying next door" },
                     { id: "Relative", desc: "Family member's home" },
@@ -12089,9 +12066,9 @@ export default function App(){
                   };
                   const DURATION_OPTIONS = ["A few days", "1-2 weeks", "1 month", "2-3 months", "6+ months", "Until repairs done"];
 
-                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">13</span>{highlightSearch(expanded ? "Will the customer be able to stay in the home?" : "Living")}</div>
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">13</span>{highlightSearch("Staying in Home")}</div>
                       {answered && !expanded && <div className="flex items-center gap-1 ml-2">
                         {timeline.length > 0 ? timeline.map((s, i) => (
                           <span key={s.id} className="text-[10px] text-emerald-600">{i > 0 && " → "}{s.type}{s.duration ? ` (${s.duration})` : ""}</span>
@@ -12209,7 +12186,7 @@ export default function App(){
                         </div>
                       </div>}
 
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, living: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), living: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -12218,10 +12195,10 @@ export default function App(){
                 {isFieldVisible("rushDeliveryNeeded") && matchesInterviewSearch("rush delivery needed urgent ASAP", "rush immediate", data.rushDeliveryNeeded === "Y" ? "Rush yes" : data.rushDeliveryNeeded === "N" ? "Rush no" : "", (data as any).rushDeclinedNote) && (() => {
                   const log = (data.interviewLog || {}).rushDelivery;
                   const hasAnswers = !!data.rushDeliveryNeeded;
-                  const answered = hasAnswers || !!log;
-                  const expanded = interviewExpanded.rushDelivery !== false;
+                  const answered = hasAnswers;
+                  const expanded = !!interviewSearch.trim() || interviewExpanded.rushDelivery === true;
                   const summary = data.rushDeliveryNeeded === "Y" ? "Yes — Rush group added" : data.rushDeliveryNeeded === "N" ? "No" : "";
-                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, rushDelivery: !p.rushDelivery}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">14</span>{highlightSearch(expanded ? "Does the customer need a rush delivery?" : "Rush")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold ml-2">{summary}</span>}
@@ -12263,7 +12240,7 @@ export default function App(){
                           <textarea value={(data as any).rushDeclinedNote || ""} onChange={e => update("rushDeclinedNote", e.target.value)} placeholder="Reason or additional context..." className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] outline-none focus:border-sky-300 resize-none" rows={2} />
                         </div>
                       )}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, rushDelivery: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), rushDelivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, rushDelivery: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -12273,10 +12250,10 @@ export default function App(){
                 {(() => {
                   const log = (data.interviewLog || {}).interests;
                   const hasAnswers = (data.rushInterests || []).length > 0;
-                  const answered = hasAnswers || !!log;
+                  const answered = hasAnswers;
                   const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ") || (!!log && !hasAnswers ? "None" : "");
-                  const expanded = interviewExpanded.interests !== false;
-                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                  const expanded = !!interviewSearch.trim() || interviewExpanded.interests === true;
+                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !expanded}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">15</span>{highlightSearch("Activities & interests")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
@@ -12292,7 +12269,7 @@ export default function App(){
                           </button>;
                         })}
                       </div>
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, interests: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -12301,12 +12278,12 @@ export default function App(){
                 {(() => {
                   const log = (data.interviewLog || {}).events;
                   const hasAnswers = (data.upcomingEvents || []).length > 0;
-                  const answered = hasAnswers || !!log;
+                  const answered = hasAnswers;
                   const summary = (data.upcomingEvents || []).map(e => e.name || "Event").join(", ") || (!!log && !hasAnswers ? "None" : "");
-                  const expanded = interviewExpanded.events !== false;
-                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                  const expanded = !!interviewSearch.trim() || interviewExpanded.events === true;
+                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">16</span>{highlightSearch("Upcoming trips & events")}</div>
+                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">16</span>{highlightSearch("Trips / Events")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
   
                     </button>
@@ -12343,7 +12320,7 @@ export default function App(){
                         <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "trip", date: "", name: "Trip"}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="flex-1 p-2 border-2 border-dashed border-slate-300 rounded-lg text-[11px] font-bold text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Add Trip</button>
                         <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "event", date: "", name: "Event"}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="flex-1 p-2 border-2 border-dashed border-slate-300 rounded-lg text-[11px] font-bold text-slate-500 hover:border-amber-400 hover:text-amber-600">+ Add Event</button>
                       </div>
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, events: false})); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -12353,13 +12330,13 @@ export default function App(){
                   const selectedGroups = data.suggestedGroups || [];
                   const groupDetails = (data as any).deliveryGroupDetails || {};
                   const hasAnswers = selectedGroups.length > 0 || !!data.estimatedReturnDate;
-                  const answered = hasAnswers || !!log;
-                  const expanded = interviewExpanded.groupBuilder !== false;
+                  const answered = hasAnswers;
+                  const expanded = !!interviewSearch.trim() || interviewExpanded.groupBuilder === true;
                   const hasFinal = selectedGroups.some(g => g.endsWith("FD") || g === "LTFD" || g === "STFD" || g === "RFD") || !!(groupDetails as any).__finalDate;
                   const finalDate = data.estimatedReturnDate || "";
                   const summary = selectedGroups.length > 0 ? selectedGroups.join(", ") + (finalDate ? ` → ${finalDate}` : "") : finalDate ? `Final: ${finalDate}` : "";
 	                  const logBoth = () => setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), suggestedGroups: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}, finalDeliveryDate: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
-                  return <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
+                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, groupBuilder: !p.groupBuilder}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">17</span>{highlightSearch("Delivery Planner")}</div>
                       {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
@@ -12459,7 +12436,7 @@ export default function App(){
                           </div>
                         </div>
                       )}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, groupBuilder: false})); logBoth(); }} className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-all ${hasAnswers ? "border-sky-300 text-sky-600 hover:bg-sky-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}ml-auto `}>Collapse</button></div>}
+                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, groupBuilder: false})); logBoth(); }} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
                     </div>}
                   </div>;
                 })()}
@@ -12528,24 +12505,28 @@ export default function App(){
                       </div>}
                       <button type="button" onClick={() => setActionItemsBlockerOpen(true)} className="w-full rounded-xl border-2 border-dashed border-rose-300 bg-rose-50/50 px-4 py-3 text-sm font-bold text-rose-600 hover:bg-rose-50 hover:border-rose-400 transition-all">+ Add Blocker</button>
                     </> : <>
-                      <div className="space-y-3">
+                      <div className="rounded-2xl border-2 border-rose-300 bg-rose-50/40 p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Assign a Blocker</div>
+                          <button type="button" onClick={() => setActionItemsBlockerOpen(false)} className="text-rose-400 hover:text-rose-600 text-base font-bold leading-none" title="Close blocker picker">×</button>
+                        </div>
                         {BRIDGE_BLOCKER_GROUPS.map(group => (
-                          <div key={group.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                            <div className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">{group.label}</div>
+                          <div key={group.id} className="rounded-xl border border-rose-200 bg-white p-3">
+                            <div className="text-xs font-bold text-rose-700 uppercase tracking-wide mb-2">{group.label}</div>
                             <div className="space-y-1.5">
                               {group.issues.map(issue => {
                                 const active = formalBlockers.includes(issue);
-                                return <button key={issue} type="button" onClick={() => toggleScopeBridgeIssue(issue)} className={`w-full text-left rounded-lg border-2 px-3 py-2.5 text-[13px] font-bold transition-all ${active ? "border-rose-400 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-600 hover:border-rose-300 hover:bg-rose-50/30"}`}>
+                                return <button key={issue} type="button" onClick={() => toggleScopeBridgeIssue(issue)} className={`w-full text-left rounded-lg border px-3 py-2.5 text-[13px] font-bold transition-all ${active ? "border-slate-300 bg-rose-100 text-rose-800" : "border-slate-200 bg-white text-slate-700 hover:bg-rose-50"}`}>
                                   <div className="flex items-center justify-between">
                                     <span>{issue}</span>
-                                    {active && <span className="text-rose-500 text-xs">Active ✓</span>}
+                                    {active && <span className="text-rose-600 text-xs">Active ✓</span>}
                                   </div>
                                 </button>;
                               })}
                             </div>
                           </div>
                         ))}
-                        <button type="button" onClick={() => setActionItemsBlockerOpen(false)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">Done</button>
+                        <button type="button" onClick={() => setActionItemsBlockerOpen(false)} className="w-full rounded-xl border-2 border-rose-300 bg-white px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-50">Close Add Blocker</button>
                       </div>
                     </>}
                   </div>
@@ -12684,18 +12665,61 @@ export default function App(){
                       </div>
                     </div>
                   )}
-                  {missing.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Missing Fields</div>
-                      <div className="space-y-1">
-                        {missing.map((m, i) => (
-                          <button key={`m-${i}`} onClick={() => { setActionItemsOpen(false); focusAuditItem(m); }} className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 hover:bg-sky-50 hover:border-sky-300">
-                            {m.label}
-                          </button>
-                        ))}
+                  {missing.length > 0 && (() => {
+                    const groupMeta: { id: string; label: string; defaultOpen: boolean; match: (m: any) => boolean }[] = [
+                      { id: "customer", label: "Customer", defaultOpen: false, match: (m) => m.section === "sec2" },
+                      { id: "insurance", label: "Insurance / Adjuster", defaultOpen: false, match: (m) => m.section === "sec4" && /insur|adjust|claim|carrier|polic/i.test(m.label || "") },
+                      { id: "billing", label: "Billing & Companies", defaultOpen: true, match: (m) => m.section === "sec4" },
+                      { id: "order", label: "Order Details", defaultOpen: true, match: (m) => m.section === "sec1" },
+                      { id: "address", label: "Address", defaultOpen: true, match: (m) => m.section === "sec3" },
+                      { id: "scope", label: "Scope & Schedule", defaultOpen: true, match: (m) => m.section === "sec5" },
+                    ];
+                    const grouped: Record<string, any[]> = {};
+                    const remainder: any[] = [];
+                    missing.forEach((m) => {
+                      const g = groupMeta.find((g) => g.match(m));
+                      if (g) { (grouped[g.id] = grouped[g.id] || []).push(m); }
+                      else remainder.push(m);
+                    });
+                    return (
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Missing Fields</div>
+                        <div className="space-y-2">
+                          {groupMeta.map((g) => {
+                            const items = grouped[g.id] || [];
+                            if (!items.length) return null;
+                            const isOpen = actionItemsGroupOpen[g.id] ?? g.defaultOpen;
+                            return (
+                              <div key={g.id} className="rounded-lg border border-slate-200 overflow-hidden">
+                                <button type="button" onClick={() => setActionItemsGroupOpen((prev) => ({ ...prev, [g.id]: !isOpen }))} className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700">
+                                  <span>{g.label} <span className="text-slate-400 font-normal">({items.length})</span></span>
+                                  <span className="text-slate-400">{isOpen ? "▾" : "▸"}</span>
+                                </button>
+                                {isOpen && (
+                                  <div className="space-y-1 p-2">
+                                    {items.map((m, i) => (
+                                      <button key={`m-${g.id}-${i}`} onClick={() => { setActionItemsOpen(false); focusAuditItem(m); }} className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 hover:bg-sky-50 hover:border-sky-300">
+                                        {m.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {remainder.length > 0 && (
+                            <div className="space-y-1">
+                              {remainder.map((m, i) => (
+                                <button key={`m-other-${i}`} onClick={() => { setActionItemsOpen(false); focusAuditItem(m); }} className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 hover:bg-sky-50 hover:border-sky-300">
+                                  {m.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   {data.reminderEnabled && data.reminderDate && (
                     <div>
                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Reminders</div>
@@ -13292,14 +13316,14 @@ export default function App(){
           }
 
           return (
-            <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setRushGuideOpen(false); }} tabIndex={-1}>
+            <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") { setRushGuideOpen(false); } }} tabIndex={-1}>
               <div className="flex-shrink-0 flex items-center gap-3 bg-teal-600 px-5 py-3 shadow-sm z-10">
                 <span className="text-lg">📋</span>
                 <span className="text-sm font-bold text-white">Rush Guide</span>
                 {primaryCustomer.first && <span className="text-teal-200 text-xs">for {[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ")}</span>}
                 <div className="flex-1" />
                 <span className="text-teal-200 text-xs">Auto-generated from interview</span>
-                <button onClick={() => setRushGuideOpen(false)} className="text-teal-200 hover:text-white text-lg font-bold ml-3">×</button>
+                <button onClick={() => { setRushGuideOpen(false); }} className="text-teal-200 hover:text-white text-lg font-bold ml-3">×</button>
               </div>
               <div className="flex-1 overflow-y-auto">
                 <div className="max-w-3xl mx-auto p-6 space-y-6">
@@ -14898,6 +14922,14 @@ export default function App(){
               <button onClick={() => setPreviewOpen(false)} className="text-white/70 hover:text-white text-lg font-bold">✕</button>
             </div>
             <div className="p-6 space-y-4 overflow-y-auto custom-scroll flex-1">
+              {(scopeBridgeState.pendingIssues || []).length > 0 && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-rose-200/60 text-sm font-bold text-rose-700">Open Blockers ({(scopeBridgeState.pendingIssues || []).length})</div>
+                  <ul className="list-disc pl-8 pr-4 py-2 text-sm text-rose-700 space-y-0.5">
+                    {(scopeBridgeState.pendingIssues || []).map((b, i) => <li key={`blk-${i}`}>{b}</li>)}
+                  </ul>
+                </div>
+              )}
               {saveSummaryMissing.length > 0 && (() => {
                 const [missingOpen, setMissingOpen] = [saveMissingOpen, setSaveMissingOpen];
                 return (

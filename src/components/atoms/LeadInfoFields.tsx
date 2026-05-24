@@ -24,6 +24,7 @@ export const LeadInfoFields = memo(
     salesRep, setSalesRep, onApplyReferrerRoles, suggestedReferrerRoles,
     combinedContactOptions, parseCombinedContact, triggerAutoFlash, setToast,
     getSalesRepForContact, onOpenCrmLog, onAddNewToSystem, dismissTip,
+    orderPoc, flagContactAsPoc,
   }) => {
     const referrerDisplayValue =
       data.referrer && data.referringCompany ? `${data.referrer} — ${data.referringCompany}` :
@@ -131,6 +132,7 @@ export const LeadInfoFields = memo(
               <ReferrerRoleAssignment
                 data={data} updateMany={updateMany}
                 referrerDisplayValue={referrerDisplayValue} setToast={setToast}
+                orderPoc={orderPoc} flagContactAsPoc={flagContactAsPoc}
               />
             )}
             <button onClick={onOpenCrmLog} className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 hover:text-sky-700">

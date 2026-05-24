@@ -3,6 +3,7 @@ import React, { useState, useEffect, memo } from "react";
 import { Field } from "./Field";
 import { Input } from "./Input";
 import { SearchSelect } from "./SearchSelect";
+import { Select } from "./Select";
 import { Chevron } from "./Chevron";
 import { ToggleMulti } from "./ToggleMulti";
 import { CustomerActionMenu } from "./CustomerActionMenu";
@@ -16,7 +17,7 @@ import { formatPhoneNumber } from "../../utils/format";
 // or when `c._forceOpen` flips. Renders action menu, welcome panel, quick-notes panel
 // as separate atoms gated by `c._showMenu` / `c.showWelcomePanel` / `c.showQuickNotes`.
 export const CustomerItem = memo(
-  ({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onSendWelcome, orderPoc, onSetOrderPoc }) => {
+  ({ c, index, total, updateCust, onRemove, highlightMissing, auditOn, onSendWelcome, orderPoc, onSetOrderPoc, salesRep, orderUseSalesRepOnly }) => {
     const toggleList = (list, value) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
     const customerDisplayName = [c.first, c.last].filter(hasMeaningfulValue).join(" ").trim();
     const [open, setOpen] = useState(!customerDisplayName);
@@ -29,7 +30,7 @@ export const CustomerItem = memo(
         const card = document.querySelector(`[data-customer-id="${c.id}"]`);
         if (!card) return;
         if (!hasMeaningfulValue(c.type)) {
-          const typeInput = card.querySelector('input[placeholder="Type..."], [class*="SearchSelect"] input');
+          const typeInput = card.querySelector('select[data-audit-key="custType"], select');
           if (typeInput) { typeInput.focus(); return; }
         }
         const firstInput = card.querySelector('input[data-audit-key="custFirst"], input:not([type="hidden"])');
@@ -43,6 +44,23 @@ export const CustomerItem = memo(
     const canSendWelcome = hasMobile && !c.doNotContact;
     const hasContact = hasMeaningfulValue(c.phone) || hasMeaningfulValue(c.email);
     const isIncomplete = customerPlaceholder || !hasMeaningfulValue(c.last) || (hasMeaningfulValue(c.first) && !hasContact);
+
+    // Order-level routing flags: contactRestricted is true when an Order POC is set or
+    // the order is "Use Sales Rep Only". Phone/email are shown but visually struck-through
+    // so it's obvious not to contact this customer directly.
+    const isThisCustomerPoc = !!(orderPoc && orderPoc.kind === "customer" && orderPoc.id === c.id);
+    const restrictedByPoc = !!orderPoc && !isThisCustomerPoc;
+    const restrictedBySalesRep = !!orderUseSalesRepOnly;
+    const contactRestricted = restrictedByPoc || restrictedBySalesRep;
+    const routingReason = restrictedByPoc
+      ? `Contact via Order POC${orderPoc.name ? `: ${orderPoc.name}` : ""}`
+      : restrictedBySalesRep
+      ? `Contact via Sales Rep${salesRep ? `: ${salesRep.split(",")[0]}` : ""}`
+      : "";
+    const routingChipClass = restrictedByPoc
+      ? "bg-violet-100 border border-violet-300 text-violet-700"
+      : "bg-amber-100 border border-amber-300 text-amber-700";
+    const routingShortChip = restrictedByPoc ? "via Order POC" : "via Sales Rep";
 
     const toggleQuickNote = (noteLabel) => {
       const nextNotes = toggleList(c.quickNotes || [], noteLabel);
@@ -107,75 +125,63 @@ export const CustomerItem = memo(
             {customerPlaceholder && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold placeholder-chip">Placeholder</span>}
             {c.contacted && <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Contacted</span>}
             {c.doNotContact && <span className="rounded-full bg-rose-100 border border-rose-300 px-2 py-0.5 text-[10px] font-bold text-rose-700">Do Not Contact</span>}
-            {c.isPoc && <span className="rounded-full bg-violet-100 border border-violet-300 px-2 py-0.5 text-[10px] font-bold text-violet-700">POC</span>}
-            {c.useSalesRepOnly && <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700">Sales Rep Only</span>}
-            {c.contactViaRep && !c.useSalesRepOnly && <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700">Via Rep</span>}
+            {isThisCustomerPoc && <span className="rounded-full bg-violet-100 border border-violet-300 px-2 py-0.5 text-[10px] font-bold text-violet-700" title="This customer is the Order POC — the team contacts them directly on behalf of the others.">POC</span>}
+            {contactRestricted && <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${routingChipClass}`} title={routingReason}>{routingReason}</span>}
           </div>
           {!customerPlaceholder && (
             <div className="flex flex-wrap gap-1.5">
               <ToggleMulti className={open ? "" : "!py-1 !px-2"} label="Primary" title={DEFAULT_COACHING["role.Primary"]} checked={!!c.isPrimary} onChange={() => updateCust(c.id, { isPrimary: !c.isPrimary })} colorClass="!bg-sky-50 !border-sky-300 !text-sky-700" showDot={false} />
               <ToggleMulti className={open ? "" : "!py-1 !px-2"} label="Policy Holder" title={DEFAULT_COACHING["role.Policyholder"]} checked={!!c.policyHolder} onChange={() => updateCust(c.id, { policyHolder: !c.policyHolder })} />
               <ToggleMulti className={open ? "" : "!py-1 !px-2"} label="Self Pay" checked={!!c.selfPay} onChange={() => updateCust(c.id, { selfPay: !c.selfPay })} />
-              <ToggleMulti
-                className={open ? "" : "!py-1 !px-2"}
-                label="POC"
-                title="Mark this customer as the Order Point of Contact. Only one POC per order."
-                checked={!!c.isPoc}
-                onChange={() => onSetOrderPoc?.(c.isPoc ? null : { kind: "customer", id: c.id })}
-                colorClass="!bg-violet-50 !border-violet-300 !text-violet-700"
-              />
             </div>
           )}
         </div>
 
         {open && (
           <div className="grid gap-4 pl-1 sm:pl-2">
-            {/* Order POC reference — surfaces the linked POC without retyping. */}
-            {orderPoc && (orderPoc.kind !== "customer" || orderPoc.id !== c.id) && (
-              <div className="rounded-lg border-2 border-violet-200 bg-violet-50/40 px-3 py-2 flex items-start gap-2">
-                <span className="text-violet-600 text-base shrink-0">👤</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">Order POC — contact via this person, not the customer</div>
-                  <div className="text-sm font-bold text-violet-900 mt-0.5">{orderPoc.name || "(unnamed)"}{orderPoc.company ? ` — ${orderPoc.company}` : ""}</div>
-                  {(orderPoc.phone || orderPoc.role) && (
-                    <div className="text-[11px] text-violet-700 mt-0.5">{[orderPoc.role, orderPoc.phone].filter(Boolean).join(" · ")}</div>
-                  )}
-                </div>
-                <button type="button" onClick={() => onSetOrderPoc?.(null)} className="shrink-0 text-[10px] font-bold text-violet-500 hover:text-violet-800 px-2">Clear POC</button>
-              </div>
-            )}
             <div className="grid grid-cols-5 gap-3">
               <div className="col-span-1">
                 <Field label="Type">
-                  <SearchSelect value={c.type || ""} onChange={(v) => updateCust(c.id, { type: v })} options={CUSTOMER_TYPES} placeholder="Type..." maxResults={CUSTOMER_TYPES.length} />
+                  <Select
+                    value={c.type || ""}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      updateCust(c.id, { type: next });
+                      // Asymmetric coupling: setting type→Point of Contact auto-flags POC.
+                      // Clearing the flag or changing the type later does NOT undo this.
+                      if (next === "Point of Contact" && !c.isPoc) {
+                        onSetOrderPoc?.({ kind: "customer", id: c.id });
+                      }
+                    }}
+                  >
+                    <option value="">Type…</option>
+                    {CUSTOMER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </Select>
                 </Field>
               </div>
               <div className="col-span-2 sm:col-span-1"><Field label="First Name"><Input data-audit-key="custFirst" className={index === 0 && auditOn && highlightMissing?.custFirst ? "audit-missing" : ""} value={c.first} onChange={(e) => updateCust(c.id, { first: e.target.value })} /></Field></div>
               <div className="col-span-2 sm:col-span-1"><Field label="Last Name"><Input data-audit-key="custLast" className={hasMeaningfulValue(c.first) && !hasMeaningfulValue(c.last) ? "attention-outline" : ""} value={c.last} onChange={(e) => updateCust(c.id, { last: e.target.value })} /></Field></div>
-              <div className="col-span-2 sm:col-span-1"><Field label="Phone"><Input data-audit-key="custPhone" className={c.type === "Point of Contact" ? "!border-violet-300 !ring-1 !ring-violet-100" : ""} type="tel" value={c.phone} onChange={(e) => updateCust(c.id, { phone: formatPhoneNumber(e.target.value) })} maxLength={14} placeholder="(555) 123-4567" /></Field></div>
-              <div className="col-span-3 sm:col-span-1"><Field label="Email"><Input data-audit-key="custEmail" className={c.type === "Point of Contact" ? "!border-violet-300 !ring-1 !ring-violet-100" : ""} type="email" value={c.email} onChange={(e) => updateCust(c.id, { email: e.target.value })} placeholder="email@example.com" /></Field></div>
+              <div className="col-span-2 sm:col-span-1">
+                <Field label="Phone" action={contactRestricted ? <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${routingChipClass}`} title={routingReason}>{routingShortChip}</span> : null}>
+                  <Input data-audit-key="custPhone" className={c.type === "Point of Contact" ? "!border-violet-300 !ring-1 !ring-violet-100" : ""} type="tel" value={c.phone} onChange={(e) => updateCust(c.id, { phone: formatPhoneNumber(e.target.value) })} maxLength={14} placeholder="(555) 123-4567" title={contactRestricted ? routingReason : undefined} />
+                </Field>
+              </div>
+              <div className="col-span-3 sm:col-span-1">
+                <Field label="Email" action={contactRestricted ? <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${routingChipClass}`} title={routingReason}>{routingShortChip}</span> : null}>
+                  <Input data-audit-key="custEmail" className={c.type === "Point of Contact" ? "!border-violet-300 !ring-1 !ring-violet-100" : ""} type="email" value={c.email} onChange={(e) => updateCust(c.id, { email: e.target.value })} placeholder="email@example.com" title={contactRestricted ? routingReason : undefined} />
+                </Field>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Preferred method:</span>
               {["Phone", "Email", "Text"].map((m) => (
-                <ToggleMulti key={m} label={m} checked={c.preferredContact === m} onChange={() => updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false, contactViaRep: false })} />
+                <ToggleMulti key={m} label={m} checked={c.preferredContact === m} onChange={() => updateCust(c.id, { preferredContact: c.preferredContact === m ? "" : m, doNotContact: false })} />
               ))}
               <span className="w-px h-4 bg-slate-200 mx-0.5" />
-              <ToggleMulti label="Contacted" checked={!!c.contacted} onChange={() => updateCust(c.id, { contacted: !c.contacted })} colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
-              <span className="w-px h-4 bg-slate-200 mx-0.5" />
-              <ToggleMulti label="Use POC Only" checked={!!c.usePocOnly} onChange={() => updateCust(c.id, { usePocOnly: !c.usePocOnly, useSalesRepOnly: false, doNotContact: false, preferredContact: "" })} colorClass="!bg-violet-50 !border-violet-300 !text-violet-700" title="Route all communication through the customer's Point of Contact" />
-              <ToggleMulti label="Use Sales Rep Only" checked={!!c.useSalesRepOnly} onChange={() => updateCust(c.id, { useSalesRepOnly: !c.useSalesRepOnly, usePocOnly: false, contactViaRep: !c.useSalesRepOnly, doNotContact: false, preferredContact: "" })} colorClass="!bg-amber-50 !border-amber-300 !text-amber-700" title="Route all communication through the assigned sales rep" />
-              <ToggleMulti label="Contact via Rep" checked={!!c.contactViaRep} onChange={() => updateCust(c.id, { contactViaRep: !c.contactViaRep, doNotContact: false, preferredContact: "" })} colorClass="!bg-amber-50 !border-amber-300 !text-amber-700" />
-              <ToggleMulti label="Do Not Contact" checked={!!c.doNotContact} onChange={() => updateCust(c.id, { doNotContact: !c.doNotContact, contactViaRep: false, usePocOnly: false, useSalesRepOnly: false, preferredContact: "" })} colorClass="!bg-rose-50 !border-rose-300 !text-rose-700" />
+              <ToggleMulti label="Contacted" title="Mark when this customer has been reached for this order" checked={!!c.contacted} onChange={() => updateCust(c.id, { contacted: !c.contacted })} colorClass="!bg-emerald-50 !border-emerald-300 !text-emerald-700" />
+              <ToggleMulti label="Do Not Contact" title="Block all outreach to this customer (system-wide guard)" checked={!!c.doNotContact} onChange={() => updateCust(c.id, { doNotContact: !c.doNotContact, preferredContact: "" })} colorClass="!bg-rose-50 !border-rose-300 !text-rose-700" />
             </div>
-            {c.usePocOnly && !orderPoc && (
-              <div className="rounded-lg border border-violet-200 bg-violet-50/40 px-3 py-2 text-[11px] text-violet-700">
-                "Use POC Only" is on but no order POC is set yet. Flag a customer or contact as POC below or in Billing &amp; Companies.
-              </div>
-            )}
-            {c.useSalesRepOnly && <div className="text-[10px] text-amber-600 pl-1">All communication for this customer should go through the assigned sales rep.</div>}
-            {c.contactViaRep && <div className="text-[10px] text-amber-600 pl-1">All communication for this contact should go through their representative.</div>}
             {c.doNotContact && <div className="text-[10px] text-rose-600 pl-1">This person is flagged as Do Not Contact — the system will block outreach.</div>}
 
             <div className="flex items-center gap-2 flex-wrap">

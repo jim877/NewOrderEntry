@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-import { CreditCard, Globe, Shield, Tag, UserRound } from "lucide-react";
+import { CreditCard, Globe, Shield, Star, Tag, UserRound } from "lucide-react";
 
 // Mapping from role keys to lucide icon components.
 const ROLE_ICON_COMPONENTS = {
@@ -10,6 +10,7 @@ const ROLE_ICON_COMPONENTS = {
   billing: CreditCard,
   adjuster: UserRound,
   national: Globe,
+  poc: Star,
 };
 
 // resolveRoleIconKey — derive an icon key from a role's iconKey/id/icon/title.
@@ -30,6 +31,7 @@ const resolveRoleIconKey = (role: any = {}) => {
   if (title.includes("bill"))      return "billto";
   if (title.includes("adjuster"))  return "adjuster";
   if (title.includes("national"))  return "national";
+  if (title.includes("poc"))       return "poc";
   return "";
 };
 
