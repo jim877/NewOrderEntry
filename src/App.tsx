@@ -260,6 +260,7 @@ import {
 import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldRetainSharedLoadItem, TRIGGER_TYPES, ACTION_TYPE_LABELS } from './utils/loadTargets';
 import { relevantScopeInstructionTypes } from './utils/serviceMapping';
 import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
+import { buildFullExportLines, copyLinesToClipboard, downloadLinesAsFile } from './utils/dataExport';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 import {
   DURATION_DAYS, BAND_COLORS, DELIVERY_COLORS, STAY_TYPE_COLORS,
@@ -6500,71 +6501,11 @@ export default function App(){
     return lines;
   };
 
-  const buildFullExportLines = () => {
-    const lines = [];
-    const seen = new Set();
-    const walk = (obj, path = "") => {
-      if (obj === null || obj === undefined) return;
-      if (typeof obj !== "object") {
-        const key = path || "value";
-        if (seen.has(key)) return;
-        seen.add(key);
-        lines.push(`${key}: ${obj}`);
-        return;
-      }
-      if (Array.isArray(obj)) {
-        if (obj.length === 0) return;
-        if (obj.every(v => typeof v !== "object")) {
-          const key = path || "value";
-          if (!seen.has(key)) {
-            seen.add(key);
-            lines.push(`${key}: ${obj.join(", ")}`);
-          }
-          return;
-        }
-        obj.forEach((v, idx) => {
-          walk(v, path ? `${path}[${idx}]` : `[${idx}]`);
-        });
-        return;
-      }
-      Object.entries(obj).forEach(([k, v]) => {
-        const nextPath = path ? `${path}.${k}` : k;
-        walk(v, nextPath);
-      });
-    };
-    walk(data);
-    return lines;
+  // copyLines — thin wrapper around copyLinesToClipboard that also toasts on success.
+  const copyLines = async (lines: string[]) => {
+    if (await copyLinesToClipboard(lines)) setToast("Copied to clipboard");
   };
-
-  const copyLines = async (lines) => {
-    const text = (lines || []).join("\n");
-    if (!text) return;
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      setToast("Copied to clipboard");
-      return;
-    }
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand("copy");
-    document.body.removeChild(textarea);
-    setToast("Copied to clipboard");
-  };
-
-  const downloadLines = (lines, filename) => {
-    const text = (lines || []).join("\n");
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  // buildFullExportLines, downloadLinesAsFile — imported from ./utils/dataExport
 
   const validateGenerateScope = () => {
     const missing = {};
@@ -6584,7 +6525,7 @@ export default function App(){
     const missing = computeAuditMissing();
     setSaveSummaryMissing(missing);
     setSaveSummaryLines(orderNarrative.map(l => `${l.section}: ${l.text}`));
-    setSaveExportLines(buildFullExportLines());
+    setSaveExportLines(buildFullExportLines(data));
     setPreviewOpen(true);
   };
 
@@ -14646,7 +14587,7 @@ export default function App(){
                 </button>
                 <button
                   className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => downloadLines(saveSummaryLines, "order-summary.txt")}
+                  onClick={() => downloadLinesAsFile(saveSummaryLines, "order-summary.txt")}
                 >
                   Download Summary
                 </button>
