@@ -257,6 +257,7 @@ import {
 import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldRetainSharedLoadItem } from './utils/loadTargets';
 import { relevantScopeInstructionTypes } from './utils/serviceMapping';
 import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
+import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 
 
 // --- UTILS ---
@@ -6019,45 +6020,7 @@ export default function App(){
       }
   };
 
-  const SUBSECTION_TO_SECTION = {
-    order: "sec1",
-    source: "sec1",
-    interview: "sec1",
-    codes: "sec1",
-    customer: "sec2",
-    address: "sec3",
-    companies: "sec4",
-    billing: "sec4",
-    finance: "sec4",
-    insurance: "sec4",
-    schedule: "sec5",
-    bridge: "sec5",
-    "sds-icons": "sec5",
-  };
-
-  const DEFAULT_SUBSECTION_BY_SECTION = {
-    sec1: "order",
-    sec2: "customer",
-    sec3: "address",
-    sec4: "companies",
-    sec5: "schedule",
-  };
-
-  const SUBSECTION_DOM_ID = {
-    order: "sec1-order",
-    source: "sec1-source",
-    interview: "sec1-interview",
-    codes: "sec1-codes",
-    companies: "sec4-companies",
-    billing: "sec4-billing",
-    finance: "sec4-finance",
-    insurance: "sec4-insurance",
-    schedule: "sec5-schedule",
-    bridge: "sec5-bridge",
-    "sds-icons": "sec5-bridge",
-    customer: "sec2",
-    address: "sec3",
-  };
+  // SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID — imported from ./utils/sectionNav
 
   const closeSubsectionsForSection = useCallback((sectionId) => {
     if (sectionId === "sec1") {
