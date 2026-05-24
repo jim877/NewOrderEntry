@@ -256,6 +256,7 @@ import {
 } from './utils/dateTime';
 import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldRetainSharedLoadItem } from './utils/loadTargets';
 import { relevantScopeInstructionTypes } from './utils/serviceMapping';
+import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
 
 
 // --- UTILS ---
@@ -12408,26 +12409,12 @@ export default function App(){
                     </div>
                   )}
                   {missing.length > 0 && (() => {
-                    const groupMeta: { id: string; label: string; defaultOpen: boolean; match: (m: any) => boolean }[] = [
-                      { id: "customer", label: "Customer", defaultOpen: false, match: (m) => m.section === "sec2" },
-                      { id: "insurance", label: "Insurance / Adjuster", defaultOpen: false, match: (m) => m.section === "sec4" && /insur|adjust|claim|carrier|polic/i.test(m.label || "") },
-                      { id: "billing", label: "Billing & Companies", defaultOpen: true, match: (m) => m.section === "sec4" },
-                      { id: "order", label: "Order Details", defaultOpen: true, match: (m) => m.section === "sec1" },
-                      { id: "address", label: "Address", defaultOpen: true, match: (m) => m.section === "sec3" },
-                      { id: "scope", label: "Scope & Schedule", defaultOpen: true, match: (m) => m.section === "sec5" },
-                    ];
-                    const grouped: Record<string, any[]> = {};
-                    const remainder: any[] = [];
-                    missing.forEach((m) => {
-                      const g = groupMeta.find((g) => g.match(m));
-                      if (g) { (grouped[g.id] = grouped[g.id] || []).push(m); }
-                      else remainder.push(m);
-                    });
+                    const { grouped, remainder } = groupActionItems(missing);
                     return (
                       <div>
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Missing Fields</div>
                         <div className="space-y-2">
-                          {groupMeta.map((g) => {
+                          {ACTION_ITEM_GROUPS.map((g) => {
                             const items = grouped[g.id] || [];
                             if (!items.length) return null;
                             const isOpen = actionItemsGroupOpen[g.id] ?? g.defaultOpen;
