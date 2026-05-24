@@ -168,7 +168,7 @@ import {
   companyTypeRequiresContact,
   syncCompanyEntryPlaceholders,
 } from './utils/companyEntry';
-import { INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS } from './config';
+import { INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS, DAMAGE_TYPES, COMPATIBLE_SECONDARIES } from './config';
 import {
   getInstructionTypeTextKey,
   inferInstructionType,
@@ -628,26 +628,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [hasBasement, setHasBasement] = useState(orderData?.propertyHasBasement || false);
   const [hasAttic, setHasAttic] = useState(orderData?.propertyHasAttic || false);
 
-  // Step 3: Damage
-  const DAMAGE_TYPES = [
-    { id: "fire", label: "Fire", icon: "\u{1F525}", color: "bg-orange-600", light: "bg-orange-50", border: "border-orange-300", details: ["Heat", "Soot", "Odor", "Extinguisher Powder", "Remediation Debris"] },
-    { id: "water", label: "Water", icon: "\u{1F4A7}", color: "bg-blue-500", light: "bg-blue-50", border: "border-blue-300", details: ["Water", "Humidity", "Musty Smell", "Visible Mildew", "Visible Mold", "Sprinkler Chemical", "Flood Cut Debris"] },
-    { id: "mold", label: "Mold", icon: "\u{1F7E2}", color: "bg-green-500", light: "bg-green-50", border: "border-green-300", details: ["Spores", "Visible Mold", "Mildew"] },
-    { id: "oil", label: "Oil", icon: "\u{1F6E2}\u{FE0F}", color: "bg-amber-700", light: "bg-amber-50", border: "border-amber-400", details: ["Leak", "Accident", "Soot", "Odor", "Oily Film"] },
-    { id: "puffback", label: "Puffback", icon: "\u{1F4A8}", color: "bg-slate-500", light: "bg-slate-50", border: "border-slate-400", details: ["Oil", "Soot", "Odor", "Oily Film"] },
-    { id: "debris", label: "Debris", icon: "\u{1FAA8}", color: "bg-stone-500", light: "bg-stone-50", border: "border-stone-300", details: ["Structural", "Contents", "Glass", "Other"] },
-    { id: "unknown", label: "Unknown", icon: "\u{2753}", color: "bg-gray-500", light: "bg-gray-50", border: "border-gray-300", details: [] },
-  ];
-  // Compatible secondary types per primary — unlisted pairs are incompatible
-  const COMPATIBLE_SECONDARIES: Record<string, string[]> = {
-    fire: ["water", "mold", "debris", "puffback"],
-    water: ["mold", "debris"],
-    mold: ["water", "debris"],
-    oil: ["puffback", "debris", "mold"],
-    puffback: ["oil", "fire", "debris"],
-    debris: ["fire", "water", "mold", "oil", "puffback"],
-    unknown: ["fire", "water", "mold", "oil", "puffback", "debris"],
-  };
+  // DAMAGE_TYPES + COMPATIBLE_SECONDARIES imported from ./config (config.json#lists)
   const [damageTypes, setDamageTypes] = useState<Record<string, number>>(() => {
     if (!orderData) return {};
     const dt: Record<string, number> = {};

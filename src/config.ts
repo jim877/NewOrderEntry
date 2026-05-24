@@ -110,8 +110,11 @@ export type CompanyRoleDef = {
   contactSource?: string;
 };
 export type ContactRoleBadge = { id: string; title: string };
+export type DamageType = { id: string; label: string; icon: string; color: string; light: string; border: string; details: string[] };
 
 export const COMPANY_TYPES: string[]                 = config.lists.companyTypes;
+export const DAMAGE_TYPES: DamageType[]              = config.lists.damageTypes;
+export const COMPATIBLE_SECONDARIES: Record<string, string[]> = config.lists.compatibleSecondaries;
 export const COMPANY_ROLE_DEFS: CompanyRoleDef[]     = config.lists.companyRoleDefs;
 export const CONTACT_ROLE_BADGES: ContactRoleBadge[] = config.lists.contactRoleBadges;
 export const SDS_CONSIDERATIONS: string[]            = config.lists.sdsConsiderations;
