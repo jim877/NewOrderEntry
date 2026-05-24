@@ -39,6 +39,34 @@ export const SMART_TRIGGER_LABELS: Record<string, string> = {
   damageMoldMildew: "Visible Mold",
 };
 
+// TRIGGER_TYPES — picker options shown in the Settings UI when editing a
+// load-target trigger. The `type` strings line up with LoadTrigger["type"]
+// (condition / loss / packout / service / interview); changing one here
+// without updating the union breaks the dropdown.
+export const TRIGGER_TYPES: Array<{ type: LoadTrigger["type"]; label: string }> = [
+  { type: "condition", label: "Condition flag" },
+  { type: "loss",      label: "Loss type" },
+  { type: "packout",   label: "Packout item" },
+  { type: "service",   label: "Service" },
+  { type: "interview", label: "Interview answer" },
+];
+
+// ACTION_TYPE_LABELS — friendly labels for interview-action types in the
+// Settings → Interview Actions admin grid. Each key matches an action-type
+// dispatched by executeInterviewActions in App.tsx.
+export const ACTION_TYPE_LABELS: Record<string, string> = {
+  loadList:           "Load List",
+  handlingCode:       "Handling Code",
+  eventInstruction:   "Event Instruction",
+  sdsObservation:     "SDS Observation",
+  suggestGroup:       "Suggest Group",
+  blocker:            "Blocker",
+  contactNote:        "Contact Note",
+  addressPlaceholder: "Address Prompt",
+  suggestOrderType:   "Order Type",
+  openMoldLimit:      "Open Mold Limit",
+};
+
 // shouldRetainSharedLoadItem — when a condition flag goes OFF, decide whether to keep the
 // shared load item that was added by another still-active flag. Today only "Lights" is shared
 // (between noLights and boardedUp); turning one off should NOT remove Lights if the other is on.

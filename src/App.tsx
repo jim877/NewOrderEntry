@@ -254,7 +254,7 @@ import {
   rushGetSeasons,
   computeStorageEstimate,
 } from './utils/dateTime';
-import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldRetainSharedLoadItem } from './utils/loadTargets';
+import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldRetainSharedLoadItem, TRIGGER_TYPES, ACTION_TYPE_LABELS } from './utils/loadTargets';
 import { relevantScopeInstructionTypes } from './utils/serviceMapping';
 import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
@@ -12650,13 +12650,6 @@ export default function App(){
                     const updateTarget = (id: string, patch: Partial<LoadTarget>) => saveTargets(targets.map(t => t.id === id ? { ...t, ...patch } : t));
                     const removeTarget = (id: string) => saveTargets(targets.filter(t => t.id !== id));
                     const categories = Array.from(new Set(targets.map(t => t.category)));
-                    const TRIGGER_TYPES: Array<{ type: LoadTrigger["type"]; label: string }> = [
-                      { type: "condition", label: "Condition flag" },
-                      { type: "loss", label: "Loss type" },
-                      { type: "packout", label: "Packout item" },
-                      { type: "service", label: "Service" },
-                      { type: "interview", label: "Interview answer" },
-                    ];
                     return categories.map(cat => (
                       <details key={cat} open>
                         <summary className="px-4 py-2 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">
@@ -12721,7 +12714,7 @@ export default function App(){
                       { label: "Preferences", keys: ["Medical Yes", "Allergies Yes", "SelfClean Yes", "Air-Dry", "Low Heat", "Dryer", "Storage Yes"] },
                     ];
                     const searchL = configSearch.toLowerCase().trim();
-                    const ACTION_TYPE_LABELS: Record<string,string> = { loadList: "Load List", handlingCode: "Handling Code", eventInstruction: "Event Instruction", sdsObservation: "SDS Observation", suggestGroup: "Suggest Group", blocker: "Blocker", contactNote: "Contact Note", addressPlaceholder: "Address Prompt", suggestOrderType: "Order Type", openMoldLimit: "Open Mold Limit" };
+                    // ACTION_TYPE_LABELS imported from ./utils/loadTargets
                     return actionGroups.map(group => {
                       const filteredKeys = group.keys.filter(k => !searchL || k.toLowerCase().includes(searchL) || (interviewActions[k]?.coaching || "").toLowerCase().includes(searchL));
                       if (!filteredKeys.length) return null;
