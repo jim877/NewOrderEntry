@@ -258,6 +258,10 @@ import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldR
 import { relevantScopeInstructionTypes } from './utils/serviceMapping';
 import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
+import {
+  DURATION_DAYS, BAND_COLORS, DELIVERY_COLORS, STAY_TYPE_COLORS,
+  SEASON_ICONS, HOLIDAY_ICONS, EVENT_ICONS, SEASON_DATES,
+} from './utils/rushGuideVisuals';
 
 
 // --- UTILS ---
@@ -12839,11 +12843,11 @@ export default function App(){
           const rentalDeliverTo = rentalAddrStr || tempAddrStr || primaryAddrStr;
           const finalDeliverTo = primaryAddrStr;
           // Duration helpers for Gantt bands
-          const DURATION_DAYS: Record<string, number> = { "A few days": 5, "1-2 weeks": 14, "1 month": 30, "2-3 months": 75, "6+ months": 180, "Until repairs done": 0 };
+          // DURATION_DAYS imported from ./utils/rushGuideVisuals
           const computeTimelineBands = () => {
             if (livingTimeline.length === 0) return [];
             const bands: {type: string; startDate: Date; endDate: Date; address: string; color: string}[] = [];
-            const BAND_COLORS: Record<string, string> = { "Neighbor": "bg-orange-400", "Relative": "bg-pink-400", "Hotel": "bg-amber-400", "Rental": "bg-sky-400", "Temp": "bg-sky-400", "Staying in home": "bg-emerald-400", "Moving": "bg-violet-400" };
+            // BAND_COLORS imported from ./utils/rushGuideVisuals
 	            // Calculate start dates for each stay using explicit end dates first, then rough durations.
 	            const starts: Date[] = [new Date(now)];
 	            for (let i = 0; i < livingTimeline.length - 1; i++) {
@@ -12872,12 +12876,6 @@ export default function App(){
           // Compute season change moments during repair window
           const seasonChanges: {name: string; startDate: Date; items: string[]; events: string[]}[] = [];
           if (estimatedReturn) {
-            const SEASON_DATES = [
-              { name: "Spring", month: 2, day: 20, items: ["Light jackets, windbreakers, and rain gear", "Transition layers (long sleeves, light sweaters)", "Sneakers and rain boots"], events: ["Graduation", "Prom", "Easter / Passover", "Spring Break"] },
-              { name: "Summer", month: 5, day: 20, items: ["Shorts, t-shirts, skirts, and lightweight clothing", "Sandals, open-toe shoes, and sunglasses", "Swimwear, beach bags, sun hats, and pool gear"], events: ["Beach Vacations", "Summer Camp", "July 4th", "Outdoor Weddings"] },
-              { name: "Fall", month: 8, day: 22, items: ["Sweaters, fleeces, and mid-weight coats", "Jeans, heavier pants, and closed-toe shoes", "Boots and layering pieces"], events: ["Back to School", "Halloween", "Thanksgiving"] },
-              { name: "Winter", month: 11, day: 21, items: ["Heavy winter coats, parkas, and snow boots", "Gloves, scarves, thermal layers, and thick socks", "Holiday formal wear"], events: ["Christmas / Hanukkah", "New Year's Eve", "Ski Trips"] },
-            ];
             SEASON_DATES.forEach(s => {
               const changeDate = new Date(now.getFullYear(), s.month, s.day);
               if (changeDate <= now) changeDate.setFullYear(changeDate.getFullYear() + 1);
@@ -13079,8 +13077,7 @@ export default function App(){
 
                     // Delivery groups — computed at outer scope so seasonal/event sections can reference them
                     const hasHouseholdItems = packoutItems.some(p => ["Rugs", "Window Treatments", "Furniture", "Art", "Appliances"].includes(p));
-                    const DELIVERY_COLORS = ["bg-teal-600", "bg-sky-600", "bg-indigo-600", "bg-amber-600", "bg-emerald-700"];
-                    const STAY_TYPE_COLORS: Record<string, string> = { "Hotel": "bg-amber-500", "Rental": "bg-sky-600", "Temp": "bg-sky-600", "Neighbor": "bg-indigo-500", "Relative": "bg-indigo-500", "Moving": "bg-slate-600", "Staying in home": "bg-emerald-600" };
+                    // DELIVERY_COLORS, STAY_TYPE_COLORS imported from ./utils/rushGuideVisuals
                     const deliveryGroups: {id: string; label: string; date: Date; icon: string; items: string[]; location: string; address: string; householdTags?: string[]; color: string}[] = [];
                     // 1) Rush
                     const rushDate = rushAddDays(now, 2);
@@ -13506,9 +13503,7 @@ export default function App(){
                       }
 
                       // All possible pins
-                      const SEASON_ICONS: Record<string, string> = { Spring: "🌷", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
-                      const HOLIDAY_ICONS: Record<string, string> = { Halloween: "🎃", Thanksgiving: "🦃", "Christmas / Hanukkah": "🎄", "Easter / Passover": "🐣", Graduation: "🎓" };
-                      const EVENT_ICONS: Record<string, string> = { vacation_beach: "🏖️", vacation_ski: "⛷️", wedding: "💒", business: "💼", sports: "⚽" };
+                      // SEASON_ICONS, HOLIDAY_ICONS, EVENT_ICONS imported from ./utils/rushGuideVisuals
 
                       const allPins: {id: string; label: string; icon: string; date: Date; pctPos: number; category: "season"|"holiday"|"event"; defaultOn: boolean}[] = [];
                       seasonChanges.forEach(sc => allPins.push({ id: `s_${sc.name}`, label: sc.name, icon: SEASON_ICONS[sc.name] || "📅", date: sc.startDate, pctPos: pct(sc.startDate), category: "season", defaultOn: true }));
