@@ -344,6 +344,25 @@
       "storefront": ["Street"],
       "commercial": ["Parking Garage", "Elevator"]
     },
+    "scopeDefaults": {
+      "trailer":    "building",
+      "house":      "building",
+      "largehouse": "building",
+      "estate":     "building",
+      "townhouse":  "building",
+      "lowrise":    "unit",
+      "highrise":   "unit",
+      "storefront": "building",
+      "commercial": "unit"
+    },
+    "linkedRooms": { "Master": "Master Bath", "Master Bath": "Master" },
+    "scopeDepthLevels": [
+      { "id": 1, "label": "Specific Items",            "short": "Specific",   "desc": "A rug, drapes, specific pieces" },
+      { "id": 2, "label": "Exposed Surfaces",          "short": "Exposed",    "desc": "Bedding, rugs, drapes, surfaces" },
+      { "id": 3, "label": "Exposed + Closets",          "short": "Closets",    "desc": "Add hanging + folded from closets" },
+      { "id": 4, "label": "Exposed + Closets + Drawers","short": "Drawers",    "desc": "Add dresser, cabinet contents" },
+      { "id": 5, "label": "Everything",                 "short": "Everything", "desc": "All contents including bins, electronics" }
+    ],
     "scopeRoomList": ["Master", "Bedroom", "Guest Room", "Nursery", "Master Bath", "Bathroom", "Half Bath", "Hall Bath", "Living", "Family", "Great Room", "Den", "Office", "Study", "Kitchen", "Kitchenette", "Dining", "Pantry", "Bar", "Hallway", "Foyer", "Entry", "Closet", "Walk-in Closet", "Storage", "Laundry", "Utility", "Garage", "Porch", "Patio", "Rec", "Playroom", "Game", "Gym", "Media", "Theater", "Attic"],
     "scopeReasonCodes": [
       { "code": "BEF", "label": "Before",            "desc": "Before photos only",        "primary": true },

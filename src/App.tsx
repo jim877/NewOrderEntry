@@ -172,10 +172,12 @@ import {
   INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS,
   DAMAGE_TYPES, COMPATIBLE_SECONDARIES,
   PROPERTY_TYPES, ACCESS_FOR_TYPE, ACCESS_DEFAULTS,
+  SCOPE_DEFAULTS, LINKED_ROOMS,
   SCOPE_ROOM_LIST as ROOM_LIST,
   SCOPE_REASON_CODES as REASON_CODES,
   SCOPE_DEPARTMENTS as DEPARTMENTS,
   SCOPE_HANDLING_CODES as HANDLING_CODES_SCOPE,
+  SCOPE_DEPTH_LEVELS as DEPTH_LEVELS,
   INTERVIEW_PACKOUT_SCOPES, INTERVIEW_STAY_TYPES, INTERVIEW_DURATION_OPTIONS,
 } from './config';
 import {
@@ -584,11 +586,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const isHouseType = ["house", "largehouse", "estate"].includes(propType);
   // Only show scope toggle when the default might be wrong
   const showScopeToggle = ["house", "largehouse", "townhouse", "lowrise"].includes(propType);
-  // Auto-defaults: houses/estates/trailers = entire, highrises/commercial = unit
-  const SCOPE_DEFAULTS: Record<string, "unit" | "building"> = {
-    trailer: "building", house: "building", largehouse: "building", estate: "building",
-    townhouse: "building", lowrise: "unit", highrise: "unit", storefront: "building", commercial: "unit",
-  };
+  // SCOPE_DEFAULTS — imported from ./config (auto-defaults: houses/estates/trailers = entire, highrises/commercial = unit)
   const selectedPropObj = PROPERTY_TYPES.find(p => p.id === propType);
   // Pre-populate unit number from NOE address apt field
   const noeApt = (() => { const addr = orderData?.addresses?.[0]; return (addr as any)?.apt || ""; })();
@@ -743,7 +741,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [highlightedRoom, setHighlightedRoom] = useState<string | null>(null);
   const [highlightedFloor, setHighlightedFloor] = useState<number | null>(null);
   const [fadingRoom, setFadingRoom] = useState<string | null>(null);
-  const LINKED_ROOMS: Record<string, string> = { "Master": "Master Bath", "Master Bath": "Master" };
+  // LINKED_ROOMS — imported from ./config
   const handleDrop = (targetFi: number) => {
     if (!dragRoom || dragRoom.fi === targetFi) { setDragRoom(null); return; }
     const roomName = homeRooms[dragRoom.fi]?.rooms[dragRoom.ri]?.name || "";
@@ -865,14 +863,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const totalAffected = homeRooms.reduce((s, f) => s + f.rooms.filter(r => r.affected).length, 0);
   const totalRoomCount = homeRooms.reduce((s, f) => s + f.rooms.length, 0);
 
-  // Step 5: Services scope
-  const DEPTH_LEVELS = [
-    { id: 1, label: "Specific Items", short: "Specific", desc: "A rug, drapes, specific pieces" },
-    { id: 2, label: "Exposed Surfaces", short: "Exposed", desc: "Bedding, rugs, drapes, surfaces" },
-    { id: 3, label: "Exposed + Closets", short: "Closets", desc: "Add hanging + folded from closets" },
-    { id: 4, label: "Exposed + Closets + Drawers", short: "Drawers", desc: "Add dresser, cabinet contents" },
-    { id: 5, label: "Everything", short: "Everything", desc: "All contents including bins, electronics" },
-  ];
+  // Step 5: DEPTH_LEVELS imported from ./config (SCOPE_DEPTH_LEVELS, aliased below)
   const [depthLevel, setDepthLevel] = useState(2);
   const SERVICES = ["Appliance", "Art", "Consulting", "Contents", "Furniture", "Hand Clean", "Pack-out", "Rugs", "Storage Only", "Textiles", "TLI", "Expert Stain Removal"];
   const [selectedServices, setSelectedServices] = useState<Record<string, boolean>>(() => {
