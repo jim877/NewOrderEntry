@@ -360,6 +360,16 @@
       { "code": "UND", "label": "Undecided",         "desc": "TBD",                       "primary": false }
     ],
     "scopeDepartments": ["All", "Window Treats", "Rugs", "Bedding", "Exposed", "Clothes", "Closets", "Drawers"],
+    "interviewPackoutScopes": ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout", "TBD"],
+    "interviewStayTypes": [
+      { "id": "Neighbor", "desc": "Staying next door" },
+      { "id": "Relative", "desc": "Family member's home" },
+      { "id": "Hotel",    "desc": "Hotel or motel" },
+      { "id": "Rental",   "desc": "Temporary rental" },
+      { "id": "Staying in home", "label": "Their Home", "desc": "Living on-site" },
+      { "id": "Moving",   "desc": "Relocating permanently" }
+    ],
+    "interviewDurationOptions": ["A few days", "1-2 weeks", "1 month", "2-3 months", "6+ months", "Until repairs done"],
     "scopeHandlingCodes": [
       { "code": "Box",   "desc": "Return items in boxes" },
       { "code": "Damp",  "desc": "Tag within 5 days" },

@@ -176,6 +176,7 @@ import {
   SCOPE_REASON_CODES as REASON_CODES,
   SCOPE_DEPARTMENTS as DEPARTMENTS,
   SCOPE_HANDLING_CODES as HANDLING_CODES_SCOPE,
+  INTERVIEW_PACKOUT_SCOPES, INTERVIEW_STAY_TYPES, INTERVIEW_DURATION_OPTIONS,
 } from './config';
 import {
   getInstructionTypeTextKey,
@@ -11443,7 +11444,7 @@ export default function App(){
                 {/* Packout Scope (Q3) */}
                 {matchesInterviewSearch("packout packing", "No Packout Content Manipulation Partial Packout Full Packout packing furniture", (data as any).packoutScope, (data as any).packoutNote) && (() => {
                   const log = (data.interviewLog || {}).packoutScope; const hasAnswers = !!(data as any).packoutScope; const answered = hasAnswers; const summary = (data as any).packoutScope || (!!log && !hasAnswers ? "None" : ""); const expanded = !!interviewSearch.trim() || interviewExpanded.packoutScope === true;
-                  const PACKOUT_SCOPES = ["No Packout", "Content Manipulation", "Partial Packout", "Full Packout", "TBD"];
+                  const PACKOUT_SCOPES = INTERVIEW_PACKOUT_SCOPES;
                   return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, packoutScope: !p.packoutScope}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
                       <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">3</span>{highlightSearch(expanded ? "Will packing out of hard furnishings be necessary?" : "Packout")}</div>
@@ -11767,14 +11768,7 @@ export default function App(){
                   const answered = hasAnswers;
 	                  const summary = timeline.length > 0 ? timeline.map(s => s.type).join(" → ") : data.livingStatus || (!!log && !hasAnswers ? "N/A" : "");
 	                  const expanded = !!interviewSearch.trim() || interviewExpanded.living === true;
-                  const STAY_TYPES = [
-                    { id: "Neighbor", desc: "Staying next door" },
-                    { id: "Relative", desc: "Family member's home" },
-                    { id: "Hotel", desc: "Hotel or motel" },
-                    { id: "Rental", desc: "Temporary rental" },
-                    { id: "Staying in home", label: "Their Home", desc: "Living on-site" },
-                    { id: "Moving", desc: "Relocating permanently" },
-                  ];
+                  const STAY_TYPES = INTERVIEW_STAY_TYPES;
 	                  const addStay = (type: string) => {
 	                    const payload = type === "Staying in home" ? addressPayloadFromChoice("type:Primary") : addressPayloadFromChoice(`type:${type}`);
 	                    const next = [...timeline, { id: safeUid(), type, duration: "", endDate: "", address: payload.address, addressType: payload.addressType, addressId: payload.addressId }];
@@ -11822,7 +11816,7 @@ export default function App(){
                     update("livingTimeline", next);
                     update("livingStatus", next[0]?.type || "");
                   };
-                  const DURATION_OPTIONS = ["A few days", "1-2 weeks", "1 month", "2-3 months", "6+ months", "Until repairs done"];
+                  const DURATION_OPTIONS = INTERVIEW_DURATION_OPTIONS;
 
                   return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
                     <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
