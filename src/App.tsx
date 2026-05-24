@@ -255,6 +255,7 @@ import {
   computeStorageEstimate,
 } from './utils/dateTime';
 import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldRetainSharedLoadItem } from './utils/loadTargets';
+import { relevantScopeInstructionTypes } from './utils/serviceMapping';
 
 
 // --- UTILS ---
@@ -2266,18 +2267,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Instructions</div>
                   {/* Instruction type buttons */}
                   <div className="flex flex-wrap gap-1.5">
-                    {(() => {
-                      const so = (orderData as any)?.serviceOfferings || [];
-                      const SERVICE_TO_SCOPE: Record<string, string[]> = {
-                        "Pack-out": ["Pickup"], "Contents": ["Pickup"], "Rugs": ["Pickup"], "Textiles": ["Pickup"],
-                        "Furniture": ["Furniture", "Pickup"], "Art": ["Pickup"], "Appliance": ["Pickup"],
-                        "TLI": ["TLI"], "Storage Only": ["Storage"], "Consulting": ["Test"],
-                      };
-                      const relevant = new Set(["Inhome", "Dispose"]); // always show
-                      so.forEach(s => (SERVICE_TO_SCOPE[s] || []).forEach(t => relevant.add(t)));
-                      if (so.length === 0) ["Pickup", "Inhome", "Furniture", "TLI", "Test", "Dispose", "Storage"].forEach(t => relevant.add(t));
-                      return [...relevant];
-                    })().map(iType => {
+                    {relevantScopeInstructionTypes((orderData as any)?.serviceOfferings || []).map(iType => {
                       const isActive = (note || "").toLowerCase().includes(iType.toLowerCase());
                       return <button key={iType} onClick={() => {
                         const current = note || "";
