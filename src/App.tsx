@@ -168,7 +168,7 @@ import {
   companyTypeRequiresContact,
   syncCompanyEntryPlaceholders,
 } from './utils/companyEntry';
-import { INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS, DAMAGE_TYPES, COMPATIBLE_SECONDARIES } from './config';
+import { INSTRUCTION_TYPES, ORDER_INSTRUCTION_PRESETS, DAMAGE_TYPES, COMPATIBLE_SECONDARIES, PROPERTY_TYPES, ACCESS_FOR_TYPE, ACCESS_DEFAULTS } from './config';
 import {
   getInstructionTypeTextKey,
   inferInstructionType,
@@ -548,40 +548,7 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
   const [wizSelectedRooms, setWizSelectedRooms] = useState<Set<string>>(new Set());
   const [bulkEditing, setBulkEditing] = useState(false);
 
-  // Step 1: Property type
-  const PROPERTY_TYPES = [
-    { id: "trailer", label: "Trailer" },
-    { id: "house", label: "House" },
-    { id: "largehouse", label: "Large House" },
-    { id: "estate", label: "Estate" },
-    { id: "townhouse", label: "Townhome" },
-    { id: "lowrise", label: "Low-Rise" },
-    { id: "highrise", label: "High-Rise" },
-    { id: "storefront", label: "Storefront" },
-    { id: "commercial", label: "Commercial" },
-  ];
-  const ACCESS_FOR_TYPE: Record<string, { label: string; items: string[] }[]> = {
-    trailer:    [{ label: "Parking", items: ["Driveway", "Street"] }, { label: "Access", items: ["Difficult Access", "Dangerous Driveway", "Gated"] }],
-    house:      [{ label: "Parking", items: ["Driveway", "Street", "Garage", "Lot"] }, { label: "Access", items: ["Stairs", "Gated", "Dirt Road", "Dangerous Driveway"] }],
-    largehouse: [{ label: "Parking", items: ["Driveway", "Street", "Garage", "Lot"] }, { label: "Access", items: ["Stairs", "Gated", "Long Walk", "Dirt Road", "Dangerous Driveway"] }],
-    estate:     [{ label: "Parking", items: ["Driveway", "Garage"] }, { label: "Access", items: ["Gated/Security", "Long Walk", "COI Required"] }],
-    townhouse:  [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Stairs", "Difficult Access"] }],
-    lowrise:    [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Stairs", "Elevator", "Long Walk", "Gated", "COI Required", "Limited Hours"] }],
-    highrise:   [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Elevator", "Service Entrance", "Long Walk", "Gated/Security", "COI Required", "Limited Hours"] }],
-    storefront: [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Service Entrance", "Limited Hours", "COI Required"] }],
-    commercial: [{ label: "Parking", items: ["Street", "Garage", "Lot", "Metered"] }, { label: "Access", items: ["Elevator", "Service Entrance", "Long Walk", "Security", "COI Required", "Limited Hours"] }],
-  };
-  const ACCESS_DEFAULTS: Record<string, string[]> = {
-    trailer:    ["Driveway"],
-    house:      ["Driveway"],
-    largehouse: ["Driveway"],
-    estate:     ["Driveway", "Gated/Security", "Long Walk"],
-    townhouse:  ["Street"],
-    lowrise:    ["Street", "Stairs"],
-    highrise:   ["Parking Garage", "Elevator"],
-    storefront: ["Street"],
-    commercial: ["Parking Garage", "Elevator"],
-  };
+  // PROPERTY_TYPES, ACCESS_FOR_TYPE, ACCESS_DEFAULTS — imported from ./config
   const noeAddr = (() => { const addrs = (orderData as any)?.addresses; return Array.isArray(addrs) ? (addrs.find((a: any) => a.isPrimary) || addrs[0] || {}) : {}; })();
   const [propType, setPropType] = useState(() => {
     const fromOrder = (orderData as any)?.propertyType;

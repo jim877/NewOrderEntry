@@ -311,6 +311,39 @@
       "debris":   ["fire", "water", "mold", "oil", "puffback"],
       "unknown":  ["fire", "water", "mold", "oil", "puffback", "debris"]
     },
+    "propertyTypes": [
+      { "id": "trailer",    "label": "Trailer" },
+      { "id": "house",      "label": "House" },
+      { "id": "largehouse", "label": "Large House" },
+      { "id": "estate",     "label": "Estate" },
+      { "id": "townhouse",  "label": "Townhome" },
+      { "id": "lowrise",    "label": "Low-Rise" },
+      { "id": "highrise",   "label": "High-Rise" },
+      { "id": "storefront", "label": "Storefront" },
+      { "id": "commercial", "label": "Commercial" }
+    ],
+    "accessForType": {
+      "trailer":    [{ "label": "Parking", "items": ["Driveway", "Street"] }, { "label": "Access", "items": ["Difficult Access", "Dangerous Driveway", "Gated"] }],
+      "house":      [{ "label": "Parking", "items": ["Driveway", "Street", "Garage", "Lot"] }, { "label": "Access", "items": ["Stairs", "Gated", "Dirt Road", "Dangerous Driveway"] }],
+      "largehouse": [{ "label": "Parking", "items": ["Driveway", "Street", "Garage", "Lot"] }, { "label": "Access", "items": ["Stairs", "Gated", "Long Walk", "Dirt Road", "Dangerous Driveway"] }],
+      "estate":     [{ "label": "Parking", "items": ["Driveway", "Garage"] }, { "label": "Access", "items": ["Gated/Security", "Long Walk", "COI Required"] }],
+      "townhouse":  [{ "label": "Parking", "items": ["Street", "Garage", "Lot", "Metered"] }, { "label": "Access", "items": ["Stairs", "Difficult Access"] }],
+      "lowrise":    [{ "label": "Parking", "items": ["Street", "Garage", "Lot", "Metered"] }, { "label": "Access", "items": ["Stairs", "Elevator", "Long Walk", "Gated", "COI Required", "Limited Hours"] }],
+      "highrise":   [{ "label": "Parking", "items": ["Street", "Garage", "Lot", "Metered"] }, { "label": "Access", "items": ["Elevator", "Service Entrance", "Long Walk", "Gated/Security", "COI Required", "Limited Hours"] }],
+      "storefront": [{ "label": "Parking", "items": ["Street", "Garage", "Lot", "Metered"] }, { "label": "Access", "items": ["Service Entrance", "Limited Hours", "COI Required"] }],
+      "commercial": [{ "label": "Parking", "items": ["Street", "Garage", "Lot", "Metered"] }, { "label": "Access", "items": ["Elevator", "Service Entrance", "Long Walk", "Security", "COI Required", "Limited Hours"] }]
+    },
+    "accessDefaults": {
+      "trailer":    ["Driveway"],
+      "house":      ["Driveway"],
+      "largehouse": ["Driveway"],
+      "estate":     ["Driveway", "Gated/Security", "Long Walk"],
+      "townhouse":  ["Street"],
+      "lowrise":    ["Street", "Stairs"],
+      "highrise":   ["Parking Garage", "Elevator"],
+      "storefront": ["Street"],
+      "commercial": ["Parking Garage", "Elevator"]
+    },
     "states": ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"],
     "customerTypes": ["Primary","Secondary","Point of Contact","Assistant","Employee","Husband","Wife","Father","Mother","Brother","Sister","Son","Daughter","Relative","Boyfriend","Girlfriend","Housekeeper","Neighbor","Owner","Partner","Policyholder","Attorney","Manager","Other"],
     "orderStatuses": ["New","Intake Complete","Pickup Complete","Tagging Complete","Ready to Bill"],
