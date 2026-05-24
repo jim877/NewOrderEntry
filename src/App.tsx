@@ -261,6 +261,7 @@ import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldR
 import { relevantScopeInstructionTypes } from './utils/serviceMapping';
 import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
 import { buildFullExportLines, copyLinesToClipboard, downloadLinesAsFile } from './utils/dataExport';
+import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, animateNavigationFocus } from './utils/domNav';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 import {
   DURATION_DAYS, BAND_COLORS, DELIVERY_COLORS, STAY_TYPE_COLORS,
@@ -5091,41 +5092,8 @@ export default function App(){
   // toggleMulti — imported from ./utils/strings
   const toggleHandling=(code)=> update("handlingCodes", toggleMulti(data.handlingCodes, code));
 
-  const focusFirstFieldInSection = (sectionKey) => {
-    const section = document.getElementById(sectionKey);
-    if (!section) return;
-    const firstFocusable = section.querySelector(
-      'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    );
-    if (firstFocusable instanceof HTMLElement) {
-      firstFocusable.focus();
-    }
-  };
-  const focusLastFieldInSection = (sectionKey) => {
-    const section = document.getElementById(sectionKey);
-    if (!section) return;
-    const focusables = Array.from(section.querySelectorAll(
-      'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    ));
-    const last = focusables[focusables.length - 1];
-    if (last instanceof HTMLElement) {
-      last.focus();
-    }
-  };
-  
-  const scrollToSection = (key) => {
-    const el = document.getElementById(key);
-    if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY - 120;
-    window.scrollTo({ top: y, behavior: "smooth" });
-  };
-
-  const animateNavigationFocus = (el) => {
-    if (!(el instanceof HTMLElement)) return;
-    el.classList.remove("animate-nav-focus");
-    void el.offsetWidth;
-    el.classList.add("animate-nav-focus");
-  };
+  // focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, animateNavigationFocus
+  // — all imported from ./utils/domNav
 
   const resetOpenSubSections = () => {
     setBillingSubOpen(false);
