@@ -5201,6 +5201,42 @@ export default function App(){
     });
   }, []);
 
+  // flagContactAsPoc — flag a contact from Detailed mode (insurance adjuster, public adjuster,
+  // additional companies, etc.) as the order POC. Finds the contact in data.vendors if present;
+  // otherwise pushes a new vendor row for them, then flips isPoc exclusively to that vendor.
+  // Pass empty company+contact to clear the POC.
+  const flagContactAsPoc = useCallback((companyName, contactName, contactType = "") => {
+    if (!companyName && !contactName) { setOrderPoc(null); return; }
+    setData(prev => {
+      const existingIdx = (prev.vendors || []).findIndex(v =>
+        normalizeCompany(v.company || "") === normalizeCompany(companyName || "") &&
+        normalizeContact(v.contact || "") === normalizeContact(contactName || "")
+      );
+      let vendors = [...(prev.vendors || [])];
+      let targetId;
+      if (existingIdx >= 0) {
+        targetId = vendors[existingIdx].id;
+      } else {
+        targetId = safeUid();
+        vendors.push({ id: targetId, company: companyName || "", contact: contactName || "", type: contactType, isPoc: false });
+      }
+      vendors = vendors.map(v => {
+        const want = v.id === targetId;
+        return v.isPoc === want ? v : { ...v, isPoc: want };
+      });
+      const customers = (prev.customers || []).map(c => c.isPoc ? { ...c, isPoc: false } : c);
+      return { ...prev, vendors, customers };
+    });
+  }, [setOrderPoc]);
+
+  // isPocContact — true when the given company+contact pair is the active order POC.
+  // Compares by normalized name + company against the resolved orderPoc.
+  const isPocContact = (companyName, contactName) => {
+    if (!orderPoc) return false;
+    return normalizeCompany(orderPoc.company || "") === normalizeCompany(companyName || "") &&
+           normalizeContact(orderPoc.name || "")    === normalizeContact(contactName || "");
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem(TEST_PRESETS_KEY, JSON.stringify(testPresets));
@@ -10452,25 +10488,40 @@ export default function App(){
                                                 <EditAffordance title="Edit contact" />
                                               </div>
                                               <span className="text-[11px] text-slate-500">{getTitleForContact(c.name) || "Contact"}</span>
-                                              {getRolesForContact && (
-                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                  {getRolesForContact(role.companyName, c.name).map(r => (
-                                                    toggleRoleForContact ? (
-                                                      <button
-                                                        key={`${role.id}-${c.name}-${r.title}`}
-                                                        type="button"
-                                                        onClick={() => toggleRoleForContact(role.companyName, c.name, r.id || r.title?.toLowerCase())}
-                                                        className="rounded-full"
-                                                        title="Click to toggle role"
-                                                      >
-                                                        <RoleBadge role={r} />
-                                                      </button>
-                                                    ) : (
-                                                      <RoleBadge key={`${role.id}-${c.name}-${r.title}`} role={r} />
-                                                    )
-                                                  ))}
-                                                </div>
-                                              )}
+                                              <div className="mt-1 flex flex-wrap gap-1 items-center">
+                                                {getRolesForContact && getRolesForContact(role.companyName, c.name).map(r => (
+                                                  toggleRoleForContact ? (
+                                                    <button
+                                                      key={`${role.id}-${c.name}-${r.title}`}
+                                                      type="button"
+                                                      onClick={(e) => { e.stopPropagation(); toggleRoleForContact(role.companyName, c.name, r.id || r.title?.toLowerCase()); }}
+                                                      className="rounded-full"
+                                                      title="Click to toggle role"
+                                                    >
+                                                      <RoleBadge role={r} />
+                                                    </button>
+                                                  ) : (
+                                                    <RoleBadge key={`${role.id}-${c.name}-${r.title}`} role={r} />
+                                                  )
+                                                ))}
+                                                {(() => {
+                                                  const isThisPoc = isPocContact(role.companyName, c.name);
+                                                  return (
+                                                    <button
+                                                      type="button"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (isThisPoc) flagContactAsPoc("", "");
+                                                        else flagContactAsPoc(role.companyName, c.name, role.type || "");
+                                                      }}
+                                                      title={isThisPoc ? "Clear as Order POC" : "Mark as Order POC (only one POC per order)"}
+                                                      className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${isThisPoc ? "border-violet-400 bg-violet-100 text-violet-800" : "border-slate-200 text-slate-500 hover:border-violet-300 hover:text-violet-700"}`}
+                                                    >
+                                                      {isThisPoc ? "✓ POC" : "Mark POC"}
+                                                    </button>
+                                                  );
+                                                })()}
+                                              </div>
                                             </div>
                                           ) : (
                                             <div className="flex items-center justify-between gap-3">
