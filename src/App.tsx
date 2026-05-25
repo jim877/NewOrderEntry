@@ -225,6 +225,7 @@ import { createAlertModalState, createSmartConfirmState } from './utils/modalSta
 import { normalizeSampleContacts } from './utils/normalizeSampleContacts';
 import { DEFAULT_FORM } from './data/defaultForm';
 import { SAMPLE_PRESET_DATA } from './data/samplePreset';
+import { OLIVO_SAMPLE_PRESET } from './data/olivoSamplePreset';
 import { buildNarrativeProse } from './utils/narrativeProse';
 import { compressImage, captureFrameFromVideo } from './utils/image';
 import { useCamera } from './hooks/useCamera';
@@ -14576,107 +14577,7 @@ export default function App(){
               <div className="mb-3">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Built-in Samples</div>
                 <button onClick={() => {
-                  setData(prev => ({
-                    ...prev,
-                    orderName: "Olivo-BrooklynNY",
-                    isLead: false,
-                    orderStatus: "New",
-                    primaryLossType: "Water",
-                    orderTypes: ["Water", "Mold"],
-                    secondaryContaminants: ["Mold"],
-                    leadSourceCategory: "Referral",
-                    referringCompany: "State Farm",
-                    referrer: "Jamie Lee",
-                    salesRep: "Jim F",
-                    contactMethod: "Call",
-                    insuranceClaim: "Yes",
-                    insuranceCompany: "State Farm",
-                    insuranceAdjuster: "Jamie Lee",
-                    nationalCarrier: "State Farm",
-                    claimNumber: "CLM-2026-04821",
-                    policyNumber: "POL-SF-99281",
-                    dateOfLoss: "2026-04-15",
-                    billingPayer: "Insurance",
-                    directionOfPayment: "Direct from Insurance",
-                    damageWasWet: "Y",
-                    damageMoldMildew: true,
-                    structuralElectricDamage: "N",
-                    noLights: false,
-                    noHeat: false,
-                    boardedUp: false,
-                    livingStatus: "Hotel",
-                    processType: "Long-Term Storage",
-                    repairsSummary: "Replace Floors, Paint",
-                    packoutSummary: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Electronics"],
-                    loadList: ["Floor Protection", "Blankets", "TV Boxes", "Dollies", "Extra Manpower"],
-                    storageNeeded: "Y",
-                    storageMonths: "8",
-                    sdsConsiderations: ["Elderly", "Pets", "Skin Sensitivity"],
-                    sdsObservations: ["Pets", "Smoking"],
-                    sdsServices: ["Anti-Microbial", "Drying", "Content Manipulation", "Expert Stain Removal", "Fiber Protection"],
-                    serviceOfferings: ["Contents", "Furniture", "Rugs", "Textiles", "Pack-out", "Storage Only"],
-                    householdAnimals: "Dog Rex, Cat Whiskers",
-                    familyMedicalIssues: "N",
-                    soapFragAllergies: "Y",
-                    soapFragNote: "Fragrance-free only — skin sensitivity",
-                    selfCleaning: "Y",
-                    selfCleaningNote: "Drawers, Undergarments",
-                    howDryLaundry: "Air-Dry",
-                    useDryCleaner: "Yes",
-                    handlingCodes: ["Det", "NoDry", "Wet", "PPE"],
-                    severityCodes: ["Water-2", "Mold-1"],
-                    qualityCode: "Q1",
-                    lossSeverity: {
-                      touched: true,
-                      fire: { enabled: false, values: { "Heat": 0, "Soot": 0, "Odor": 0, "Extinguisher Powder": 0, "Remediation Debris": 0 } },
-                      water: { enabled: true, values: { "Water": 3, "Humidity": 2, "Musty Smell": 2, "Visible Mildew": 1, "Visible Mold": 2, "Sprinkler Chemical": 0, "Flood Cut Debris": 1 } },
-                      puffback: { enabled: false, values: { "Oil": 0, "Soot": 0, "Odor": 0, "Oily Film": 0 } },
-                    },
-                    sdsRooms: [
-                      { id: safeUid(), name: "Kitchen", affected: true, severitySelections: ["Water3", "Mold1"], tasks: ["Pack out all contents", "Remove wet rugs"], notes: "Burst pipe under sink. Standing water 2 inches. Mold starting behind cabinets." },
-                      { id: safeUid(), name: "Basement", affected: true, severitySelections: ["Water2", "Mold2"], tasks: ["Full pack out", "Dehumidification needed"], notes: "Water migrated from kitchen. Visible mold on walls and ceiling tiles. Strong musty odor." },
-                      { id: safeUid(), name: "Living Room", affected: true, severitySelections: ["Water1"], tasks: ["Remove area rugs", "Pack out electronics"], notes: "Minor water damage to hardwood floors near kitchen entrance." },
-                      { id: safeUid(), name: "Master Bedroom", affected: false, severitySelections: [], tasks: ["Pack bedding for rush delivery"], notes: "Not directly affected but customer needs bedding rushed to hotel." },
-                      { id: safeUid(), name: "Kids Room", affected: false, severitySelections: [], tasks: ["Pack school supplies and toys"], notes: "Sofia's room — rush school backpack and comfort toys." },
-                    ],
-                    sdsPhotos: [
-                      { id: safeUid(), src: "/Gemini_Pets.png", room: "Kitchen", note: "Water damage under sink — burst pipe" },
-                      { id: safeUid(), src: "/Drying.png", room: "Kitchen", note: "Standing water on kitchen floor" },
-                      { id: safeUid(), src: "/Content_Manipulation.png", room: "Basement", note: "Mold visible on basement walls" },
-                      { id: safeUid(), src: "/Expert_Stain_Removal.png", room: "Basement", note: "Water staining on carpet" },
-                      { id: safeUid(), src: "/Gemini_Pets.png", room: "Living Room", note: "Hardwood floor water marks near kitchen" },
-                    ],
-                    suggestedGroups: ["RD", "LTD", "Storage Only"],
-                    moldCoverageConfirm: "$15,000",
-                    moldLimit: "15000",
-                    contentsCoverageLimit: "250000",
-                    customers: [
-                      { ...initCustomer({ first: "Maria", last: "Olivo", phone: "(718) 555-0142", email: "maria.olivo@email.com", type: "Policyholder", isPrimary: true, policyHolder: true, preferredContact: "Phone" }) },
-                      { ...initCustomer({ first: "Tony", last: "Olivo", phone: "(718) 555-0143", email: "tony.olivo@email.com", type: "Spouse" }) },
-                    ],
-                    addresses: [
-                      { ...initAddress({ street: "482 Atlantic Ave", apt: "3B", city: "Brooklyn", state: "NY", zip: "11217", type: "Apartment", isPrimary: true, isLossSite: true, lat: "40.6844", lng: "-73.9785" }) },
-                      { ...initAddress({ street: "Holiday Inn Downtown", city: "Brooklyn", state: "NY", zip: "11201", type: "Hotel" }) },
-                    ],
-                    household: [
-                      { id: safeUid(), category: "person", type: "Elderly", name: "Rosa Olivo", age: "78" },
-                      { id: safeUid(), category: "person", type: "Child", name: "Sofia", age: "7" },
-                      { id: safeUid(), category: "pet", type: "Dog", name: "Rex" },
-                      { id: safeUid(), category: "pet", type: "Cat", name: "Whiskers" },
-                    ],
-                    rushInterests: ["school", "christmas"],
-                    upcomingEvents: [
-                      { id: safeUid(), name: "Florida Vacation", type: "vacation_beach", date: "2026-07-15" },
-                      { id: safeUid(), name: "Sofia's Birthday", type: "wedding", date: "2026-05-20" },
-                    ],
-                    scheduleType: "Pickup",
-                    pickupDate: "2026-04-24",
-                    pickupTime: "9:00 AM",
-                    eventAssignee: "Jim F",
-                    eventVehicle: "Truck 4",
-                    contactAssignment: "office",
-                    eventInstructions: "Water damage from burst pipe in kitchen. Mold visible in basement. Elderly grandmother (78) staying — be patient and careful. Dog Rex and cat Whiskers on premises — keep doors closed. Customer prefers fragrance-free products. Air-dries all clothing.",
-                  }));
+                  setData(prev => ({ ...prev, ...OLIVO_SAMPLE_PRESET() }));
                   setToast("Full SDS Sample loaded");
                   setShowPresetModal(false);
                 }} className="w-full rounded-lg border border-teal-300 bg-teal-50 px-4 py-3 text-left hover:bg-teal-100 transition-colors">
