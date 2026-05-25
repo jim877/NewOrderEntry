@@ -160,6 +160,7 @@ import {
   BlockerRulesCard,
   FieldConfigToolbar,
   RushGuideFamilyStep,
+  RushGuideEventsStep,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -11007,24 +11008,15 @@ export default function App(){
                     />
                   )}
 
-                  {/* Step 3: Events */}
-                  {rushGuideStep === 3 && <>
-                    <div><button onClick={() => setRushGuideStep(2)} className="text-xs text-slate-400 hover:text-slate-600 mb-2">← Back</button><h2 className="text-xl font-bold text-slate-900 mb-1">Step 3: Upcoming Trips & Events</h2><p className="text-sm text-slate-500">Any travel or formal events before {rushFormatDate(estimatedReturn)}?</p></div>
-                    <div className="space-y-3">
-                      {(rushGuideData.events || []).map(evt => (
-                        <div key={evt.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 grid grid-cols-3 gap-3 relative">
-                          <button onClick={() => setRushGuideData(p => ({...p, events: p.events.filter(e => e.id !== evt.id)}))} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 text-sm">×</button>
-                          <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Name</div><input value={evt.name} onChange={e => setRushGuideData(p => ({...p, events: p.events.map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev)}))} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" /></div>
-                          <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Type</div><select value={evt.type} onChange={e => setRushGuideData(p => ({...p, events: p.events.map(ev => ev.id === evt.id ? {...ev, type: e.target.value} : ev)}))} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white">{RUSH_EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
-                          <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Date</div><input type="date" value={evt.date} onChange={e => setRushGuideData(p => ({...p, events: p.events.map(ev => ev.id === evt.id ? {...ev, date: e.target.value} : ev)}))} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" /></div>
-                        </div>
-                      ))}
-                      <button onClick={() => setRushGuideData(p => ({...p, events: [...(p.events||[]), {id: safeUid(), type: "vacation_beach", date: "", name: ""}]}))} className="w-full p-3 border-2 border-dashed border-slate-300 rounded-xl text-sm font-bold text-slate-500 hover:border-teal-400 hover:text-teal-600">+ Add Trip or Event</button>
-                    </div>
-                    <div className="flex justify-end pt-4 border-t border-slate-100">
-                      <button onClick={() => setRushGuideStep(4)} className="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-md">Generate Smart Checklist →</button>
-                    </div>
-                  </>}
+                  {rushGuideStep === 3 && (
+                    <RushGuideEventsStep
+                      events={rushGuideData.events || []}
+                      setRushGuideData={setRushGuideData}
+                      onBack={() => setRushGuideStep(2)}
+                      onNext={() => setRushGuideStep(4)}
+                      estimatedReturnLabel={rushFormatDate(estimatedReturn)}
+                    />
+                  )}
 
                   {/* Results */}
                   {(repairInfo || orderSituation || estimatedReturn) ? (() => {
