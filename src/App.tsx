@@ -314,6 +314,8 @@ import {
   applyContactPocReducer,
   isPocContact as isPocContactFor,
   applyPrimaryPolicyHolderReducer,
+  appendCustomerPlaceholderReducer,
+  appendAddressPlaceholderReducer,
 } from './utils/orderEntities';
 import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
 import { computeSectionAuditStatus, computeAuditRequiredCount as computeAuditRequiredCountFor } from './utils/auditStatus';
@@ -5940,45 +5942,23 @@ export default function App(){
   
   const addNewAddress = useCallback(() => {
     const addressId = safeUid();
-    setData(p => {
-        // Remove any existing empty addresses (except primary)
-        const cleaned = p.addresses.filter((a, i) => i === 0 || hasMeaningfulValue(a.street) || hasMeaningfulValue(a.city));
-        const hasPrimary = cleaned.some(a => a.isPrimary);
-        return {
-          ...p,
-          addresses: [
-            ...cleaned,
-            initAddress({
-              id: addressId,
-              isPrimary: !hasPrimary,
-              isLossSite: false,
-              type: "",
-              placeholder: createPlaceholderFlag("address", "Address type needed")
-            })
-          ]
-        };
-    });
+    setData(p => appendAddressPlaceholderReducer(p, initAddress({
+      id: addressId,
+      isLossSite: false,
+      type: "",
+      placeholder: createPlaceholderFlag("address", "Address type needed"),
+    })));
     setPendingAddressTypePromptId(addressId);
     setToast("Address placeholder added. Select a Type now, or leave it for later.");
   }, [setToast]);
   
   const addNewCustomer = useCallback(() => {
-    // Remove any existing empty customers first
-    setData(p => {
-      const cleaned = p.customers.filter((c, i) => i === 0 || hasMeaningfulValue(c.first) || hasMeaningfulValue(c.last) || hasMeaningfulValue(c.phone) || hasMeaningfulValue(c.email));
-      return {
-        ...p,
-        customers: [
-          ...cleaned,
-          initCustomer({
-            type: "",
-            policyHolder: false,
-            isPrimary: false,
-            placeholder: createPlaceholderFlag("customer", "Customer details needed")
-          })
-        ]
-      };
-    });
+    setData(p => appendCustomerPlaceholderReducer(p, initCustomer({
+      type: "",
+      policyHolder: false,
+      isPrimary: false,
+      placeholder: createPlaceholderFlag("customer", "Customer details needed"),
+    })));
   }, []);
 
   const handleAddressTypePromptFocused = useCallback((addressId) => {

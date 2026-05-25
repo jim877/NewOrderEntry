@@ -87,6 +87,42 @@ export const resolveOrderPoc = (data: any): OrderPoc | null => {
   return null;
 };
 
+// appendCustomerPlaceholderReducer — pure reducer that removes
+// "empty" non-primary customer slots and appends a new placeholder
+// at the end. The newCustomer payload is built at the call site so
+// the helper stays free of orderFactories imports.
+export const appendCustomerPlaceholderReducer = (prev: any, newCustomer: any) => {
+  const cleaned = (prev.customers || []).filter(
+    (c: any, i: number) =>
+      i === 0 ||
+      (
+        // hasMeaningfulValue isn't imported here — inline check matches order.ts.
+        (c?.first !== "" && c?.first != null) ||
+        (c?.last !== "" && c?.last != null) ||
+        (c?.phone !== "" && c?.phone != null) ||
+        (c?.email !== "" && c?.email != null)
+      )
+  );
+  return { ...prev, customers: [...cleaned, newCustomer] };
+};
+
+// appendAddressPlaceholderReducer — pure reducer for the "add new
+// address" button. Removes empty non-first addresses and appends the
+// new one (marked Primary when no existing address holds that flag).
+// Builds the newAddress inline using the supplied id + initAddress +
+// createPlaceholderFlag callables so the helper stays free of
+// orderFactories imports.
+export const appendAddressPlaceholderReducer = (prev: any, newAddress: any) => {
+  const cleaned = (prev.addresses || []).filter(
+    (a: any, i: number) => i === 0 || (a?.street !== "" && a?.street != null) || (a?.city !== "" && a?.city != null)
+  );
+  const hasPrimary = cleaned.some((a: any) => a.isPrimary);
+  return {
+    ...prev,
+    addresses: [...cleaned, { ...newAddress, isPrimary: newAddress.isPrimary ?? !hasPrimary }],
+  };
+};
+
 // applyPrimaryPolicyHolderReducer — pure reducer that flips the
 // primary customer's policyHolder flag + type based on whether the
 // order is currently insurance-related. When insurance-related, marks
