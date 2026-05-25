@@ -151,6 +151,7 @@ import {
   GlobalDirectoryModal,
   ConfirmAppointmentModal,
   OutboundActionsPanel,
+  SaveSummaryGates,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14017,34 +14018,12 @@ export default function App(){
               <button onClick={() => setPreviewOpen(false)} className="text-white/70 hover:text-white text-lg font-bold">✕</button>
             </div>
             <div className="p-6 space-y-4 overflow-y-auto custom-scroll flex-1">
-              {(scopeBridgeState.pendingIssues || []).length > 0 && (
-                <div className="rounded-lg border border-rose-200 bg-rose-50 overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-rose-200/60 text-sm font-bold text-rose-700">Open Blockers ({(scopeBridgeState.pendingIssues || []).length})</div>
-                  <ul className="list-disc pl-8 pr-4 py-2 text-sm text-rose-700 space-y-0.5">
-                    {(scopeBridgeState.pendingIssues || []).map((b, i) => <li key={`blk-${i}`}>{b}</li>)}
-                  </ul>
-                </div>
-              )}
-              {saveSummaryMissing.length > 0 && (() => {
-                const [missingOpen, setMissingOpen] = [saveMissingOpen, setSaveMissingOpen];
-                return (
-                  <div className="rounded-lg border border-rose-200 bg-rose-50 overflow-hidden">
-                    <button type="button" onClick={() => setMissingOpen(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-rose-100/50">
-                      <div className="text-sm font-bold text-rose-700">Missing Fields ({saveSummaryMissing.length})</div>
-                      <span className="text-rose-400 text-xs">{missingOpen ? "▾" : "▸"}</span>
-                    </button>
-                    {missingOpen && (
-                      <div className="px-4 pb-3">
-                        <ul className="list-disc pl-5 text-sm text-rose-700">
-                          {saveSummaryMissing.map((m, idx) => (
-                            <li key={`${m.key}-${idx}`}>{m.label}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+              <SaveSummaryGates
+                pendingIssues={scopeBridgeState.pendingIssues || []}
+                missing={saveSummaryMissing}
+                missingOpen={saveMissingOpen}
+                setMissingOpen={setSaveMissingOpen}
+              />
               <SaveSummaryPreview
                 orderNarrative={orderNarrative}
                 saveExportLines={saveExportLines}
