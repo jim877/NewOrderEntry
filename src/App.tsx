@@ -140,6 +140,7 @@ import {
   SmartConfirmModal,
   RoleAssignModal,
   QuickAddModal,
+  ReminderModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14856,62 +14857,23 @@ export default function App(){
       )}
 
       {reminderModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold text-white">Schedule Reminder</h3>
-                <div className="text-sm text-sky-100 mt-1">Choose when to send a reminder.</div>
-              </div>
-              <button
-                className="text-white/80 hover:text-white text-2xl font-bold leading-none"
-                onClick={() => setReminderModalOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <Field label="Reminder For">
-                <Select value={reminderDraft.assignee} onChange={e => setReminderDraft(d => ({ ...d, assignee: e.target.value }))}>
-                  <option value="">{data.currentUser || "Select user..."}</option>
-                  {TECHS.filter(t => t !== "Unassigned").map(t => <option key={t} value={t}>{t}</option>)}
-                </Select>
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Reminder Date">
-                  <DatePicker value={reminderDraft.date} onChange={(v)=>setReminderDraft(d => ({ ...d, date: v }))} />
-                </Field>
-                <Field label="Reminder Time">
-                  <TimePicker value={reminderDraft.time} onChange={(v)=>setReminderDraft(d => ({ ...d, time: v }))} />
-                </Field>
-              </div>
-            </div>
-            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
-              {data.reminderEnabled && (
-                <button
-                  className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                  onClick={() => {
-                    updateMany({ reminderEnabled: false, reminderDate: "", reminderTime: "" });
-                    setReminderModalOpen(false);
-                  }}
-                >
-                  Clear
-                </button>
-              )}
-              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setReminderModalOpen(false)}>Cancel</button>
-              <button
-                className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
-                onClick={() => {
-                  updateMany({ reminderEnabled: true, reminderDate: reminderDraft.date, reminderTime: reminderDraft.time, reminderAssignee: reminderDraft.assignee || data.currentUser || "" });
-                  setReminderModalOpen(false);
-                  setToast("Reminder scheduled");
-                }}
-              >
-                Save Reminder
-              </button>
-            </div>
-          </div>
-        </div>
+        <ReminderModal
+          draft={reminderDraft}
+          setDraft={setReminderDraft}
+          currentUser={data.currentUser || ""}
+          techs={TECHS.filter((t) => t !== "Unassigned")}
+          reminderEnabled={!!data.reminderEnabled}
+          onClose={() => setReminderModalOpen(false)}
+          onClear={() => {
+            updateMany({ reminderEnabled: false, reminderDate: "", reminderTime: "" });
+            setReminderModalOpen(false);
+          }}
+          onSave={() => {
+            updateMany({ reminderEnabled: true, reminderDate: reminderDraft.date, reminderTime: reminderDraft.time, reminderAssignee: reminderDraft.assignee || data.currentUser || "" });
+            setReminderModalOpen(false);
+            setToast("Reminder scheduled");
+          }}
+        />
       )}
 
       {welcomeModal.isOpen && (

@@ -52,3 +52,4 @@ export { AlertModal } from "./AlertModal";
 export { SmartConfirmModal } from "./SmartConfirmModal";
 export { RoleAssignModal } from "./RoleAssignModal";
 export { QuickAddModal } from "./QuickAddModal";
+export { ReminderModal } from "./ReminderModal";
