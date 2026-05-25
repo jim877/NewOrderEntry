@@ -87,3 +87,4 @@ export { AddressSection } from "./AddressSection";
 export { CustomerSection } from "./CustomerSection";
 export { ScheduleSection } from "./ScheduleSection";
 export { BillingCompaniesSection } from "./BillingCompaniesSection";
+export { OrderSection } from "./OrderSection";
