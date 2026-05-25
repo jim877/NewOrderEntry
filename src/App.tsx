@@ -259,6 +259,7 @@ import {
 } from './utils/dateTime';
 import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldRetainSharedLoadItem, TRIGGER_TYPES, ACTION_TYPE_LABELS } from './utils/loadTargets';
 import { relevantScopeInstructionTypes } from './utils/serviceMapping';
+import { interviewAnswersFromOrderData, orderUpdatesFromInterviewAnswers } from './utils/interviewMapping';
 import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
 import { buildFullExportLines, copyLinesToClipboard, downloadLinesAsFile } from './utils/dataExport';
 import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, animateNavigationFocus } from './utils/domNav';
@@ -449,93 +450,15 @@ const ScopeWizard = ({ onClose, orderData, onOrderUpdate, onShowOrder, onShowSds
 
   // Interview question list — built lazily so loadList options pick up live Settings edits.
   const INTERVIEW_SECTIONS = getScopeInterviewSections();
-  const [interviewAnswers, setInterviewAnswers] = useState<Record<string, string | string[] | boolean | null>>(() => {
-    if (!orderData) return {};
-    const d = orderData as any;
-    const a: Record<string, string | string[] | boolean | null> = {};
-    // Living / delivery
-    if (d.livingStatus) a.living = d.livingStatus;
-    if (d.processType) a.delivery = d.processType;
-    // Repairs
-    if (d.repairsSummary) a.repairs = String(d.repairsSummary).split(", ").filter(Boolean);
-    // Boolean questions with notes
-    if (d.familyMedicalIssues === "Y" || d.familyMedicalIssues === true) a.medicalIssues = true;
-    if (d.familyMedicalIssues === "N" || d.familyMedicalIssues === false) a.medicalIssues = false;
-    if (d.familyMedicalNote) a.medicalIssues_note = d.familyMedicalNote;
-    if (d.soapFragAllergies === "Y" || d.soapFragAllergies === true) a.soapAllergies = true;
-    if (d.soapFragAllergies === "N" || d.soapFragAllergies === false) a.soapAllergies = false;
-    if (d.soapFragNote) a.soapAllergies_note = d.soapFragNote;
-    if (d.selfCleaning === "Y" || d.selfCleaning === true) a.selfCleaning = true;
-    if (d.selfCleaning === "N" || d.selfCleaning === false) a.selfCleaning = false;
-    if (d.selfCleaningNote) a.selfCleaning_note = d.selfCleaningNote;
-    if (d.storageNeeded === "Y" || d.storageNeeded === true) a.needStorage = true;
-    if (d.storageNeeded === "N" || d.storageNeeded === false) a.needStorage = false;
-    // Single-select
-    if (d.useDryCleaner) a.useDryCleaner = d.useDryCleaner;
-    if (d.howDryLaundry) a.dryLaundry = d.howDryLaundry;
-    // Multi-select lists
-    if (d.loadList?.length) a.loadList = d.loadList;
-    if (d.packoutSummary?.length) a.packout = d.packoutSummary;
-    if (d.sdsConsiderations?.length) a.considerations = d.sdsConsiderations;
-    if (d.suggestedGroups?.length) a.suggestedGroups = d.suggestedGroups;
-    if (d.finalDeliveryQualifier) a.finalDeliveryDate = d.finalDeliveryQualifier;
-    if (d.rushDeliveryNeeded === "Y") a.rushDelivery = true;
-    if (d.rushDeliveryNeeded === "N") a.rushDelivery = false;
-    // Conditions from boolean flags
-    const conditions: string[] = [];
-    if (d.damageWasWet === true || d.damageWasWet === "Y") conditions.push("Still Wet");
-    if (d.damageMoldMildew === true || d.damageMoldMildew === "Y") conditions.push("Visible Mold");
-    if (d.structuralElectricDamage) conditions.push("Structural Damage");
-    if (d.noLights === true || d.noLights === "Y") conditions.push("No Electricity");
-    if (d.noHeat === true || d.noHeat === "Y") conditions.push("No Heat");
-    if (d.boardedUp === true || d.boardedUp === "Y") conditions.push("Boarded Up");
-    if (conditions.length) a.conditions = conditions;
-    // Pets
-    const pets = (d.customers || []).flatMap((c: any) => (c.pets || []).map((p: any) => p.type || p.name || "")).filter(Boolean);
-    if (pets.length) a.petsInHome = pets;
-    return a;
-  });
+  const [interviewAnswers, setInterviewAnswers] = useState<Record<string, string | string[] | boolean | null>>(
+    () => interviewAnswersFromOrderData(orderData) as Record<string, string | string[] | boolean | null>,
+  );
 
 
   // Sync interview answers to NOE in real-time
   const syncInterviewToNOE = useCallback((answers: Record<string, any>) => {
     if (!onOrderUpdate) return;
-    const updates: Record<string, any> = {};
-    // Map interview keys → NOE fields
-    if (answers.living !== undefined) updates.livingStatus = answers.living;
-    if (answers.delivery !== undefined) updates.processType = answers.delivery;
-    if (answers.rushDelivery !== undefined) updates.rushDeliveryNeeded = answers.rushDelivery === true ? "Y" : answers.rushDelivery === false ? "N" : "";
-    if (answers.deliveryAddress !== undefined) updates.deliveryAddress = answers.deliveryAddress;
-    if (answers.livingAddresses !== undefined) updates.livingAddresses = answers.livingAddresses;
-    if (answers.repairs !== undefined) updates.repairsSummary = Array.isArray(answers.repairs) ? answers.repairs.join(", ") : "";
-    if (answers.medicalIssues !== undefined) { updates.familyMedicalIssues = answers.medicalIssues === true ? "Y" : answers.medicalIssues === false ? "N" : ""; }
-    if (answers.medicalIssues_note !== undefined) updates.familyMedicalNote = answers.medicalIssues_note;
-    if (answers.soapAllergies !== undefined) { updates.soapFragAllergies = answers.soapAllergies === true ? "Y" : answers.soapAllergies === false ? "N" : ""; }
-    if (answers.soapAllergies_note !== undefined) updates.soapFragNote = answers.soapAllergies_note;
-    if (answers.selfCleaning !== undefined) { updates.selfCleaning = answers.selfCleaning === true ? "Y" : answers.selfCleaning === false ? "N" : ""; }
-    if (answers.selfCleaning_note !== undefined) updates.selfCleaningNote = answers.selfCleaning_note;
-    if (answers.needStorage !== undefined) { updates.storageNeeded = answers.needStorage === true ? "Y" : answers.needStorage === false ? "N" : ""; }
-    if (answers.useDryCleaner !== undefined) updates.useDryCleaner = answers.useDryCleaner;
-    if (answers.dryLaundry !== undefined) updates.howDryLaundry = answers.dryLaundry;
-    if (answers.loadList !== undefined) updates.loadList = answers.loadList;
-    if (answers.packout !== undefined) updates.packoutSummary = answers.packout;
-    if (answers.considerations !== undefined) updates.sdsConsiderations = answers.considerations;
-    if (answers.suggestedGroups !== undefined) updates.suggestedGroups = answers.suggestedGroups;
-    if (answers.finalDeliveryDate !== undefined) updates.finalDeliveryQualifier = answers.finalDeliveryDate;
-    if (answers.interests !== undefined) updates.customerInterests = answers.interests;
-    if (answers.upcomingEvents !== undefined) updates.customerUpcomingEvents = answers.upcomingEvents;
-    if (Array.isArray(answers.conditions)) {
-      updates.damageWasWet = answers.conditions.includes("Still Wet") ? "Y" : "N";
-      updates.damageMoldMildew = answers.conditions.includes("Visible Mold") ? "Y" : "N";
-      updates.noHeat = answers.conditions.includes("No Heat") ? "Y" : "N";
-      updates.noLights = answers.conditions.includes("No Electricity") ? "Y" : "N";
-      updates.boardedUp = answers.conditions.includes("Boarded Up") ? "Y" : "N";
-    }
-    if (Array.isArray(answers.petsInHome)) {
-      // Will be picked up by the NOE pet display
-      updates.interviewPets = answers.petsInHome;
-    }
-    onOrderUpdate(updates);
+    onOrderUpdate(orderUpdatesFromInterviewAnswers(answers));
   }, [onOrderUpdate]);
 
   // Sync photos to parent in real-time
