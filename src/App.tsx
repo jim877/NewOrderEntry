@@ -304,6 +304,7 @@ import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './util
 import { computeSectionAuditStatus } from './utils/auditStatus';
 import { buildOrderNarrative } from './utils/orderNarrative';
 import { computeAuditMissing as computeAuditMissingFor } from './utils/auditMissing';
+import { buildCompanyRoleAssignments } from './utils/companyRoles';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6930,77 +6931,22 @@ export default function App(){
     return map;
   }, [sampleContacts]);
 
-  const companyRoleAssignments = useMemo(() => {
-    return COMPANY_ROLE_DEFS.map(role => {
-      const rawEntry = data.additionalCompanies?.[role.type];
-      const entry = rawEntry ? syncCompanyEntryPlaceholders(rawEntry) : null;
-      const sourceCompany = role.source ? (data[role.source] || "") : "";
-      const sourceContact = role.contactSource ? (data[role.contactSource] || "") : "";
-      const contactsFromEntry = entryContactList(entry);
-      const companyName = sourceCompany || entry?.company || "";
-      const contactsFromSample = (() => {
-        if (!companyName) return [];
-        const target = normalizeCompany(companyName);
-        if (!target) return [];
-        const direct = globalDirectoryByCompany.get(target) || [];
-        if (direct.length) return direct.map(c => ({ name: c.name }));
-        const matches = [];
-        globalDirectoryByCompany.forEach((list, key) => {
-          if (key.includes(target) || target.includes(key)) {
-            list.forEach(c => matches.push({ name: c.name }));
-          }
-        });
-        return matches;
-      })();
-      const mergedContacts = [
-        ...contactsFromEntry,
-        ...contactsFromSample.filter(c => !contactsFromEntry.find(e => normalizeContact(e.name) === normalizeContact(c.name)))
-      ];
-      const contactName = sourceContact || mergedContacts[0]?.name || "";
-      const normalizedEntry = syncCompanyEntryPlaceholders({
-        ...(entry || {}),
-        company: companyName || entry?.company || "",
-        contact: contactName || entry?.contact || "",
-        contacts: mergedContacts,
-        placeholder: entry?.placeholder || null,
-        contactPlaceholder: entry?.contactPlaceholder || null
-      });
-      if (!companyTypeRequiresContact(role.type)) {
-        normalizedEntry.contactPlaceholder = null;
-      }
-      const companyPlaceholder = !!entry && !sourceCompany && isCompanyPlaceholder(normalizedEntry);
-      const contactPlaceholder =
-        !!entry &&
-        !sourceContact &&
-        !companyPlaceholder &&
-        companyTypeRequiresContact(role.type) &&
-        isContactPlaceholder(normalizedEntry);
-      const pending = companyPlaceholder || contactPlaceholder;
-      const filled = !!companyName;
-      return {
-        ...role,
-        companyName,
-        contactName,
-        pending,
-        filled,
-        companyPlaceholder,
-        contactPlaceholder,
-        entry: normalizedEntry,
-        contacts: mergedContacts
-      };
-    });
-  }, [
-    data.additionalCompanies,
-    data.insuranceCompany,
-    data.insuranceAdjuster,
-    data.publicAdjustingCompany,
-    data.publicAdjuster,
-    data.independentAdjustingCo,
-    data.independentAdjuster,
-    data.tpaCompany,
-    data.tpaContact,
-    globalDirectoryByCompany
-  ]);
+  // Per-role Company assignment rows for Section 4 — see utils/companyRoles.
+  const companyRoleAssignments = useMemo(
+    () => buildCompanyRoleAssignments(data, COMPANY_ROLE_DEFS, globalDirectoryByCompany),
+    [
+      data.additionalCompanies,
+      data.insuranceCompany,
+      data.insuranceAdjuster,
+      data.publicAdjustingCompany,
+      data.publicAdjuster,
+      data.independentAdjustingCo,
+      data.independentAdjuster,
+      data.tpaCompany,
+      data.tpaContact,
+      globalDirectoryByCompany,
+    ]
+  );
 
   const visibleCompanyRoles = useMemo(() => {
     const base = companyRolesExpanded
