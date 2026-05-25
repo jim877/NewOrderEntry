@@ -342,6 +342,7 @@ import {
 } from './utils/contactOptions';
 import { computeSuggestedReferrerRoles } from './utils/referrerRoles';
 import { buildActionItemPlaceholders, buildBillToBlockers } from './utils/actionItemsData';
+import { toggleBridgeMilestoneReducer, toggleProceedWithoutApprovalReducer } from './utils/bridgeMilestones';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6615,57 +6616,15 @@ export default function App(){
     });
   }, [patchScopeBridge]);
 
-  const toggleScopeBridgeMilestone = useCallback((milestoneId, atId) => {
-    patchScopeBridge((prev) => {
-      const currentMilestones = prev.milestones || {};
-      const currentPending = Array.from(new Set((prev.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean)));
-      const nextEnabled = !currentMilestones[milestoneId];
-      const isEstimateApproval = milestoneId === "estimateApproved";
-      const isAuthorizationSigned = milestoneId === "authorizationOnFile";
-      const clearOverridePatch = isEstimateApproval && nextEnabled
-        ? {
-            proceedWithoutApproval: false,
-            proceedWithoutApprovalAt: "",
-            proceedWithoutApprovalBy: "",
-          }
-        : {};
-      let nextPending = [...currentPending];
-      if (nextEnabled && isAuthorizationSigned) {
-        nextPending = nextPending.filter((issue) => issue !== "Won't Sign Authorization");
-      }
-      if (nextEnabled && isEstimateApproval) {
-        nextPending = nextPending.filter((issue) => issue !== "Customer Wants Estimate" && issue !== "Adjuster Wants Estimate");
-      }
-      return {
-        ...prev,
-        pendingIssues: nextPending,
-        milestones: {
-          ...currentMilestones,
-          ...clearOverridePatch,
-          [milestoneId]: nextEnabled,
-          [atId]: nextEnabled ? new Date().toISOString() : "",
-        }
-      };
-    });
-  }, [patchScopeBridge]);
+  const toggleScopeBridgeMilestone = useCallback(
+    (milestoneId, atId) => patchScopeBridge((prev) => toggleBridgeMilestoneReducer(prev, milestoneId, atId)),
+    [patchScopeBridge]
+  );
 
-  const toggleProceedWithoutApproval = useCallback(() => {
-    patchScopeBridge((prev) => {
-      const currentMilestones = prev.milestones || {};
-      const nextEnabled = !currentMilestones.proceedWithoutApproval;
-      return {
-        ...prev,
-        milestones: {
-          ...currentMilestones,
-          proceedWithoutApproval: nextEnabled,
-          proceedWithoutApprovalAt: nextEnabled ? new Date().toISOString() : "",
-          estimateApproved: nextEnabled ? false : currentMilestones.estimateApproved,
-          estimateApprovedAt: nextEnabled ? "" : currentMilestones.estimateApprovedAt,
-          estimateApprovedBy: nextEnabled ? "" : currentMilestones.estimateApprovedBy,
-        },
-      };
-    });
-  }, [patchScopeBridge]);
+  const toggleProceedWithoutApproval = useCallback(
+    () => patchScopeBridge(toggleProceedWithoutApprovalReducer),
+    [patchScopeBridge]
+  );
 
   const updateScopeBridgeMilestone = useCallback((milestoneKey, value) => {
     patchScopeBridge((prev) => ({
