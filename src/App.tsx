@@ -293,6 +293,7 @@ import { downloadOrderIcs } from './utils/icsExport';
 import { renderAlertMessageContent, renderAlertDetailContent } from './utils/alertContent';
 import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
 import { getOrderCompanyNames, getOrderContactNames } from './utils/orderEntities';
+import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
 import { loadJsonFromStorage, loadMergedRecordFromStorage, saveJsonToStorage } from './utils/localStorageState';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
@@ -13855,27 +13856,7 @@ export default function App(){
               orderNarrativeProse={(data as any).orderNarrativeProseOverride || buildNarrativeProse(orderNarrative, data)}
               rushGuideTimeline={buildRushGuideTimeline(data)}
               onClose={() => setShowSdsPreview(false)}
-              onPhotoNoteChange={(photoId: string, note: string) => {
-                if (photoId.startsWith("scope-")) {
-                  // Update in scopePhotos (walkthrough photos)
-                  const parts = photoId.replace("scope-", "").split("-");
-                  const rKey = `${parts[0]}-${parts[1]}`;
-                  const ts = Number(parts[2]);
-                  setData(prev => {
-                    const scopePhotos = { ...(prev as any).scopePhotos };
-                    if (scopePhotos[rKey]) {
-                      scopePhotos[rKey] = scopePhotos[rKey].map((p: any) => p.ts === ts ? { ...p, note } : p);
-                    }
-                    return { ...prev, scopePhotos };
-                  });
-                } else {
-                  // Update in sdsPhotos
-                  setData(prev => ({
-                    ...prev,
-                    sdsPhotos: (prev.sdsPhotos || []).map((p: any) => p.id === photoId ? { ...p, note } : p),
-                  }));
-                }
-              }}
+              onPhotoNoteChange={(photoId: string, note: string) => setData((prev) => updateSdsPhotoNote(prev, photoId, note))}
               onNarrativeChange={(prose: string[]) => {
                 update("orderNarrativeProseOverride", prose);
               }}
