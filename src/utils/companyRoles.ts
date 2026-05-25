@@ -42,6 +42,34 @@ export type CompanyRoleAssignment = CompanyRoleDef & {
   contacts: { name: string }[];
 };
 
+// migrateReferringCompanyEntryReducer — legacy data shape migration.
+// Older saves stored the referrer under additionalCompanies["Referring
+// Company"]; we now key by inferred company type (Public Adjusting /
+// Insurance / etc.). This reducer rewrites the legacy key into the
+// inferred type slot, merging with any existing entry there.
+export const migrateReferringCompanyEntryReducer = (
+  prev: any,
+  legacyEntry: any,
+  inferredType: string,
+) => {
+  const nextTypes = new Set(
+    (prev.additionalCompanyTypes || []).filter((t: string) => t !== "Referring Company")
+  );
+  nextTypes.add(inferredType);
+  const nextCompanies = { ...(prev.additionalCompanies || {}) };
+  delete nextCompanies["Referring Company"];
+  const existing = nextCompanies[inferredType] || { contact: "", company: "" };
+  nextCompanies[inferredType] = syncCompanyEntryPlaceholders({
+    contact: legacyEntry.contact || existing.contact || "",
+    company: legacyEntry.company || existing.company || "",
+  });
+  return {
+    ...prev,
+    additionalCompanyTypes: Array.from(nextTypes),
+    additionalCompanies: nextCompanies,
+  };
+};
+
 // dedupeAdditionalCompanyEntries — pure folding pass over the
 // additionalCompanies map that:
 //   1. Re-runs syncCompanyEntryPlaceholders on every entry so the

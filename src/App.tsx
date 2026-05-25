@@ -318,7 +318,11 @@ import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './util
 import { computeSectionAuditStatus, computeAuditRequiredCount as computeAuditRequiredCountFor } from './utils/auditStatus';
 import { buildOrderNarrative } from './utils/orderNarrative';
 import { computeAuditMissing as computeAuditMissingFor } from './utils/auditMissing';
-import { buildCompanyRoleAssignments, dedupeAdditionalCompanyEntries } from './utils/companyRoles';
+import {
+  buildCompanyRoleAssignments,
+  dedupeAdditionalCompanyEntries,
+  migrateReferringCompanyEntryReducer,
+} from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { mapAuditMissingToTargets } from './utils/auditTargets';
 import {
@@ -7299,18 +7303,7 @@ export default function App(){
     const legacyEntry = data.additionalCompanies["Referring Company"];
     const inferredType = autoTypeForCompany(legacyEntry.company || data.referringCompany || "");
     if (!inferredType) return;
-    setData(prev => {
-      const nextTypes = new Set((prev.additionalCompanyTypes || []).filter(t => t !== "Referring Company"));
-      nextTypes.add(inferredType);
-      const nextCompanies = { ...(prev.additionalCompanies || {}) };
-      delete nextCompanies["Referring Company"];
-      const existing = nextCompanies[inferredType] || { contact: "", company: "" };
-      nextCompanies[inferredType] = syncCompanyEntryPlaceholders({
-        contact: legacyEntry.contact || existing.contact || "",
-        company: legacyEntry.company || existing.company || ""
-      });
-      return { ...prev, additionalCompanyTypes: Array.from(nextTypes), additionalCompanies: nextCompanies };
-    });
+    setData(prev => migrateReferringCompanyEntryReducer(prev, legacyEntry, inferredType));
   }, [data.additionalCompanies, data.referringCompany]);
 
   useEffect(() => {
