@@ -294,6 +294,7 @@ import { renderAlertMessageContent, renderAlertDetailContent } from './utils/ale
 import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
 import { getOrderCompanyNames, getOrderContactNames } from './utils/orderEntities';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
+import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
 import { loadJsonFromStorage, loadMergedRecordFromStorage, saveJsonToStorage } from './utils/localStorageState';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
@@ -6993,39 +6994,10 @@ export default function App(){
     return lines;
   }, [data]);
 
-  const mergedSdsPhotos = useMemo(() => {
-    const manual = data.sdsPhotos || [];
-    const seen = new Set(manual.map(p => p.id));
-    const merged = [...manual];
-    // Merge walkthrough photos from ScopeWizard (keyed by "fi-ri")
-    const scopePhotos = (data as any).scopePhotos || {};
-    const propRooms = data.propertyRooms || [];
-    // propertyRooms is built from homeRooms.flatMap((f, fi) => f.rooms.map((r, ri) => ...))
-    // Group by floor to reconstruct fi/ri → flat index mapping
-    const floors = [...new Set(propRooms.map((r: any) => r.floor))];
-    Object.entries(scopePhotos).forEach(([rKey, photos]: [string, any[]]) => {
-      const [fi, ri] = rKey.split("-").map(Number);
-      // Try to get room name from the photo itself first, then fall back to propertyRooms
-      let fallbackName = "";
-      if (propRooms.length > 0) {
-        let idx = 0;
-        for (let f = 0; f < fi && f < floors.length; f++) {
-          idx += propRooms.filter((r: any) => r.floor === floors[f]).length;
-        }
-        idx += ri;
-        fallbackName = propRooms[idx]?.name || "";
-      }
-      (photos || []).forEach((photo: any) => {
-        const id = `scope-${rKey}-${photo.ts}`;
-        if (!seen.has(id)) {
-          seen.add(id);
-          const roomName = photo.roomName || fallbackName || `Room ${fi + 1}-${ri + 1}`;
-          merged.push({ id, src: photo.src, room: roomName, floor: photo.floor || "", note: photo.note || "", reason: photo.reason || "", ts: photo.ts, tag: photo.tag || "" });
-        }
-      });
-    });
-    return merged;
-  }, [data.sdsPhotos, (data as any).scopePhotos, data.propertyRooms]);
+  const mergedSdsPhotos = useMemo(
+    () => mergeSdsPhotos(data.sdsPhotos || [], (data as any).scopePhotos || {}, data.propertyRooms || []),
+    [data.sdsPhotos, (data as any).scopePhotos, data.propertyRooms],
+  );
 
   const mergedSdsCoverPhoto = useMemo(() => {
     return data.sdsCoverPhoto || null;
