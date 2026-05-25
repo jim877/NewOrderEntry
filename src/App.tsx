@@ -175,6 +175,7 @@ import {
   toggleRestorationTypeSelection,
   selectNonRestorationSubtypeSelection,
   computeOrderTypeNormalizationPatch,
+  computeInsuranceInferencePatch,
 } from './utils/orderType';
 import {
   INSURANCE_COMPANY_SHORTCUTS,
@@ -7652,19 +7653,9 @@ export default function App(){
     if (!primaryCarrier) return;
     const linkedCarrier = resolveLinkedNationalCarrierName(primaryCarrier, sampleContacts);
     setData((prev) => {
-      const patch = {};
-      if (!prev.billingCompany && inferredBillingCarrier) patch.billingCompany = inferredBillingCarrier;
-      if (!prev.insuranceCompany && primaryCarrier) patch.insuranceCompany = primaryCarrier;
-      if (!prev.adjusterCompany && inferredInsuranceCarrier && prev.insuranceAdjuster) {
-        patch.adjusterCompany = inferredInsuranceCarrier;
-      }
-      if (prev.insuranceClaim !== "Yes") patch.insuranceClaim = "Yes";
-      if (prev.involvesInsurance !== "Yes") patch.involvesInsurance = "Yes";
-      if (!prev.billingPayer && inferredBillingCarrier) patch.billingPayer = "Insurance";
-      if (linkedCarrier && prev.nationalCarrier !== linkedCarrier) {
-        patch.nationalCarrier = linkedCarrier;
-        patch.nationalCarrierRequested = false;
-      }
+      const patch = computeInsuranceInferencePatch(
+        prev, inferredBillingCarrier, inferredInsuranceCarrier, primaryCarrier, linkedCarrier
+      );
       return Object.keys(patch).length ? { ...prev, ...patch } : prev;
     });
   }, [

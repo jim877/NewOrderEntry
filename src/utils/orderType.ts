@@ -60,6 +60,36 @@ export const selectNonRestorationSubtypeSelection = (orderTypes: string[] = [], 
   return [NON_RESTORATION_PRIMARY, subtype];
 };
 
+// computeInsuranceInferencePatch — pure reducer for the "infer
+// insurance company + national carrier from billing/insurance
+// contact" useEffect. Given the inferred billing/insurance carriers
+// (already resolved by the caller through isInsuranceCarrierCompany +
+// resolveInsuranceCarrierFromContact) and the linked national
+// carrier name, return only the fields that need to change. Empty
+// patch means no change.
+export const computeInsuranceInferencePatch = (
+  prev: any,
+  inferredBillingCarrier: string,
+  inferredInsuranceCarrier: string,
+  primaryCarrier: string,
+  linkedCarrier: string,
+) => {
+  const patch: any = {};
+  if (!prev.billingCompany && inferredBillingCarrier) patch.billingCompany = inferredBillingCarrier;
+  if (!prev.insuranceCompany && primaryCarrier) patch.insuranceCompany = primaryCarrier;
+  if (!prev.adjusterCompany && inferredInsuranceCarrier && prev.insuranceAdjuster) {
+    patch.adjusterCompany = inferredInsuranceCarrier;
+  }
+  if (prev.insuranceClaim !== "Yes") patch.insuranceClaim = "Yes";
+  if (prev.involvesInsurance !== "Yes") patch.involvesInsurance = "Yes";
+  if (!prev.billingPayer && inferredBillingCarrier) patch.billingPayer = "Insurance";
+  if (linkedCarrier && prev.nationalCarrier !== linkedCarrier) {
+    patch.nationalCarrier = linkedCarrier;
+    patch.nationalCarrierRequested = false;
+  }
+  return patch;
+};
+
 // computeOrderTypeNormalizationPatch — pure reducer for the
 // "normalize order types + cascade non-restoration cleanup" useEffect.
 // Returns the diff to apply (empty -> no change). When the resolved
