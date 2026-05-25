@@ -246,6 +246,8 @@ import {
   formatOrderAddressLine,
   formatOrderAddressChoiceLabel,
   buildOrderAddressChoices,
+  resolveAddressChoicePayload,
+  resolveAddressChoiceValue,
 } from './utils/order';
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
@@ -5479,36 +5481,19 @@ export default function App(){
     [data.addresses],
   );
   const addressPayloadFromChoice = useCallback((choiceValue: string) => {
-    if (!choiceValue) return { addressType: "", address: "", addressId: "" };
-    if (choiceValue.startsWith("addr:")) {
-      const addressId = choiceValue.slice(5);
-      const addr = (data.addresses || []).find((a: any) => a.id === addressId);
-      if (!addr) return { addressType: "", address: "", addressId: "" };
-      const type = addr.type || "Address";
-      return { addressType: type, address: formatOrderAddressLine(addr) || `${type} address TBD`, addressId };
-    }
-    if (choiceValue.startsWith("type:")) {
-      const type = choiceValue.slice(5);
-      const existing = (data.addresses || []).find((a: any) => (a.type || "").toLowerCase() === type.toLowerCase() && !a.inactive);
-      if (!existing) ensureAddressType(type, { placeholder: true });
-      return {
-        addressType: type,
-        address: existing ? (formatOrderAddressLine(existing) || `${type} address TBD`) : `${type} address TBD`,
-        addressId: existing?.id || "",
-      };
-    }
-    return { addressType: "", address: choiceValue, addressId: "" };
-  }, [data.addresses, ensureAddressType, formatOrderAddressLine]);
-  const addressChoiceValue = useCallback((record: any = {}) => {
-    if (record.addressId) return `addr:${record.addressId}`;
-    if (record.addressType) return `type:${record.addressType}`;
-    if (record.location && ORDER_ADDRESS_TYPES.some(type => type.toLowerCase() === String(record.location).toLowerCase())) return `type:${record.location}`;
-    if (record.address) {
-      const match = (data.addresses || []).find((addr: any) => formatOrderAddressLine(addr) === record.address);
-      if (match) return `addr:${match.id}`;
-    }
-    return "";
-  }, [data.addresses, formatOrderAddressLine]);
+    const { needsPlaceholder, ...payload } = resolveAddressChoicePayload(
+      choiceValue,
+      data.addresses || [],
+      formatOrderAddressLine,
+    );
+    if (needsPlaceholder) ensureAddressType(needsPlaceholder, { placeholder: true });
+    return payload;
+  }, [data.addresses, ensureAddressType]);
+  const addressChoiceValue = useCallback(
+    (record: any = {}) =>
+      resolveAddressChoiceValue(record, data.addresses || [], ORDER_ADDRESS_TYPES, formatOrderAddressLine),
+    [data.addresses]
+  );
 
   const updateLivingStatus = (value) => {
     update("livingStatus", value);

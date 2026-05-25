@@ -56,6 +56,73 @@ export const formatOrderAddressChoiceLabel = (addr: any = {}, idx = 0) => {
   return `${type} — ${line || "TBD"}`;
 };
 
+// resolveAddressChoicePayload — parse an address-choice value (the
+// strings emitted by buildOrderAddressChoices) back into the
+// { addressType, address, addressId } shape Action Items records
+// store. Returns an extra `needsPlaceholder` field with the type
+// name when the caller needs to side-effect an ensureAddressType
+// call (e.g. user picked a "type:..." option but no address of that
+// type exists yet).
+export const resolveAddressChoicePayload = (
+  choiceValue: string,
+  addresses: any[],
+  formatLine: (addr: any) => string,
+): { addressType: string; address: string; addressId: string; needsPlaceholder: string | null } => {
+  if (!choiceValue) return { addressType: "", address: "", addressId: "", needsPlaceholder: null };
+  if (choiceValue.startsWith("addr:")) {
+    const addressId = choiceValue.slice(5);
+    const addr = (addresses || []).find((a: any) => a.id === addressId);
+    if (!addr) return { addressType: "", address: "", addressId: "", needsPlaceholder: null };
+    const type = addr.type || "Address";
+    return {
+      addressType: type,
+      address: formatLine(addr) || `${type} address TBD`,
+      addressId,
+      needsPlaceholder: null,
+    };
+  }
+  if (choiceValue.startsWith("type:")) {
+    const type = choiceValue.slice(5);
+    const existing = (addresses || []).find(
+      (a: any) => (a.type || "").toLowerCase() === type.toLowerCase() && !a.inactive
+    );
+    return {
+      addressType: type,
+      address: existing ? (formatLine(existing) || `${type} address TBD`) : `${type} address TBD`,
+      addressId: existing?.id || "",
+      needsPlaceholder: existing ? null : type,
+    };
+  }
+  return { addressType: "", address: choiceValue, addressId: "", needsPlaceholder: null };
+};
+
+// resolveAddressChoiceValue — inverse: given an Action Items record,
+// derive the choice string that selects the matching option. Tries
+// the explicit addressId first, then addressType, then a fuzzy
+// location-name match against ORDER_ADDRESS_TYPES, then a final
+// address-line equality match against the order's saved addresses.
+export const resolveAddressChoiceValue = (
+  record: any,
+  addresses: any[],
+  orderAddressTypes: string[],
+  formatLine: (addr: any) => string,
+): string => {
+  const r = record || {};
+  if (r.addressId) return `addr:${r.addressId}`;
+  if (r.addressType) return `type:${r.addressType}`;
+  if (
+    r.location &&
+    (orderAddressTypes || []).some((type) => type.toLowerCase() === String(r.location).toLowerCase())
+  ) {
+    return `type:${r.location}`;
+  }
+  if (r.address) {
+    const match = (addresses || []).find((addr: any) => formatLine(addr) === r.address);
+    if (match) return `addr:${match.id}`;
+  }
+  return "";
+};
+
 // buildOrderAddressChoices — turn the order's address list into the picker
 // shape used by Living Address / Delivery Group / Reminder modals. Returns
 // { known, placeholders, all } so callers can render the two groups
