@@ -5,6 +5,7 @@
 // patched state into the order.
 
 import { canonicalBridgeIssue } from "./bridge";
+import { toggleMulti } from "./strings";
 
 // toggleBridgeMilestoneReducer — flip a milestone on/off. When
 // enabling certain milestones, also drop matching pending issues:
@@ -56,6 +57,28 @@ export const toggleBridgeMilestoneReducer = (
     },
   };
 };
+
+// toggleBridgeIssueReducer — flip a single pending issue on/off in
+// the bridge state's pendingIssues list. Normalizes the issue label
+// before comparing so case/whitespace variants don't double up.
+export const toggleBridgeIssueReducer = (prev: any, issue: string) => {
+  const normalizedIssue = canonicalBridgeIssue(issue);
+  const currentPending = Array.from(
+    new Set((prev.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean))
+  );
+  const nextPending = toggleMulti(currentPending, normalizedIssue);
+  return { ...prev, pendingIssues: nextPending };
+};
+
+// updateBridgeMilestoneReducer — direct write into a single milestone
+// field. Used for free-text milestone-completed-by inputs.
+export const updateBridgeMilestoneReducer = (prev: any, milestoneKey: string, value: any) => ({
+  ...prev,
+  milestones: {
+    ...(prev.milestones || {}),
+    [milestoneKey]: value,
+  },
+});
 
 // toggleProceedWithoutApprovalReducer — the "proceed without
 // approval" override is mutually exclusive with estimateApproved.

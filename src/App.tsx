@@ -343,7 +343,12 @@ import {
 } from './utils/contactOptions';
 import { computeSuggestedReferrerRoles } from './utils/referrerRoles';
 import { buildActionItemPlaceholders, buildBillToBlockers } from './utils/actionItemsData';
-import { toggleBridgeMilestoneReducer, toggleProceedWithoutApprovalReducer } from './utils/bridgeMilestones';
+import {
+  toggleBridgeMilestoneReducer,
+  toggleProceedWithoutApprovalReducer,
+  toggleBridgeIssueReducer,
+  updateBridgeMilestoneReducer,
+} from './utils/bridgeMilestones';
 import {
   resolveBridgePickupStep,
   resolveBridgeProcessStep,
@@ -6574,17 +6579,10 @@ export default function App(){
     applyScopeBridge(next);
   }, [scopeBridgeState, deriveScopeBridgeStatus, applyScopeBridge]);
 
-  const toggleScopeBridgeIssue = useCallback((issue) => {
-    patchScopeBridge((prev) => {
-      const normalizedIssue = canonicalBridgeIssue(issue);
-      const currentPending = Array.from(new Set((prev.pendingIssues || []).map(canonicalBridgeIssue).filter(Boolean)));
-      const nextPending = toggleMulti(currentPending, normalizedIssue);
-      return {
-        ...prev,
-        pendingIssues: nextPending,
-      };
-    });
-  }, [patchScopeBridge]);
+  const toggleScopeBridgeIssue = useCallback(
+    (issue) => patchScopeBridge((prev) => toggleBridgeIssueReducer(prev, issue)),
+    [patchScopeBridge]
+  );
 
   const toggleScopeBridgeMilestone = useCallback(
     (milestoneId, atId) => patchScopeBridge((prev) => toggleBridgeMilestoneReducer(prev, milestoneId, atId)),
@@ -6596,15 +6594,10 @@ export default function App(){
     [patchScopeBridge]
   );
 
-  const updateScopeBridgeMilestone = useCallback((milestoneKey, value) => {
-    patchScopeBridge((prev) => ({
-      ...prev,
-      milestones: {
-        ...(prev.milestones || {}),
-        [milestoneKey]: value
-      }
-    }));
-  }, [patchScopeBridge]);
+  const updateScopeBridgeMilestone = useCallback(
+    (milestoneKey, value) => patchScopeBridge((prev) => updateBridgeMilestoneReducer(prev, milestoneKey, value)),
+    [patchScopeBridge]
+  );
   const autoBridgeIssues = useMemo(
     () => computeAutoBridgeIssues(
       data,
