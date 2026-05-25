@@ -395,6 +395,17 @@
       { "key": "sendRushGuide",    "label": "Send Rush Guide & Timeline",   "desc": "Delivery timeline to customer",           "icon": "📋" },
       { "key": "sendConfirmation", "label": "Send Appointment Confirmation","desc": "Confirm scheduled event details",         "icon": "✅" }
     ],
+    "interviewActionGroups": [
+      { "label": "Conditions",     "keys": ["Still Wet", "Visible Mold", "Structural Damage", "No Electricity", "No Heat", "Boarded Up"] },
+      { "label": "Repairs",        "keys": ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"] },
+      { "label": "Living Status",  "keys": ["Staying in home", "Hotel", "Temp", "Moving"] },
+      { "label": "Delivery",       "keys": ["Deliver ASAP", "Deliver to Temp", "Deliver to New Home", "Long-Term Storage"] },
+      { "label": "Packout",        "keys": ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"] },
+      { "label": "Considerations", "keys": ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"] },
+      { "label": "Preferences",    "keys": ["Medical Yes", "Allergies Yes", "SelfClean Yes", "Air-Dry", "Low Heat", "Dryer", "Storage Yes"] }
+    ],
+    "loadingCategories": ["Equipment", "Packing", "PPE", "Site", "Crew", "Other"],
+    "auditStatusGates": ["always", "never", "Intake Complete", "Pickup Complete", "Tagging Complete", "Ready to Bill"],
     "scopeHandlingCodes": [
       { "code": "Box",   "desc": "Return items in boxes" },
       { "code": "Damp",  "desc": "Tag within 5 days" },

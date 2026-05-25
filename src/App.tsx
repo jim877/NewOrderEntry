@@ -202,6 +202,7 @@ import {
   SCOPE_DEPTH_LEVELS as DEPTH_LEVELS,
   INTERVIEW_PACKOUT_SCOPES, INTERVIEW_STAY_TYPES, INTERVIEW_DURATION_OPTIONS,
   OUTBOUND_ACTIONS,
+  INTERVIEW_ACTION_GROUPS, LOADING_CATEGORIES, AUDIT_STATUS_GATES,
 } from './config';
 import {
   getInstructionTypeTextKey,
@@ -12047,12 +12048,7 @@ export default function App(){
                               </button>
                             </div>
                             <select value={cfg.requiredAtStatus || "always"} onChange={e => setFieldConfig(prev => ({...prev, [key]: {...prev[key], requiredAtStatus: e.target.value}}))} className="text-[10px] border border-slate-200 rounded px-1.5 py-0.5 text-slate-600 bg-white">
-                              <option value="always">Always</option>
-                              <option value="never">Never</option>
-                              <option value="Intake Complete">Intake Complete</option>
-                              <option value="Pickup Complete">Pickup Complete</option>
-                              <option value="Tagging Complete">Tagging Complete</option>
-                              <option value="Ready to Bill">Ready to Bill</option>
+                              {AUDIT_STATUS_GATES.map(g => <option key={g} value={g}>{g === "always" ? "Always" : g === "never" ? "Never" : g}</option>)}
                             </select>
                             {cfg.selectType && (
                               <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], selectType: prev[key].selectType === "multi" ? "single" : "multi"}}))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${cfg.selectType === "multi" ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-400'}`}>
@@ -12207,7 +12203,7 @@ export default function App(){
                                 <div className="flex items-center gap-2">
                                   <input value={t.label} onChange={e => updateTarget(t.id, { label: e.target.value })} className="flex-1 rounded border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none focus:border-amber-400" />
                                   <select value={t.category} onChange={e => updateTarget(t.id, { category: e.target.value })} className="rounded border border-slate-200 px-2 py-1 text-[10px] text-slate-600 bg-white">
-                                    {["Equipment","Packing","PPE","Site","Crew","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                                    {LOADING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                   </select>
                                   {auto && <span className="rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[9px] font-bold">Auto-matched</span>}
                                   <button onClick={() => removeTarget(t.id)} className="text-[10px] font-bold text-rose-400 hover:text-rose-600 px-1">×</button>
@@ -12248,18 +12244,9 @@ export default function App(){
                 </div>
                 <div className="divide-y divide-slate-100">
                   {(() => {
-                    const actionGroups = [
-                      { label: "Conditions", keys: ["Still Wet", "Visible Mold", "Structural Damage", "No Electricity", "No Heat", "Boarded Up"] },
-                      { label: "Repairs", keys: ["Just Cleaning", "Paint", "Refinish Floors", "Replace Floors", "Cosmetic Damage", "Major Structural Damage", "Complete Rebuild"] },
-                      { label: "Living Status", keys: ["Staying in home", "Hotel", "Temp", "Moving"] },
-                      { label: "Delivery", keys: ["Deliver ASAP", "Deliver to Temp", "Deliver to New Home", "Long-Term Storage"] },
-                      { label: "Packout", keys: ["Rugs", "Window Treatments", "Clothing", "Bedding", "Furniture", "Art", "Electronics", "Hardware", "Appliances"] },
-                      { label: "Considerations", keys: ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity", "Pets"] },
-                      { label: "Preferences", keys: ["Medical Yes", "Allergies Yes", "SelfClean Yes", "Air-Dry", "Low Heat", "Dryer", "Storage Yes"] },
-                    ];
                     const searchL = configSearch.toLowerCase().trim();
-                    // ACTION_TYPE_LABELS imported from ./utils/loadTargets
-                    return actionGroups.map(group => {
+                    // INTERVIEW_ACTION_GROUPS imported from ./config; ACTION_TYPE_LABELS from ./utils/loadTargets
+                    return INTERVIEW_ACTION_GROUPS.map(group => {
                       const filteredKeys = group.keys.filter(k => !searchL || k.toLowerCase().includes(searchL) || (interviewActions[k]?.coaching || "").toLowerCase().includes(searchL));
                       if (!filteredKeys.length) return null;
                       return (
