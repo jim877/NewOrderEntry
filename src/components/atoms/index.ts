@@ -65,3 +65,4 @@ export { ConfirmAppointmentModal } from "./ConfirmAppointmentModal";
 export { OutboundActionsPanel } from "./OutboundActionsPanel";
 export { SaveSummaryGates } from "./SaveSummaryGates";
 export { SaveSummaryActions } from "./SaveSummaryActions";
+export { CoachingConfigCard } from "./CoachingConfigCard";
