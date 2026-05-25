@@ -54,3 +54,4 @@ export { RoleAssignModal } from "./RoleAssignModal";
 export { QuickAddModal } from "./QuickAddModal";
 export { ReminderModal } from "./ReminderModal";
 export { EditContactModal } from "./EditContactModal";
+export { LivingAddressPrompt } from "./LivingAddressPrompt";

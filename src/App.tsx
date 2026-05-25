@@ -142,6 +142,7 @@ import {
   QuickAddModal,
   ReminderModal,
   EditContactModal,
+  LivingAddressPrompt,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14690,37 +14691,12 @@ export default function App(){
       )}
 
       {livingAddressPrompt.open && !interviewPanelOpen && (
-        <div className="fixed inset-0 z-[109] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Add {livingAddressPrompt.type} Address?</h3>
-            <div className="text-sm text-slate-600 mb-4">
-              No <span className="font-semibold">{livingAddressPrompt.type}</span> address exists yet.
-            </div>
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeLivingAddressPrompt}
-                className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-              >
-                Not Now
-              </button>
-              <button
-                type="button"
-                onClick={() => addLivingAddressFromPrompt("placeholder")}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Create Placeholder
-              </button>
-              <button
-                type="button"
-                onClick={() => addLivingAddressFromPrompt("full")}
-                className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-white hover:bg-sky-600"
-              >
-                Enter Address Now
-              </button>
-            </div>
-          </div>
-        </div>
+        <LivingAddressPrompt
+          type={livingAddressPrompt.type}
+          onClose={closeLivingAddressPrompt}
+          onCreatePlaceholder={() => addLivingAddressFromPrompt("placeholder")}
+          onEnterAddressNow={() => addLivingAddressFromPrompt("full")}
+        />
       )}
 
       {groupLinkModal.open && (
