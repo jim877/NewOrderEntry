@@ -69,3 +69,4 @@ export { CoachingConfigCard } from "./CoachingConfigCard";
 export { LoadingListConfigCard } from "./LoadingListConfigCard";
 export { InterviewActionsConfigCard } from "./InterviewActionsConfigCard";
 export { FieldConfigGrid } from "./FieldConfigGrid";
+export { BlockerRulesCard } from "./BlockerRulesCard";
