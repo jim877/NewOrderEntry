@@ -266,6 +266,7 @@ import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, ani
 import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } from './utils/deliveryGroup';
 import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
 import { downloadOrderIcs } from './utils/icsExport';
+import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 import {
   DURATION_DAYS, BAND_COLORS, DELIVERY_COLORS, STAY_TYPE_COLORS,
@@ -4111,43 +4112,10 @@ export default function App(){
   const toast = toastQueue.length > 0 ? toastQueue[0].message : "";
   const coaching = useCallback((key: string) => getCoaching(key, (data as any)._coachingOverrides), [data]);
   const [showSearch, setShowSearch] = useState(false);
-  const TEST_PRESETS_KEY = "noe-test-presets";
+  // TEST_PRESETS_KEY, loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName — imported from ./utils/testPresets
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [presetName, setPresetName] = useState("");
-  const [testPresets, setTestPresets] = useState(() => {
-    try {
-      const raw = localStorage.getItem(TEST_PRESETS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        return [
-          {
-            id: "preset-sample",
-            name: "Sample Order (Auto)",
-            createdAt: new Date().toISOString(),
-            data: SAMPLE_PRESET_DATA()
-          }
-        ];
-      }
-      return [
-        {
-          id: "preset-sample",
-          name: "Sample Order (Auto)",
-          createdAt: new Date().toISOString(),
-          data: SAMPLE_PRESET_DATA()
-        }
-      ];
-    } catch {
-      return [
-        {
-          id: "preset-sample",
-          name: "Sample Order (Auto)",
-          createdAt: new Date().toISOString(),
-          data: SAMPLE_PRESET_DATA()
-        }
-      ];
-    }
-  });
+  const [testPresets, setTestPresets] = useState(loadTestPresetsFromStorage);
   const [fieldConfig, setFieldConfig] = useState(() => {
     try { const s = localStorage.getItem("noe-field-config-v1"); if (!s) return { ...DEFAULT_FIELD_CONFIG }; const saved = JSON.parse(s); const merged = { ...DEFAULT_FIELD_CONFIG }; Object.keys(merged).forEach(k => { if (saved[k]) merged[k] = { ...merged[k], ...saved[k] }; }); return merged; }
     catch { return { ...DEFAULT_FIELD_CONFIG }; }
@@ -4894,11 +4862,7 @@ export default function App(){
            normalizeContact(orderPoc.name || "")    === normalizeContact(contactName || "");
   };
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(TEST_PRESETS_KEY, JSON.stringify(testPresets));
-    } catch { /* storage unavailable */ }
-  }, [testPresets]);
+  useEffect(() => { saveTestPresetsToStorage(testPresets); }, [testPresets]);
 
   const saveTestPreset = useCallback(() => {
     const name = presetName.trim();
@@ -4913,15 +4877,7 @@ export default function App(){
       data,
       scopePhotos: (data as any).scopePhotos || null
     };
-    setTestPresets(prev => {
-      const existingIndex = prev.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
-      if (existingIndex >= 0) {
-        const next = [...prev];
-        next[existingIndex] = { ...payload, id: prev[existingIndex].id };
-        return next;
-      }
-      return [payload, ...prev];
-    });
+    setTestPresets(prev => upsertTestPresetByName(prev, payload));
     setPresetName("");
     setToast("Test preset saved.");
   }, [data, presetName]);
