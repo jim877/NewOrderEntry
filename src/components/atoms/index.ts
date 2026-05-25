@@ -79,3 +79,4 @@ export { RushGuideOptionalDeliveries } from "./RushGuideOptionalDeliveries";
 export { RushGuideOutputActions } from "./RushGuideOutputActions";
 export { RushGuideSetupPanel } from "./RushGuideSetupPanel";
 export { RushGuideDeliveryCards } from "./RushGuideDeliveryCards";
+export { RushGuideGanttTimeline } from "./RushGuideGanttTimeline";
