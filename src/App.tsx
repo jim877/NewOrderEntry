@@ -9949,62 +9949,78 @@ export default function App(){
 
                 {/* Load List */}
                 {isFieldVisible("loadList") && matchesInterviewSearch("need to bring", "Tall Ladder Extra Manpower Floor Protection Dollies Wardrobe Boxes TV Boxes Blankets Plastic Bags", data.loadList, (data as any).loadListNote) && (() => {
-                  const log = (data.interviewLog || {}).loadList; const hasAnswers = (data.loadList || []).length > 0; const answered = hasAnswers; const summary = (data.loadList || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = !!interviewSearch.trim() || interviewExpanded.loadList === true;
-                  return <div className={`noe-iq rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: !p.loadList}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">5</span>{highlightSearch(expanded ? "What do we need to bring?" : "Bring")}</div>
-                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      {(() => {
-                        const targets: LoadTarget[] = (data as any)._loadTargets || DEFAULT_LOAD_TARGETS;
-                        const autoLabels = new Set(matchLoadTargets(data, targets));
-                        const grouped: Record<string, LoadTarget[]> = {};
-                        targets.forEach(t => { (grouped[t.category] = grouped[t.category] || []).push(t); });
-                        return Object.entries(grouped).map(([cat, items]) => (
-                          <div key={cat}>
-                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">{cat}</div>
-                            <div className="flex flex-wrap gap-2">
-                              {items.map(t => {
-                                const isAuto = autoLabels.has(t.label);
-                                return (
-                                  <ToggleMulti
-                                    key={t.id}
-                                    label={t.label + (isAuto ? " ✦" : "")}
-                                    checked={(data.loadList || []).includes(t.label)}
-                                    onChange={() => update("loadList", toggleMulti(data.loadList || [], t.label))}
-                                    className={`!px-2 !py-1 !text-xs ${isAuto ? "!ring-2 !ring-amber-300" : ""} ${isSearchMatch(t.label) ? "!ring-2 !ring-yellow-400" : ""}`}
-                                  />
-                                );
-                              })}
-                            </div>
+                  const log = (data.interviewLog || {}).loadList;
+                  const hasAnswers = (data.loadList || []).length > 0;
+                  const summary = (data.loadList || []).join(", ") || (!!log && !hasAnswers ? "None" : "");
+                  const expanded = !!interviewSearch.trim() || interviewExpanded.loadList === true;
+                  const targets: LoadTarget[] = (data as any)._loadTargets || DEFAULT_LOAD_TARGETS;
+                  const autoLabels = new Set(matchLoadTargets(data, targets));
+                  const grouped: Record<string, LoadTarget[]> = {};
+                  targets.forEach(t => { (grouped[t.category] = grouped[t.category] || []).push(t); });
+                  return (
+                    <InterviewQuestionCard
+                      number={5}
+                      title="What do we need to bring?"
+                      collapsedLabel="Bring"
+                      summary={summary}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      showAnsweredTint={hasAnswers && !expanded}
+                      onToggle={() => setInterviewExpanded(p => ({ ...p, loadList: !p.loadList }))}
+                    >
+                      {Object.entries(grouped).map(([cat, items]) => (
+                        <div key={cat}>
+                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">{cat}</div>
+                          <div className="flex flex-wrap gap-2">
+                            {items.map(t => {
+                              const isAuto = autoLabels.has(t.label);
+                              return (
+                                <ToggleMulti
+                                  key={t.id}
+                                  label={t.label + (isAuto ? " ✦" : "")}
+                                  checked={(data.loadList || []).includes(t.label)}
+                                  onChange={() => update("loadList", toggleMulti(data.loadList || [], t.label))}
+                                  className={`!px-2 !py-1 !text-xs ${isAuto ? "!ring-2 !ring-amber-300" : ""} ${isSearchMatch(t.label) ? "!ring-2 !ring-yellow-400" : ""}`}
+                                />
+                              );
+                            })}
                           </div>
-                        ));
-                      })()}
+                        </div>
+                      ))}
                       {matchLoadTargets(data).length > 0 && <div className="text-[10px] text-amber-600">✦ Auto-suggested based on conditions/packout/loss type</div>}
                       <Input value={(data as any).loadListNote || ""} onChange={e => update("loadListNote", e.target.value)} placeholder="Additional notes about what to bring..." className="!text-xs" />
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, loadList: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
-                    </div>}
-                  </div>;
+                      <CollapseInterviewRow log={log} onCollapse={() => setInterviewExpanded(p => ({ ...p, loadList: false }))} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
+                  );
                 })()}
 
                 {/* Considerations */}
                 {isFieldVisible("sdsConsiderations") && matchesInterviewSearch("special considerations", "Elderly Pregnancy Baby Hearing Impaired Spanish Only Respiratory Concerns Premium Brands Skin Sensitivity", data.sdsConsiderations) && (() => {
-                  const log = (data.interviewLog || {}).considerations; const hasAnswers = (data.sdsConsiderations || []).length > 0; const answered = hasAnswers; const summary = (data.sdsConsiderations || []).join(", ") || (!!log && !hasAnswers ? "None" : ""); const expanded = !!interviewSearch.trim() || interviewExpanded.considerations === true;
-                  return <div className={`noe-iq rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: !p.considerations}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">6</span>{highlightSearch("Considerations")}</div>
-                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
+                  const log = (data.interviewLog || {}).considerations;
+                  const hasAnswers = (data.sdsConsiderations || []).length > 0;
+                  const summary = (data.sdsConsiderations || []).join(", ") || (!!log && !hasAnswers ? "None" : "");
+                  const expanded = !!interviewSearch.trim() || interviewExpanded.considerations === true;
+                  const CONSIDERATIONS = ["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"];
+                  return (
+                    <InterviewQuestionCard
+                      number={6}
+                      title="Considerations"
+                      summary={summary}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      showAnsweredTint={hasAnswers && !expanded}
+                      onToggle={() => setInterviewExpanded(p => ({ ...p, considerations: !p.considerations }))}
+                    >
                       <div className="flex flex-wrap gap-2">
-                        {["Elderly", "Pregnancy", "Baby", "Hearing Impaired", "Spanish Only", "Respiratory Concerns", "Premium Brands", "Skin Sensitivity"].map(s => (
+                        {CONSIDERATIONS.map(s => (
                           <ToggleMulti key={s} label={s} checked={(data.sdsConsiderations || []).includes(s)} onChange={() => { const isAdding = !(data.sdsConsiderations || []).includes(s); update("sdsConsiderations", toggleMulti(data.sdsConsiderations || [], s)); executeInterviewActions(s, isAdding); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(s) ? "!ring-2 !ring-yellow-400" : ""}`} />
                         ))}
                       </div>
-                      {((data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c))) && (
+                      {(data.sdsConsiderations || []).some(c => ["Skin Sensitivity", "Respiratory Concerns", "Pregnancy"].includes(c)) && (
                         <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-3 py-2.5 space-y-2">
                           <div className="text-[12px] font-bold text-sky-700 uppercase tracking-wider">Handling Codes</div>
                           <div className="flex flex-wrap gap-1.5">
@@ -10015,15 +10031,17 @@ export default function App(){
                           <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="Specific allergies or sensitivities" className="!text-xs !py-1.5" />
                         </div>
                       )}
-                      {showCoaching && (data.sdsConsiderations || []).filter(s => interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`)).map(s => (
-                        <div key={`coach-${s}`} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
-                          <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
-                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
-                        </div>
-                      ))}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, considerations: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
-                    </div>}
-                  </div>;
+                      {showCoaching && (data.sdsConsiderations || [])
+                        .filter(s => interviewActions[s]?.coaching && !dismissedCoaching.has(`c-${s}`))
+                        .map(s => (
+                          <div key={`coach-${s}`} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
+                            <div className="flex-1">🎓 <span className="font-bold">{s}:</span> {interviewActions[s].coaching}</div>
+                            <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${s}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
+                          </div>
+                        ))}
+                      <CollapseInterviewRow log={log} onCollapse={() => setInterviewExpanded(p => ({ ...p, considerations: false }))} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
+                  );
                 })()}
 
                 {/* Pets in Home */}
