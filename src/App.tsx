@@ -355,6 +355,7 @@ import {
 import { buildKnownPeople } from './utils/knownPeople';
 import { buildCurrentOrderSpecialDocs, buildCurrentOrderCustomerForms } from './utils/companyDocuments';
 import { computePackoutLoadChanges } from './utils/packoutLoadChanges';
+import { dryHandlingPatch } from './utils/dryHandlingCodes';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -5630,12 +5631,7 @@ export default function App(){
   }, [data.packoutSummary, data.loadList, openSmartConfirm]);
 
   const updateHowDry = (v) => {
-      const addCodes = [];
-      const removeCodes = [];
-      if (v === "Air-Dry") { addCodes.push("NoDry"); removeCodes.push("Low"); }
-      if (v === "Low Heat") { addCodes.push("Low"); removeCodes.push("NoDry"); }
-      if (v === "Dryer") { removeCodes.push("NoDry", "Low"); }
-
+      const { addCodes, removeCodes } = dryHandlingPatch(v);
       const currentHandling = new Set(data.handlingCodes || []);
       const removableNow = removeCodes.filter(c => currentHandling.has(c));
 
