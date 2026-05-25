@@ -74,3 +74,4 @@ export { FieldConfigToolbar } from "./FieldConfigToolbar";
 export { RushGuideFamilyStep } from "./RushGuideFamilyStep";
 export { RushGuideEventsStep } from "./RushGuideEventsStep";
 export { RushGuideReminders } from "./RushGuideReminders";
+export { RushGuideShareButtons } from "./RushGuideShareButtons";

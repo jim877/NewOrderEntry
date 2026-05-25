@@ -162,6 +162,7 @@ import {
   RushGuideFamilyStep,
   RushGuideEventsStep,
   RushGuideReminders,
+  RushGuideShareButtons,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -11767,30 +11768,12 @@ export default function App(){
                                 </div>
                               </div>);
                             })}
-                            {/* Share buttons */}
-                            <div className="px-4 pb-4 flex gap-2">
-                              <button onClick={() => {
-                                const lines = deliveryGroups.map((dg, i) => {
-                                  const dgNotes = (rushGuideData as any).deliveryNotes?.[dg.id] || "";
-                                  return `${i + 1}. ${dg.label} (${rushFormatDate(dg.date)})\n${dg.items.map(item => `  - ${item}`).join("\n")}${dgNotes ? `\n  Note: ${dgNotes}` : ""}`;
-                                }).join("\n\n");
-                                const text = `Rush Guide - ${data.orderName || "Order"}\n\n${lines}`;
-                                if (navigator.share) { navigator.share({ title: "Rush Guide", text }); }
-                                else { navigator.clipboard.writeText(text); setToast?.("Copied to clipboard"); }
-                              }} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-all">
-                                Share / Copy
-                              </button>
-                              <button onClick={() => {
-                                const lines = deliveryGroups.map((dg, i) => {
-                                  const dgNotes = (rushGuideData as any).deliveryNotes?.[dg.id] || "";
-                                  return `${i + 1}. ${dg.label} (${rushFormatDate(dg.date)})%0A${dg.items.map(item => `  - ${item}`).join("%0A")}${dgNotes ? `%0ANote: ${dgNotes}` : ""}`;
-                                }).join("%0A%0A");
-                                const subject = encodeURIComponent(`Rush Guide - ${data.orderName || "Order"}`);
-                                window.open(`mailto:?subject=${subject}&body=${lines}`);
-                              }} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-bold text-blue-600 hover:bg-blue-50 transition-all">
-                                Email
-                              </button>
-                            </div>
+                            <RushGuideShareButtons
+                              deliveryGroups={deliveryGroups}
+                              orderName={data.orderName || ""}
+                              deliveryNotes={(rushGuideData as any).deliveryNotes || {}}
+                              onCopyToast={setToast}
+                            />
                           </div>
                         </div>
                       );
