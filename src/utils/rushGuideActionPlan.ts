@@ -4,9 +4,224 @@
 // plus the reminders list. Reads exclusively from order data + the
 // rushGuide-local overrides. No React, no setState.
 
-import { rushFormatDate } from "./dateTime";
+import { rushFormatDate, rushAddDays, parseLocalDate } from "./dateTime";
+import { DELIVERY_COLORS, STAY_TYPE_COLORS } from "./rushGuideVisuals";
 import type { HouseholdComposition } from "./rushGuideTimeline";
 import type { SeasonChange, HolidayEvent } from "./rushGuideTimeline";
+
+export type DeliveryGroup = {
+  id: string;
+  label: string;
+  date: Date;
+  icon: string;
+  items: string[];
+  location: string;
+  address: string;
+  color: string;
+  householdTags?: string[];
+  addressType?: string;
+  addressId?: string;
+};
+
+const HOUSEHOLD_TAG_MAP: { packoutItem: string; tag: string }[] = [
+  { packoutItem: "Rugs", tag: "Rugs laid" },
+  { packoutItem: "Window Treatments", tag: "Drapes hung" },
+  { packoutItem: "Furniture", tag: "Furniture placed" },
+  { packoutItem: "Art", tag: "Art re-hung" },
+  { packoutItem: "Appliances", tag: "Appliances installed" },
+];
+
+// buildRushGuideDeliveryGroups — pure builder for the deliveryGroups
+// array. Walks through the canonical delivery sequence (rush → rental
+// or short-term → final → custom → post-final), then applies user
+// date/address overrides and finally sorts by date.
+//
+// The output is consumed by the Gantt timeline + delivery cards. The
+// helper does not mutate any input; it returns a fresh array.
+export const buildRushGuideDeliveryGroups = (input: {
+  rushItems: string[];
+  shortTermItems: string[];
+  now: Date;
+  estimatedReturn: Date | null;
+  hasHotel: boolean;
+  hasRental: boolean;
+  rushDeliverTo: string;
+  primaryAddrStr: string;
+  finalDeliverTo: string;
+  timelineBands: { type: string; startDate: Date; endDate: Date; address: string }[];
+  packoutItems: string[];
+  interviewGroups: string[];
+  customDeliveries: { id: string; label: string; dateStr: string; address: string; sourceId: string }[];
+  postFinalEvents: string[];
+  groupOverrides: Record<string, any>;
+}): DeliveryGroup[] => {
+  const {
+    rushItems,
+    shortTermItems,
+    now,
+    estimatedReturn,
+    hasHotel,
+    hasRental,
+    rushDeliverTo,
+    primaryAddrStr,
+    finalDeliverTo,
+    timelineBands,
+    packoutItems,
+    interviewGroups,
+    customDeliveries,
+    postFinalEvents,
+    groupOverrides,
+  } = input;
+
+  const deliveryGroups: DeliveryGroup[] = [];
+
+  // 1) Rush delivery — date is now+2; location prefers the first
+  // timelineBand, falling back to hotel > rental > home.
+  const rushDate = rushAddDays(now, 2);
+  const rushLoc = timelineBands.length > 0
+    ? { location: timelineBands[0].type, address: timelineBands[0].address }
+    : { location: hasHotel ? "Hotel" : hasRental ? "Rental" : "Home", address: rushDeliverTo };
+  deliveryGroups.push({
+    id: "rush",
+    label: "Rush Delivery",
+    date: rushDate,
+    icon: "⚡",
+    items: rushItems,
+    location: rushLoc.location,
+    address: rushLoc.address,
+    color: STAY_TYPE_COLORS[rushLoc.location] || DELIVERY_COLORS[0],
+  });
+
+  // 2) Rental delivery — only when a rental band exists in the timeline.
+  if (hasRental && timelineBands.length > 1) {
+    const rentalBand = timelineBands.find((b) => ["Rental", "Temp"].includes(b.type));
+    if (rentalBand) {
+      deliveryGroups.push({
+        id: "rental",
+        label: "Rental Delivery",
+        date: rushAddDays(rentalBand.startDate, 3),
+        icon: "📦",
+        items: shortTermItems,
+        location: rentalBand.type,
+        address: rentalBand.address,
+        color: STAY_TYPE_COLORS[rentalBand.type] || DELIVERY_COLORS[1],
+      });
+    }
+  }
+
+  // 2b) Short-Term Delivery — when STD/STFD was suggested but no rental band exists.
+  if (!hasRental && interviewGroups.some((g) => ["STD", "STFD"].includes(g))) {
+    deliveryGroups.push({
+      id: "short-term",
+      label: "Short-Term Delivery",
+      date: rushAddDays(now, 7),
+      icon: "📦",
+      items: shortTermItems,
+      location: "Home",
+      address: rushDeliverTo,
+      color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length],
+    });
+  }
+
+  // 3) Final delivery — dates from estimatedReturn (or now+30 as fallback);
+  // household tags are derived from packout items when present.
+  if (estimatedReturn) {
+    const finalHouseholdTags = HOUSEHOLD_TAG_MAP
+      .filter((m) => packoutItems.includes(m.packoutItem))
+      .map((m) => m.tag);
+    deliveryGroups.push({
+      id: "final",
+      label: "Final Delivery",
+      date: estimatedReturn,
+      icon: "🏡",
+      items: ["All remaining wardrobe and household items"],
+      location: "Home",
+      address: finalDeliverTo,
+      householdTags: finalHouseholdTags,
+      color: DELIVERY_COLORS[deliveryGroups.length],
+    });
+  } else {
+    deliveryGroups.push({
+      id: "final",
+      label: "Final Delivery",
+      date: rushAddDays(now, 30),
+      icon: "🏡",
+      items: ["All remaining items"],
+      location: "Home",
+      address: rushDeliverTo || primaryAddrStr,
+      color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length],
+    });
+  }
+
+  // 4) Custom deliveries created by the user — resolve their location
+  // by looking up which timelineBand the date falls inside.
+  const resolveAddressAtDate = (d: Date) => {
+    for (const b of timelineBands) {
+      if (d >= b.startDate && d < b.endDate) return { location: b.type, address: b.address };
+    }
+    if (timelineBands.length) {
+      const last = timelineBands[timelineBands.length - 1];
+      return { location: last.type, address: last.address };
+    }
+    return { location: hasHotel ? "Hotel" : "Home", address: primaryAddrStr };
+  };
+  (customDeliveries || []).forEach((cd) => {
+    const cdDate = parseLocalDate(cd.dateStr);
+    if (!cdDate) return;
+    const loc = resolveAddressAtDate(cdDate);
+    deliveryGroups.push({
+      id: cd.id,
+      label: cd.label,
+      date: cdDate,
+      icon: "📦",
+      items: [],
+      location: loc.location,
+      address: cd.address || loc.address,
+      color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length],
+    });
+  });
+
+  // 5) Post-final events (in-home cleaning, unpacking, etc.) — spread
+  // out at 3-day intervals after the final delivery.
+  const preFinalGroup = deliveryGroups.find((g) => g.id === "final");
+  if (preFinalGroup && (postFinalEvents || []).length > 0) {
+    postFinalEvents.forEach((evt, i) => {
+      const postId = `post_${evt.replace(/\s/g, "_").toLowerCase()}`;
+      const savedDate = groupOverrides[postId]?.dateStr ? parseLocalDate(groupOverrides[postId].dateStr) : null;
+      const postDate = savedDate || rushAddDays(preFinalGroup.date, 3 + i * 2);
+      const savedAddress = groupOverrides[postId]?.address;
+      deliveryGroups.push({
+        id: postId,
+        label: evt,
+        date: postDate,
+        icon: "🏠",
+        items: [`Post-final: ${evt}`],
+        location: preFinalGroup.location,
+        address: savedAddress !== undefined ? savedAddress : preFinalGroup.address,
+        color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length],
+      });
+    });
+  }
+
+  // 6) Apply per-group overrides (date/address/addressType/addressId).
+  // Mutates the local array — fresh objects are written to so the
+  // result is structurally clean for the caller.
+  deliveryGroups.forEach((dg) => {
+    const ovr = groupOverrides[dg.id];
+    if (!ovr) return;
+    if (ovr.dateStr) {
+      const d = parseLocalDate(ovr.dateStr);
+      if (d) dg.date = d;
+    }
+    if (ovr.address !== undefined) dg.address = ovr.address;
+    if (ovr.addressType !== undefined) dg.addressType = ovr.addressType;
+    if (ovr.addressId !== undefined) dg.addressId = ovr.addressId;
+  });
+
+  // 7) Sort by date so the Gantt + cards render in chronological order.
+  deliveryGroups.sort((a, b) => a.date.getTime() - b.date.getTime());
+  return deliveryGroups;
+};
 
 export type SeasonalWardrobe = {
   id: string;

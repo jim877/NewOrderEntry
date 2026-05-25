@@ -317,7 +317,7 @@ import {
   computeRushSeasonChanges,
   computeRushHolidayEvents,
 } from './utils/rushGuideTimeline';
-import { buildRushGuideActionPlan } from './utils/rushGuideActionPlan';
+import { buildRushGuideActionPlan, buildRushGuideDeliveryGroups } from './utils/rushGuideActionPlan';
 import {
   getOrderCompanyNames,
   getOrderContactNames,
@@ -11055,83 +11055,24 @@ export default function App(){
 
                     // Delivery groups — computed at outer scope so seasonal/event sections can reference them
                     const hasHouseholdItems = packoutItems.some(p => ["Rugs", "Window Treatments", "Furniture", "Art", "Appliances"].includes(p));
-                    // DELIVERY_COLORS, STAY_TYPE_COLORS imported from ./utils/rushGuideVisuals
-                    const deliveryGroups: {id: string; label: string; date: Date; icon: string; items: string[]; location: string; address: string; householdTags?: string[]; color: string}[] = [];
-                    // 1) Rush
-                    const rushDate = rushAddDays(now, 2);
-                    const rushBandIdx = timelineBands.length > 0 ? 0 : 0;
-                    const rushLoc = timelineBands.length > 0 ? { location: timelineBands[0].type, address: timelineBands[0].address } : { location: hasHotel ? "Hotel" : hasRental ? "Rental" : "Home", address: rushDeliverTo };
-                    const rushColor = STAY_TYPE_COLORS[rushLoc.location] || DELIVERY_COLORS[0];
-                    deliveryGroups.push({ id: "rush", label: "Rush Delivery", date: rushDate, icon: "⚡", items: rushItems, location: rushLoc.location, address: rushLoc.address, color: rushColor });
-                    // 2) Rental (only if rental exists)
-                    if (hasRental && timelineBands.length > 1) {
-                      const rentalBand = timelineBands.find(b => ["Rental", "Temp"].includes(b.type));
-                      if (rentalBand) {
-                        const stDelivery = rushAddDays(rentalBand.startDate, 3);
-                        deliveryGroups.push({ id: "rental", label: "Rental Delivery", date: stDelivery, icon: "📦", items: shortTermItems, location: rentalBand.type, address: rentalBand.address, color: STAY_TYPE_COLORS[rentalBand.type] || DELIVERY_COLORS[1] });
-                      }
-                    }
-                    // 2b) Short-Term Delivery (when STD/STFD suggested but no rental band)
-                    const interviewGroups = data.suggestedGroups || [];
-                    if (!hasRental && interviewGroups.some((g: string) => ["STD", "STFD"].includes(g))) {
-                      const stDate = rushAddDays(now, 7);
-                      deliveryGroups.push({ id: "short-term", label: "Short-Term Delivery", date: stDate, icon: "📦", items: shortTermItems, location: "Home", address: rushDeliverTo, color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length] });
-                    }
-                    // 3) Final
-                    if (estimatedReturn) {
-                      const finalHouseholdTags: string[] = [];
-                      if (packoutItems.includes("Rugs")) finalHouseholdTags.push("Rugs laid");
-                      if (packoutItems.includes("Window Treatments")) finalHouseholdTags.push("Drapes hung");
-                      if (packoutItems.includes("Furniture")) finalHouseholdTags.push("Furniture placed");
-                      if (packoutItems.includes("Art")) finalHouseholdTags.push("Art re-hung");
-                      if (packoutItems.includes("Appliances")) finalHouseholdTags.push("Appliances installed");
-                      deliveryGroups.push({ id: "final", label: "Final Delivery", date: estimatedReturn, icon: "🏡", items: ["All remaining wardrobe and household items"], location: "Home", address: finalDeliverTo, householdTags: finalHouseholdTags, color: DELIVERY_COLORS[deliveryGroups.length] });
-                    }
-                    // Default final delivery placeholder when no final delivery exists
-                    if (!estimatedReturn && !deliveryGroups.some(g => g.id === "final")) {
-                      const defaultFinalDate = rushAddDays(now, 30);
-                      deliveryGroups.push({ id: "final", label: "Final Delivery", date: defaultFinalDate, icon: "🏡", items: ["All remaining items"], location: "Home", address: rushDeliverTo || primaryAddrStr, color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length] });
-                    }
-                    // Custom deliveries created by user
-                    const customDeliveries = ((rushGuideData as any).customDeliveries || []) as {id: string; label: string; dateStr: string; address: string; sourceId: string}[];
-                    // Address resolver from timeline bands
-                    const resolveAddressAtDate = (d: Date) => {
-                      for (const b of timelineBands) { if (d >= b.startDate && d < b.endDate) return { location: b.type, address: b.address }; }
-                      if (timelineBands.length) { const last = timelineBands[timelineBands.length - 1]; return { location: last.type, address: last.address }; }
-                      return { location: hasHotel ? "Hotel" : "Home", address: primaryAddrStr };
-                    };
-                    customDeliveries.forEach(cd => {
-	                      const cdDate = parseLocalDate(cd.dateStr);
-	                      if (!cdDate) return;
-	                      const loc = resolveAddressAtDate(cdDate);
-                      deliveryGroups.push({ id: cd.id, label: cd.label, date: cdDate, icon: "📦", items: [], location: loc.location, address: cd.address || loc.address, color: DELIVERY_COLORS[deliveryGroups.length % DELIVERY_COLORS.length] });
+                    const deliveryGroups = buildRushGuideDeliveryGroups({
+                      rushItems,
+                      shortTermItems,
+                      now,
+                      estimatedReturn,
+                      hasHotel,
+                      hasRental,
+                      rushDeliverTo,
+                      primaryAddrStr,
+                      finalDeliverTo,
+                      timelineBands,
+                      packoutItems,
+                      interviewGroups: data.suggestedGroups || [],
+                      customDeliveries: ((rushGuideData as any).customDeliveries || []) as any,
+                      postFinalEvents: (data as any).postFinalEvents || [],
+                      groupOverrides: (rushGuideData as any).groupOverrides || {},
                     });
-                    // Post-final delivery events (inhome cleaning, unpacking, etc.)
-                    const postFinalEvents = (data as any).postFinalEvents || [];
-                    const preFinalGroup = deliveryGroups.find(g => g.id === "final");
-                    const _postOverrides = (rushGuideData as any).groupOverrides || {};
-                    if (preFinalGroup && postFinalEvents.length > 0) {
-                      postFinalEvents.forEach((evt: string, i: number) => {
-                        const postId = `post_${evt.replace(/\s/g, "_").toLowerCase()}`;
-                        const savedDate = _postOverrides[postId]?.dateStr ? parseLocalDate(_postOverrides[postId].dateStr) : null;
-                        const postDate = savedDate || rushAddDays(preFinalGroup.date, 3 + i * 2);
-                        const savedAddress = _postOverrides[postId]?.address;
-                        deliveryGroups.push({ id: postId, label: evt, date: postDate, icon: "🏠", items: [`Post-final: ${evt}`], location: preFinalGroup.location, address: savedAddress !== undefined ? savedAddress : preFinalGroup.address, color: DELIVERY_COLORS[(deliveryGroups.length) % DELIVERY_COLORS.length] });
-                      });
-                    }
-                    // Apply user overrides for date/address — AFTER all groups including post-final
-                    const groupOverrides = (rushGuideData as any).groupOverrides || {};
-                    deliveryGroups.forEach(dg => {
-                      const ovr = groupOverrides[dg.id];
-	                      if (ovr) {
-	                        if (ovr.dateStr) { const d = parseLocalDate(ovr.dateStr); if (d) dg.date = d; }
-	                        if (ovr.address !== undefined) dg.address = ovr.address;
-	                        if (ovr.addressType !== undefined) dg.addressType = ovr.addressType;
-	                        if (ovr.addressId !== undefined) dg.addressId = ovr.addressId;
-	                      }
-	                    });
-	                    // Sort by date
-	                    deliveryGroups.sort((a, b) => a.date.getTime() - b.date.getTime());
+	                    const groupOverrides = (rushGuideData as any).groupOverrides || {};
 	                    const applyDeliveryDateChange = (change: any) => {
 	                      if (!change?.id || !change.newDateStr) return;
 	                      if (change.id.startsWith("custom_")) {
