@@ -298,6 +298,7 @@ import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
 import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
+import { hydrateOrderFromParsed } from './utils/orderHydrate';
 import { loadJsonFromStorage, loadMergedRecordFromStorage, saveJsonToStorage } from './utils/localStorageState';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 import {
@@ -3978,24 +3979,9 @@ export default function App(){
     try {
       const s = localStorage.getItem("same-day-scope-v52");
       const parsed = s ? JSON.parse(s) : {};
-      const normalizedSdsServices = (parsed.sdsServices || []).map(item => item === "Drying Needed" ? "Drying" : item);
-      const parsedScopeBridge = normalizeScopeBridgeState(parsed.scopeBridge || {});
-      const mergedSelectedGroups = Array.isArray(parsed.suggestedGroups) && parsed.suggestedGroups.length
-        ? parsed.suggestedGroups
-        : (parsedScopeBridge.selectedGroups || []);
-      return { 
-        ...DEFAULT_FORM, 
-        ...parsed, 
-        addresses: parsed.addresses?.length ? parsed.addresses : DEFAULT_FORM.addresses, 
-        customers: parsed.customers?.length ? parsed.customers : DEFAULT_FORM.customers,
+      return hydrateOrderFromParsed(parsed, {
         orderInstructions: normalizeInstructionEntries(parsed.orderInstructions || []),
-        sdsServices: normalizedSdsServices,
-        suggestedGroups: mergedSelectedGroups,
-        scopeBridge: withScopeBridgeSnippet({
-          ...parsedScopeBridge,
-          selectedGroups: mergedSelectedGroups,
-        }),
-      };
+      });
     } catch { return DEFAULT_FORM; }
   });
   const recordWord = data.isLead === true ? "Lead" : "Order";
@@ -4907,24 +4893,7 @@ export default function App(){
 
   const loadTestPreset = useCallback((preset) => {
     if (!preset?.data) return;
-    const parsed = preset.data;
-    const normalizedSdsServices = (parsed.sdsServices || []).map(item => item === "Drying Needed" ? "Drying" : item);
-    const parsedScopeBridge = normalizeScopeBridgeState(parsed.scopeBridge || {});
-    const mergedSelectedGroups = Array.isArray(parsed.suggestedGroups) && parsed.suggestedGroups.length
-      ? parsed.suggestedGroups
-      : (parsedScopeBridge.selectedGroups || []);
-    setData({
-      ...DEFAULT_FORM,
-      ...parsed,
-      addresses: parsed.addresses?.length ? parsed.addresses : DEFAULT_FORM.addresses,
-      customers: parsed.customers?.length ? parsed.customers : DEFAULT_FORM.customers,
-      sdsServices: normalizedSdsServices,
-      suggestedGroups: mergedSelectedGroups,
-      scopeBridge: withScopeBridgeSnippet({
-        ...parsedScopeBridge,
-        selectedGroups: mergedSelectedGroups,
-      }),
-    });
+    setData(hydrateOrderFromParsed(preset.data));
     if (preset.scopePhotos) {
       setData(p => ({ ...p, scopePhotos: preset.scopePhotos }));
     }
