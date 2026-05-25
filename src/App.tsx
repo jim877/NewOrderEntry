@@ -135,6 +135,8 @@ import {
   SaveSummaryPreview,
   TestPresetsModal,
   AddNewSystemModal,
+  OrderInstructionModal,
+  AlertModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -13834,100 +13836,20 @@ export default function App(){
         {/* Old audit sidebar removed — now in Action Items panel */}
       
       {orderInstructionModal.isOpen && (
-        <div className="fixed inset-0 z-[128] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="border-b border-slate-200 bg-white px-6 py-4">
-              <h3 className="text-xl font-bold text-slate-900">
-                {orderInstructionModal.mode === "edit" ? "Edit Order Instruction" : "Add Order Instruction"}
-              </h3>
-            </div>
-            <div className="space-y-4 p-6">
-              <Field label="Instruction Type">
-                <Select
-                  value={orderInstructionModal.draft.type}
-                  onChange={(e) => setOrderInstructionModal((prev) => ({
-                    ...prev,
-                    draft: { ...prev.draft, type: e.target.value },
-                  }))}
-                >
-                  {INSTRUCTION_TYPES.map((type) => (
-                    <option key={`order-instruction-type-${type}`} value={type}>{type}</option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Instruction">
-                <Textarea
-                  value={orderInstructionModal.draft.text}
-                  onChange={(e) => setOrderInstructionModal((prev) => ({
-                    ...prev,
-                    draft: { ...prev.draft, text: e.target.value },
-                  }))}
-                  placeholder="Enter an order-only instruction..."
-                />
-              </Field>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                Order-level instructions apply only to this order. Company and contact instructions remain inherited from their saved profiles.
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
-              <button
-                className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                onClick={closeOrderInstructionModal}
-              >
-                Cancel
-              </button>
-              <button
-                className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
-                onClick={saveOrderInstruction}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
+        <OrderInstructionModal
+          state={orderInstructionModal}
+          setState={setOrderInstructionModal}
+          onClose={closeOrderInstructionModal}
+          onSave={saveOrderInstruction}
+        />
       )}
       {alertModal.isOpen && (
-        <div className="fixed inset-0 z-[129] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="border-b border-slate-200 bg-white px-6 py-4">
-              <h3 className="text-xl font-bold text-slate-900">{alertModal.title || "Alert"}</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              {alertModal.message ? (
-                <p className="text-sm text-slate-700">{renderAlertMessageContent(alertModal.message, alertModal.title)}</p>
-              ) : null}
-              {alertModal.details?.length ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                  <ul className="space-y-1 text-sm text-slate-700">
-                    {alertModal.details.map((detail, index) => (
-                      <li key={`alert-detail-${index}`}>• {renderAlertDetailContent(detail)}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
-              <button
-                className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                onClick={() => setAlertModal(createAlertModalState())}
-              >
-                {alertModal.onConfirm ? (alertModal.dismissLabel || "Cancel") : (alertModal.dismissLabel || "Close")}
-              </button>
-              {alertModal.onConfirm ? (
-                <button
-                  className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
-                  onClick={() => {
-                    const action = alertModal.onConfirm;
-                    setAlertModal(createAlertModalState());
-                    action?.();
-                  }}
-                >
-                  {alertModal.confirmLabel || "Confirm"}
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
+        <AlertModal
+          state={alertModal}
+          onClose={() => setAlertModal(createAlertModalState())}
+          renderMessage={renderAlertMessageContent}
+          renderDetail={renderAlertDetailContent}
+        />
       )}
       {toastQueue.length > 0 && <ToastStack toasts={toastQueue} onRemove={removeToast} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
       {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
