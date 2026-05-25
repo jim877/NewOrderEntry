@@ -43,6 +43,67 @@ export type CompanyRoleAssignment = CompanyRoleDef & {
   contacts: { name: string }[];
 };
 
+// applyBillingContactChangeReducer — pure reducer for the billing
+// contact picker. Writes contact + best-guess company (resolved or
+// fall through to the existing value). Empty contact clears
+// billingCompany only when the user explicitly typed a company.
+export const applyBillingContactChangeReducer = (
+  prev: any,
+  contact: string,
+  parsedCompany: string,
+  resolvedCompany: string,
+) => ({
+  ...prev,
+  billingContact: contact,
+  billingCompany: contact
+    ? (resolvedCompany || prev.billingCompany || "")
+    : (parsedCompany || prev.billingCompany || ""),
+});
+
+// applyAdjusterContactChangeReducer — same shape as billing but writes
+// insuranceAdjuster + adjusterCompany, and also fills in
+// insuranceCompany when it's empty (the adjuster's company is usually
+// the insurance carrier).
+export const applyAdjusterContactChangeReducer = (
+  prev: any,
+  contact: string,
+  parsedCompany: string,
+  resolvedCompany: string,
+) => ({
+  ...prev,
+  insuranceAdjuster: contact,
+  adjusterCompany: contact
+    ? (resolvedCompany || prev.adjusterCompany || "")
+    : (parsedCompany || prev.adjusterCompany || ""),
+  insuranceCompany: prev.insuranceCompany || parsedCompany || resolvedCompany || "",
+});
+
+// applyInsuranceCompanyChangeReducer — pure reducer for the
+// Insurance Company picker. Writes the new company name, flips
+// insuranceClaim/involvesInsurance to "Yes" when a company is set
+// (and we're not in non-restoration mode), and updates the linked
+// national carrier (or clears it when the company changed away).
+export const applyInsuranceCompanyChangeReducer = (
+  prev: any,
+  company: string,
+  linkedCarrier: string,
+  isNonRestorationProject: boolean,
+) => {
+  const companyChanged = normalizeCompany(prev.insuranceCompany || "") !== normalizeCompany(company);
+  return {
+    ...prev,
+    insuranceCompany: company,
+    insuranceClaim: company ? "Yes" : prev.insuranceClaim,
+    involvesInsurance: company && !isNonRestorationProject ? "Yes" : prev.involvesInsurance,
+    nationalCarrier: linkedCarrier
+      ? linkedCarrier
+      : (companyChanged ? "" : prev.nationalCarrier || ""),
+    nationalCarrierRequested: linkedCarrier
+      ? false
+      : (companyChanged ? false : !!prev.nationalCarrierRequested),
+  };
+};
+
 // applyAdditionalContactChangeReducer — pure reducer used by
 // handleAdditionalContactChange. Patches the additionalCompanies[type]
 // entry with the new contact + best-guess company (the existing one,

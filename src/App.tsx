@@ -324,6 +324,9 @@ import {
   migrateReferringCompanyEntryReducer,
   upsertAdditionalCompanyReducer,
   applyAdditionalContactChangeReducer,
+  applyBillingContactChangeReducer,
+  applyAdjusterContactChangeReducer,
+  applyInsuranceCompanyChangeReducer,
 } from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { mapAuditMissingToTargets } from './utils/auditTargets';
@@ -7402,13 +7405,7 @@ export default function App(){
       return;
     }
 
-    setData(prev => ({
-      ...prev,
-      billingContact: contact,
-      billingCompany: contact
-        ? (resolvedCompany || prev.billingCompany || "")
-        : (parsed.company || prev.billingCompany || "")
-    }));
+    setData(prev => applyBillingContactChangeReducer(prev, contact, parsed.company, resolvedCompany));
 
     if (contact && resolvedCompany) {
       registerContactCompany(contact, resolvedCompany);
@@ -7427,17 +7424,7 @@ export default function App(){
     if (company) {
       setCompanies((prev) => Array.from(new Set([...prev, company])));
     }
-    setData((prev) => {
-      const companyChanged = normalizeCompany(prev.insuranceCompany || "") !== normalizeCompany(company);
-      return {
-        ...prev,
-        insuranceCompany: company,
-        insuranceClaim: company ? "Yes" : prev.insuranceClaim,
-        involvesInsurance: company && !isNonRestorationProject ? "Yes" : prev.involvesInsurance,
-        nationalCarrier: linkedCarrier ? linkedCarrier : (companyChanged ? "" : prev.nationalCarrier || ""),
-        nationalCarrierRequested: linkedCarrier ? false : (companyChanged ? false : !!prev.nationalCarrierRequested),
-      };
-    });
+    setData((prev) => applyInsuranceCompanyChangeReducer(prev, company, linkedCarrier, isNonRestorationProject));
   };
 
   const requestNationalCarrierLink = () => {
@@ -7458,14 +7445,7 @@ export default function App(){
       return;
     }
 
-    setData(prev => ({
-      ...prev,
-      insuranceAdjuster: contact,
-      adjusterCompany: contact
-        ? (resolvedCompany || prev.adjusterCompany || "")
-        : (parsed.company || prev.adjusterCompany || ""),
-      insuranceCompany: prev.insuranceCompany || parsed.company || resolvedCompany || ""
-    }));
+    setData(prev => applyAdjusterContactChangeReducer(prev, contact, parsed.company, resolvedCompany));
 
     if (contact && resolvedCompany) {
       registerContactCompany(contact, resolvedCompany);
