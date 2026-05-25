@@ -26,6 +26,60 @@ export const REPAIR_TYPE_MAP: Record<string, string> = {
   "Complete Rebuild": "rebuild",
 };
 
+export type RushGuideAddresses = {
+  allAddresses: any[];
+  primaryAddress: any;
+  primaryAddrStr: string;
+  tempAddress: any;
+  tempAddrStr: string;
+  hotelAddress: any;
+  hotelAddrStr: string;
+  rentalAddress: any;
+  rentalAddrStr: string;
+};
+
+const formatAddrLine = (a: any) =>
+  [a?.street, a?.city, a?.state, a?.zip].filter(Boolean).join(", ");
+
+// buildRushGuideAddresses — pure derivation of the address strings
+// the Rush Guide needs (primary, temp, hotel, rental). Uses the
+// livingTimeline first when present (per-stay address overrides the
+// type-matched address); falls back to the order's saved addresses.
+export const buildRushGuideAddresses = (data: any): RushGuideAddresses => {
+  const allAddresses = data.addresses || [];
+  const livingTimeline = data.livingTimeline || [];
+  const timelineHotel = livingTimeline.find((s: any) => s.type === "Hotel");
+  const timelineRental = livingTimeline.find((s: any) => s.type === "Rental" || s.type === "Temp");
+
+  const primaryAddress = allAddresses.find((a: any) => a.isPrimary) || allAddresses[0] || {};
+  const tempAddress = allAddresses.find((a: any) => /temp|hotel|rental/i.test(a.type || "")) || {};
+  const hotelAddress = allAddresses.find((a: any) => /hotel/i.test(a.type || "")) || {};
+  const rentalAddress = allAddresses.find((a: any) => /temp|rental/i.test(a.type || "")) || {};
+
+  return {
+    allAddresses,
+    primaryAddress,
+    primaryAddrStr: formatAddrLine(primaryAddress),
+    tempAddress,
+    tempAddrStr: formatAddrLine(tempAddress),
+    hotelAddress,
+    hotelAddrStr: timelineHotel?.address || formatAddrLine(hotelAddress),
+    rentalAddress,
+    rentalAddrStr: timelineRental?.address || formatAddrLine(rentalAddress),
+  };
+};
+
+// buildRushGuideConditions — pure derivation of the condition flag
+// object the Rush Guide consumes. Y/Y string + true/false coercions
+// match the order shape's mixed-bool conventions.
+export const buildRushGuideConditions = (data: any) => ({
+  wet: data.damageWasWet === "Y" || data.damageWasWet === true,
+  mold: !!data.damageMoldMildew,
+  structural: data.structuralElectricDamage === "Y",
+  noLights: !!data.noLights,
+  boarded: !!data.boardedUp,
+});
+
 export type HouseholdComposition = {
   babies: number;
   kids: number;

@@ -309,6 +309,8 @@ import {
   LIVING_SITUATION_MAP,
   REPAIR_TYPE_MAP,
   buildHouseholdComposition,
+  buildRushGuideAddresses,
+  buildRushGuideConditions,
 } from './utils/rushGuideTimeline';
 import {
   getOrderCompanyNames,
@@ -10932,18 +10934,13 @@ export default function App(){
           const people = household.filter(m => m.category === "person");
           const pets = household.filter(m => m.category === "pet");
           const primaryCustomer = (data.customers || [])[0] || {};
-          // Addresses
-          const allAddresses = data.addresses || [];
-          const primaryAddress = allAddresses.find(a => a.isPrimary) || allAddresses[0] || {};
-          const primaryAddrStr = [primaryAddress.street, primaryAddress.city, primaryAddress.state, primaryAddress.zip].filter(Boolean).join(", ");
-          const tempAddress = allAddresses.find(a => /temp|hotel|rental/i.test(a.type || "")) || {};
-          const tempAddrStr = [tempAddress.street, tempAddress.city, tempAddress.state, tempAddress.zip].filter(Boolean).join(", ");
+          const { allAddresses, primaryAddress, primaryAddrStr, tempAddress, tempAddrStr, hotelAddress, hotelAddrStr, rentalAddress, rentalAddrStr } = buildRushGuideAddresses(data);
           const { babies, kids, elderly, adults, totalPeople, petCount, petNames } = buildHouseholdComposition(data);
           const considerations = data.sdsConsiderations || [];
           const packoutItems = data.packoutSummary || [];
           const interests = data.rushInterests || [];
           const events = data.upcomingEvents || [];
-          const conditions = { wet: data.damageWasWet === "Y" || data.damageWasWet === true, mold: !!data.damageMoldMildew, structural: data.structuralElectricDamage === "Y", noLights: !!data.noLights, boarded: !!data.boardedUp };
+          const conditions = buildRushGuideConditions(data);
 
           const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === orderRepairType);
           const now = new Date();
@@ -10955,14 +10952,8 @@ export default function App(){
           const seasons = estimatedReturn ? rushGetSeasons(now, estimatedReturn) : [];
           const storageRepairMismatch = repairReturn && storageReturn && Math.abs(repairReturn.getTime() - storageReturn.getTime()) > 30 * 24 * 60 * 60 * 1000;
 
-          // Smart address resolution from living timeline
+          // Smart address resolution from living timeline — see utils/rushGuideTimeline.
           const livingTimeline = data.livingTimeline || [];
-          const timelineHotel = livingTimeline.find(s => s.type === "Hotel");
-          const timelineRental = livingTimeline.find(s => s.type === "Rental" || s.type === "Temp");
-          const hotelAddress = allAddresses.find(a => /hotel/i.test(a.type || "")) || {};
-          const hotelAddrStr = timelineHotel?.address || [hotelAddress.street, hotelAddress.city, hotelAddress.state, hotelAddress.zip].filter(Boolean).join(", ");
-          const rentalAddress = allAddresses.find(a => /temp|rental/i.test(a.type || "")) || {};
-          const rentalAddrStr = timelineRental?.address || [rentalAddress.street, rentalAddress.city, rentalAddress.state, rentalAddress.zip].filter(Boolean).join(", ");
           // Determine delivery pattern from timeline or single status
           const isLongTerm = repairInfo && repairInfo.days > 30;
           const hasHotel = livingTimeline.some(s => s.type === "Hotel") || orderSituation === "hotel" || !!hotelAddrStr;
