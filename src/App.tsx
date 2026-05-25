@@ -134,6 +134,7 @@ import {
   BuildingIcon,
   SaveSummaryPreview,
   TestPresetsModal,
+  AddNewSystemModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14570,85 +14571,15 @@ export default function App(){
       )}
 
       {addNewSystemModal && (
-        <div className="fixed inset-0 z-[140] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-8 sm:pt-16 overflow-auto"
-          onKeyDown={e => { if (e.key === "Escape") setAddNewSystemModal(null); }}
-        >
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden" tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
-            <div className="bg-sky-500 px-6 py-4">
-              <h3 className="text-lg font-bold text-white">Add New Contact / Company</h3>
-              <p className="text-sm text-sky-100">This will add them to the system for future orders.</p>
-            </div>
-            <div className="p-6 space-y-5">
-              <div className="space-y-3">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Company</div>
-                <SearchSelect
-                  value={addNewSystemModal.companyName}
-                  onChange={v => setAddNewSystemModal(p => ({ ...p, companyName: v, isNewCompany: !companies.some(c => normalizeCompany(c) === normalizeCompany(v)) }))}
-                  onQueryChange={() => {}}
-                  options={companies.map(c => ({ label: c, value: c, type: "company" }))}
-                  placeholder="Search existing or type new company..."
-                  onAddNew={v => setAddNewSystemModal(p => ({ ...p, companyName: v, isNewCompany: true }))}
-                />
-                {addNewSystemModal.companyName && (
-                  <div className={`text-[11px] font-semibold ${addNewSystemModal.isNewCompany ? 'text-amber-600' : 'text-emerald-600'}`}>
-                    {addNewSystemModal.isNewCompany ? `"${addNewSystemModal.companyName}" is new — will be created` : `"${addNewSystemModal.companyName}" found`}
-                  </div>
-                )}
-                {addNewSystemModal.isNewCompany && addNewSystemModal.companyName && (
-                  <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">New Company Details</div>
-                      <button type="button" onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(addNewSystemModal.companyName)}`, '_blank')} className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-100">Search Google</button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {COMPANY_TYPES.map(type => (
-                        <button key={type} type="button" onClick={() => setAddNewSystemModal(p => ({ ...p, companyType: type }))}
-                          className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition-all ${addNewSystemModal.companyType === type ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-500 hover:border-sky-300'}`}
-                        >{type}</button>
-                      ))}
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <Input value={addNewSystemModal.companyPhone || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, companyPhone: formatPhoneNumber(e.target.value) }))} placeholder="Company phone" />
-                      <Input value={addNewSystemModal.companyWebsite || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, companyWebsite: e.target.value }))} placeholder="Website" />
-                    </div>
-                    <Input value={addNewSystemModal.companyAddress || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, companyAddress: e.target.value }))} placeholder="Company address" />
-                  </div>
-                )}
-              </div>
-              <div className="space-y-3">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact{addNewSystemModal.companyName ? ` at ${addNewSystemModal.companyName}` : ""}</div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Input value={addNewSystemModal.firstName || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" />
-                  <Input value={addNewSystemModal.lastName || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" />
-                </div>
-                <Input value={addNewSystemModal.title || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, title: e.target.value }))} placeholder="Title (e.g. Adjuster, Project Manager, Owner)" />
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Input value={addNewSystemModal.phone || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, phone: formatPhoneNumber(e.target.value) }))} placeholder="Phone" />
-                  <Input value={addNewSystemModal.email || ""} onChange={e => setAddNewSystemModal(p => ({ ...p, email: e.target.value }))} placeholder="Email" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-slate-50 px-6 py-4 flex justify-between border-t border-slate-200">
-              <button onClick={() => setAddNewSystemModal(null)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700">Cancel</button>
-              <button
-                onClick={() => {
-                  const fullName = [addNewSystemModal.firstName, addNewSystemModal.lastName].filter(Boolean).join(" ");
-                  const companyName = addNewSystemModal.companyName || "";
-                  if (!fullName && !companyName) return;
-                  const inferredType = addNewSystemModal.isNewCompany ? (addNewSystemModal.companyType || "Other") : inferCompanyTypeFromName(companyName);
-                  const entry = { company: companyName, contact: fullName, type: inferredType, title: addNewSystemModal.title || "", id: safeUid() };
-                  update("vendors", [...(data.vendors || []), entry]);
-                  setToast(`Added ${fullName ? fullName + (companyName ? " at " + companyName : "") : companyName} to the system`);
-                  setAddNewSystemModal(null);
-                }}
-                disabled={!addNewSystemModal.firstName && !addNewSystemModal.companyName}
-                className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white hover:bg-sky-600 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Add to System & Order
-              </button>
-            </div>
-          </div>
-        </div>
+        <AddNewSystemModal
+          state={addNewSystemModal}
+          setState={setAddNewSystemModal}
+          companies={companies}
+          vendors={data.vendors || []}
+          update={update}
+          setToast={setToast}
+          onClose={() => setAddNewSystemModal(null)}
+        />
       )}
       {addCompanyModalOpen && (
           <div className="mb-4">

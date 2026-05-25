@@ -46,3 +46,4 @@ export { LeadInfoFields } from "./LeadInfoFields";
 export { BuildingIcon } from "./BuildingIcon";
 export { SaveSummaryPreview } from "./SaveSummaryPreview";
 export { TestPresetsModal } from "./TestPresetsModal";
+export { AddNewSystemModal } from "./AddNewSystemModal";
