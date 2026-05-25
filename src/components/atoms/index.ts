@@ -84,3 +84,4 @@ export { InterviewQuestionCard, CollapseInterviewRow } from "./InterviewQuestion
 export { SdsPreviewModal } from "./SdsPreviewModal";
 export { SaveSummaryModal } from "./SaveSummaryModal";
 export { AddressSection } from "./AddressSection";
+export { CustomerSection } from "./CustomerSection";
