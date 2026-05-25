@@ -53,3 +53,31 @@ export const getOrderContactNames = (data: any): string[] => {
   });
   return Array.from(names.values());
 };
+
+// getEstimateRequesterQuickOptions — flat list of "Name (Role)" labels for
+// the Estimate Requester picker. Pulls primary customer + every named role
+// holder on the order, de-duped case-insensitively. Empty names skipped.
+export const getEstimateRequesterQuickOptions = (data: any): string[] => {
+  const options: string[] = [];
+  const seen = new Set<string>();
+  const add = (name: any, roleLabel = "") => {
+    const trimmed = (name || "").toString().trim();
+    if (!trimmed) return;
+    const value = roleLabel ? `${trimmed} (${roleLabel})` : trimmed;
+    const key = value.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    options.push(value);
+  };
+  (data.customers || []).forEach((customer: any) => {
+    const fullName = [customer.first, customer.last].filter(Boolean).join(" ").trim();
+    add(fullName, "Customer");
+  });
+  add(data.insuranceAdjuster, "Adjuster");
+  add(data.publicAdjuster, "Public Adjuster");
+  add(data.independentAdjuster, "Independent Adjuster");
+  add(data.tpaContact, "TPA");
+  add(data.billingContact, "Bill To");
+  add(data.referrer, "Referrer");
+  return options;
+};

@@ -299,7 +299,7 @@ import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSum
 import { downloadOrderIcs } from './utils/icsExport';
 import { renderAlertMessageContent, renderAlertDetailContent } from './utils/alertContent';
 import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
-import { getOrderCompanyNames, getOrderContactNames } from './utils/orderEntities';
+import { getOrderCompanyNames, getOrderContactNames, getEstimateRequesterQuickOptions } from './utils/orderEntities';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6682,30 +6682,7 @@ export default function App(){
     setToast(`No national carrier link found for ${data.insuranceCompany}.`);
   }, [insuranceCarrierLinkMissing, data.insuranceCompany]);
 
-  const estimateRequesterQuickOptions = useMemo(() => {
-    const options = [];
-    const seen = new Set();
-    const add = (name, roleLabel = "") => {
-      const trimmed = (name || "").toString().trim();
-      if (!trimmed) return;
-      const value = roleLabel ? `${trimmed} (${roleLabel})` : trimmed;
-      const key = value.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      options.push(value);
-    };
-    (data.customers || []).forEach((customer) => {
-      const fullName = [customer.first, customer.last].filter(Boolean).join(" ").trim();
-      add(fullName, "Customer");
-    });
-    add(data.insuranceAdjuster, "Adjuster");
-    add(data.publicAdjuster, "Public Adjuster");
-    add(data.independentAdjuster, "Independent Adjuster");
-    add(data.tpaContact, "TPA");
-    add(data.billingContact, "Bill To");
-    add(data.referrer, "Referrer");
-    return options;
-  }, [
+  const estimateRequesterQuickOptions = useMemo(() => getEstimateRequesterQuickOptions(data), [
     data.customers,
     data.insuranceAdjuster,
     data.publicAdjuster,
