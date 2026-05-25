@@ -132,6 +132,7 @@ import {
   AddressItem,
   LeadInfoFields,
   BuildingIcon,
+  SaveSummaryPreview,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14283,39 +14284,13 @@ export default function App(){
                   </div>
                 );
               })()}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <button type="button" onClick={() => setPreviewView("narrative")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "narrative" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>Narrative</button>
-                  <button type="button" onClick={() => setPreviewView("table")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "table" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>Table</button>
-                  <button type="button" onClick={() => setPreviewView("fields")} className={`rounded-full px-3 py-1 text-[10px] font-bold border ${previewView === "fields" ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>All Fields</button>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-5 py-4">
-                  {orderNarrative.length === 0 ? (
-                    <div className="text-sm text-slate-400 italic">No data entered yet.</div>
-                  ) : previewView === "narrative" ? (
-                    <div className="text-sm leading-relaxed text-slate-700 space-y-2">
-                      {buildNarrativeProse(orderNarrative, data).map((t, i) => <p key={i}>{t}</p>)}
-                    </div>
-                  ) : previewView === "table" ? (
-                    <div className="space-y-1.5">
-                      {orderNarrative.map((line, idx) => (
-                        <div key={idx} className="flex items-baseline gap-2">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20 shrink-0 text-right">{line.section}</span>
-                          <span className="text-sm text-slate-700">{line.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-slate-700 space-y-1 max-h-[320px] overflow-y-auto custom-scroll">
-                      {saveExportLines.length === 0 ? (
-                        <div className="text-slate-400">No fields entered yet.</div>
-                      ) : (
-                        saveExportLines.map((l, idx) => <div key={`${l}-${idx}`}>{l}</div>)
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <SaveSummaryPreview
+                orderNarrative={orderNarrative}
+                saveExportLines={saveExportLines}
+                data={data}
+                previewView={previewView as any}
+                setPreviewView={setPreviewView}
+              />
               <div className="flex flex-wrap gap-2">
                 <button
                   className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100"
