@@ -301,6 +301,7 @@ import { renderAlertMessageContent, renderAlertDetailContent } from './utils/ale
 import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
 import { getOrderCompanyNames, getOrderContactNames, getEstimateRequesterQuickOptions } from './utils/orderEntities';
 import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
+import { computeSectionAuditStatus } from './utils/auditStatus';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6671,67 +6672,10 @@ export default function App(){
     data.referrer,
   ]);
 
-  const sectionAuditStatus = useMemo(() => {
-    const missing = computeAuditMissing();
-    const missingBySection = missing.reduce((acc, item) => {
-      const section = item.section || item.id;
-      if (!section) return acc;
-      acc[section] = (acc[section] || 0) + 1;
-      return acc;
-    }, {});
-
-    const requiredBySection = { sec1: 0, sec2: 0, sec3: 0, sec4: 0, sec5: 0 };
-
-    requiredBySection.sec1 += 3; // orderName, orderTypes, leadSourceCategory
-    if (isNonRestorationSelected(data.orderTypes || [])) requiredBySection.sec1 += 1;
-    if (data.leadSourceCategory === "Referral") requiredBySection.sec1 += 2;
-    if (data.leadSourceCategory === "Marketing" || data.leadSourceCategory === "Internal") requiredBySection.sec1 += 1;
-    if ((data.orderTypes || []).includes("Mold")) requiredBySection.sec1 += 1;
-
-    requiredBySection.sec2 += 4; // primary customer fields
-    requiredBySection.sec3 += 6; // primary address fields
-    requiredBySection.sec4 += 1; // billingPayer
-
-    if (data.rentOrOwn === "Rent") requiredBySection.sec3 += 1;
-
-    const needsPickupAudit = ["Pickup Complete","Ready to Bill"].includes(data.orderStatus);
-    const needsFinanceAudit = ["Intake Complete","Ready to Bill"].includes(data.orderStatus);
-
-    if (needsPickupAudit) {
-      const severityGroupsNeeded = (data.orderTypes || []).reduce((acc, t) => {
-        const group = t === "Dust/Debris" ? "Dust" : t;
-        if (SEVERITY_GROUPS.includes(group)) acc.add(group);
-        return acc;
-      }, new Set());
-      requiredBySection.sec1 += severityGroupsNeeded.size;
-      requiredBySection.sec1 += 2; // interview + codes
-    }
-
-    if (needsFinanceAudit) {
-      requiredBySection.sec4 += 4; // pricing + estimate
-    }
-
-    requiredBySection.sec3 += (data.addresses || []).filter(addr => isAddressPlaceholder(addr)).length;
-    requiredBySection.sec2 += (data.customers || []).filter((customer) => isPlaceholderFlagActive(customer?.placeholder)).length;
-    requiredBySection.sec4 += Object.values(data.additionalCompanies || {}).reduce((acc, rawEntry) => {
-      const entry = syncCompanyEntryPlaceholders(rawEntry || {});
-      const companyPending = isCompanyPlaceholder(entry);
-      if (companyPending) return acc + 1;
-      if (isContactPlaceholder(entry)) return acc + 1;
-      return acc;
-    }, 0);
-
-    return SECTION_ORDER.reduce((acc, sectionId) => {
-      const required = requiredBySection[sectionId] || 0;
-      const missingCount = missingBySection[sectionId] || 0;
-      acc[sectionId] = {
-        required,
-        missing: missingCount,
-        complete: required > 0 && missingCount === 0
-      };
-      return acc;
-    }, {});
-  }, [data]);
+  const sectionAuditStatus = useMemo(
+    () => computeSectionAuditStatus(data, computeAuditMissing(), SEVERITY_GROUPS, SECTION_ORDER),
+    [data],
+  );
 
   const completedSections = useMemo(() => {
     return new Set(SECTION_ORDER.filter(sectionId => sectionAuditStatus?.[sectionId]?.complete));
