@@ -390,6 +390,14 @@ import {
 import { computeSuggestedReferrerRoles } from './utils/referrerRoles';
 import { buildActionItemPlaceholders, buildBillToBlockers } from './utils/actionItemsData';
 import {
+  SMART_TRIGGER_REASONS,
+  smartIsOff,
+  computeSmartUpdateAdds,
+  computeSmartUpdateRemovals,
+  applySmartUpdateReducer,
+  applySmartRemovalReducer,
+} from './utils/smartUpdates';
+import {
   toggleBridgeMilestoneReducer,
   toggleProceedWithoutApprovalReducer,
   toggleBridgeIssueReducer,
@@ -5289,102 +5297,25 @@ export default function App(){
   }, []);
 
   const updateSmart = (k, v) => {
-      const loadListAdded = [];
-      const addHandling = [];
-      const isOn = v === true || v === "Y";
-      const isOff = v === false || v === "N" || v === "" || v === null;
-      const currentLoadList = new Set(data.loadList || []);
-      const currentHandling = new Set(data.handlingCodes || []);
-      const currentOrderTypes = new Set(data.orderTypes || []);
-      const pendingRemovals = { load: [], handling: [], orderTypes: [] };
-
-      if (k === 'noHeat' && isOn && !currentLoadList.has('Heater')) loadListAdded.push('Heater');
-      if ((k === 'noLights' && isOn) || (k === 'boardedUp' && isOn)) { if(!currentLoadList.has('Lights')) loadListAdded.push('Lights'); }
-      if (k === 'damageWasWet' && isOn && !currentLoadList.has('Plastic Bags')) loadListAdded.push('Plastic Bags');
-      if (k === 'damageMoldMildew' && isOn && !currentLoadList.has('Tyvek')) loadListAdded.push('Tyvek');
-
-      if (k === "damageWasWet") {
-        if (isOn) addHandling.push("Wet");
-      }
-      if (k === "damageMoldMildew") {
-        if (isOn) addHandling.push("PPE");
-      }
-
-      if (isOff) {
-        const candidates = {
-          load: [],
-          handling: [],
-          orderTypes: [],
-        };
-        if (k === "noHeat") candidates.load.push("Heater");
-        if (k === "noLights" || k === "boardedUp") candidates.load.push("Lights");
-        if (k === "damageWasWet") {
-          candidates.load.push("Plastic Bags");
-          candidates.handling.push("Wet");
-        }
-        if (k === "damageMoldMildew") {
-          candidates.load.push("Tyvek");
-          candidates.handling.push("PPE");
-          candidates.orderTypes.push("Mold");
-        }
-        if (k === "damageMoldMildew" && currentOrderTypes.has("Mold")) {
-          // If Mold remains selected, PPE is still auto-required elsewhere.
-          candidates.handling = candidates.handling.filter(code => code !== "PPE");
-        }
-
-        const presentLoad = candidates.load.filter((item) => {
-          if (!currentLoadList.has(item)) return false;
-          if (shouldRetainSharedLoadItem(k, item, v, data)) return false;
-          return true;
-        });
-        const presentHandling = candidates.handling.filter((code) => currentHandling.has(code));
-        const presentOrderTypes = candidates.orderTypes.filter((type) => currentOrderTypes.has(type));
-        pendingRemovals.load = presentLoad;
-        pendingRemovals.handling = presentHandling;
-        pendingRemovals.orderTypes = presentOrderTypes;
-      }
+      const currentLoadList = new Set<string>(data.loadList || []);
+      const currentHandling = new Set<string>(data.handlingCodes || []);
+      const currentOrderTypes = new Set<string>(data.orderTypes || []);
+      const { loadListAdded, addHandling } = computeSmartUpdateAdds(k, v, currentLoadList, currentHandling);
+      const pendingRemovals = computeSmartUpdateRemovals(k, v, currentLoadList, currentHandling, currentOrderTypes, data);
 
       if (loadListAdded.length > 0) {
-          const reasonMap = {
-            damageWasWet: "Still Wet",
-            damageMoldMildew: "Visible Mold",
-            noHeat: "No Heat",
-            noLights: "No Electricity",
-            boardedUp: "Boarded Up"
-          };
-          const reason = reasonMap[k] || "condition selected";
-          setSmartNotification({ message: `Bring: ${loadListAdded.join(', ')} added because ${reason}`, loadListToRemove: loadListAdded });
-          setConditionAutoFillHints(prev => ({ ...prev, [k]: loadListAdded.join(', ') }));
-          setTimeout(() => setConditionAutoFillHints(prev => { const next = { ...prev }; delete next[k]; return next; }), 4000);
+        const reason = SMART_TRIGGER_REASONS[k] || "condition selected";
+        setSmartNotification({ message: `Bring: ${loadListAdded.join(', ')} added because ${reason}`, loadListToRemove: loadListAdded });
+        setConditionAutoFillHints(prev => ({ ...prev, [k]: loadListAdded.join(', ') }));
+        setTimeout(() => setConditionAutoFillHints(prev => { const next = { ...prev }; delete next[k]; return next; }), 4000);
       }
-      
-      setData(prev => {
-          const newData = { ...prev, [k]: v };
-          const newLoadList = new Set(prev.loadList || []);
-          loadListAdded.forEach(i => newLoadList.add(i));
-          newData.loadList = Array.from(newLoadList);
-          if (k === "damageMoldMildew" && isOn && !(prev.orderTypes || []).includes("Mold")) {
-            newData.orderTypes = [...(prev.orderTypes || []), "Mold"];
-            newData.autoAddedOrderTypes = [...(prev.autoAddedOrderTypes || []), "Mold"];
-          }
-          if (addHandling.length) {
-            const handling = new Set(prev.handlingCodes || []);
-            addHandling.forEach(c => handling.add(c));
-            newData.handlingCodes = Array.from(handling);
-          }
-          return newData;
-      });
 
-      const hasPendingRemovals =
-        pendingRemovals.load.length ||
-        pendingRemovals.handling.length ||
-        pendingRemovals.orderTypes.length;
+      setData(prev => applySmartUpdateReducer(prev, k, v, loadListAdded, addHandling));
 
-      if (isOff && hasPendingRemovals) {
+      const hasPendingRemovals = pendingRemovals.load.length || pendingRemovals.handling.length || pendingRemovals.orderTypes.length;
+      if (smartIsOff(v) && hasPendingRemovals) {
         const label = SMART_TRIGGER_LABELS[k] || "this condition";
         const autoAdded = (data.autoAddedOrderTypes || []) as string[];
-
-        // Auto-remove items that were auto-suggested (not user-selected)
         const autoRemoveTypes = pendingRemovals.orderTypes.filter(type => autoAdded.includes(type));
         const manualTypes = pendingRemovals.orderTypes.filter(type => !autoAdded.includes(type));
 
@@ -5397,17 +5328,10 @@ export default function App(){
           }));
         }
 
-        // Build prompt only for remaining manual items
-        const details = [];
-        if (pendingRemovals.load.length) {
-          details.push(`Bring Instructions: ${pendingRemovals.load.join(", ")}`);
-        }
-        if (pendingRemovals.handling.length) {
-          details.push(`Handling Codes: ${pendingRemovals.handling.join(", ")}`);
-        }
-        if (manualTypes.length) {
-          details.push(`Order Type: ${manualTypes.join(", ")}`);
-        }
+        const details: string[] = [];
+        if (pendingRemovals.load.length) details.push(`Bring Instructions: ${pendingRemovals.load.join(", ")}`);
+        if (pendingRemovals.handling.length) details.push(`Handling Codes: ${pendingRemovals.handling.join(", ")}`);
+        if (manualTypes.length) details.push(`Order Type: ${manualTypes.join(", ")}`);
 
         if (details.length > 0) {
           openSmartConfirm({
@@ -5416,25 +5340,7 @@ export default function App(){
             details,
             confirmLabel: "Yes, Remove",
             cancelLabel: "Keep Fields",
-            onConfirm: () => {
-              setData(prev => {
-                const next = { ...prev };
-                if (pendingRemovals.load.length) {
-                  const list = new Set(prev.loadList || []);
-                  pendingRemovals.load.forEach(item => list.delete(item));
-                  next.loadList = Array.from(list);
-                }
-                if (pendingRemovals.handling.length) {
-                  const handling = new Set(prev.handlingCodes || []);
-                  pendingRemovals.handling.forEach(code => handling.delete(code));
-                  next.handlingCodes = Array.from(handling);
-                }
-                if (manualTypes.length) {
-                  next.orderTypes = (prev.orderTypes || []).filter(type => !manualTypes.includes(type));
-                }
-                return next;
-              });
-            }
+            onConfirm: () => setData(prev => applySmartRemovalReducer(prev, { load: pendingRemovals.load, handling: pendingRemovals.handling, orderTypes: manualTypes })),
           });
         }
       }
