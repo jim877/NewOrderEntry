@@ -362,6 +362,7 @@ import { buildKnownPeople } from './utils/knownPeople';
 import { buildCurrentOrderSpecialDocs, buildCurrentOrderCustomerForms } from './utils/companyDocuments';
 import { computePackoutLoadChanges } from './utils/packoutLoadChanges';
 import { dryHandlingPatch } from './utils/dryHandlingCodes';
+import { computeAutoOrderName } from './utils/orderName';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -5494,17 +5495,8 @@ export default function App(){
   useEffect(() => {
     if (data.orderNameLocked) return;
     if (!data.orderNameAuto) return;
-    const primaryCustomer = (data.customers || []).find(c => c.isPrimary) || {};
-    const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || {};
-    const last = (primaryCustomer.last || "").trim();
-    const city = (primaryAddr.city || "").trim();
-    const state = (primaryAddr.state || "").trim();
-    if (!last && !city && !state) return;
-    const town = [city, state].filter(Boolean).join("");
-    const nextName = [last || "Order", town].filter(Boolean).join("-").replace(/\s+/g, "");
-    if (nextName && nextName !== data.orderName) {
-      update("orderName", nextName);
-    }
+    const nextName = computeAutoOrderName(data);
+    if (nextName && nextName !== data.orderName) update("orderName", nextName);
   }, [data.orderNameLocked, data.orderNameAuto, data.customers, data.addresses, data.orderName, update]);
 
   const groupLinks = data.groupAddressLinks || {};
