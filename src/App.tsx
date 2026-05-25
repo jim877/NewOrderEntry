@@ -7423,15 +7423,6 @@ export default function App(){
     return opts;
   };
 
-  const resolveCompanyTypeForName = (companyName) => {
-    if (!companyName) return "";
-    const match = Object.entries(data.additionalCompanies || {}).find(([, entry]) => normalizeCompany(entry?.company) === normalizeCompany(companyName));
-    if (match) return match[0];
-    const sample = sampleContacts.find(c => normalizeCompany(c.company) === normalizeCompany(companyName));
-    if (sample?.companyType) return sample.companyType;
-    return autoTypeForCompany(companyName);
-  };
-
   const addContactToCompany = (type, contactName, companyName) => {
     const name = (contactName || "").trim();
     if (!name) return;
@@ -13298,7 +13289,7 @@ export default function App(){
                           setToast("Contact required.");
                           return;
                         }
-                        const type = resolveCompanyTypeForName(companyName);
+                        const type = getCompanyTypeForRoles(companyName);
                         addContactToCompany(type, contactName, companyName);
                         setAddContactExisting({ contact: "", company: "" });
                       }}
