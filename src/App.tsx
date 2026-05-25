@@ -340,6 +340,7 @@ import {
   buildExistingCompanyOptions,
   buildGlobalDirectoryByCompany,
   orderCompanyRoles,
+  upsertSampleContactReducer,
 } from './utils/companyDirectory';
 import {
   normalizeCompanyType,
@@ -7070,29 +7071,7 @@ export default function App(){
       setCompanies(prev => Array.from(new Set([...prev, company])));
     }
     if (contact && company) {
-      setSampleContacts(prev => {
-        const normalized = normalizeSampleContacts(prev);
-        const existingIndex = normalized.findIndex(c => normalizeContact(c.name) === normalizeContact(contact));
-        if (existingIndex >= 0) {
-          const next = [...normalized];
-          const existing = next[existingIndex];
-          next[existingIndex] = { ...existing, company: company || existing.company };
-          return next;
-        }
-        const defaults = inferRoleCapabilities(autoTypeForCompany(company), company);
-        return [...normalized, {
-          id: safeUid(),
-          name: contact,
-          company,
-          companyType: autoTypeForCompany(company),
-          title: "",
-          salesRep: "",
-          isAdjuster: false,
-          canRefer: defaults.canRefer,
-          canBill: defaults.canBill,
-          canInsure: defaults.canInsure
-        }];
-      });
+      setSampleContacts(prev => upsertSampleContactReducer(prev, contact, company, safeUid(), autoTypeForCompany));
     }
   };
 

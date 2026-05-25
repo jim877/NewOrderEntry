@@ -5,6 +5,8 @@
 // originally a cluster of inline useMemos in App.tsx.
 
 import { normalizeCompany, normalizeContact } from "./strings";
+import { normalizeSampleContacts } from "./normalizeSampleContacts";
+import { inferRoleCapabilities } from "./companyProfiles";
 
 export type DirectoryEntry = { name: string; title?: string };
 
@@ -59,6 +61,48 @@ export const buildGlobalDirectoryByCompany = (sampleContacts: any[]): Map<string
     map.get(key)!.push({ name: c.name, title: c.title });
   });
   return map;
+};
+
+// upsertSampleContactReducer — pure reducer for the setSampleContacts
+// callback in registerContactCompany. Finds the row whose name
+// matches the given contact (case-insensitive); if present, patches
+// its company; otherwise appends a fresh row with inferred company
+// type + role capabilities. Caller supplies the auto-classifier
+// (App.tsx's autoTypeForCompany) so the helper doesn't import config.
+export const upsertSampleContactReducer = (
+  prev: any[],
+  contact: string,
+  company: string,
+  newRowId: string,
+  classifyCompanyName: (name: string) => string,
+): any[] => {
+  const normalized = normalizeSampleContacts(prev);
+  const existingIndex = normalized.findIndex(
+    (c: any) => normalizeContact(c.name) === normalizeContact(contact)
+  );
+  if (existingIndex >= 0) {
+    const next = [...normalized];
+    const existing = next[existingIndex];
+    next[existingIndex] = { ...existing, company: company || existing.company };
+    return next;
+  }
+  const companyType = classifyCompanyName(company);
+  const defaults = inferRoleCapabilities(companyType, company);
+  return [
+    ...normalized,
+    {
+      id: newRowId,
+      name: contact,
+      company,
+      companyType,
+      title: "",
+      salesRep: "",
+      isAdjuster: false,
+      canRefer: defaults.canRefer,
+      canBill: defaults.canBill,
+      canInsure: defaults.canInsure,
+    },
+  ];
 };
 
 // orderCompanyRoles — apply the Section 4 "visible roles" filter +
