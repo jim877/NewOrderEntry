@@ -307,6 +307,12 @@ import { computeAuditMissing as computeAuditMissingFor } from './utils/auditMiss
 import { buildCompanyRoleAssignments } from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { mapAuditMissingToTargets } from './utils/auditTargets';
+import {
+  buildContactCompanyMap,
+  buildExistingCompanyOptions,
+  buildGlobalDirectoryByCompany,
+  orderCompanyRoles,
+} from './utils/companyDirectory';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6864,46 +6870,20 @@ export default function App(){
     }, new Set());
   }, [data.orderTypes]);
 
-  const contactCompanyMap = useMemo(() => {
-    const map = new Map();
-    Object.values(data.additionalCompanies || {}).forEach(entry => {
-      if (entry?.contact && entry?.company) {
-        map.set(normalizeContact(entry.contact), entry.company);
-      }
-      if (entry?.contacts && entry.contacts.length && entry.company) {
-        entry.contacts.forEach(c => {
-          if (c?.name) map.set(normalizeContact(c.name), entry.company);
-        });
-      }
-    });
-    if (data.billingContact && data.billingCompany) {
-      map.set(normalizeContact(data.billingContact), data.billingCompany);
-    }
-    sampleContacts.forEach(c => {
-      if (c?.name && c?.company) map.set(normalizeContact(c.name), c.company);
-    });
-    return map;
-  }, [data.additionalCompanies, data.billingContact, data.billingCompany, sampleContacts]);
-
-  const existingCompanyOptions = useMemo(() => {
-    const set = new Set();
-    (companies || []).forEach(c => c && set.add(c));
-    Object.values(data.additionalCompanies || {}).forEach(entry => {
-      if (entry?.company) set.add(entry.company);
-    });
-    return Array.from(set);
-  }, [companies, data.additionalCompanies]);
-
-  const globalDirectoryByCompany = useMemo(() => {
-    const map = new Map();
-    sampleContacts.forEach(c => {
-      const key = normalizeCompany(c.company || "");
-      if (!key) return;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push({ name: c.name, title: c.title });
-    });
-    return map;
-  }, [sampleContacts]);
+  // Directory derivations (contactCompanyMap / existingCompanyOptions /
+  // globalDirectoryByCompany) — see utils/companyDirectory.
+  const contactCompanyMap = useMemo(
+    () => buildContactCompanyMap(data, sampleContacts),
+    [data.additionalCompanies, data.billingContact, data.billingCompany, sampleContacts]
+  );
+  const existingCompanyOptions = useMemo(
+    () => buildExistingCompanyOptions(companies, data),
+    [companies, data.additionalCompanies]
+  );
+  const globalDirectoryByCompany = useMemo(
+    () => buildGlobalDirectoryByCompany(sampleContacts),
+    [sampleContacts]
+  );
 
   // Per-role Company assignment rows for Section 4 — see utils/companyRoles.
   const companyRoleAssignments = useMemo(
@@ -6922,23 +6902,10 @@ export default function App(){
     ]
   );
 
-  const visibleCompanyRoles = useMemo(() => {
-    const base = companyRolesExpanded
-      ? companyRoleAssignments
-      : companyRoleAssignments.filter(r => r.pending || r.filled);
-    return base
-      .map((r, idx) => ({ ...r, _idx: idx }))
-      .sort((a, b) => {
-        const rank = (r) => (r.filled ? 0 : r.pending ? 1 : 2);
-        const diff = rank(a) - rank(b);
-        if (diff !== 0) return diff;
-        const aLabel = (a.label || "").toLowerCase();
-        const bLabel = (b.label || "").toLowerCase();
-        if (aLabel === bLabel) return a._idx - b._idx;
-        return aLabel.localeCompare(bLabel);
-      })
-      .map(({ _idx, ...r }) => r);
-  }, [companyRoleAssignments, companyRolesExpanded]);
+  const visibleCompanyRoles = useMemo(
+    () => orderCompanyRoles(companyRoleAssignments, companyRolesExpanded),
+    [companyRoleAssignments, companyRolesExpanded]
+  );
 
   const pendingCompanyRoleCount = useMemo(() => {
     return companyRoleAssignments.filter(r => r.pending).length;
