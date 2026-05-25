@@ -263,6 +263,7 @@ import { interviewAnswersFromOrderData, orderUpdatesFromInterviewAnswers } from 
 import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
 import { buildFullExportLines, copyLinesToClipboard, downloadLinesAsFile } from './utils/dataExport';
 import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, animateNavigationFocus } from './utils/domNav';
+import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } from './utils/deliveryGroup';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 import {
   DURATION_DAYS, BAND_COLORS, DELIVERY_COLORS, STAY_TYPE_COLORS,
@@ -4061,14 +4062,7 @@ export default function App(){
 
   // Delivery Planner helpers
   // computeStorageEstimate — imported from ./utils/dateTime
-  const computeAutoAddress = (groupId: string) => {
-    const tl = data.livingTimeline || [];
-    if (!tl.length) return null;
-    if (groupId === "RD" || groupId === "RFD") return tl[0]; // Rush → first stay
-    if (groupId.startsWith("LT") || groupId === "LTFD") return tl[tl.length - 1]; // Final → last stay
-    if (groupId.startsWith("ST")) return tl.find(s => s.type !== "Staying in home") || tl[0]; // Short-term → first non-home
-    return null;
-  };
+  const computeAutoAddress = (groupId: string) => pickAutoAddressForDeliveryGroup(groupId, data.livingTimeline || []);
 
   // Auto-derive storageNeeded/storageMonths from Final delivery group date
   useEffect(() => {
@@ -4091,11 +4085,7 @@ export default function App(){
     const details = (data as any).deliveryGroupDetails || {};
     const finalEntry = Object.entries(details).find(([, det]: [string, any]) => det?.isFinal);
     if (!finalEntry) return;
-    const addrType = ((finalEntry[1] as any)?.addressType || "").toLowerCase();
-    let pt = "";
-    if (addrType === "primary" || addrType === "home") pt = "Deliver ASAP";
-    else if (["hotel", "rental", "temp", "temporary"].includes(addrType)) pt = "Deliver to Temp";
-    else if (["moving", "new home"].includes(addrType)) pt = "Deliver to New Home";
+    const pt = deliveryAddressTypeToProcessType((finalEntry[1] as any)?.addressType);
     if (pt && pt !== data.processType) update("processType", pt);
   }, [(data as any).deliveryGroupDetails]);
 
