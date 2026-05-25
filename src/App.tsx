@@ -319,6 +319,11 @@ import {
   getCompanyRoleCapabilities as getCompanyRoleCapabilitiesFor,
   isRoleEligibleForCompany as isRoleEligibleForCompanyFor,
 } from './utils/roleEligibility';
+import {
+  filterRolePromptOptions,
+  computeRolePromptDefaults,
+  preferredRoleFromSource,
+} from './utils/rolePrompt';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -7045,49 +7050,29 @@ export default function App(){
     });
   }, []);
 
-  const getRolePromptOptions = useCallback((company, contact, skipRoles = [], forceRoles = []) => {
-    const blocked = new Set(skipRoles || []);
-    const forced = new Set(forceRoles || []);
-    const referrerAssigned = !!(data.referringCompany || data.referrer);
-    const insuranceAssigned = !!(data.insuranceCompany || data.insuranceAdjuster);
-    const billToAssigned = !!(data.billingCompany || data.billingContact);
-    const normalizedCompany = normalizeCompany(company || "");
-    const normalizedContact = normalizeContact(contact || "");
-    const sameReferrer =
-      (!!normalizedCompany && normalizeCompany(data.referringCompany || "") === normalizedCompany) ||
-      (!!normalizedContact && normalizeContact(data.referrer || "") === normalizedContact);
-    const sameInsurance =
-      (!!normalizedCompany && normalizeCompany(data.insuranceCompany || "") === normalizedCompany) ||
-      (!!normalizedContact && normalizeContact(data.insuranceAdjuster || "") === normalizedContact);
-    const sameBillTo =
-      (!!normalizedCompany && normalizeCompany(data.billingCompany || "") === normalizedCompany) ||
-      (!!normalizedContact && normalizeContact(data.billingContact || "") === normalizedContact);
-    const companyTypeHint = normalizeCompanyType(getCompanyTypeForRoles(company || ""));
-    const isPublicAdjuster = companyTypeHint.includes("public adjust");
-    return CONTACT_ROLE_BADGES.filter(role => {
-      if (blocked.has(role.id) && !forced.has(role.id)) return false;
-      if (forced.has(role.id)) return isRoleEligibleForCompany(role.id, company);
-      if (!isRoleEligibleForCompany(role.id, company)) return false;
-      if (role.id === "referrer") return !referrerAssigned || sameReferrer;
-      if (role.id === "insurance") {
-        if (isPublicAdjuster) return false;
-        return !insuranceAssigned || sameInsurance;
-      }
-      if (role.id === "billto") return !billToAssigned || sameBillTo;
-      if (role.id === "poc") return true;
-      return false;
-    });
-  }, [
-    data.referringCompany,
-    data.referrer,
-    data.insuranceCompany,
-    data.insuranceAdjuster,
-    data.billingCompany,
-    data.billingContact,
-    isRoleEligibleForCompany,
-    getCompanyTypeForRoles,
-    normalizeCompanyType
-  ]);
+  const getRolePromptOptions = useCallback(
+    (company, contact, skipRoles = [], forceRoles = []) =>
+      filterRolePromptOptions({
+        badges: CONTACT_ROLE_BADGES,
+        company,
+        contact,
+        data,
+        skipRoles,
+        forceRoles,
+        companyTypeHint: getCompanyTypeForRoles(company || ""),
+        isRoleEligibleForCompany,
+      }),
+    [
+      data.referringCompany,
+      data.referrer,
+      data.insuranceCompany,
+      data.insuranceAdjuster,
+      data.billingCompany,
+      data.billingContact,
+      isRoleEligibleForCompany,
+      getCompanyTypeForRoles,
+    ]
+  );
 
   const openRoleAssignmentPrompt = useCallback(({ company, contact, source = "", skipRoles = [], preferredRoles = [], forceRoles = [] }) => {
     const nextCompany = (company || "").trim();
@@ -7095,32 +7080,19 @@ export default function App(){
     if (!nextCompany && !nextContact) return;
     const options = getRolePromptOptions(nextCompany, nextContact, skipRoles, forceRoles);
     if (!options.length) return;
-    const optionIds = new Set(options.map(option => option.id));
-    const sourceKey = (source || "").toLowerCase();
-    const preferredFromSource =
-      sourceKey.includes("referrer") ? "referrer" :
-      sourceKey.includes("billing") ? "billto" :
-      (sourceKey.includes("insurance") || sourceKey.includes("adjuster")) ? "insurance" :
-      "";
     const matchedContact = nextContact
       ? sampleContacts.find(c => normalizeContact(c.name || "") === normalizeContact(nextContact))
       : null;
-    const titleHint = (matchedContact?.title || "").toLowerCase();
-    const companyTypeHint = normalizeCompanyType(getCompanyTypeForRoles(nextCompany));
-    const capabilities = getCompanyRoleCapabilities(nextCompany, companyTypeHint);
-    const suggested = [];
-    if (capabilities.canRefer && optionIds.has("referrer")) suggested.push("referrer");
-    if (capabilities.canInsure && optionIds.has("insurance")) suggested.push("insurance");
-    if (capabilities.canBill && optionIds.has("billto")) suggested.push("billto");
-    (forceRoles || []).forEach(roleId => { if (optionIds.has(roleId)) suggested.push(roleId); });
-    (preferredRoles || []).forEach(roleId => { if (optionIds.has(roleId)) suggested.push(roleId); });
-    if (preferredFromSource && optionIds.has(preferredFromSource)) suggested.push(preferredFromSource);
-    if (titleHint.includes("adjuster") && optionIds.has("insurance")) suggested.push("insurance");
-    if (companyTypeHint.includes("insurance") && optionIds.has("insurance")) suggested.push("insurance");
-    // Never auto-suggest POC — user must opt in explicitly. If POC is the only available
-    // role (e.g., Public Adjuster with Insurance hidden), leave the prompt with nothing selected.
-    if (!suggested.length && options.length === 1 && options[0].id !== "poc") suggested.push(options[0].id);
-    const selectedDefaults = Array.from(new Set(suggested)).filter((id) => id !== "poc");
+    const companyTypeHint = getCompanyTypeForRoles(nextCompany);
+    const selectedDefaults = computeRolePromptDefaults({
+      options,
+      forceRoles,
+      preferredRoles,
+      preferredFromSource: preferredRoleFromSource(source),
+      capabilities: getCompanyRoleCapabilities(nextCompany, companyTypeHint),
+      titleHint: matchedContact?.title || "",
+      companyTypeHint,
+    });
     setRoleAssignModal({
       isOpen: true,
       source,
@@ -7129,7 +7101,7 @@ export default function App(){
       options,
       selected: selectedDefaults
     });
-  }, [getRolePromptOptions, getCompanyTypeForRoles, normalizeCompanyType, sampleContacts, getCompanyRoleCapabilities]);
+  }, [getRolePromptOptions, getCompanyTypeForRoles, sampleContacts, getCompanyRoleCapabilities]);
 
   const applyRoleAssignments = useCallback((roles, company, contact) => {
     const selected = new Set(roles || []);
