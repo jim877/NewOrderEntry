@@ -324,6 +324,12 @@ import {
   computeRolePromptDefaults,
   preferredRoleFromSource,
 } from './utils/rolePrompt';
+import {
+  buildCombinedContactOptions,
+  parseCombinedContact as parseCombinedContactFor,
+  getContactOptionsForCompany as getContactOptionsForCompanyFor,
+  findSampleContact,
+} from './utils/contactOptions';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6974,37 +6980,14 @@ export default function App(){
 
   const companySet = useMemo(() => new Set(companies), [companies]);
 
-  const combinedContactOptions = useMemo(() => {
-    const contactOpts = [];
-    const seenContacts = new Set();
-    const addContact = (contact, company) => {
-      if (!contact || seenContacts.has(contact)) return;
-      seenContacts.add(contact);
-      const label = company ? `${contact} (${company})` : contact;
-      const value = company ? `${contact} — ${company}` : contact;
-      contactOpts.push({ label, value, type: "contact" });
-    };
-    sampleContacts.forEach(c => addContact(c.name, c.company));
-    contacts.forEach(c => {
-      const company = contactCompanyMap.get(normalizeContact(c));
-      addContact(c, company);
-    });
-    const companyOpts = companies.map(c => ({ label: c, value: c, type: "company" }));
-    return [...contactOpts, ...companyOpts];
-  }, [contacts, companies, contactCompanyMap, sampleContacts]);
+  // Combined contact picker — see utils/contactOptions.
+  const combinedContactOptions = useMemo(
+    () => buildCombinedContactOptions(contacts, companies, contactCompanyMap, sampleContacts),
+    [contacts, companies, contactCompanyMap, sampleContacts]
+  );
 
-  const parseCombinedContact = (value) => {
-    const v = (value || "").trim();
-    if (!v) return { contact: "", company: "" };
-    const dashParts = v.split("—").map(p => p.trim()).filter(Boolean);
-    if (dashParts.length >= 2) return { contact: dashParts[0], company: dashParts.slice(1).join(" — ") };
-    const paren = v.match(/^(.+)\s+\((.+)\)$/);
-    if (paren) return { contact: paren[1].trim(), company: paren[2].trim() };
-    if (companySet.has(v)) return { contact: "", company: v };
-    const mappedCompany = contactCompanyMap.get(normalizeContact(v)) || "";
-    if (mappedCompany) return { contact: v, company: mappedCompany };
-    return { contact: v, company: "" };
-  };
+  const parseCombinedContact = (value) =>
+    parseCombinedContactFor(value, companySet, contactCompanyMap);
 
   // Role-eligibility helpers — see utils/roleEligibility.
   const getCompanyTypeForRoles = useCallback(
@@ -7404,24 +7387,8 @@ export default function App(){
     });
   };
 
-  const getContactOptionsForCompany = (company) => {
-    if (!company) return [];
-    const opts = [];
-    const seen = new Set();
-    const add = (name) => {
-      if (!name || seen.has(name)) return;
-      seen.add(name);
-      opts.push({ label: name, value: name, type: "contact" });
-    };
-    sampleContacts.forEach(c => {
-      if (normalizeCompany(c.company) === normalizeCompany(company)) add(c.name);
-    });
-    contacts.forEach(c => {
-      const comp = contactCompanyMap.get(normalizeContact(c));
-      if (comp && normalizeCompany(comp) === normalizeCompany(company)) add(c);
-    });
-    return opts;
-  };
+  const getContactOptionsForCompany = (company) =>
+    getContactOptionsForCompanyFor(company, contacts, contactCompanyMap, sampleContacts);
 
   const addContactToCompany = (type, contactName, companyName) => {
     const name = (contactName || "").trim();
@@ -7462,15 +7429,8 @@ export default function App(){
     });
   };
 
-  const getSalesRepForContact = (name) => {
-    const found = sampleContacts.find(c => normalizeContact(c.name) === normalizeContact(name));
-    return found?.salesRep || "";
-  };
-
-  const getTitleForContact = (name) => {
-    const found = sampleContacts.find(c => normalizeContact(c.name) === normalizeContact(name));
-    return found?.title || "";
-  };
+  const getSalesRepForContact = (name) => findSampleContact(name, sampleContacts)?.salesRep || "";
+  const getTitleForContact = (name) => findSampleContact(name, sampleContacts)?.title || "";
 
   const updateCompanyCapability = useCallback((companyName, rowIndex, field, value) => {
     setSampleContacts(prev => {
