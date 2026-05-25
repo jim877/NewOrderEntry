@@ -343,6 +343,14 @@ import {
 import { computeSuggestedReferrerRoles } from './utils/referrerRoles';
 import { buildActionItemPlaceholders, buildBillToBlockers } from './utils/actionItemsData';
 import { toggleBridgeMilestoneReducer, toggleProceedWithoutApprovalReducer } from './utils/bridgeMilestones';
+import {
+  resolveBridgePickupStep,
+  resolveBridgeProcessStep,
+  resolveBridgeDeliveryStep,
+  applyBridgePickupStepReducer,
+  applyBridgeProcessStepReducer,
+  applyBridgeDeliveryStepReducer,
+} from './utils/bridgeStages';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6709,53 +6717,30 @@ export default function App(){
     return parts.join(" · ");
   }, [data.estimateType, data.estimateRequestedBy]);
   const authorizationOnFile = !!(scopeBridgeState.milestones || {}).authorizationOnFile;
-  const selectedBridgePickupStep = useMemo(() => {
-    const pickup = (scopeBridgeState.pickupOption || "").toString();
-    if (pickup === "wait") return "hold";
-    if (pickup === "urgent") return "priority";
-    return "schedule";
-  }, [scopeBridgeState.pickupOption]);
-  const selectedBridgeProcessStep = useMemo(() => {
-    const process = (scopeBridgeState.processingOption || "").toString();
-    if (process === "tag_hold") return "hold";
-    if (process === "urgent" || process === "specific") return "priority";
-    return "yes";
-  }, [scopeBridgeState.processingOption]);
-  const selectedBridgeDeliveryStep = useMemo(() => {
-    const delivery = (scopeBridgeState.deliveryOption || "").toString();
-    if (delivery === "hold_cod") return "hold_cod";
-    if (delivery === "priority") return "priority";
-    if (delivery === "ok") return "ok";
-
-    const nextStep = (scopeBridgeState.nextStep || "").toString();
-    if (nextStep === "delivery_hold_cod" || nextStep === "cod" || nextStep === "delivery_hold") return "hold_cod";
-    if (nextStep === "delivery_priority" || nextStep === "emergency_groups_only") return "priority";
-    if ((scopeBridgeState.processingOption || "").toString() === "cod") return "hold_cod";
-    return "ok";
-  }, [scopeBridgeState.deliveryOption, scopeBridgeState.nextStep, scopeBridgeState.processingOption]);
-  const setBridgePickupStep = useCallback((optionId) => {
-    patchScopeBridge((prev) => {
-      const pickupOption = optionId === "hold" ? "wait" : optionId === "priority" ? "urgent" : "";
-      return { ...prev, pickupOption };
-    });
-  }, [patchScopeBridge]);
-  const setBridgeProcessStep = useCallback((optionId) => {
-    patchScopeBridge((prev) => {
-      const processingOption = optionId === "hold" ? "tag_hold" : optionId === "priority" ? "urgent" : "all";
-      return { ...prev, processingOption };
-    });
-  }, [patchScopeBridge]);
-  const setBridgeDeliveryStep = useCallback((optionId) => {
-    patchScopeBridge((prev) => {
-      const deliveryOption = optionId === "hold_cod" ? "hold_cod" : optionId === "priority" ? "priority" : "ok";
-      const nextStep = optionId === "hold_cod"
-        ? "delivery_hold_cod"
-        : optionId === "priority"
-          ? "delivery_priority"
-          : "delivery_ok";
-      return { ...prev, deliveryOption, nextStep };
-    });
-  }, [patchScopeBridge]);
+  const selectedBridgePickupStep = useMemo(
+    () => resolveBridgePickupStep(scopeBridgeState.pickupOption),
+    [scopeBridgeState.pickupOption]
+  );
+  const selectedBridgeProcessStep = useMemo(
+    () => resolveBridgeProcessStep(scopeBridgeState.processingOption),
+    [scopeBridgeState.processingOption]
+  );
+  const selectedBridgeDeliveryStep = useMemo(
+    () => resolveBridgeDeliveryStep(scopeBridgeState),
+    [scopeBridgeState.deliveryOption, scopeBridgeState.nextStep, scopeBridgeState.processingOption]
+  );
+  const setBridgePickupStep = useCallback(
+    (optionId) => patchScopeBridge((prev) => applyBridgePickupStepReducer(prev, optionId)),
+    [patchScopeBridge]
+  );
+  const setBridgeProcessStep = useCallback(
+    (optionId) => patchScopeBridge((prev) => applyBridgeProcessStepReducer(prev, optionId)),
+    [patchScopeBridge]
+  );
+  const setBridgeDeliveryStep = useCallback(
+    (optionId) => patchScopeBridge((prev) => applyBridgeDeliveryStepReducer(prev, optionId)),
+    [patchScopeBridge]
+  );
   const attentionWater = data.damageWasWet === "Y" || data.damageWasWet === true;
   const attentionMold = !!data.damageMoldMildew;
   const highlightStorageFromProcess = data.processType === "Long-Term Storage";
