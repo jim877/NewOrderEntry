@@ -238,6 +238,7 @@ import {
   summarizeConditions,
   formatOrderAddressLine,
   formatOrderAddressChoiceLabel,
+  buildOrderAddressChoices,
 } from './utils/order';
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
@@ -5485,28 +5486,11 @@ export default function App(){
   }, []);
 
   // ORDER_ADDRESS_TYPES — imported from ./config
-  // formatOrderAddressLine, formatOrderAddressChoiceLabel — imported from ./utils/order
-  const orderAddressChoices = useMemo(() => {
-    const activeAddresses = (data.addresses || []).filter((addr: any) => !addr.inactive);
-    const known = activeAddresses.map((addr: any, idx: number) => ({
-      kind: "known",
-      value: `addr:${addr.id}`,
-      type: addr.type || `Address ${idx + 1}`,
-      label: formatOrderAddressChoiceLabel(addr, idx) + (addr.linkedContext ? ` (${addr.linkedContext})` : ""),
-      address: formatOrderAddressLine(addr) || `${addr.type || `Address ${idx + 1}`} address TBD`,
-      addressId: addr.id,
-    }));
-    const types = Array.from(new Set([...ORDER_ADDRESS_TYPES, ...LIVING_STATUS_ADDRESS_TYPES, ...activeAddresses.map((addr: any) => addr.type).filter(Boolean)]));
-    const placeholders = types.map(type => ({
-      kind: "type",
-      value: `type:${type}`,
-      type,
-      label: `${type} — TBD`,
-      address: `${type} address TBD`,
-      addressId: "",
-    }));
-    return { known, placeholders, all: [...known, ...placeholders] };
-  }, [data.addresses, formatOrderAddressChoiceLabel, formatOrderAddressLine]);
+  // formatOrderAddressLine, formatOrderAddressChoiceLabel, buildOrderAddressChoices — imported from ./utils/order
+  const orderAddressChoices = useMemo(
+    () => buildOrderAddressChoices(data.addresses || [], ORDER_ADDRESS_TYPES, LIVING_STATUS_ADDRESS_TYPES),
+    [data.addresses],
+  );
   const addressPayloadFromChoice = useCallback((choiceValue: string) => {
     if (!choiceValue) return { addressType: "", address: "", addressId: "" };
     if (choiceValue.startsWith("addr:")) {

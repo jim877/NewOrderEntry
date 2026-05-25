@@ -56,6 +56,42 @@ export const formatOrderAddressChoiceLabel = (addr: any = {}, idx = 0) => {
   return `${type} — ${line || "TBD"}`;
 };
 
+// buildOrderAddressChoices — turn the order's address list into the picker
+// shape used by Living Address / Delivery Group / Reminder modals. Returns
+// { known, placeholders, all } so callers can render the two groups
+// separately or combine them. `known` entries reference real address ids;
+// `placeholders` are typed slots ("type:Hotel") used when a record doesn't
+// exist yet.
+export const buildOrderAddressChoices = (
+  addresses: any[] = [],
+  orderAddressTypes: string[] = [],
+  livingStatusAddressTypes: string[] = [],
+) => {
+  const activeAddresses = (addresses || []).filter((addr: any) => !addr.inactive);
+  const known = activeAddresses.map((addr: any, idx: number) => ({
+    kind: "known",
+    value: `addr:${addr.id}`,
+    type: addr.type || `Address ${idx + 1}`,
+    label: formatOrderAddressChoiceLabel(addr, idx) + (addr.linkedContext ? ` (${addr.linkedContext})` : ""),
+    address: formatOrderAddressLine(addr) || `${addr.type || `Address ${idx + 1}`} address TBD`,
+    addressId: addr.id,
+  }));
+  const types = Array.from(new Set([
+    ...orderAddressTypes,
+    ...livingStatusAddressTypes,
+    ...activeAddresses.map((addr: any) => addr.type).filter(Boolean),
+  ]));
+  const placeholders = types.map((type: string) => ({
+    kind: "type",
+    value: `type:${type}`,
+    type,
+    label: `${type} — TBD`,
+    address: `${type} address TBD`,
+    addressId: "",
+  }));
+  return { known, placeholders, all: [...known, ...placeholders] };
+};
+
 // isAddressPlaceholder — address is a placeholder if its placeholder flag is on,
 // street is empty, street says "TBD", or type contains "placeholder".
 export const isAddressPlaceholder = (addr: any = {}) => {
