@@ -123,8 +123,119 @@ export const buildHouseholdComposition = (data: any): HouseholdComposition => {
   };
 };
 
-import { rushAddDays, rushFormatDate, rushGetSeasons } from "./dateTime";
+import { rushAddDays, rushFormatDate, rushGetSeasons, parseLocalDate } from "./dateTime";
 import { RUSH_REPAIR_TIMELINES } from "../config";
+import { DURATION_DAYS, BAND_COLORS } from "./rushGuideVisuals";
+
+// computeEstimatedReturn — resolve the estimated repair-finish date
+// from the order. Priority: explicit estimatedReturnDate > later of
+// (repair timeline, storage months) > whichever single one is set.
+// Returns { explicitReturn, repairReturn, storageReturn,
+// estimatedReturn, storageRepairMismatch } so the call site can also
+// surface "repair and storage windows don't match" warnings.
+export const computeEstimatedReturn = (
+  data: any,
+  repairInfo: any,
+  now: Date,
+): {
+  explicitReturn: Date | null;
+  repairReturn: Date | null;
+  storageReturn: Date | null;
+  estimatedReturn: Date | null;
+  storageRepairMismatch: boolean;
+} => {
+  const explicitReturn = parseLocalDate(data.estimatedReturnDate);
+  const repairReturn = repairInfo ? rushAddDays(now, repairInfo.days) : null;
+  const storageReturn = data.storageMonths
+    ? rushAddDays(now, parseInt(data.storageMonths) * 30)
+    : null;
+  const estimatedReturn =
+    explicitReturn
+    || (repairReturn && storageReturn
+      ? (repairReturn > storageReturn ? repairReturn : storageReturn)
+      : repairReturn || storageReturn);
+  const storageRepairMismatch = !!(
+    repairReturn
+    && storageReturn
+    && Math.abs(repairReturn.getTime() - storageReturn.getTime()) > 30 * 24 * 60 * 60 * 1000
+  );
+  return { explicitReturn, repairReturn, storageReturn, estimatedReturn, storageRepairMismatch };
+};
+
+// resolveRushDeliveryAddresses — decide where the rush, rental, and
+// final deliveries should go. Rush prefers hotel > rental > temp >
+// primary; rental falls back through temp > primary; final is always
+// the primary address. hasHotel/hasRental are derived from the timeline
+// AND single-status (orderSituation) AND the resolved address strings.
+export const resolveRushDeliveryAddresses = (
+  livingTimeline: any[],
+  orderSituation: string,
+  hotelAddrStr: string,
+  rentalAddrStr: string,
+  tempAddrStr: string,
+  primaryAddrStr: string,
+) => {
+  const hasHotel =
+    livingTimeline.some((s: any) => s.type === "Hotel") || orderSituation === "hotel" || !!hotelAddrStr;
+  const hasRental =
+    livingTimeline.some((s: any) => s.type === "Rental" || s.type === "Temp")
+    || orderSituation === "temp"
+    || !!rentalAddrStr;
+  const rushDeliverTo = hasHotel && hotelAddrStr
+    ? hotelAddrStr
+    : hasRental && rentalAddrStr
+      ? rentalAddrStr
+      : tempAddrStr || primaryAddrStr;
+  const rentalDeliverTo = rentalAddrStr || tempAddrStr || primaryAddrStr;
+  const finalDeliverTo = primaryAddrStr;
+  return { hasHotel, hasRental, rushDeliverTo, rentalDeliverTo, finalDeliverTo };
+};
+
+// computeRushTimelineBands — the contiguous-no-gap Gantt bands shown
+// in the Rush Guide timeline. One band per livingTimeline stay; start
+// dates are calculated using explicit endDate first, then duration
+// fallback. The last band runs to the explicit stay end, the
+// estimatedReturn, or 90 days out.
+export const computeRushTimelineBands = (
+  livingTimeline: any[],
+  now: Date,
+  estimatedReturn: Date | null,
+  allAddresses: any[],
+): { type: string; startDate: Date; endDate: Date; address: string; color: string }[] => {
+  if (livingTimeline.length === 0) return [];
+  const starts: Date[] = [new Date(now)];
+  for (let i = 0; i < livingTimeline.length - 1; i++) {
+    const explicitEnd = parseLocalDate(livingTimeline[i].endDate);
+    if (explicitEnd && explicitEnd > starts[i]) starts.push(explicitEnd);
+    else {
+      const days = (DURATION_DAYS as any)[livingTimeline[i].duration] || 30;
+      starts.push(rushAddDays(starts[i], days));
+    }
+  }
+  const totalEnd = estimatedReturn || rushAddDays(now, 90);
+  const bands: { type: string; startDate: Date; endDate: Date; address: string; color: string }[] = [];
+  livingTimeline.forEach((stay: any, i: number) => {
+    const start = starts[i];
+    const explicitEnd = parseLocalDate(stay.endDate);
+    const end = i < livingTimeline.length - 1
+      ? starts[i + 1]
+      : (explicitEnd && explicitEnd > start ? explicitEnd : totalEnd);
+    const addressFromType = stay.addressType
+      ? (allAddresses.find((a: any) => (a.type || "").toLowerCase() === stay.addressType.toLowerCase()) || {})
+      : {};
+    const addressLine = stay.address
+      || [addressFromType.street, addressFromType.city, addressFromType.state, addressFromType.zip].filter(Boolean).join(", ")
+      || (stay.addressType ? `${stay.addressType} address TBD` : "");
+    bands.push({
+      type: stay.type,
+      startDate: start,
+      endDate: end,
+      address: addressLine,
+      color: (BAND_COLORS as any)[stay.type] || "bg-slate-400",
+    });
+  });
+  return bands;
+};
 
 const REPAIR_MAP: Record<string, string> = {
   "Just Cleaning": "cleaning",
