@@ -267,7 +267,7 @@ import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } fro
 import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
 import { downloadOrderIcs } from './utils/icsExport';
 import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
-import { loadJsonFromStorage, loadMergedRecordFromStorage } from './utils/localStorageState';
+import { loadJsonFromStorage, loadMergedRecordFromStorage, saveJsonToStorage } from './utils/localStorageState';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 import {
   DURATION_DAYS, BAND_COLORS, DELIVERY_COLORS, STAY_TYPE_COLORS,
@@ -4519,13 +4519,13 @@ export default function App(){
     } catch { return DEFAULT_CONTACTS; }
   });
 
-  useEffect(()=>{ localStorage.setItem("companies-registry",JSON.stringify(companies)); },[companies]);
-  useEffect(()=>{ localStorage.setItem("contacts-registry",JSON.stringify(contacts)); },[contacts]);
-  useEffect(()=>{ localStorage.setItem("same-day-scope-v52", JSON.stringify(data)); },[data]);
-  useEffect(()=>{ localStorage.setItem("noe-field-config-v1", JSON.stringify(fieldConfig)); },[fieldConfig]);
-  useEffect(()=>{ localStorage.setItem("noe-blocker-rules-v1", JSON.stringify(blockerRules)); },[blockerRules]);
-  useEffect(()=>{ localStorage.setItem("noe-interview-actions-v1", JSON.stringify(interviewActions)); },[interviewActions]);
-  useEffect(()=>{ localStorage.setItem("sample-contacts", JSON.stringify(sampleContacts)); },[sampleContacts]);
+  useEffect(() => saveJsonToStorage("companies-registry", companies), [companies]);
+  useEffect(() => saveJsonToStorage("contacts-registry", contacts), [contacts]);
+  useEffect(() => saveJsonToStorage("same-day-scope-v52", data), [data]);
+  useEffect(() => saveJsonToStorage("noe-field-config-v1", fieldConfig), [fieldConfig]);
+  useEffect(() => saveJsonToStorage("noe-blocker-rules-v1", blockerRules), [blockerRules]);
+  useEffect(() => saveJsonToStorage("noe-interview-actions-v1", interviewActions), [interviewActions]);
+  useEffect(() => saveJsonToStorage("sample-contacts", sampleContacts), [sampleContacts]);
   const [householdEditOpen, setHouseholdEditOpen] = useState(false);
 
   useEffect(() => {
@@ -12306,7 +12306,7 @@ export default function App(){
                       const targets = (data as any)._loadTargets || DEFAULT_LOAD_TARGETS;
                       const next = [...targets, { id: `lt_${Date.now()}`, label: "New Item", category: "Equipment", triggers: [] }];
                       setData(p => ({ ...p, _loadTargets: next }));
-                      try { localStorage.setItem("noe.loadTargets", JSON.stringify(next)); } catch { /* ignore */ }
+                      saveJsonToStorage("noe.loadTargets", next);
                     }} className="rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] font-bold text-amber-600 hover:bg-amber-50">+ Add Target</button>
                     <button onClick={() => {
                       if (window.confirm("Reset loading list to defaults?")) {
@@ -12322,7 +12322,7 @@ export default function App(){
                     const targets: LoadTarget[] = (data as any)._loadTargets || DEFAULT_LOAD_TARGETS;
                     const saveTargets = (next: LoadTarget[]) => {
                       setData(p => ({ ...p, _loadTargets: next }));
-                      try { localStorage.setItem("noe.loadTargets", JSON.stringify(next)); } catch { /* ignore */ }
+                      saveJsonToStorage("noe.loadTargets", next);
                     };
                     const updateTarget = (id: string, patch: Partial<LoadTarget>) => saveTargets(targets.map(t => t.id === id ? { ...t, ...patch } : t));
                     const removeTarget = (id: string) => saveTargets(targets.filter(t => t.id !== id));

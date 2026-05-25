@@ -4,6 +4,16 @@
 // interviewActions / etc. without each one re-implementing the same
 // try/catch/parse boilerplate.
 
+// saveJsonToStorage — JSON-serialize + write at `key`. Swallows storage
+// errors (quota exceeded, private mode, SSR) — caller treats persistence as
+// best-effort. Mirrors loadJsonFromStorage's SSR-safe pattern.
+export const saveJsonToStorage = (key: string, value: unknown): void => {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch { /* storage unavailable */ }
+};
+
 // loadJsonFromStorage — read a JSON-serialized value at `key`, falling back
 // to `fallback()` on missing, parse error, or any thrown exception. The
 // fallback is a factory so callers don't accidentally share a mutable
