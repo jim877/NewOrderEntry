@@ -302,6 +302,7 @@ import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
 import { getOrderCompanyNames, getOrderContactNames, getEstimateRequesterQuickOptions } from './utils/orderEntities';
 import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
 import { computeSectionAuditStatus } from './utils/auditStatus';
+import { buildOrderNarrative } from './utils/orderNarrative';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6753,123 +6754,7 @@ export default function App(){
   const scopeBridgeSnippet = useMemo(() => buildScopeBridgeSnippet(scopeBridgeState), [scopeBridgeState]);
 
   // --- Live Order Narrative ---
-  const orderNarrative = useMemo(() => {
-    const lines = [];
-    // Loss type
-    if (data.primaryLossType) {
-      let lossLine = `${data.primaryLossType} loss`;
-      const causes = (data.lossDetails?.[data.primaryLossType]?.causes || []);
-      const origins = (data.lossDetails?.[data.primaryLossType]?.origins || []);
-      if (causes.length) lossLine += ` (${causes.join(", ").toLowerCase()})`;
-      if (origins.length) lossLine += ` originating in ${origins.join(", ").toLowerCase()}`;
-      if ((data.secondaryContaminants || []).length) {
-        lossLine += `, with secondary ${(data.secondaryContaminants || []).join(", ").toLowerCase()}`;
-      }
-      lossLine += ".";
-      lines.push({ section: "Loss", text: lossLine });
-    }
-    // Customer
-    const customers = (data.customers || []).filter(c => hasMeaningfulValue(c.first) || hasMeaningfulValue(c.last));
-    customers.forEach((c, i) => {
-      const name = [c.first, c.last].filter(Boolean).join(" ");
-      const details = [c.phone, c.email].filter(Boolean).join(", ");
-      const role = c.isPrimary ? "Customer" : (c.type || "Contact");
-      lines.push({ section: role, text: `${name}${details ? " — " + details : ""}` });
-    });
-    // Address
-    const addrs = (data.addresses || []).filter(a => !a.inactive && hasMeaningfulValue(a.street));
-    addrs.forEach(a => {
-      const label = a.isPrimary ? "Address" : (a.type || "Address");
-      lines.push({ section: label, text: summarizeAddress(a) });
-    });
-    // Source
-    if (data.referrer || data.referringCompany) {
-      lines.push({ section: "Referral", text: [data.referrer, data.referringCompany].filter(Boolean).join(" at ") });
-    }
-    if (data.salesRep) {
-      lines.push({ section: "Sales Rep", text: data.salesRep.split(",")[0] });
-    }
-    // Insurance
-    if (data.insuranceCompany) {
-      let ins = data.insuranceCompany;
-      if (data.insuranceAdjuster) ins += ` — Adjuster: ${data.insuranceAdjuster}`;
-      lines.push({ section: "Insurance", text: ins });
-    }
-    if (data.claimNumber) lines.push({ section: "Claim #", text: data.claimNumber });
-    // Vendors
-    (data.vendors || []).forEach(v => {
-      if (v.company || v.contact) {
-        lines.push({ section: v.type || "Company", text: [v.company, v.contact].filter(Boolean).join(" — ") });
-      }
-    });
-    // Services
-    if ((data.serviceOfferings || []).length) {
-      lines.push({ section: "Services", text: (data.serviceOfferings || []).join(", ") });
-    }
-    // Conditions
-    const conditions = [];
-    if (data.damageWasWet === "Y" || data.damageWasWet === true) conditions.push("still wet");
-    if (data.damageMoldMildew) conditions.push("visible mold");
-    if (data.structuralElectricDamage === "Y") conditions.push("structural damage");
-    if (data.noLights) conditions.push("no electricity");
-    if (data.noHeat) conditions.push("no heat");
-    if (data.boardedUp) conditions.push("boarded up");
-    if (conditions.length) {
-      lines.push({ section: "Conditions", text: conditions.join(", ") + "." });
-    }
-    // Living / Storage
-    if (data.livingStatus) lines.push({ section: "Living", text: data.livingStatus });
-    if (data.storageNeeded === "Y") {
-      lines.push({ section: "Storage", text: `Long-term storage${data.storageMonths ? `, approximately ${data.storageMonths} months` : ""}` });
-    }
-    // Repairs
-    if (data.repairsSummary) lines.push({ section: "Repairs", text: data.repairsSummary });
-    // Packout
-    if ((data.packoutSummary || []).length) {
-      lines.push({ section: "Pack-out", text: (data.packoutSummary || []).join(", ") });
-    }
-    // Considerations
-    const considerations = (data.sdsConsiderations || []).filter(c => c !== "Pets");
-    if (considerations.length) {
-      lines.push({ section: "Considerations", text: considerations.join(", ") });
-    }
-    const petStr = data.householdAnimals || (data.household || []).filter((m: any) => m.category === "pet").map((p: any) => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
-    if (petStr) {
-      lines.push({ section: "Pets", text: petStr });
-    }
-    // Interview details
-    if (data.familyMedicalIssues === "Y") {
-      lines.push({ section: "Medical", text: data.familyMedicalNote || "Medical issues reported" });
-    }
-    if (data.soapFragAllergies === "Y") {
-      lines.push({ section: "Allergies", text: data.soapFragNote || "Soap/fragrance allergies reported" });
-    }
-    if (data.selfCleaning === "Y") {
-      lines.push({ section: "Self-Clean", text: data.selfCleaningNote || "Customer will clean some items themselves" });
-    }
-    if (data.useDryCleaner && data.useDryCleaner !== "No") {
-      lines.push({ section: "Dry Cleaner", text: data.useDryCleaner === "Yes" ? "Uses a dry cleaner" : "Rarely uses dry cleaner" });
-    }
-    if (data.howDryLaundry && data.howDryLaundry !== "Dryer") {
-      lines.push({ section: "Laundry", text: data.howDryLaundry === "Air-Dry" ? "Customer air-dries clothing — do not machine dry" : "Customer prefers low heat drying" });
-    }
-    if (data.processType) {
-      lines.push({ section: "Delivery", text: data.processType });
-    }
-    if ((data.handlingCodes || []).length) {
-      lines.push({ section: "Handling", text: (data.handlingCodes || []).join(", ") });
-    }
-    // Schedule
-    if (data.scheduleType || data.pickupDate) {
-      const parts = [data.scheduleType, data.pickupDate ? formatDateLabel(data.pickupDate) : "", data.pickupTime].filter(Boolean);
-      lines.push({ section: "Scheduled", text: parts.join(" — ") });
-    }
-    if (data.eventAssignee) lines.push({ section: "Assignee", text: data.eventAssignee });
-    // Custom notes
-    const customNotes = stripEventSystemLines(data.eventInstructions || "").trim();
-    if (customNotes) lines.push({ section: "Event Instructions", text: customNotes });
-    return lines;
-  }, [data]);
+  const orderNarrative = useMemo(() => buildOrderNarrative(data), [data]);
 
   const mergedSdsPhotos = useMemo(
     () => mergeSdsPhotos(data.sdsPhotos || [], (data as any).scopePhotos || {}, data.propertyRooms || []),
