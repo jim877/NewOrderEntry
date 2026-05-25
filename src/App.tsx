@@ -145,6 +145,7 @@ import {
   LivingAddressPrompt,
   GroupLinkModal,
   CrmLogModal,
+  PlanOfActionModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14917,112 +14918,35 @@ export default function App(){
       )}
 
       {planModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Plan of Action</h3>
-              <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setPlanModalOpen(false)}>×</button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={newPlanStep}
-                  onChange={e=>setNewPlanStep(e.target.value)}
-                  placeholder="Add a step..."
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPlanStep(); } }}
-                />
-                <Select value={planAssignee} onChange={(e)=>setPlanAssignee(e.target.value)} className="!w-48">
-                  <option value="">Assignee</option>
-                  {[...new Set([data.currentUser, ...SALES_REPS].filter(Boolean))].map(rep => (
-                    <option key={rep} value={rep}>{rep}</option>
-                  ))}
-                </Select>
-                <button onClick={addPlanStep} className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-white hover:bg-sky-500">Add</button>
-              </div>
-              <div className="space-y-2">
-                {planDraftSteps.length === 0 && <div className="text-sm text-slate-500">No steps yet.</div>}
-                {planDraftSteps.map((step, idx) => (
-                  <div
-                    key={step.id}
-                    draggable
-                    onDragStart={() => setPlanDragId(step.id)}
-                    onDragEnd={() => setPlanDragId(null)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => {
-                      if (!planDragId || planDragId === step.id) return;
-                      const fromIdx = planDraftSteps.findIndex(s => s.id === planDragId);
-                      const toIdx = planDraftSteps.findIndex(s => s.id === step.id);
-                      if (fromIdx < 0 || toIdx < 0) return;
-                      const next = [...planDraftSteps];
-                      const [moved] = next.splice(fromIdx, 1);
-                      next.splice(toIdx, 0, moved);
-                      setPlanDraftSteps(next);
-                      setPlanReorderDirty(true);
-                    }}
-                    className={`flex items-center justify-between rounded-lg border px-3 py-2 bg-white ${planDragId === step.id ? 'border-sky-400 ring-2 ring-sky-200' : 'border-slate-200'} ${planDragId && planDragId !== step.id ? 'border-dashed border-sky-200' : ''}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-slate-400 w-5">{idx + 1}.</span>
-                      <button onClick={() => togglePlanStep(step.id)} className={`h-6 w-6 rounded-full border flex items-center justify-center text-xs font-bold ${step.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300 text-slate-400'}`}>{step.done ? '✓' : ''}</button>
-                      {planEditingId === step.id ? (
-                        <Input
-                          value={planEditingText}
-                          onChange={e=>setPlanEditingText(e.target.value)}
-                          className="!py-1.5 !text-sm w-64"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              setData(p => ({ ...p, planSteps: (p.planSteps || []).map(s => s.id === step.id ? { ...s, text: planEditingText } : s) }));
-                              setPlanEditingId(null);
-                            }
-                          }}
-                        />
-                      ) : (
-                        <span className={`text-sm ${step.done ? 'line-through text-slate-400' : 'text-slate-700'}`}>{step.text}</span>
-                      )}
-                      <Select
-                        value={step.assignee || ""}
-                        onChange={(e) => {
-                          const nextAssignee = e.target.value;
-                          setPlanDraftSteps(prev => prev.map(s => s.id === step.id ? { ...s, assignee: nextAssignee } : s));
-                          setData(p => ({ ...p, planSteps: (p.planSteps || []).map(s => s.id === step.id ? { ...s, assignee: nextAssignee } : s) }));
-                        }}
-                        className="!w-40 !py-1.5 !text-xs"
-                      >
-                        <option value="">Assignee</option>
-                        {[...new Set([data.currentUser, ...SALES_REPS].filter(Boolean))].map(rep => (
-                          <option key={rep} value={rep}>{rep}</option>
-                        ))}
-                      </Select>
-                      {step.done && (
-                        <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[8px] font-bold text-slate-600">{getInitials(step.doneBy || "Unknown")}</span>
-                          {step.doneAt ? new Date(step.doneAt).toLocaleString([], { year: "2-digit", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {planEditingId === step.id ? (
-                        <button className="text-slate-500 hover:text-slate-700 text-xs" onClick={() => { setData(p => ({ ...p, planSteps: (p.planSteps || []).map(s => s.id === step.id ? { ...s, text: planEditingText } : s) })); setPlanEditingId(null); }}>Save</button>
-                      ) : (
-                        <button className="text-slate-500 hover:text-slate-700 text-xs" onClick={() => { setPlanEditingId(step.id); setPlanEditingText(step.text); }}>Edit</button>
-                      )}
-                      <button className="text-slate-400 hover:text-red-600" onClick={() => removePlanStep(step.id)}>×</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-slate-50 px-6 py-4 flex items-center justify-between gap-3 border-t border-slate-200">
-              {planReorderDirty ? (
-                <div className="flex gap-2">
-                  <button className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100" onClick={() => { setPlanDraftSteps(data.planSteps || []); setPlanReorderDirty(false); }}>Cancel Reorder</button>
-                  <button className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-bold text-white hover:bg-sky-500" onClick={() => { setData(p => ({ ...p, planSteps: planDraftSteps })); setPlanReorderDirty(false); }}>Confirm Order</button>
-                </div>
-              ) : <span />}
-              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setPlanModalOpen(false)}>Close</button>
-            </div>
-          </div>
-        </div>
+        <PlanOfActionModal
+          steps={planDraftSteps}
+          setSteps={setPlanDraftSteps}
+          currentUser={data.currentUser || ""}
+          salesReps={SALES_REPS}
+          newStep={newPlanStep}
+          setNewStep={setNewPlanStep}
+          newAssignee={planAssignee}
+          setNewAssignee={setPlanAssignee}
+          onAddStep={addPlanStep}
+          onToggleStep={togglePlanStep}
+          onRemoveStep={removePlanStep}
+          editingId={planEditingId}
+          setEditingId={setPlanEditingId}
+          editingText={planEditingText}
+          setEditingText={setPlanEditingText}
+          onCommitEdit={(id, nextText) => setData((p) => ({ ...p, planSteps: (p.planSteps || []).map((s) => s.id === id ? { ...s, text: nextText } : s) }))}
+          onReassign={(id, nextAssignee) => {
+            setPlanDraftSteps((prev) => prev.map((s) => s.id === id ? { ...s, assignee: nextAssignee } : s));
+            setData((p) => ({ ...p, planSteps: (p.planSteps || []).map((s) => s.id === id ? { ...s, assignee: nextAssignee } : s) }));
+          }}
+          dragId={planDragId}
+          setDragId={setPlanDragId}
+          reorderDirty={planReorderDirty}
+          setReorderDirty={setPlanReorderDirty}
+          onCancelReorder={() => { setPlanDraftSteps(data.planSteps || []); setPlanReorderDirty(false); }}
+          onConfirmReorder={() => { setData((p) => ({ ...p, planSteps: planDraftSteps })); setPlanReorderDirty(false); }}
+          onClose={() => setPlanModalOpen(false)}
+        />
       )}
     </React.Fragment>
   );
