@@ -286,6 +286,7 @@ import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, ani
 import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } from './utils/deliveryGroup';
 import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
 import { downloadOrderIcs } from './utils/icsExport';
+import { renderAlertMessageContent, renderAlertDetailContent } from './utils/alertContent';
 import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
 import { loadJsonFromStorage, loadMergedRecordFromStorage, saveJsonToStorage } from './utils/localStorageState';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
@@ -6697,36 +6698,7 @@ export default function App(){
     closeOrderInstructionModal();
     setToast(orderInstructionModal.mode === "edit" ? "Order instruction updated." : "Order instruction added.");
   }, [orderInstructionModal, closeOrderInstructionModal]);
-  const renderAlertMessageContent = useCallback((message = "", title = "") => {
-    const marker = " has saved guidance for this order.";
-    if (
-      message &&
-      marker &&
-      message.endsWith(marker) &&
-      /instructions found|requirements found/i.test(title || "")
-    ) {
-      const entity = message.slice(0, -marker.length).trim();
-      return (
-        <>
-          <span className="font-semibold text-slate-900">{entity}</span>
-          <span>{marker}</span>
-        </>
-      );
-    }
-    return message;
-  }, []);
-  const renderAlertDetailContent = useCallback((detail = "") => {
-    const separatorIndex = (detail || "").indexOf(":");
-    if (separatorIndex === -1) return detail;
-    const label = detail.slice(0, separatorIndex).trim();
-    const text = detail.slice(separatorIndex + 1).trim();
-    return (
-      <>
-        <span className="font-semibold text-slate-900">{label}:</span>
-        {text ? <span>{` ${text}`}</span> : null}
-      </>
-    );
-  }, []);
+  // renderAlertMessageContent, renderAlertDetailContent — imported from ./utils/alertContent
   const toggleOrderInstructionPreset = useCallback((type, text) => {
     const preset = normalizeInstructionEntry({ type, text }, type);
     if (!preset) return;
