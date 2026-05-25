@@ -323,6 +323,7 @@ import {
   dedupeAdditionalCompanyEntries,
   migrateReferringCompanyEntryReducer,
   upsertAdditionalCompanyReducer,
+  applyAdditionalContactChangeReducer,
 } from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { mapAuditMissingToTargets } from './utils/auditTargets';
@@ -7386,25 +7387,7 @@ export default function App(){
 
   const handleAdditionalContactChange = (type, contact) => {
     const suggested = contactCompanyMap.get(normalizeContact(contact));
-    setData(prev => ({
-      ...prev,
-      additionalCompanies: {
-        ...(prev.additionalCompanies || {}),
-        [type]: syncCompanyEntryPlaceholders({
-          ...(prev.additionalCompanies?.[type] || { contact: "", company: "" }),
-          contact,
-          company: (prev.additionalCompanies?.[type]?.company || suggested || ""),
-          contactPlaceholder: hasMeaningfulValue(contact)
-            ? null
-            : (
-                companyTypeRequiresContact(type)
-                  ? (prev.additionalCompanies?.[type]?.contactPlaceholder || createPlaceholderFlag("contact", `${type} contact pending`))
-                  : null
-              )
-        })
-      }
-    }));
-    // roles are handled via chips; no special type handling
+    setData(prev => applyAdditionalContactChangeReducer(prev, type, contact, suggested || ""));
   };
 
   const handleBillingContactChange = (value) => {

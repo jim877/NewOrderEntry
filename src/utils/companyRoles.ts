@@ -43,6 +43,38 @@ export type CompanyRoleAssignment = CompanyRoleDef & {
   contacts: { name: string }[];
 };
 
+// applyAdditionalContactChangeReducer — pure reducer used by
+// handleAdditionalContactChange. Patches the additionalCompanies[type]
+// entry with the new contact + best-guess company (the existing one,
+// or the contactCompanyMap suggestion). Maintains the
+// contactPlaceholder flag for company types that require a contact.
+export const applyAdditionalContactChangeReducer = (
+  prev: any,
+  type: string,
+  contact: string,
+  suggestedCompany: string,
+) => ({
+  ...prev,
+  additionalCompanies: {
+    ...(prev.additionalCompanies || {}),
+    [type]: syncCompanyEntryPlaceholders({
+      ...(prev.additionalCompanies?.[type] || { contact: "", company: "" }),
+      contact,
+      company: prev.additionalCompanies?.[type]?.company || suggestedCompany || "",
+      contactPlaceholder: hasMeaningfulValue(contact)
+        ? null
+        : (
+            companyTypeRequiresContact(type)
+              ? (
+                  prev.additionalCompanies?.[type]?.contactPlaceholder
+                    || createPlaceholderFlag("contact", `${type} contact pending`)
+                )
+              : null
+          ),
+    }),
+  },
+});
+
 // upsertAdditionalCompanyReducer — pure reducer body for the
 // upsertAdditionalCompany flow. Walks the existing additionalCompanies
 // looking for an entry whose company or contact matches the incoming
