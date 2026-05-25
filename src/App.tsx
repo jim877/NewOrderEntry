@@ -330,6 +330,7 @@ import {
   addPlaceholderCompanyTypeReducer,
   addContactToCompanyReducer,
   removeAdditionalCompanyTypeReducer,
+  findMatchingAdditionalCompanyType,
 } from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { mapAuditMissingToTargets } from './utils/auditTargets';
@@ -7114,19 +7115,14 @@ export default function App(){
 
   const addCompanyFromSearch = (type, value) => {
     if (!type) return;
-      const parsed = parseCombinedContact(value);
-      if (parsed.contact && !parsed.company) {
-        setToast("Company required for contact.");
-        return;
-      }
-    const exists = Object.entries(data.additionalCompanies || {}).find(([t, entry]) => {
-      const sameCompany = parsed.company && entry?.company && normalizeCompany(entry.company) === normalizeCompany(parsed.company);
-      const sameContact = parsed.contact && entry?.contact && normalizeContact(entry.contact) === normalizeContact(parsed.contact);
-      const sameContactInList = parsed.contact && entryContactList(entry || {}).some(c => normalizeContact(c?.name || "") === normalizeContact(parsed.contact));
-      return sameCompany || sameContact || sameContactInList;
-    });
-    if (exists && exists[0] === type) {
-      triggerAutoFlash(`company-${exists[0]}`);
+    const parsed = parseCombinedContact(value);
+    if (parsed.contact && !parsed.company) {
+      setToast("Company required for contact.");
+      return;
+    }
+    const existingType = findMatchingAdditionalCompanyType(data.additionalCompanies || {}, parsed.company, parsed.contact);
+    if (existingType && existingType === type) {
+      triggerAutoFlash(`company-${existingType}`);
       return;
     }
     const applied = upsertAdditionalCompany(type, { contact: parsed.contact || "", company: parsed.company || "" });
@@ -7148,14 +7144,9 @@ export default function App(){
       setToast("Company required for contact.");
       return;
     }
-    const exists = Object.entries(data.additionalCompanies || {}).find(([t, entry]) => {
-      const sameCompany = company && entry?.company && normalizeCompany(entry.company) === normalizeCompany(company);
-      const sameContact = contact && entry?.contact && normalizeContact(entry.contact) === normalizeContact(contact);
-      const sameContactInList = contact && entryContactList(entry || {}).some(c => normalizeContact(c?.name || "") === normalizeContact(contact));
-      return sameCompany || sameContact || sameContactInList;
-    });
-    if (exists && exists[0] === nextType) {
-      triggerAutoFlash(`company-${exists[0]}`);
+    const existingType = findMatchingAdditionalCompanyType(data.additionalCompanies || {}, company, contact);
+    if (existingType && existingType === nextType) {
+      triggerAutoFlash(`company-${existingType}`);
       return;
     }
     const applied = upsertAdditionalCompany(nextType, { contact: contact || "", company: company || "" });

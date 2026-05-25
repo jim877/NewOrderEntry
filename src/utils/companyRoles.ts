@@ -43,6 +43,28 @@ export type CompanyRoleAssignment = CompanyRoleDef & {
   contacts: { name: string }[];
 };
 
+// findMatchingAdditionalCompanyType — search the additionalCompanies
+// map for an entry that matches the given (company, contact) pair
+// by either company name, single contact, or membership in the
+// contacts list. Returns the type key, or "" when no match.
+// Used by addCompanyFromSearch / addCompanyDirect to detect "this
+// is already on the order" duplicates before opening role prompts.
+export const findMatchingAdditionalCompanyType = (
+  additionalCompanies: Record<string, any> = {},
+  company: string,
+  contact: string,
+): string => {
+  const entry = Object.entries(additionalCompanies).find(([, e]: [string, any]) => {
+    const sameCompany = company && e?.company && normalizeCompany(e.company) === normalizeCompany(company);
+    const sameContact = contact && e?.contact && normalizeContact(e.contact) === normalizeContact(contact);
+    const sameContactInList = contact && entryContactList(e || {}).some(
+      (c: any) => normalizeContact(c?.name || "") === normalizeContact(contact)
+    );
+    return sameCompany || sameContact || sameContactInList;
+  });
+  return entry?.[0] || "";
+};
+
 // addPlaceholderCompanyTypeReducer — pure reducer that adds an
 // empty placeholder entry for the given company type, or a no-op
 // when one already exists. The contactPlaceholder flag is set only
