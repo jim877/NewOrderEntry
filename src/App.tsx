@@ -354,6 +354,7 @@ import {
 } from './utils/bridgeStages';
 import { buildKnownPeople } from './utils/knownPeople';
 import { buildCurrentOrderSpecialDocs, buildCurrentOrderCustomerForms } from './utils/companyDocuments';
+import { computePackoutLoadChanges } from './utils/packoutLoadChanges';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -5591,27 +5592,12 @@ export default function App(){
 
   useEffect(() => {
     const selected = data.packoutSummary || [];
-    const previous = prevPackoutSummaryRef.current || [];
-    const current = new Set(data.loadList || []);
-    const added = [];
-    selected.forEach(item => {
-      (PACKOUT_LOAD_MAP[item] || []).forEach(loadItem => {
-        if (!current.has(loadItem)) {
-          current.add(loadItem);
-          added.push(loadItem);
-        }
-      });
-    });
-    const removedSelections = previous.filter(item => !selected.includes(item));
-    const removeCandidates = [];
-    removedSelections.forEach(item => {
-      (PACKOUT_LOAD_MAP[item] || []).forEach(loadItem => {
-        const stillRequired = selected.some(sel => (PACKOUT_LOAD_MAP[sel] || []).includes(loadItem));
-        if (!stillRequired && current.has(loadItem) && !removeCandidates.includes(loadItem)) {
-          removeCandidates.push(loadItem);
-        }
-      });
-    });
+    const { added, removeCandidates, removedSelections } = computePackoutLoadChanges(
+      selected,
+      prevPackoutSummaryRef.current || [],
+      data.loadList || [],
+      PACKOUT_LOAD_MAP,
+    );
     if (added.length) {
       setData(prev => {
         const next = new Set(prev.loadList || []);
