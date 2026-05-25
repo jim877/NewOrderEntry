@@ -15,6 +15,7 @@
 // useMemo body collapses to a one-line delegation.
 
 import { normalizeCompany, normalizeContact } from "./strings";
+import { hasMeaningfulValue, createPlaceholderFlag } from "./order";
 import {
   syncCompanyEntryPlaceholders,
   entryContactList,
@@ -40,6 +41,90 @@ export type CompanyRoleAssignment = CompanyRoleDef & {
   contactPlaceholder: boolean;
   entry: any;
   contacts: { name: string }[];
+};
+
+// upsertAdditionalCompanyReducer — pure reducer body for the
+// upsertAdditionalCompany flow. Walks the existing additionalCompanies
+// looking for an entry whose company or contact matches the incoming
+// one; if found, that entry's type wins and the rows merge (contacts
+// accumulate, placeholders carry forward). Otherwise the entry slots
+// under `nextType`. When the user is replacing a different-company
+// entry under nextType (existingForType provided), the old contacts
+// are cleared first so the new company gets fresh contact slots.
+export const upsertAdditionalCompanyReducer = (
+  prev: any,
+  nextType: string,
+  entry: any,
+  existingForType: any,
+  incomingCompany: string,
+): { next: any; targetType: string } => {
+  const types = new Set(prev.additionalCompanyTypes || []);
+  const entries = { ...(prev.additionalCompanies || {}) };
+  const incomingEntry = syncCompanyEntryPlaceholders(entry || {});
+  const incomingContacts = entryContactList(incomingEntry);
+  const keyContact = incomingEntry.contact ? normalizeContact(incomingEntry.contact) : "";
+  const keyCompany = incomingEntry.company ? normalizeCompany(incomingEntry.company) : "";
+
+  const existingType = Object.entries(entries).find(([, e]: [string, any]) => {
+    const existingContacts = entryContactList(e || {});
+    const sameContact = keyContact && e?.contact && normalizeContact(e.contact) === keyContact;
+    const sameContactInList = incomingContacts.some((incoming: any) =>
+      existingContacts.some((existing: any) =>
+        normalizeContact(existing?.name || "") === normalizeContact(incoming?.name || "")
+      )
+    );
+    const sameCompany = keyCompany && e?.company && normalizeCompany(e.company) === keyCompany;
+    return sameContact || sameContactInList || sameCompany;
+  })?.[0];
+  const targetType = existingType || nextType;
+
+  // Different-company replacement under nextType — clear old contacts.
+  if (
+    !existingType &&
+    targetType === nextType &&
+    existingForType?.company &&
+    normalizeCompany(existingForType.company) !== normalizeCompany(incomingCompany)
+  ) {
+    entries[targetType] = { ...(entries[targetType] || {}), contacts: [], contact: "" };
+  }
+  if (existingType && existingType !== targetType) {
+    delete entries[existingType];
+    types.delete(existingType);
+  }
+
+  const existingEntry = syncCompanyEntryPlaceholders(entries[targetType] || {});
+  const existingContacts = entryContactList(existingEntry);
+  const mergedContacts = [...existingContacts];
+  incomingContacts.forEach((c: any) => {
+    if (!c?.name) return;
+    if (!mergedContacts.find((x: any) => normalizeContact(x.name) === normalizeContact(c.name))) {
+      mergedContacts.push({ name: c.name, inactive: !!c.inactive, placeholder: c.placeholder || null });
+    }
+  });
+  types.add(targetType);
+  entries[targetType] = syncCompanyEntryPlaceholders({
+    ...(existingEntry || {}),
+    ...incomingEntry,
+    contacts: mergedContacts,
+    contact: mergedContacts.find((c: any) => hasMeaningfulValue(c?.name))?.name
+      || incomingEntry.contact
+      || existingEntry.contact
+      || "",
+    placeholder: hasMeaningfulValue(incomingEntry.company)
+      ? null
+      : (incomingEntry.placeholder || existingEntry.placeholder || null),
+    contactPlaceholder: mergedContacts.some((c: any) => hasMeaningfulValue(c?.name))
+      ? null
+      : (
+          companyTypeRequiresContact(targetType)
+            ? (incomingEntry.contactPlaceholder || existingEntry.contactPlaceholder || createPlaceholderFlag("contact", `${targetType} contact pending`))
+            : null
+        ),
+  });
+  return {
+    next: { ...prev, additionalCompanyTypes: Array.from(types), additionalCompanies: entries },
+    targetType,
+  };
 };
 
 // migrateReferringCompanyEntryReducer — legacy data shape migration.

@@ -322,6 +322,7 @@ import {
   buildCompanyRoleAssignments,
   dedupeAdditionalCompanyEntries,
   migrateReferringCompanyEntryReducer,
+  upsertAdditionalCompanyReducer,
 } from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { mapAuditMissingToTargets } from './utils/auditTargets';
@@ -7345,59 +7346,15 @@ export default function App(){
       );
       if (!ok) return false;
     }
+    let resolvedTargetType = nextType;
     setData(prev => {
-      const types = new Set(prev.additionalCompanyTypes || []);
-      const entries = { ...(prev.additionalCompanies || {}) };
-      const incomingEntry = syncCompanyEntryPlaceholders(entry || {});
-      const incomingContacts = entryContactList(incomingEntry);
-      const keyContact = incomingEntry.contact ? normalizeContact(incomingEntry.contact) : "";
-      const keyCompany = incomingEntry.company ? normalizeCompany(incomingEntry.company) : "";
-      const existingType = Object.entries(entries).find(([t, e]) => {
-        const existingContacts = entryContactList(e || {});
-        const sameContact = keyContact && e?.contact && normalizeContact(e.contact) === keyContact;
-        const sameContactInList = incomingContacts.some(incoming =>
-          existingContacts.some(existing => normalizeContact(existing?.name || "") === normalizeContact(incoming?.name || ""))
-        );
-        const sameCompany = keyCompany && e?.company && normalizeCompany(e.company) === keyCompany;
-        return sameContact || sameContactInList || sameCompany;
-      })?.[0];
-      const targetType = existingType || nextType;
-      // If user confirmed a different-company replacement, clear the old contacts so the new
-      // company gets a fresh contact slot (otherwise the old contact stays attached to the new company).
-      if (!existingType && targetType === nextType && existingForType?.company && normalizeCompany(existingForType.company) !== normalizeCompany(incomingCompany)) {
-        entries[targetType] = { ...(entries[targetType] || {}), contacts: [], contact: "" };
-      }
-      if (existingType && existingType !== targetType) {
-        delete entries[existingType];
-        types.delete(existingType);
-      }
-      const existingEntry = syncCompanyEntryPlaceholders(entries[targetType] || {});
-      const existingContacts = entryContactList(existingEntry);
-      const mergedContacts = [...existingContacts];
-      incomingContacts.forEach(c => {
-        if (!c?.name) return;
-        if (!mergedContacts.find(x => normalizeContact(x.name) === normalizeContact(c.name))) {
-          mergedContacts.push({ name: c.name, inactive: !!c.inactive, placeholder: c.placeholder || null });
-        }
-      });
-      types.add(targetType);
-      entries[targetType] = syncCompanyEntryPlaceholders({
-        ...(existingEntry || {}),
-        ...incomingEntry,
-        contacts: mergedContacts,
-        contact: mergedContacts.find(c => hasMeaningfulValue(c?.name))?.name || incomingEntry.contact || existingEntry.contact || "",
-        placeholder: hasMeaningfulValue(incomingEntry.company) ? null : (incomingEntry.placeholder || existingEntry.placeholder || null),
-        contactPlaceholder: mergedContacts.some(c => hasMeaningfulValue(c?.name))
-          ? null
-          : (
-              companyTypeRequiresContact(targetType)
-                ? (incomingEntry.contactPlaceholder || existingEntry.contactPlaceholder || createPlaceholderFlag("contact", `${targetType} contact pending`))
-                : null
-            )
-      });
-      setCompanyEdit(prev => ({ ...prev, [targetType]: false }));
-      return { ...prev, additionalCompanyTypes: Array.from(types), additionalCompanies: entries };
+      const { next, targetType } = upsertAdditionalCompanyReducer(
+        prev, nextType, entry, existingForType, incomingCompany
+      );
+      resolvedTargetType = targetType;
+      return next;
     });
+    setCompanyEdit(prev => ({ ...prev, [resolvedTargetType]: false }));
     return true;
   };
 
