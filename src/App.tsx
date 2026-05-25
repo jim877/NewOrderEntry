@@ -149,6 +149,7 @@ import {
   WelcomeMessageModal,
   SdsQuestionnaireModal,
   GlobalDirectoryModal,
+  ConfirmAppointmentModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14423,97 +14424,30 @@ export default function App(){
       )}
 
       {confirmDetails && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
-              <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-                  <div className="bg-sky-500 px-6 py-4 flex items-center justify-between">
-                      <div>
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="text-xl">📅</span> Confirm Appointment</h3>
-                        <div className="text-sm text-sky-100 mt-1">Review details before sending confirmation.</div>
-                      </div>
-                      <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setConfirmDetails(null)}>×</button>
-                  </div>
-                  <div className="p-6 space-y-5">
-                    {(() => {
-                      const missing = [];
-                      if (!data.pickupDate) missing.push("Date");
-                      if (!data.pickupTime || data.pickupTime === "12:00 AM") missing.push("Start Time");
-                      if (!data.eventVehicle) missing.push("Vehicle");
-                      if (!data.eventAssignee) missing.push("Assignee");
-                      if (!confirmDetails.address) missing.push("Address");
-                      return missing.length ? (
-                        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">
-                          <div className="font-bold mb-1">Missing Information:</div>
-                          <ul className="space-y-1">
-                            {missing.map(item => (
-                              <li key={item} className="flex items-center gap-2">
-                                <span className="text-orange-600">⚠️</span>
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-orange-700">
-                            <input type="checkbox" checked={confirmMissingOk} onChange={(e)=>setConfirmMissingOk(e.target.checked)} />
-                            Proceed without this information
-                          </label>
-                        </div>
-                      ) : null;
-                    })()}
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-bold text-slate-500">Context</div>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmContextOpen(v => !v)}
-                    className="text-[10px] font-bold text-sky-600 hover:text-sky-700"
-                  >
-                    {confirmContextOpen ? "Hide" : "Show"}
-                  </button>
-                </div>
-                {confirmContextOpen && (
-                  <div className="mt-2 text-xs text-slate-600 space-y-1">
-                    <div><span className="font-semibold">Primary Customer:</span> {(data.customers?.[0]?.first || "")} {(data.customers?.[0]?.last || "")}</div>
-                    <div><span className="font-semibold">Referring Company:</span> {data.referringCompany || "—"}</div>
-                    <div><span className="font-semibold">Referrer:</span> {data.referrer || "—"}</div>
-                    <div><span className="font-semibold">Insurance Company:</span> {data.insuranceCompany || "—"}</div>
-                    <div><span className="font-semibold">Adjuster:</span> {data.insuranceAdjuster || "—"}</div>
-                    <div><span className="font-semibold">Assignee:</span> {data.eventAssignee || "—"}</div>
-                    <div><span className="font-semibold">Vehicle:</span> {data.eventVehicle || "—"}</div>
-                    <div><span className="font-semibold">Additional Companies:</span> {Object.entries(data.additionalCompanies || {}).map(([t, v]) => v?.company || v?.contact ? `${t}: ${v.company || "—"} (${v.contact || "—"})` : null).filter(Boolean).join(" • ") || "—"}</div>
-                  </div>
-                )}
-              </div>
-                          <div className="grid grid-cols-2 gap-4">
-                              <div><label className="text-xs font-bold text-slate-400 uppercase">Type</label><div className="font-medium">{confirmDetails.type}</div></div>
-                              <div><label className="text-xs font-bold text-slate-400 uppercase">Date & Time</label><div className="font-medium">{confirmDetails.date} @ {confirmDetails.time}</div></div>
-                          </div>
-                          <div><label className="text-xs font-bold text-slate-400 uppercase">Address</label><div className="font-medium">{confirmDetails.address || "No Primary Address Set"}</div></div>
-                          {!data.eventFirm && (
-                            <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">
-                              This event is not firm. {data.pickupTimeTentative ? "Confirming will send a tentative appointment." : "Mark as firm or confirm a tentative appointment to proceed."}
-                              {data.pickupTimeTentative && (
-                                <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-orange-700">
-                                  <input type="checkbox" checked={confirmTentativeOk} onChange={(e)=>setConfirmTentativeOk(e.target.checked)} />
-                                  I want to confirm a tentative appointment
-                                </label>
-                              )}
-                            </div>
-                          )}
-                          <div className="flex flex-wrap gap-2">
-                            <button onClick={downloadIcs} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:border-sky-300 hover:text-sky-700">📅 Add to Calendar</button>
-                          </div>
-                  </div>
-                  <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
-                      <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setConfirmDetails(null)}>Cancel</button>
-                      <button
-                        className={`rounded-lg px-6 py-2 text-sm font-bold text-white shadow ${((!data.eventFirm && (!data.pickupTimeTentative || !confirmTentativeOk)) || (!confirmMissingOk && (( !data.eventVehicle) || (!data.eventAssignee) || (!confirmDetails.address)))) ? "bg-slate-300 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"}`}
-                        disabled={(!data.eventFirm && (!data.pickupTimeTentative || !confirmTentativeOk)) || (!confirmMissingOk && (( !data.eventVehicle) || (!data.eventAssignee) || (!confirmDetails.address)))}
-                        onClick={() => { setToast("Appointment Confirmed & Sent!"); setConfirmDetails(null); }}
-                      >
-                        Send Confirmation
-                      </button>
-                  </div>
-              </div>
-          </div>
+        <ConfirmAppointmentModal
+          details={confirmDetails}
+          pickupDate={data.pickupDate}
+          pickupTime={data.pickupTime}
+          eventVehicle={data.eventVehicle}
+          eventAssignee={data.eventAssignee}
+          eventFirm={!!data.eventFirm}
+          pickupTimeTentative={!!data.pickupTimeTentative}
+          primaryCustomer={data.customers?.[0] || {}}
+          referringCompany={data.referringCompany}
+          referrer={data.referrer}
+          insuranceCompany={data.insuranceCompany}
+          insuranceAdjuster={data.insuranceAdjuster}
+          additionalCompanies={data.additionalCompanies || {}}
+          contextOpen={confirmContextOpen}
+          setContextOpen={setConfirmContextOpen}
+          missingOk={confirmMissingOk}
+          setMissingOk={setConfirmMissingOk}
+          tentativeOk={confirmTentativeOk}
+          setTentativeOk={setConfirmTentativeOk}
+          onAddToCalendar={downloadIcs}
+          onConfirm={() => { setToast("Appointment Confirmed & Sent!"); setConfirmDetails(null); }}
+          onClose={() => setConfirmDetails(null)}
+        />
       )}
 
       {livingAddressPrompt.open && !interviewPanelOpen && (
