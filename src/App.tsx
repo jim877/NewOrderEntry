@@ -298,7 +298,7 @@ import { loadTargetsFromStorage, matchLoadTargets, SMART_TRIGGER_LABELS, shouldR
 import { relevantScopeInstructionTypes } from './utils/serviceMapping';
 import { interviewAnswersFromOrderData, orderUpdatesFromInterviewAnswers } from './utils/interviewMapping';
 import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
-import { buildFullExportLines, copyLinesToClipboard, downloadLinesAsFile } from './utils/dataExport';
+import { buildFullExportLines, copyLinesToClipboard, downloadLinesAsFile, buildSaveSummaryLines } from './utils/dataExport';
 import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, animateNavigationFocus, focusSearchLabel } from './utils/domNav';
 import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } from './utils/deliveryGroup';
 import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
@@ -6090,58 +6090,7 @@ export default function App(){
     setData(p=>({...p,addresses:p.addresses.filter(a=>a.id!==id)}));
   }, []);
 
-  const buildSaveSummary = () => {
-    const lines = [];
-    const push = (label, value) => {
-      if (value === undefined || value === null || value === "") return;
-      if (Array.isArray(value) && value.length === 0) return;
-      lines.push(`${label}: ${Array.isArray(value) ? value.join(", ") : value}`);
-    };
-    push("Record Type", data.isLead === true ? "Lead" : data.isLead === false ? "Order" : "");
-    push("Order Status", data.orderStatus);
-    push("Project Type", projectTypeFromOrderTypes(data.orderTypes || []));
-    push("Order Name", data.orderName);
-    push("Order Type", data.orderTypes);
-    push("Service Offerings", data.serviceOfferings);
-    if (data.leadSourceCategory) {
-      push("Lead Source", data.leadSourceCategory);
-      push("Lead Source Detail", data.leadSourceDetail);
-      push("Referring Company", data.referringCompany);
-      push("Referrer", data.referrer);
-    }
-    if ((data.customers || []).length) {
-      (data.customers || []).forEach((c, idx) => {
-        const name = [c.first, c.last].filter(Boolean).join(" ").trim();
-        if (name) push(`Customer ${idx + 1}`, name);
-        if (c.phone) push(`Customer ${idx + 1} Phone`, c.phone);
-        if (c.email) push(`Customer ${idx + 1} Email`, c.email);
-      });
-    }
-    if ((data.addresses || []).length) {
-      (data.addresses || []).forEach((a, idx) => {
-        const addr = [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ");
-        if (addr) push(`Address ${idx + 1}`, addr);
-      });
-    }
-    push("Bill To", data.billingPayer);
-    push("Billing Company", data.billingCompany);
-    push("Billing Contact", data.billingContact);
-    push("Order Instructions", normalizeInstructionEntries(data.orderInstructions || []).map((entry) => `${entry.type}: ${entry.text}`).join(" | "));
-    push("Insurance Claim", data.insuranceClaim);
-    push("Insurance Company", data.insuranceCompany);
-    push("National Carrier", data.nationalCarrier);
-    push("Adjuster", data.insuranceAdjuster);
-    push("Claim #", data.claimNumber);
-    push("Policy #", data.policyNumber);
-    push("Work Order #", data.workOrderNumber);
-    push("Order Specific Email", data.insuranceOrderEmail);
-    push("Contents Limit", data.contentsCoverageLimit);
-    push("Mold Limit", data.moldLimit);
-    push("Schedule Type", data.scheduleType);
-    push("Schedule Date", data.pickupDate);
-    push("Schedule Time", data.pickupTime);
-    return lines;
-  };
+  const buildSaveSummary = () => buildSaveSummaryLines(data);
 
   // copyLines — thin wrapper around copyLinesToClipboard that also toasts on success.
   const copyLines = async (lines: string[]) => {
