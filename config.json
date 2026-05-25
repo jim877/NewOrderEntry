@@ -389,6 +389,12 @@
       { "id": "Moving",   "desc": "Relocating permanently" }
     ],
     "interviewDurationOptions": ["A few days", "1-2 weeks", "1 month", "2-3 months", "6+ months", "Until repairs done"],
+    "outboundActions": [
+      { "key": "sendNewOrderText", "label": "Send New Order Text",          "desc": "Notify team of the new order",            "icon": "📱" },
+      { "key": "sendWelcomeText",  "label": "Send Welcome Text / Email",    "desc": "Customer welcome with order details",     "icon": "👋" },
+      { "key": "sendRushGuide",    "label": "Send Rush Guide & Timeline",   "desc": "Delivery timeline to customer",           "icon": "📋" },
+      { "key": "sendConfirmation", "label": "Send Appointment Confirmation","desc": "Confirm scheduled event details",         "icon": "✅" }
+    ],
     "scopeHandlingCodes": [
       { "code": "Box",   "desc": "Return items in boxes" },
       { "code": "Damp",  "desc": "Tag within 5 days" },

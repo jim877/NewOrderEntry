@@ -196,6 +196,7 @@ import {
   SCOPE_HANDLING_CODES as HANDLING_CODES_SCOPE,
   SCOPE_DEPTH_LEVELS as DEPTH_LEVELS,
   INTERVIEW_PACKOUT_SCOPES, INTERVIEW_STAY_TYPES, INTERVIEW_DURATION_OPTIONS,
+  OUTBOUND_ACTIONS,
 } from './config';
 import {
   getInstructionTypeTextKey,
@@ -14128,12 +14129,7 @@ export default function App(){
                     if (data.eventCustomerContacted) autoQueued["sendConfirmation"] = "Customer was marked as contacted";
                     if (data.pickupDate) autoQueued["sendConfirmation"] = "Appointment scheduled";
                     const dismissed = (data as any).dismissedOutbound || [];
-                    return [
-                      { key: "sendNewOrderText", label: "Send New Order Text", desc: "Notify team of the new order", icon: "📱" },
-                      { key: "sendWelcomeText", label: "Send Welcome Text / Email", desc: "Customer welcome with order details", icon: "👋" },
-                      { key: "sendRushGuide", label: "Send Rush Guide & Timeline", desc: "Delivery timeline to customer", icon: "📋" },
-                      { key: "sendConfirmation", label: "Send Appointment Confirmation", desc: "Confirm scheduled event details", icon: "✅" },
-                    ].map(action => {
+                    return OUTBOUND_ACTIONS.map(action => {
                       const isQueued = (data.queuedOutbound || []).includes(action.key);
                       const isDismissed = dismissed.includes(action.key);
                       const wasAutoQueued = !isDismissed && autoQueued[action.key];
