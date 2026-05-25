@@ -313,6 +313,12 @@ import {
   buildGlobalDirectoryByCompany,
   orderCompanyRoles,
 } from './utils/companyDirectory';
+import {
+  normalizeCompanyType,
+  resolveCompanyTypeForRoles,
+  getCompanyRoleCapabilities as getCompanyRoleCapabilitiesFor,
+  isRoleEligibleForCompany as isRoleEligibleForCompanyFor,
+} from './utils/roleEligibility';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6995,46 +7001,32 @@ export default function App(){
     return { contact: v, company: "" };
   };
 
-  const normalizeCompanyType = useCallback((type) => (type || "").toString().trim().toLowerCase(), []);
+  // Role-eligibility helpers — see utils/roleEligibility.
+  const getCompanyTypeForRoles = useCallback(
+    (companyName = "") => resolveCompanyTypeForRoles(companyName, data, sampleContacts, autoTypeForCompany),
+    [data.additionalCompanies, sampleContacts]
+  );
 
-  const getCompanyTypeForRoles = useCallback((companyName = "") => {
-    if (!companyName) return "";
-    const fromAdditional = Object.entries(data.additionalCompanies || {}).find(([, entry]) =>
-      normalizeCompany(entry?.company || "") === normalizeCompany(companyName)
-    );
-    if (fromAdditional?.[0]) return fromAdditional[0];
-    const sample = sampleContacts.find(c => normalizeCompany(c.company || "") === normalizeCompany(companyName));
-    if (sample?.companyType) return sample.companyType;
-    return autoTypeForCompany(companyName);
-  }, [data.additionalCompanies, sampleContacts]);
+  const getCompanyRoleCapabilities = useCallback(
+    (companyName = "", typeOverride = "") =>
+      getCompanyRoleCapabilitiesFor(companyName, typeOverride, data, sampleContacts, autoTypeForCompany),
+    [data.additionalCompanies, sampleContacts]
+  );
 
-  const getCompanyRoleCapabilities = useCallback((companyName = "", typeOverride = "") => {
-    const defaultCaps = inferRoleCapabilities(typeOverride || getCompanyTypeForRoles(companyName), companyName);
-    if (!companyName) return defaultCaps;
-    const normalizedCompany = normalizeCompany(companyName);
-    const sample = sampleContacts.find(c => normalizeCompany(c.company || "") === normalizedCompany);
-    if (!sample) return defaultCaps;
-    return {
-      canRefer: typeof sample.canRefer === "boolean" ? sample.canRefer : defaultCaps.canRefer,
-      canBill: typeof sample.canBill === "boolean" ? sample.canBill : defaultCaps.canBill,
-      canInsure: typeof sample.canInsure === "boolean" ? sample.canInsure : defaultCaps.canInsure
-    };
-  }, [getCompanyTypeForRoles, sampleContacts]);
-
-  const isRoleEligibleForCompany = useCallback((roleId, companyName, typeOverride = "") => {
-    const capabilities = getCompanyRoleCapabilities(companyName, typeOverride);
-    if (roleId === "referrer") return !!capabilities.canRefer;
-    if (roleId === "billto") return !!capabilities.canBill;
-    if (roleId !== "insurance") return true;
-    if (!capabilities.canInsure) return false;
-    const normalizedType = normalizeCompanyType(typeOverride || getCompanyTypeForRoles(companyName));
-    if (!normalizedType) return true;
-    if (INSURANCE_ELIGIBLE_COMPANY_TYPES.has(normalizedType)) return true;
-    if (normalizedType.includes("contractor")) return false;
-    if (normalizedType.includes("insurance")) return true;
-    const carrierMatch = NATIONAL_CARRIERS.some(c => normalizeCompany(c) === normalizeCompany(companyName || ""));
-    return carrierMatch;
-  }, [getCompanyRoleCapabilities, getCompanyTypeForRoles, normalizeCompanyType]);
+  const isRoleEligibleForCompany = useCallback(
+    (roleId, companyName, typeOverride = "") =>
+      isRoleEligibleForCompanyFor(
+        roleId,
+        companyName,
+        typeOverride,
+        data,
+        sampleContacts,
+        INSURANCE_ELIGIBLE_COMPANY_TYPES,
+        NATIONAL_CARRIERS,
+        autoTypeForCompany,
+      ),
+    [data.additionalCompanies, sampleContacts]
+  );
 
   const getEligibleRoleLabels = useCallback((companyName, typeOverride = "") => {
     return CONTACT_ROLE_BADGES
