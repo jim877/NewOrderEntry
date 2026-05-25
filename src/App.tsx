@@ -267,6 +267,7 @@ import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } fro
 import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
 import { downloadOrderIcs } from './utils/icsExport';
 import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
+import { loadJsonFromStorage, loadMergedRecordFromStorage } from './utils/localStorageState';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 import {
   DURATION_DAYS, BAND_COLORS, DELIVERY_COLORS, STAY_TYPE_COLORS,
@@ -4116,18 +4117,9 @@ export default function App(){
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [testPresets, setTestPresets] = useState(loadTestPresetsFromStorage);
-  const [fieldConfig, setFieldConfig] = useState(() => {
-    try { const s = localStorage.getItem("noe-field-config-v1"); if (!s) return { ...DEFAULT_FIELD_CONFIG }; const saved = JSON.parse(s); const merged = { ...DEFAULT_FIELD_CONFIG }; Object.keys(merged).forEach(k => { if (saved[k]) merged[k] = { ...merged[k], ...saved[k] }; }); return merged; }
-    catch { return { ...DEFAULT_FIELD_CONFIG }; }
-  });
-  const [blockerRules, setBlockerRules] = useState(() => {
-    try { const s = localStorage.getItem("noe-blocker-rules-v1"); return s ? JSON.parse(s) : [...DEFAULT_BLOCKER_RULES]; }
-    catch { return [...DEFAULT_BLOCKER_RULES]; }
-  });
-  const [interviewActions, setInterviewActions] = useState(() => {
-    try { const s = localStorage.getItem("noe-interview-actions-v1"); if (!s) return { ...DEFAULT_INTERVIEW_ACTIONS }; const saved = JSON.parse(s); const merged = { ...DEFAULT_INTERVIEW_ACTIONS }; Object.keys(merged).forEach(k => { if (saved[k]) merged[k] = { ...merged[k], ...saved[k] }; }); return merged; }
-    catch { return { ...DEFAULT_INTERVIEW_ACTIONS }; }
-  });
+  const [fieldConfig, setFieldConfig] = useState(() => loadMergedRecordFromStorage("noe-field-config-v1", DEFAULT_FIELD_CONFIG));
+  const [blockerRules, setBlockerRules] = useState(() => loadJsonFromStorage("noe-blocker-rules-v1", () => [...DEFAULT_BLOCKER_RULES]));
+  const [interviewActions, setInterviewActions] = useState(() => loadMergedRecordFromStorage("noe-interview-actions-v1", DEFAULT_INTERVIEW_ACTIONS));
   const [showFieldConfig, setShowFieldConfig] = useState(false);
   const [configSelectedKeys, setConfigSelectedKeys] = useState(new Set());
   const [configSearch, setConfigSearch] = useState("");
