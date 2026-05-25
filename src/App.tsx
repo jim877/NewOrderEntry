@@ -171,6 +171,7 @@ import {
   InterviewQuestionCard,
   CollapseInterviewRow,
   SdsPreviewModal,
+  SaveSummaryModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -7995,75 +7996,39 @@ export default function App(){
       )}
 
       {previewOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden flex flex-col">
-            <div className="bg-sky-500 px-6 py-4 flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="text-xl font-bold text-white">Review & Save</h3>
-                <div className="text-sky-100 text-xs mt-0.5">{orderNarrative.length} details captured{data.orderName ? ` — ${data.orderName}` : ""}</div>
-              </div>
-              <button onClick={() => setPreviewOpen(false)} className="text-white/70 hover:text-white text-lg font-bold">✕</button>
-            </div>
-            <div className="p-6 space-y-4 overflow-y-auto custom-scroll flex-1">
-              <SaveSummaryGates
-                pendingIssues={scopeBridgeState.pendingIssues || []}
-                missing={saveSummaryMissing}
-                missingOpen={saveMissingOpen}
-                setMissingOpen={setSaveMissingOpen}
-              />
-              <SaveSummaryPreview
-                orderNarrative={orderNarrative}
-                saveExportLines={saveExportLines}
-                data={data}
-                previewView={previewView as any}
-                setPreviewView={setPreviewView}
-              />
-              <SaveSummaryActions
-                onCopyNlt={() => {
-                  const nlt = (data.orderName ? `NLT: ${data.orderName}\n\n` : "") + orderNarrative.map((l) => `${l.section}: ${l.text}`).join("\n");
-                  copyLines(nlt.split("\n"));
-                }}
-                onCopyNarrative={() => {
-                  const prose = buildNarrativeProse(orderNarrative, data).join("\n\n");
-                  copyLines(prose.split("\n"));
-                }}
-                onDownloadSummary={() => downloadLinesAsFile(saveSummaryLines, "order-summary.txt")}
-                onSendToEventInstructions={() => {
-                  const narrative = orderNarrative.map((l) => `${l.section}: ${l.text}`).join("\n");
-                  const existing = stripEventSystemLines(data.eventInstructions || "").trim();
-                  const combined = existing ? `${existing}\n\n--- Order Summary ---\n${narrative}` : `--- Order Summary ---\n${narrative}`;
-                  update("eventInstructions", composeEventInstructions(combined, data, conditionSummary));
-                  setToast("Narrative added to Event Instructions");
-                }}
-              />
-              <OutboundActionsPanel
-                customers={data.customers || []}
-                eventCustomerContacted={data.eventCustomerContacted}
-                pickupDate={data.pickupDate}
-                queuedOutbound={data.queuedOutbound || []}
-                dismissedOutbound={(data as any).dismissedOutbound || []}
-                setQueuedOutbound={(next) => update("queuedOutbound", next)}
-                setDismissedOutbound={(next) => update("dismissedOutbound", next)}
-              />
-            </div>
-            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 shrink-0">
-              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setPreviewOpen(false)}>Close</button>
-              <button
-                className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
-                onClick={() => { setPreviewOpen(false); validateGenerateScope(); }}
-              >
-                Save {recordWord}
-              </button>
-              <button
-                className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow hover:bg-violet-700 flex items-center gap-1.5"
-                onClick={() => { setPreviewOpen(false); validateGenerateScope(); setTimeout(() => setShowScope(true), 300); }}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.04l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
-                Save & Scope
-              </button>
-            </div>
-          </div>
-        </div>
+        <SaveSummaryModal
+          data={data}
+          scopeBridgeState={scopeBridgeState}
+          orderNarrative={orderNarrative}
+          saveSummaryMissing={saveSummaryMissing}
+          saveMissingOpen={saveMissingOpen}
+          setMissingOpen={setSaveMissingOpen}
+          saveExportLines={saveExportLines}
+          previewView={previewView}
+          setPreviewView={setPreviewView}
+          recordWord={recordWord}
+          onClose={() => setPreviewOpen(false)}
+          onSave={() => { setPreviewOpen(false); validateGenerateScope(); }}
+          onSaveAndScope={() => { setPreviewOpen(false); validateGenerateScope(); setTimeout(() => setShowScope(true), 300); }}
+          onCopyNlt={() => {
+            const nlt = (data.orderName ? `NLT: ${data.orderName}\n\n` : "") + orderNarrative.map((l) => `${l.section}: ${l.text}`).join("\n");
+            copyLines(nlt.split("\n"));
+          }}
+          onCopyNarrative={() => {
+            const prose = buildNarrativeProse(orderNarrative, data).join("\n\n");
+            copyLines(prose.split("\n"));
+          }}
+          onDownloadSummary={() => downloadLinesAsFile(saveSummaryLines, "order-summary.txt")}
+          onSendToEventInstructions={() => {
+            const narrative = orderNarrative.map((l) => `${l.section}: ${l.text}`).join("\n");
+            const existing = stripEventSystemLines(data.eventInstructions || "").trim();
+            const combined = existing ? `${existing}\n\n--- Order Summary ---\n${narrative}` : `--- Order Summary ---\n${narrative}`;
+            update("eventInstructions", composeEventInstructions(combined, data, conditionSummary));
+            setToast("Narrative added to Event Instructions");
+          }}
+          setQueuedOutbound={(next) => update("queuedOutbound", next)}
+          setDismissedOutbound={(next) => update("dismissedOutbound", next)}
+        />
       )}
       
       {modal.type && (
