@@ -174,6 +174,7 @@ import {
   toggleNonRestorationPrimarySelection,
   toggleRestorationTypeSelection,
   selectNonRestorationSubtypeSelection,
+  computeOrderTypeNormalizationPatch,
 } from './utils/orderType';
 import {
   INSURANCE_COMPANY_SHORTCUTS,
@@ -7620,24 +7621,7 @@ export default function App(){
 
   useEffect(() => {
     setData((prev) => {
-      const currentTypes = prev.orderTypes || [];
-      const nextTypes = normalizeOrderTypes(currentTypes);
-      const nextProjectType = projectTypeFromOrderTypes(nextTypes);
-      const patch = {};
-
-      if (!stringListMatches(nextTypes, currentTypes)) patch.orderTypes = nextTypes;
-      if ((prev.restorationType || "") !== nextProjectType) patch.restorationType = nextProjectType;
-
-      if (nextProjectType === "Non-Restoration Project") {
-        patch.involvesInsurance = "No";
-        patch.payorQuick = prev.payorQuick === "Insurance" ? "" : prev.payorQuick;
-        patch.insuranceClaim = "No";
-        patch.insuranceCompany = "";
-        patch.insuranceAdjuster = "";
-        patch.claimNumber = "";
-        patch.dateOfLoss = "";
-      }
-
+      const patch = computeOrderTypeNormalizationPatch(prev);
       if (!Object.keys(patch).length) return prev;
       return { ...prev, ...patch };
     });

@@ -4,6 +4,7 @@
 // "Commercial Cleaning"; Restoration is an arbitrary subset of LOSS_TYPES (Fire/Water/...).
 
 import { LOSS_TYPES, NON_RESTORATION_PRIMARY, NON_RESTORATION_SUBTYPES } from "../config";
+import { stringListMatches } from "./strings";
 
 export const getNonRestorationSubtype = (orderTypes: string[] = []) =>
   NON_RESTORATION_SUBTYPES.find((type) => (orderTypes || []).includes(type)) || "";
@@ -57,4 +58,31 @@ export const toggleRestorationTypeSelection = (orderTypes: string[] = [], type =
 export const selectNonRestorationSubtypeSelection = (orderTypes: string[] = [], subtype = "") => {
   if (!NON_RESTORATION_SUBTYPES.includes(subtype)) return normalizeOrderTypes(orderTypes);
   return [NON_RESTORATION_PRIMARY, subtype];
+};
+
+// computeOrderTypeNormalizationPatch — pure reducer for the
+// "normalize order types + cascade non-restoration cleanup" useEffect.
+// Returns the diff to apply (empty -> no change). When the resolved
+// project type flips to Non-Restoration, clears insurance fields that
+// no longer apply.
+export const computeOrderTypeNormalizationPatch = (prev: any) => {
+  const currentTypes = prev.orderTypes || [];
+  const nextTypes = normalizeOrderTypes(currentTypes);
+  const nextProjectType = projectTypeFromOrderTypes(nextTypes);
+  const patch: any = {};
+
+  if (!stringListMatches(nextTypes, currentTypes)) patch.orderTypes = nextTypes;
+  if ((prev.restorationType || "") !== nextProjectType) patch.restorationType = nextProjectType;
+
+  if (nextProjectType === "Non-Restoration Project") {
+    patch.involvesInsurance = "No";
+    patch.payorQuick = prev.payorQuick === "Insurance" ? "" : prev.payorQuick;
+    patch.insuranceClaim = "No";
+    patch.insuranceCompany = "";
+    patch.insuranceAdjuster = "";
+    patch.claimNumber = "";
+    patch.dateOfLoss = "";
+  }
+
+  return patch;
 };

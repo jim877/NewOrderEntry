@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 // Pure derivation of the auto-generated order name. Format:
 // "LastName-CityState" with whitespace stripped. Returns null when
 // neither last name nor city+state are available, so the call site
