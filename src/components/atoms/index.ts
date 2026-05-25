@@ -83,3 +83,4 @@ export { RushGuideGanttTimeline } from "./RushGuideGanttTimeline";
 export { InterviewQuestionCard, CollapseInterviewRow } from "./InterviewQuestionCard";
 export { SdsPreviewModal } from "./SdsPreviewModal";
 export { SaveSummaryModal } from "./SaveSummaryModal";
+export { AddressSection } from "./AddressSection";

@@ -172,6 +172,7 @@ import {
   CollapseInterviewRow,
   SdsPreviewModal,
   SaveSummaryModal,
+  AddressSection,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -4686,38 +4687,26 @@ export default function App(){
                       </div>
                     </Section>
 
-                    <Section id="sec3" noeSection="address" title="3. Address" helpText="Enter the job site + any related locations (temp housing, hotel, alt delivery)." isOpen={openSections.sec3} onHeaderClick={()=>handleToggleSection('sec3')} onCaretClick={()=>handleToggleSection('sec3')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec3") ? "audit-outline" : ""}
-                    >
-                      <div className="space-y-4">
-                        {data.addresses.map((a,i)=><AddressItem key={a.id} addr={a} total={data.addresses.length} updateAddr={updateAddr} onRemove={removeAddr} index={i} highlightMissing={data.highlightMissing} auditOn={auditOn} onVerify={verifyAddressDemo} ToggleMulti={ToggleMulti} rentOrOwn={data.rentOrOwn} rentCoverageLimit={data.rentCoverageLimit} onRentOrOwnChange={(v)=>update("rentOrOwn", v)} onRentCoverageChange={(v)=>update("rentCoverageLimit", v)} forceShowCoords={i===0 ? showPrimaryCoords : false} autoOpenForTypePrompt={pendingAddressTypePromptId === a.id} autoFocusTypePrompt={pendingAddressTypePromptId === a.id} onTypePromptFocused={handleAddressTypePromptFocused} />)}
-                        <div className="pt-2 space-y-2">
-                          <button onClick={addNewAddress} className="w-full rounded-lg border-2 border-dashed border-slate-300 p-3 text-sm font-bold text-slate-500 hover:border-sky-500 hover:text-sky-600 transition-colors">+ Add Another Address</button>
-                          <div className="flex flex-wrap gap-1.5 justify-center">
-                            {["Hotel", "Temporary", "Rental", "Relative", "New Home", "Storage"].map(purpose => (
-                              <button key={purpose} type="button" onClick={() => {
-                                const id = safeUid();
-                                setData(p => ({
-                                  ...p,
-                                  addresses: [...p.addresses, initAddress({
-                                    id,
-                                    isPrimary: false,
-                                    isLossSite: false,
-                                    type: purpose,
-                                    placeholder: createPlaceholderFlag("address", `${purpose} — address needed`),
-                                    name: `${purpose} Address`,
-                                  })]
-                                }));
-                                setToast?.(`${purpose} address placeholder added`);
-                              }} className="rounded-full border border-dashed border-slate-300 px-3 py-1 text-[10px] font-bold text-slate-500 hover:border-sky-400 hover:text-sky-600 hover:bg-sky-50">+ {purpose}</button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                          <button onClick={() => handleToggleSection('sec3')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Done</button>
-                          <button onClick={() => goToNextSection('sec3')} onKeyDown={(e) => handleNextSectionKeyDown(e, 'sec3')} className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-bold text-white hover:bg-sky-500">Next</button>
-                        </div>
-                      </div>
-                    </Section>
+                    <AddressSection
+                      data={data}
+                      isOpen={openSections.sec3}
+                      compact={compactMode}
+                      auditOn={auditOn}
+                      auditOutline={auditOn && auditTargets.sections.has("sec3")}
+                      showPrimaryCoords={showPrimaryCoords}
+                      pendingAddressTypePromptId={pendingAddressTypePromptId}
+                      updateAddr={updateAddr}
+                      removeAddr={removeAddr}
+                      update={update}
+                      setData={setData}
+                      setToast={setToast}
+                      verifyAddressDemo={verifyAddressDemo}
+                      handleAddressTypePromptFocused={handleAddressTypePromptFocused}
+                      addNewAddress={addNewAddress}
+                      handleToggleSection={handleToggleSection}
+                      goToNextSection={goToNextSection}
+                      handleNextSectionKeyDown={handleNextSectionKeyDown}
+                    />
 
                     <Section id="sec4" noeSection="billing" title="4. Billing & Companies" helpText="Who pays + who is involved (billing, insurance, limits/approvals, all companies/contacts)." isOpen={openSections.sec4} onHeaderClick={()=>handleToggleSection('sec4')} onCaretClick={()=>handleToggleSection('sec4')} compact={compactMode} className={auditOn && auditTargets.sections.has("sec4") ? "audit-outline" : ""}
                     >
