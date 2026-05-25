@@ -161,6 +161,7 @@ import {
   FieldConfigToolbar,
   RushGuideFamilyStep,
   RushGuideEventsStep,
+  RushGuideReminders,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -11795,11 +11796,7 @@ export default function App(){
                       );
                     })()}
 
-                    {/* Reminders */}
-                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
-                      <div className="text-xs font-bold text-amber-800 mb-2">Important Reminders</div>
-                      <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">{reminders.map((r,i) => <li key={i}>{r}</li>)}</ul>
-                    </div>
+                    <RushGuideReminders reminders={reminders} />
 
                     {/* (Delivery cards integrated into Gantt timeline below) */}
 
