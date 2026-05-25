@@ -87,6 +87,78 @@ export const resolveOrderPoc = (data: any): OrderPoc | null => {
   return null;
 };
 
+// applyOrderPocReducer — pure reducer that walks customers + vendors
+// and flips isPoc exclusively to the target. Pass null to clear all
+// POC flags. Customer rows hold POC for customer-flagged entries;
+// vendor rows hold POC for vendor-flagged entries.
+export const applyOrderPocReducer = (
+  prev: any,
+  target: { kind: "customer" | "vendor"; id: string } | null,
+) => {
+  const customers = (prev.customers || []).map((c: any) => {
+    const want = target?.kind === "customer" && target.id === c.id;
+    return c.isPoc === want ? c : { ...c, isPoc: want };
+  });
+  const vendors = (prev.vendors || []).map((v: any) => {
+    const want = target?.kind === "vendor" && target.id === v.id;
+    return v.isPoc === want ? v : { ...v, isPoc: want };
+  });
+  return { ...prev, customers, vendors };
+};
+
+// applyContactPocReducer — pure reducer used when the user flags a
+// company/contact pair (e.g. an additional-company contact) as the
+// order POC. Finds the matching vendor row, or appends a new one with
+// the supplied type, then flips isPoc exclusively to that vendor and
+// clears any customer-side isPoc flags.
+export const applyContactPocReducer = (
+  prev: any,
+  companyName: string,
+  contactName: string,
+  contactType: string,
+  newVendorId: string,
+) => {
+  const existingIdx = (prev.vendors || []).findIndex(
+    (v: any) =>
+      normalizeCompany(v.company || "") === normalizeCompany(companyName || "") &&
+      normalizeContact(v.contact || "") === normalizeContact(contactName || "")
+  );
+  let vendors = [...(prev.vendors || [])];
+  let targetId: string;
+  if (existingIdx >= 0) {
+    targetId = vendors[existingIdx].id;
+  } else {
+    targetId = newVendorId;
+    vendors.push({
+      id: targetId,
+      company: companyName || "",
+      contact: contactName || "",
+      type: contactType,
+      isPoc: false,
+    });
+  }
+  vendors = vendors.map((v: any) => {
+    const want = v.id === targetId;
+    return v.isPoc === want ? v : { ...v, isPoc: want };
+  });
+  const customers = (prev.customers || []).map((c: any) => (c.isPoc ? { ...c, isPoc: false } : c));
+  return { ...prev, vendors, customers };
+};
+
+// isPocContact — true when the given company+contact pair matches
+// the resolved orderPoc (compared by normalized company + contact).
+export const isPocContact = (
+  orderPoc: OrderPoc | null,
+  companyName: string,
+  contactName: string,
+): boolean => {
+  if (!orderPoc) return false;
+  return (
+    normalizeCompany(orderPoc.company || "") === normalizeCompany(companyName || "") &&
+    normalizeContact((orderPoc as any).name || "") === normalizeContact(contactName || "")
+  );
+};
+
 // getEstimateRequesterQuickOptions — flat list of "Name (Role)" labels for
 // the Estimate Requester picker. Pulls primary customer + every named role
 // holder on the order, de-duped case-insensitively. Empty names skipped.

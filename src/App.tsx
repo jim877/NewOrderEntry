@@ -301,7 +301,15 @@ import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSum
 import { downloadOrderIcs } from './utils/icsExport';
 import { renderAlertMessageContent, renderAlertDetailContent } from './utils/alertContent';
 import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
-import { getOrderCompanyNames, getOrderContactNames, getEstimateRequesterQuickOptions, resolveOrderPoc } from './utils/orderEntities';
+import {
+  getOrderCompanyNames,
+  getOrderContactNames,
+  getEstimateRequesterQuickOptions,
+  resolveOrderPoc,
+  applyOrderPocReducer,
+  applyContactPocReducer,
+  isPocContact as isPocContactFor,
+} from './utils/orderEntities';
 import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
 import { computeSectionAuditStatus, computeAuditRequiredCount as computeAuditRequiredCountFor } from './utils/auditStatus';
 import { buildOrderNarrative } from './utils/orderNarrative';
@@ -4829,17 +4837,7 @@ export default function App(){
         if (!window.confirm(`POC is presently ${orderPoc.name || "set"}, are you sure you want to change it?`)) return;
       }
     }
-    setData(prev => {
-      const customers = (prev.customers || []).map(c => {
-        const want = target?.kind === "customer" && target.id === c.id;
-        return c.isPoc === want ? c : { ...c, isPoc: want };
-      });
-      const vendors = (prev.vendors || []).map(v => {
-        const want = target?.kind === "vendor" && target.id === v.id;
-        return v.isPoc === want ? v : { ...v, isPoc: want };
-      });
-      return { ...prev, customers, vendors };
-    });
+    setData(prev => applyOrderPocReducer(prev, target));
   }, [orderPoc]);
 
   // flagContactAsPoc — flag a contact from Detailed mode (insurance adjuster, public adjuster,
@@ -4857,35 +4855,11 @@ export default function App(){
         if (!window.confirm(`POC is presently ${orderPoc.name || "set"}, are you sure you want to change it?`)) return;
       }
     }
-    setData(prev => {
-      const existingIdx = (prev.vendors || []).findIndex(v =>
-        normalizeCompany(v.company || "") === normalizeCompany(companyName || "") &&
-        normalizeContact(v.contact || "") === normalizeContact(contactName || "")
-      );
-      let vendors = [...(prev.vendors || [])];
-      let targetId;
-      if (existingIdx >= 0) {
-        targetId = vendors[existingIdx].id;
-      } else {
-        targetId = safeUid();
-        vendors.push({ id: targetId, company: companyName || "", contact: contactName || "", type: contactType, isPoc: false });
-      }
-      vendors = vendors.map(v => {
-        const want = v.id === targetId;
-        return v.isPoc === want ? v : { ...v, isPoc: want };
-      });
-      const customers = (prev.customers || []).map(c => c.isPoc ? { ...c, isPoc: false } : c);
-      return { ...prev, vendors, customers };
-    });
+    setData(prev => applyContactPocReducer(prev, companyName, contactName, contactType, safeUid()));
   }, [setOrderPoc, orderPoc]);
 
-  // isPocContact — true when the given company+contact pair is the active order POC.
-  // Compares by normalized name + company against the resolved orderPoc.
-  const isPocContact = (companyName, contactName) => {
-    if (!orderPoc) return false;
-    return normalizeCompany(orderPoc.company || "") === normalizeCompany(companyName || "") &&
-           normalizeContact(orderPoc.name || "")    === normalizeContact(contactName || "");
-  };
+  const isPocContact = (companyName, contactName) =>
+    isPocContactFor(orderPoc, companyName, contactName);
 
   useEffect(() => { saveTestPresetsToStorage(testPresets); }, [testPresets]);
 
