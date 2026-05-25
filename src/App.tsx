@@ -159,6 +159,7 @@ import {
   FieldConfigGrid,
   BlockerRulesCard,
   FieldConfigToolbar,
+  RushGuideFamilyStep,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -10996,37 +10997,15 @@ export default function App(){
               <div className="flex-1 overflow-y-auto">
                 <div className="max-w-3xl mx-auto p-6 space-y-6">
 
-                  {/* Step 2: Family */}
-                  {rushGuideStep === 2 && <>
-                    <div><button onClick={() => setRushGuideStep(1)} className="text-xs text-slate-400 hover:text-slate-600 mb-2">← Back</button><h2 className="text-xl font-bold text-slate-900 mb-1">Step 2: Family & Lifestyle</h2></div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[{id:"adults",label:"Adults"},{id:"kids",label:"Children"},{id:"babies",label:"Babies/Toddlers"},{id:"pets",label:"Pets"}].map(t => (
-                        <div key={t.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50">
-                          <span className="text-sm font-bold text-slate-700">{t.label}</span>
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => setRushGuideData(p => ({...p, family: {...family, [t.id]: Math.max(0, family[t.id]-1)}}))} className="w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-600 font-bold text-sm">-</button>
-                            <span className="w-4 text-center font-bold">{family[t.id]}</span>
-                            <button onClick={() => setRushGuideData(p => ({...p, family: {...family, [t.id]: family[t.id]+1}}))} className="w-7 h-7 rounded-full bg-teal-50 border border-teal-200 text-teal-700 font-bold text-sm">+</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Activities & Interests</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {RUSH_INTERESTS.map(i => {
-                          const active = (rushGuideData.interests || []).includes(i.id);
-                          return <button key={i.id} onClick={() => setRushGuideData(p => ({...p, interests: active ? p.interests.filter(x => x !== i.id) : [...(p.interests||[]), i.id]}))} className={`p-3 rounded-xl border text-center ${active ? 'border-teal-500 bg-teal-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                            <div className={`text-xs font-bold ${active ? 'text-teal-800' : 'text-slate-700'}`}>{i.label}</div>
-                            <div className="text-[9px] text-slate-500">{i.desc}</div>
-                          </button>;
-                        })}
-                      </div>
-                    </div>
-                    <div className="flex justify-end pt-4 border-t border-slate-100">
-                      <button onClick={() => setRushGuideStep(3)} className="rounded-xl bg-teal-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-700">Next →</button>
-                    </div>
-                  </>}
+                  {rushGuideStep === 2 && (
+                    <RushGuideFamilyStep
+                      family={family}
+                      interests={rushGuideData.interests || []}
+                      setRushGuideData={setRushGuideData}
+                      onBack={() => setRushGuideStep(1)}
+                      onNext={() => setRushGuideStep(3)}
+                    />
+                  )}
 
                   {/* Step 3: Events */}
                   {rushGuideStep === 3 && <>
