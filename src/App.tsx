@@ -295,6 +295,7 @@ import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
 import { getOrderCompanyNames, getOrderContactNames } from './utils/orderEntities';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
+import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
 import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
 import { loadJsonFromStorage, loadMergedRecordFromStorage, saveJsonToStorage } from './utils/localStorageState';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
@@ -7002,44 +7003,14 @@ export default function App(){
   const mergedSdsCoverPhoto = useMemo(() => {
     return data.sdsCoverPhoto || null;
   }, [data.sdsCoverPhoto]);
-  const bridgeStatusClass = useMemo(() => {
-    if (scopeBridgeState.projectStatus === "green") return "border-emerald-300 bg-emerald-50 text-slate-700";
-    if (scopeBridgeState.projectStatus === "yellow") return "border-amber-300 bg-amber-50 text-slate-700";
-    if (scopeBridgeState.projectStatus === "red") return "border-rose-300 bg-rose-50 text-slate-700";
-    return "border-slate-200 bg-white text-slate-500";
-  }, [scopeBridgeState.projectStatus]);
-  const bridgeSectionClass = useMemo(() => {
-    if (scopeBridgeState.projectStatus === "green") return "border-emerald-300 bg-emerald-50/20 ring-1 ring-emerald-100";
-    if (scopeBridgeState.projectStatus === "yellow") return "border-amber-300 bg-amber-50/20 ring-1 ring-amber-100";
-    if (scopeBridgeState.projectStatus === "red") return "border-rose-300 bg-rose-50/20 ring-1 ring-rose-100";
-    return "";
-  }, [scopeBridgeState.projectStatus]);
-
-  const deriveScopeBridgeStatus = useCallback((bridge) => {
-    if ((bridge?.projectStatus || "") === "red") return "red";
-    const hasPending = (bridge?.pendingIssues || []).length > 0;
-    const processingOption = (bridge?.processingOption || "").toString();
-    const deliveryOption = (bridge?.deliveryOption || "").toString();
-    const nextStep = (bridge?.nextStep || "").toString();
-    const legacyOperationalStep = [
-      "pickup_hold",
-      "processing_hold",
-      "emergency_groups_only",
-      "cod",
-      "delivery_hold",
-      "wait_approval",
-      "wait_test",
-      "delivery_priority",
-      "delivery_hold_cod",
-    ].includes(nextStep);
-    const hasOperationalHold =
-      (bridge?.pickupOption || "") === "wait" ||
-      (bridge?.pickupOption || "") === "urgent" ||
-      ["tag_hold", "urgent", "cod", "specific"].includes(processingOption) ||
-      ["priority", "hold_cod"].includes(deliveryOption) ||
-      legacyOperationalStep;
-    return hasPending || hasOperationalHold ? "yellow" : "green";
-  }, []);
+  const bridgeStatusClassNames = useMemo(
+    () => bridgeStatusClass(scopeBridgeState.projectStatus),
+    [scopeBridgeState.projectStatus],
+  );
+  const bridgeSectionClassNames = useMemo(
+    () => bridgeSectionClass(scopeBridgeState.projectStatus),
+    [scopeBridgeState.projectStatus],
+  );
 
   const patchScopeBridge = useCallback((updater, opts = {}) => {
     const options = opts || {};
@@ -10412,7 +10383,7 @@ export default function App(){
                           </div>
                         )}
                         </SubSection>
-                        <SubSection id="sec5-bridge" title="Scope Update and Blockers" open={scheduleBridgeOpen} onToggle={(nextOpen) => setScheduleBridgeOpen(!!nextOpen)} compact={compactMode} className={bridgeSectionClass}>
+                        <SubSection id="sec5-bridge" title="Scope Update and Blockers" open={scheduleBridgeOpen} onToggle={(nextOpen) => setScheduleBridgeOpen(!!nextOpen)} compact={compactMode} className={bridgeSectionClassNames}>
                           <div className="space-y-4">
                             <div className="flex justify-end gap-2">
                               <button
@@ -10433,7 +10404,7 @@ export default function App(){
                               </button>
                             </div>
 
-                            <div className={`rounded-lg border p-3 space-y-4 ${bridgeStatusClass}`}>
+                            <div className={`rounded-lg border p-3 space-y-4 ${bridgeStatusClassNames}`}>
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
                                   {activeBridgeIssues.length} blocker(s)
