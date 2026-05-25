@@ -141,6 +141,7 @@ import {
   RoleAssignModal,
   QuickAddModal,
   ReminderModal,
+  EditContactModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14996,74 +14997,33 @@ export default function App(){
 
       {/* Edit Contact Modal */}
       {editContactModal?.isOpen && (
-        <div className="fixed inset-0 z-[200] bg-black/40 flex items-center justify-center p-4" onClick={() => setEditContactModal(null)}>
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-800">Edit Contact</h3>
-              <button onClick={() => setEditContactModal(null)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">×</button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase">Name</label>
-                <input value={editContactModal.contactName} onChange={e => setEditContactModal(p => p ? { ...p, contactName: e.target.value } : p)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase">Company</label>
-                <input value={editContactModal.companyName} onChange={e => setEditContactModal(p => p ? { ...p, companyName: e.target.value } : p)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase">Title</label>
-                <input value={editContactModal.contactTitle} onChange={e => setEditContactModal(p => p ? { ...p, contactTitle: e.target.value } : p)} placeholder="e.g. Senior Adjuster" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase">Email</label>
-                  <input value={editContactModal.contactEmail} onChange={e => setEditContactModal(p => p ? { ...p, contactEmail: e.target.value } : p)} placeholder="email@company.com" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase">Phone</label>
-                  <input value={editContactModal.contactPhone} onChange={e => setEditContactModal(p => p ? { ...p, contactPhone: e.target.value } : p)} placeholder="(555) 123-4567" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 mt-1" />
-                </div>
-              </div>
-              {/* Role badges */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase">Roles</label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {["Referrer", "Bill-To", "Adjuster", "Public Adjuster", "Contractor", "Building Mgmt"].map(role => {
-                    const isActive = (() => {
-                      if (role === "Referrer") return data.referrer === editContactModal.contactName || data.referringCompany === editContactModal.companyName;
-                      if (role === "Bill-To") return data.billingCompany === editContactModal.companyName;
-                      if (role === "Adjuster") return data.insuranceAdjuster === editContactModal.contactName;
-                      return false;
-                    })();
-                    return (
-                      <button key={role} onClick={() => {
-                        if (role === "Referrer") { update("referrer", editContactModal.contactName); update("referringCompany", editContactModal.companyName); }
-                        if (role === "Bill-To") { update("billingCompany", editContactModal.companyName); update("billingContact", editContactModal.contactName); }
-                        if (role === "Adjuster") { update("insuranceAdjuster", editContactModal.contactName); update("adjusterCompany", editContactModal.companyName); }
-                      }} className={`rounded-full border-2 px-3 py-1 text-xs font-bold transition-all ${isActive ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>{role}{isActive ? " ✓" : ""}</button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button onClick={() => setEditContactModal(null)} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button onClick={() => {
-                // Save changes — update vendor details
-                const m = editContactModal;
-                const vendorIdx = (data.vendors || []).findIndex((v: any) => v.contact === m.contactName || v.company === m.companyName);
-                if (vendorIdx >= 0) {
-                  const next = [...(data.vendors || [])];
-                  next[vendorIdx] = { ...next[vendorIdx], contact: m.contactName, company: m.companyName };
-                  update("vendors", next);
-                }
-                setEditContactModal(null);
-                setToast?.("Contact updated");
-              }} className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700">Save</button>
-            </div>
-          </div>
-        </div>
+        <EditContactModal
+          state={editContactModal}
+          setState={setEditContactModal}
+          isRoleActive={(role, contact, company) => {
+            if (role === "Referrer") return data.referrer === contact || data.referringCompany === company;
+            if (role === "Bill-To") return data.billingCompany === company;
+            if (role === "Adjuster") return data.insuranceAdjuster === contact;
+            return false;
+          }}
+          onAssignRole={(role, contact, company) => {
+            if (role === "Referrer") { update("referrer", contact); update("referringCompany", company); }
+            if (role === "Bill-To")  { update("billingCompany", company); update("billingContact", contact); }
+            if (role === "Adjuster") { update("insuranceAdjuster", contact); update("adjusterCompany", company); }
+          }}
+          onClose={() => setEditContactModal(null)}
+          onSave={() => {
+            const m = editContactModal;
+            const vendorIdx = (data.vendors || []).findIndex((v: any) => v.contact === m.contactName || v.company === m.companyName);
+            if (vendorIdx >= 0) {
+              const next = [...(data.vendors || [])];
+              next[vendorIdx] = { ...next[vendorIdx], contact: m.contactName, company: m.companyName };
+              update("vendors", next);
+            }
+            setEditContactModal(null);
+            setToast?.("Contact updated");
+          }}
+        />
       )}
 
       {crmModal.isOpen && (
