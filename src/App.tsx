@@ -317,6 +317,7 @@ import {
   computeRushSeasonChanges,
   computeRushHolidayEvents,
 } from './utils/rushGuideTimeline';
+import { buildRushGuideActionPlan } from './utils/rushGuideActionPlan';
 import {
   getOrderCompanyNames,
   getOrderContactNames,
@@ -10963,110 +10964,24 @@ export default function App(){
           const seasonChanges = computeRushSeasonChanges(now, estimatedReturn, interests);
           const holidayEvents = computeRushHolidayEvents(now, estimatedReturn, interests);
 
-          // Generate action plan
-          const rushItems: string[] = [];
-          const shortTermItems: string[] = [];
-          const seasonalWardrobes: {id: string; season: string; date: string; rawDate: Date; items: string[]; events: string[]; assignedGroup: string}[] = [];
-          const eventDeliveries: {id: string; name: string; date: string; items: string[]; address: string}[] = [];
-          const reminders: string[] = [
-            "Remove Valuables: Please remove any valuables or highly personal items from your textiles.",
-            "No Need to Bag: You do not need to photograph, bag, or list any items — we will do that for you!"
-          ];
-
-          if (repairInfo || orderSituation || estimatedReturn) {
-            // Core essentials
-            rushItems.push(`Clothing & undergarments to last ${totalPeople} people a couple of weeks`);
-            rushItems.push("Daily footwear, sneakers, and belts");
-
-            // Living situation
-            if (orderSituation === "hotel" || orderSituation === "temp") rushItems.push("Suitcases, duffel bags, or overnight bags");
-            if (orderSituation === "home") {
-              rushItems.push("Daily household essentials (towels, shower curtains)");
-              shortTermItems.push("Temporary window shades (for privacy)");
-              shortTermItems.push("Throw rugs and daily bedding");
-              reminders.push("Since you are staying home, we will try to work as quietly as possible.");
-            } else if (orderSituation === "hotel") {
-              reminders.push("Hotels provide bedding and towels, so there is no need to rush those items.");
-              rushItems.push("Favorite blankets or pillows for comfort");
-            } else if (orderSituation === "temp") {
-              reminders.push("Most rentals are furnished so you likely will not need full bedding or towels unless preferred.");
-            }
-
-            // Family composition (age-aware)
-            if (babies > 0) { rushItems.push("Strollers, diaper bags, and car seats"); rushItems.push("Crib bedding, baby blankets, and sleep sacks"); }
-            if (kids > 0) { rushItems.push("Favorite comfort toys or stuffed animals"); }
-            if (elderly > 0) { reminders.push("We will be extra careful with fragile or sentimental items for elderly family members. Please set aside any medications, medical devices, or mobility aids that are needed immediately."); }
-            if (petCount > 0) rushItems.push(`Pet beds, leashes, and carrying crates${petNames ? ` (${petNames})` : ""}`);
-
-            // Considerations-driven items
-            if (considerations.includes("Pregnancy")) { rushItems.push("Maternity clothing and comfort items"); reminders.push("All items will be cleaned with baby-safe, hypoallergenic products."); }
-            if (considerations.includes("Premium Brands")) { reminders.push("Your high-end designer pieces will be routed for delicate hand-cleaning."); }
-
-            // Packout items → what's being picked up affects what needs rushing
-            if (packoutItems.includes("Clothing")) rushItems.push("Prioritize your most-needed clothing for the Rush delivery");
-            if (packoutItems.includes("Bedding") && orderSituation === "home") rushItems.push("Temporary bedding while yours is being cleaned");
-            if (packoutItems.includes("Electronics")) rushItems.push("Identify any electronics you need immediately (chargers, laptops)");
-
-            // Conditions-driven urgency
-            if (conditions.wet) reminders.push("URGENT: Wet items are being separated by color and treated immediately with anti-microbial.");
-            if (conditions.mold) reminders.push("Mold-affected items require special handling with PPE — do not disturb.");
-            if (conditions.boarded) reminders.push("Access may be limited — please confirm entry arrangements.");
-
-            // Interests / activities
-            if (interests.includes("school")) rushItems.push("School backpacks, uniforms, and kids sports gear");
-            if (interests.includes("workout")) rushItems.push("Workout clothes, sneakers, and gym equipment");
-            if (interests.includes("work_from_home")) { if (hasRental) shortTermItems.push("Home office supplies, desk accessories, and work materials"); else rushItems.push("Home office supplies, desk accessories, and work materials"); }
-            if (interests.includes("religious")) { if (hasRental) shortTermItems.push("Formal religious attire, prayer items, and head coverings"); else rushItems.push("Formal religious attire, prayer items, and head coverings"); }
-
-            // Season change deliveries — each can be assigned to a group
-            // Default logic: rental exists → deliver to rental. No rental → include in rush (if soon) or keep separate for a hotel LTD
-            const defaultSeasonGroup = (dateMs: number) => {
-              if (hasRental) return "short"; // deliver to rental
-              const daysOut = (dateMs - now.getTime()) / 86400000;
-              if (daysOut < 30) return "rush"; // soon enough to include in rush
-              return "separate"; // will need a separate delivery to hotel
-            };
-            seasonChanges.forEach(sc => {
-              const scId = `season_${sc.name.toLowerCase()}`;
-              const override = (rushGuideData as any).seasonOverrides?.[scId];
-              const assignedGroup = override?.group || defaultSeasonGroup(sc.startDate.getTime());
-              seasonalWardrobes.push({ id: scId, season: sc.name, date: rushFormatDate(sc.startDate), rawDate: sc.startDate, items: sc.items, events: sc.events, assignedGroup });
+          const { rushItems, shortTermItems, seasonalWardrobes, eventDeliveries, reminders } =
+            buildRushGuideActionPlan({
+              household: { babies, kids, elderly, adults, totalPeople, petCount, petNames },
+              orderSituation,
+              hasRental,
+              now,
+              estimatedReturn,
+              repairInfo,
+              considerations,
+              packoutItems,
+              conditions,
+              interests,
+              seasonChanges,
+              holidayEvents,
+              rawEvents: events,
+              seasonOverrides: (rushGuideData as any).seasonOverrides || {},
+              eventOverrides: (rushGuideData as any).eventOverrides || {},
             });
-
-            // Process holiday events as seasonal wardrobes
-            holidayEvents.forEach(he => {
-              const override = (rushGuideData as any).seasonOverrides?.[he.id];
-              const assignedGroup = override?.group || defaultSeasonGroup(he.date.getTime());
-              seasonalWardrobes.push({ id: he.id, season: he.name, date: rushFormatDate(he.date), rawDate: he.date, items: he.items, events: [], assignedGroup });
-            });
-
-            // Merge seasonal items assigned to rush/short into those arrays
-            seasonalWardrobes.forEach(sw => {
-              if (sw.assignedGroup === "rush") rushItems.push(...sw.items.map(i => `[${sw.season}] ${i}`));
-              if (sw.assignedGroup === "short") shortTermItems.push(...sw.items.map(i => `[${sw.season}] ${i}`));
-            });
-
-            // Events from interview data + rush guide overrides
-            events.forEach(evt => {
-              if (!evt.date) return;
-              const eventDate = new Date(evt.date);
-              if (estimatedReturn && eventDate > estimatedReturn) { reminders.push(`Your trip "${evt.name}" falls after repairs are expected to finish.`); return; }
-              const items: string[] = [];
-              if (evt.type === "vacation_beach") { items.push("Swimwear, resort wear, and sandals"); items.push("Beach bags, sunglasses, and sun hats"); items.push("Suitcases and travel luggage"); }
-              else if (evt.type === "vacation_ski") { items.push("Ski gear, thermal layers, heavy coats, and boots"); items.push("Suitcases and travel luggage"); }
-              else if (evt.type === "wedding") { items.push("Suits, formal dresses, dress shoes"); items.push("Ties, jewelry, and formal accessories"); }
-              else if (evt.type === "business") { items.push("Business professional attire and dress shoes"); items.push("Briefcase, garment bags, and carry-on luggage"); }
-              else if (evt.type === "sports") { items.push("Uniforms, cleats, and practice gear"); items.push("Sports equipment bags and gear"); }
-              // Check rush guide overrides for group assignment
-              const override = (rushGuideData as any).eventOverrides?.[evt.id];
-              const assignedGroup = override?.group || "event";
-              const eventAddress = override?.address || "";
-              if (assignedGroup === "rush") { rushItems.push(...items.map(i => `[${evt.name}] ${i}`)); }
-              else if (assignedGroup === "short") { shortTermItems.push(...items.map(i => `[${evt.name}] ${i}`)); }
-              else if (assignedGroup === "rental") { /* shown in rental delivery section */ }
-              else { eventDeliveries.push({ id: evt.id, name: evt.name, date: rushFormatDate(eventDate), items, address: eventAddress }); }
-            });
-          }
 
           return (
             <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") { setRushGuideOpen(false); } }} tabIndex={-1}>
