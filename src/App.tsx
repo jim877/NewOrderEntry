@@ -314,6 +314,8 @@ import {
   computeEstimatedReturn,
   resolveRushDeliveryAddresses,
   computeRushTimelineBands,
+  computeRushSeasonChanges,
+  computeRushHolidayEvents,
 } from './utils/rushGuideTimeline';
 import {
   getOrderCompanyNames,
@@ -10958,32 +10960,8 @@ export default function App(){
             resolveRushDeliveryAddresses(livingTimeline, orderSituation, hotelAddrStr, rentalAddrStr, tempAddrStr, primaryAddrStr);
           const timelineBands = computeRushTimelineBands(livingTimeline, now, estimatedReturn, allAddresses);
 
-          // Compute season change moments during repair window
-          const seasonChanges: {name: string; startDate: Date; items: string[]; events: string[]}[] = [];
-          if (estimatedReturn) {
-            SEASON_DATES.forEach(s => {
-              const changeDate = new Date(now.getFullYear(), s.month, s.day);
-              if (changeDate <= now) changeDate.setFullYear(changeDate.getFullYear() + 1);
-              if (changeDate > now && changeDate <= estimatedReturn) {
-                const enrichedItems = [...s.items];
-                if (s.name === "Summer" && interests.includes("summer_activities")) enrichedItems.push("Pool toys, beach towels, water shoes");
-                if (s.name === "Winter" && interests.includes("winter_sports")) enrichedItems.push("Skiing/snowboarding equipment, snow pants, goggles");
-                if (s.name === "Spring" && interests.includes("graduation")) enrichedItems.push("Cap and gown, formal celebration attire");
-                if (s.name === "Fall" && interests.includes("school")) enrichedItems.push("School backpacks, uniforms, kids sports gear");
-                seasonChanges.push({ name: s.name, startDate: changeDate, items: enrichedItems, events: s.events });
-              }
-            });
-          }
-
-          // Holiday events — computed outside conditional so Gantt can access
-          const holidayEvents: {id: string; name: string; date: Date; items: string[]}[] = [];
-          if (estimatedReturn) {
-            if (interests.includes("halloween")) { const d = new Date(now.getFullYear(), 9, 31); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_halloween", name: "Halloween", date: d, items: ["Costumes and accessories", "Halloween decorations and party supplies"] }); }
-            if (interests.includes("thanksgiving")) { const d = new Date(now.getFullYear(), 10, 27); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_thanksgiving", name: "Thanksgiving", date: d, items: ["Holiday table linens and servingware", "Fall decorations", "Formal holiday clothing"] }); }
-            if (interests.includes("christmas")) { const d = new Date(now.getFullYear(), 11, 25); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_christmas", name: "Christmas / Hanukkah", date: d, items: ["Holiday clothing and formal wear", "Holiday decorations and ornaments", "Gift wrapping supplies", "Stockings and holiday bedding"] }); }
-            if (interests.includes("easter")) { const d = new Date(now.getFullYear(), 3, 5); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_easter", name: "Easter / Passover", date: d, items: ["Spring formal attire", "Holiday table settings", "Children's Easter outfits"] }); }
-            if (interests.includes("graduation")) { const d = new Date(now.getFullYear(), 4, 15); if (d <= now) d.setFullYear(d.getFullYear() + 1); if (d <= estimatedReturn) holidayEvents.push({ id: "holiday_graduation", name: "Graduation", date: d, items: ["Cap and gown", "Formal celebration attire", "Photography outfits"] }); }
-          }
+          const seasonChanges = computeRushSeasonChanges(now, estimatedReturn, interests);
+          const holidayEvents = computeRushHolidayEvents(now, estimatedReturn, interests);
 
           // Generate action plan
           const rushItems: string[] = [];

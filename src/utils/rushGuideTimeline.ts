@@ -125,7 +125,86 @@ export const buildHouseholdComposition = (data: any): HouseholdComposition => {
 
 import { rushAddDays, rushFormatDate, rushGetSeasons, parseLocalDate } from "./dateTime";
 import { RUSH_REPAIR_TIMELINES } from "../config";
-import { DURATION_DAYS, BAND_COLORS } from "./rushGuideVisuals";
+import { DURATION_DAYS, BAND_COLORS, SEASON_DATES } from "./rushGuideVisuals";
+
+export type SeasonChange = {
+  name: string;
+  startDate: Date;
+  items: string[];
+  events: string[];
+};
+
+// computeRushSeasonChanges — walk SEASON_DATES and collect each
+// seasonal transition that falls between `now` and `estimatedReturn`.
+// Each entry's items list is enriched with interest-driven extras
+// (summer_activities -> pool toys, winter_sports -> ski gear, etc.).
+// Returns [] when estimatedReturn is null.
+export const computeRushSeasonChanges = (
+  now: Date,
+  estimatedReturn: Date | null,
+  interests: string[],
+): SeasonChange[] => {
+  if (!estimatedReturn) return [];
+  const out: SeasonChange[] = [];
+  SEASON_DATES.forEach((s: any) => {
+    const changeDate = new Date(now.getFullYear(), s.month, s.day);
+    if (changeDate <= now) changeDate.setFullYear(changeDate.getFullYear() + 1);
+    if (changeDate <= now || changeDate > estimatedReturn) return;
+    const enrichedItems = [...s.items];
+    if (s.name === "Summer" && interests.includes("summer_activities")) enrichedItems.push("Pool toys, beach towels, water shoes");
+    if (s.name === "Winter" && interests.includes("winter_sports")) enrichedItems.push("Skiing/snowboarding equipment, snow pants, goggles");
+    if (s.name === "Spring" && interests.includes("graduation")) enrichedItems.push("Cap and gown, formal celebration attire");
+    if (s.name === "Fall" && interests.includes("school")) enrichedItems.push("School backpacks, uniforms, kids sports gear");
+    out.push({ name: s.name, startDate: changeDate, items: enrichedItems, events: s.events });
+  });
+  return out;
+};
+
+export type HolidayEvent = { id: string; name: string; date: Date; items: string[] };
+
+const HOLIDAY_DEFS: { interestKey: string; id: string; name: string; month: number; day: number; items: string[] }[] = [
+  {
+    interestKey: "halloween", id: "holiday_halloween", name: "Halloween", month: 9, day: 31,
+    items: ["Costumes and accessories", "Halloween decorations and party supplies"],
+  },
+  {
+    interestKey: "thanksgiving", id: "holiday_thanksgiving", name: "Thanksgiving", month: 10, day: 27,
+    items: ["Holiday table linens and servingware", "Fall decorations", "Formal holiday clothing"],
+  },
+  {
+    interestKey: "christmas", id: "holiday_christmas", name: "Christmas / Hanukkah", month: 11, day: 25,
+    items: ["Holiday clothing and formal wear", "Holiday decorations and ornaments", "Gift wrapping supplies", "Stockings and holiday bedding"],
+  },
+  {
+    interestKey: "easter", id: "holiday_easter", name: "Easter / Passover", month: 3, day: 5,
+    items: ["Spring formal attire", "Holiday table settings", "Children's Easter outfits"],
+  },
+  {
+    interestKey: "graduation", id: "holiday_graduation", name: "Graduation", month: 4, day: 15,
+    items: ["Cap and gown", "Formal celebration attire", "Photography outfits"],
+  },
+];
+
+// computeRushHolidayEvents — for each interests-opted holiday whose
+// date falls between now and estimatedReturn, emit the holiday event
+// the Gantt + delivery planner can consume. Years roll forward when
+// the holiday has already passed in the current calendar year.
+export const computeRushHolidayEvents = (
+  now: Date,
+  estimatedReturn: Date | null,
+  interests: string[],
+): HolidayEvent[] => {
+  if (!estimatedReturn) return [];
+  const out: HolidayEvent[] = [];
+  HOLIDAY_DEFS.forEach((h) => {
+    if (!interests.includes(h.interestKey)) return;
+    const d = new Date(now.getFullYear(), h.month, h.day);
+    if (d <= now) d.setFullYear(d.getFullYear() + 1);
+    if (d > estimatedReturn) return;
+    out.push({ id: h.id, name: h.name, date: d, items: h.items });
+  });
+  return out;
+};
 
 // computeEstimatedReturn — resolve the estimated repair-finish date
 // from the order. Priority: explicit estimatedReturnDate > later of
