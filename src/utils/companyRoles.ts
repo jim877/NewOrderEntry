@@ -43,6 +43,71 @@ export type CompanyRoleAssignment = CompanyRoleDef & {
   contacts: { name: string }[];
 };
 
+// addPlaceholderCompanyTypeReducer — pure reducer that adds an
+// empty placeholder entry for the given company type, or a no-op
+// when one already exists. The contactPlaceholder flag is set only
+// for company types that require a contact (companyTypeRequiresContact).
+export const addPlaceholderCompanyTypeReducer = (prev: any, type: string) => {
+  const types = new Set(prev.additionalCompanyTypes || []);
+  types.add(type);
+  const existing = prev.additionalCompanies?.[type];
+  return {
+    ...prev,
+    additionalCompanyTypes: Array.from(types),
+    additionalCompanies: {
+      ...(prev.additionalCompanies || {}),
+      [type]: syncCompanyEntryPlaceholders(
+        existing || {
+          contact: "",
+          company: "",
+          placeholder: createPlaceholderFlag("company", `${type} pending`),
+          contactPlaceholder: companyTypeRequiresContact(type)
+            ? createPlaceholderFlag("contact", `${type} contact pending`)
+            : null,
+        }
+      ),
+    },
+  };
+};
+
+// addContactToCompanyReducer — pure reducer for adding a single
+// contact to the contacts list of an additionalCompanies entry.
+// Returns prev unchanged when the contact already exists (matched by
+// normalized name). Side-effect-free: company name + role flash are
+// handled at the call site.
+export const addContactToCompanyReducer = (
+  prev: any,
+  type: string,
+  contactName: string,
+  companyName: string,
+) => {
+  const entries = { ...(prev.additionalCompanies || {}) };
+  const entry = syncCompanyEntryPlaceholders(entries[type] || { contact: "", company: companyName, contacts: [] });
+  const list = entry.contacts && entry.contacts.length
+    ? entry.contacts
+    : (entry.contact ? [{ name: entry.contact, inactive: false, placeholder: null }] : []);
+  if (list.find((c: any) => normalizeContact(c.name) === normalizeContact(contactName))) return prev;
+  const next = [...list, { name: contactName, inactive: false, placeholder: null }];
+  entries[type] = syncCompanyEntryPlaceholders({
+    ...entry,
+    company: companyName,
+    contacts: next,
+    contact: entry.contact || next[0]?.name || "",
+    contactPlaceholder: null,
+  });
+  return { ...prev, additionalCompanies: entries };
+};
+
+// removeAdditionalCompanyTypeReducer — pure reducer that drops a
+// type from additionalCompanyTypes and removes its entry. Used when
+// the user un-toggles a role that has only a placeholder entry.
+export const removeAdditionalCompanyTypeReducer = (prev: any, type: string) => {
+  const nextTypes = (prev.additionalCompanyTypes || []).filter((t: string) => t !== type);
+  const nextCompanies = { ...(prev.additionalCompanies || {}) };
+  delete nextCompanies[type];
+  return { ...prev, additionalCompanyTypes: nextTypes, additionalCompanies: nextCompanies };
+};
+
 // applyBillingContactChangeReducer — pure reducer for the billing
 // contact picker. Writes contact + best-guess company (resolved or
 // fall through to the existing value). Empty contact clears

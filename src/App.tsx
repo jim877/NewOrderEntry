@@ -327,6 +327,9 @@ import {
   applyBillingContactChangeReducer,
   applyAdjusterContactChangeReducer,
   applyInsuranceCompanyChangeReducer,
+  addPlaceholderCompanyTypeReducer,
+  addContactToCompanyReducer,
+  removeAdditionalCompanyTypeReducer,
 } from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { mapAuditMissingToTargets } from './utils/auditTargets';
@@ -7184,23 +7187,7 @@ export default function App(){
       setToast("This contact belongs to a different company.");
       return;
     }
-    setData(prev => {
-      const entries = { ...(prev.additionalCompanies || {}) };
-      const entry = syncCompanyEntryPlaceholders(entries[type] || { contact: "", company: companyName, contacts: [] });
-      const list = entry.contacts && entry.contacts.length
-        ? entry.contacts
-        : (entry.contact ? [{ name: entry.contact, inactive: false, placeholder: null }] : []);
-      if (list.find(c => normalizeContact(c.name) === normalizeContact(name))) return prev;
-      const next = [...list, { name, inactive: false, placeholder: null }];
-      entries[type] = syncCompanyEntryPlaceholders({
-        ...entry,
-        company: companyName,
-        contacts: next,
-        contact: entry.contact || next[0]?.name || "",
-        contactPlaceholder: null
-      });
-      return { ...prev, additionalCompanies: entries };
-    });
+    setData(prev => addContactToCompanyReducer(prev, type, name, companyName));
     registerContactCompany(name, companyName);
     triggerAutoFlash(`company-${type}`);
     openRoleAssignmentPrompt({
@@ -7229,28 +7216,7 @@ export default function App(){
 
   const addPlaceholderCompanyType = (type) => {
     if (!type) return;
-    setData(prev => {
-      const types = new Set(prev.additionalCompanyTypes || []);
-      types.add(type);
-      const existing = prev.additionalCompanies?.[type];
-      return {
-        ...prev,
-        additionalCompanyTypes: Array.from(types),
-        additionalCompanies: {
-          ...(prev.additionalCompanies || {}),
-          [type]: syncCompanyEntryPlaceholders(
-            existing || {
-              contact: "",
-              company: "",
-              placeholder: createPlaceholderFlag("company", `${type} pending`),
-              contactPlaceholder: companyTypeRequiresContact(type)
-                ? createPlaceholderFlag("contact", `${type} contact pending`)
-                : null
-            }
-          )
-        }
-      };
-    });
+    setData(prev => addPlaceholderCompanyTypeReducer(prev, type));
     setCompanyEdit(prev => ({ ...prev, [type]: true }));
   };
 
@@ -7261,12 +7227,7 @@ export default function App(){
     const hasCompany = !!(sourceCompany || entry?.company);
     if (hasCompany) return;
     if (entry && !entry.company) {
-      setData(prev => {
-        const nextTypes = (prev.additionalCompanyTypes || []).filter(t => t !== role.type);
-        const nextCompanies = { ...(prev.additionalCompanies || {}) };
-        delete nextCompanies[role.type];
-        return { ...prev, additionalCompanyTypes: nextTypes, additionalCompanies: nextCompanies };
-      });
+      setData(prev => removeAdditionalCompanyTypeReducer(prev, role.type));
       return;
     }
     addPlaceholderCompanyType(role.type);
