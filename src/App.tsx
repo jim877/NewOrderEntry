@@ -10596,26 +10596,36 @@ export default function App(){
                     </InterviewQuestionCard>
                   );
                 })()}
-                {/* Delivery Group Builder */}
+                {/* Delivery Group Builder (Q17) */}
                 {matchesInterviewSearch("delivery group builder final suggested", "RD RFD STD STFD LTD LTFD Inhome TLI Test Dispose Storage Only final months date", data.suggestedGroups, data.estimatedReturnDate, data.storageMonths) && (() => {
                   const log = (data.interviewLog || {}).suggestedGroups || (data.interviewLog || {}).finalDeliveryDate;
                   const selectedGroups = data.suggestedGroups || [];
                   const groupDetails = (data as any).deliveryGroupDetails || {};
                   const hasAnswers = selectedGroups.length > 0 || !!data.estimatedReturnDate;
-                  const answered = hasAnswers;
                   const expanded = !!interviewSearch.trim() || interviewExpanded.groupBuilder === true;
                   const hasFinal = selectedGroups.some(g => g.endsWith("FD") || g === "LTFD" || g === "STFD" || g === "RFD") || !!(groupDetails as any).__finalDate;
                   const finalDate = data.estimatedReturnDate || "";
                   const summary = selectedGroups.length > 0 ? selectedGroups.join(", ") + (finalDate ? ` → ${finalDate}` : "") : finalDate ? `Final: ${finalDate}` : "";
-	                  const logBoth = () => setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), suggestedGroups: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}, finalDeliveryDate: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
-                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, groupBuilder: !p.groupBuilder}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">17</span>{highlightSearch("Delivery Planner")}</div>
-                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-3">
-                      {showCoaching && !dismissedCoaching.has("c-groupBuilder") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.planner")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-groupBuilder"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+                  const logBoth = () => setData(p => ({ ...p, interviewLog: { ...(p.interviewLog || {}), suggestedGroups: { user: p.currentUser || "Unknown", at: formatShortTimestamp() }, finalDeliveryDate: { user: p.currentUser || "Unknown", at: formatShortTimestamp() } } }));
+                  return (
+                    <InterviewQuestionCard
+                      number={17}
+                      title="Delivery Planner"
+                      summary={summary}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      showAnsweredTint={false}
+                      accent="teal"
+                      onToggle={() => setInterviewExpanded(p => ({ ...p, groupBuilder: !p.groupBuilder }))}
+                    >
+                      {showCoaching && !dismissedCoaching.has("c-groupBuilder") && (
+                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
+                          <span className="flex-1">{coaching("section.planner")}</span>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-groupBuilder"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                        </div>
+                      )}
                       {/* Group selection chips */}
                       <div className="space-y-1.5">
                         <div className="text-[10px] font-bold text-slate-500 uppercase">Select Groups</div>
@@ -10708,9 +10718,9 @@ export default function App(){
                           </div>
                         </div>
                       )}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => { setInterviewExpanded(p => ({...p, groupBuilder: false})); logBoth(); }} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
-                    </div>}
-                  </div>;
+                      <CollapseInterviewRow log={log} onCollapse={() => { setInterviewExpanded(p => ({ ...p, groupBuilder: false })); logBoth(); }} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
+                  );
                 })()}
 
 
