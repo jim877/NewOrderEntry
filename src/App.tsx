@@ -265,6 +265,7 @@ import { buildFullExportLines, copyLinesToClipboard, downloadLinesAsFile } from 
 import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, animateNavigationFocus } from './utils/domNav';
 import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } from './utils/deliveryGroup';
 import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
+import { downloadOrderIcs } from './utils/icsExport';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 import {
   DURATION_DAYS, BAND_COLORS, DELIVERY_COLORS, STAY_TYPE_COLORS,
@@ -4967,41 +4968,7 @@ export default function App(){
     setData(p => ({ ...p, eventNotes: [entry, ...(p.eventNotes || [])] }));
   }, [data.currentUser]);
 
-  const downloadIcs = useCallback(() => {
-    if (!data.pickupDate) return;
-    const dtStart = formatIcsDateTime(data.pickupDate, data.pickupTime);
-    const dtEnd = data.pickupTime ? formatIcsDateTime(data.pickupDate, addHours(data.pickupTime, 1)) : "";
-    const summary = `${data.scheduleType || "Event"} - ${data.orderName || "New Order"}`;
-    const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || {};
-    const location = [primaryAddr.street, primaryAddr.city, primaryAddr.state, primaryAddr.zip].filter(Boolean).join(" ");
-    const descriptionLines = [
-      data.eventAssignee ? `Assignee: ${data.eventAssignee}` : null,
-      data.eventVehicle ? `Vehicle: ${data.eventVehicle}` : null
-    ].filter(Boolean).join("\\n");
-    const lines = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//New Order Entry//EN",
-      "BEGIN:VEVENT",
-      `UID:${safeUid()}`,
-      `SUMMARY:${summary}`,
-      descriptionLines ? `DESCRIPTION:${descriptionLines}` : null,
-      location ? `LOCATION:${location}` : null,
-      data.pickupTime ? `DTSTART:${dtStart}` : `DTSTART;VALUE=DATE:${dtStart}`,
-      data.pickupTime && dtEnd ? `DTEND:${dtEnd}` : null,
-      "END:VEVENT",
-      "END:VCALENDAR"
-    ].filter(Boolean).join("\r\n");
-    const blob = new Blob([lines], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${(data.orderName || "event").replace(/\s+/g, "_")}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [data]);
+  const downloadIcs = useCallback(() => downloadOrderIcs(data), [data]);
 
   // toggleMulti — imported from ./utils/strings
   const toggleHandling=(code)=> update("handlingCodes", toggleMulti(data.handlingCodes, code));
