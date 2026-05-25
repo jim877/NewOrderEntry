@@ -352,6 +352,7 @@ import {
   applyBridgeDeliveryStepReducer,
 } from './utils/bridgeStages';
 import { buildKnownPeople } from './utils/knownPeople';
+import { buildCurrentOrderSpecialDocs, buildCurrentOrderCustomerForms } from './utils/companyDocuments';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6279,25 +6280,14 @@ export default function App(){
     data.additionalCompanies,
   ]);
 
-  const currentOrderSpecialDocs = useMemo(() => {
-    return mergeUniqueStrings(
-      orderCompanyNames.flatMap((companyName) => getCompanyProfile(companyName).specialDocuments || []),
-      orderContactNames.flatMap((contactName) => getContactProfile(contactName).specialDocuments || [])
-    );
-  }, [orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile]);
-
-  const currentOrderCustomerForms = useMemo(() => {
-    return mergeUniqueStrings(
-      orderCompanyNames.flatMap((companyName) => {
-        const profile = getCompanyProfile(companyName);
-        return profile.customerTextForms?.length ? profile.customerTextForms : profile.specialDocuments;
-      }),
-      orderContactNames.flatMap((contactName) => {
-        const profile = getContactProfile(contactName);
-        return profile.customerTextForms?.length ? profile.customerTextForms : profile.specialDocuments;
-      })
-    );
-  }, [orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile]);
+  const currentOrderSpecialDocs = useMemo(
+    () => buildCurrentOrderSpecialDocs(orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile),
+    [orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile]
+  );
+  const currentOrderCustomerForms = useMemo(
+    () => buildCurrentOrderCustomerForms(orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile),
+    [orderCompanyNames, orderContactNames, getCompanyProfile, getContactProfile]
+  );
   const orderLevelInstructions = useMemo(
     () => normalizeInstructionEntries(data.orderInstructions || []),
     [data.orderInstructions]
