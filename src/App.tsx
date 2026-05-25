@@ -156,6 +156,7 @@ import {
   CoachingConfigCard,
   LoadingListConfigCard,
   InterviewActionsConfigCard,
+  FieldConfigGrid,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -11976,79 +11977,14 @@ export default function App(){
               <button onClick={() => setShowFieldConfig(false)} className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">Close</button>
             </div>
             <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto w-full space-y-6">
-              {FIELD_CONFIG_SECTIONS.map(section => {
-                const searchLower = configSearch.toLowerCase().trim();
-                const keys = Object.keys(fieldConfig).filter(k => {
-                  if (fieldConfig[k].category !== section.id) return false;
-                  if (!searchLower) return true;
-                  return fieldConfig[k].label.toLowerCase().includes(searchLower) || k.toLowerCase().includes(searchLower) || (fieldConfig[k].coaching || "").toLowerCase().includes(searchLower);
-                });
-                if (!keys.length) return null;
-                const allSelected = keys.every(k => configSelectedKeys.has(k));
-                return (
-                  <div key={section.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                    <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-100">
-                      <input type="checkbox" checked={allSelected} onChange={() => {
-                        setConfigSelectedKeys(prev => {
-                          const next = new Set(prev);
-                          if (allSelected) keys.forEach(k => next.delete(k));
-                          else keys.forEach(k => next.add(k));
-                          return next;
-                        });
-                      }} className="h-4 w-4 rounded" />
-                      <span className="text-sm font-bold text-slate-700">{section.label}</span>
-                      <span className="text-xs text-slate-400">{keys.length} fields</span>
-                    </div>
-                    <div className="divide-y divide-slate-100">
-                      {keys.map(key => {
-                        const cfg = fieldConfig[key];
-                        const selected = configSelectedKeys.has(key);
-                        return (<React.Fragment key={key}>
-                          <div className={`flex items-center gap-3 px-4 py-2 text-sm ${!cfg.visible ? 'bg-slate-50/50 opacity-60' : ''}`}>
-                            <input type="checkbox" checked={selected} onChange={() => {
-                              setConfigSelectedKeys(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
-                            }} className="h-3.5 w-3.5 rounded" />
-                            <span className="text-xs font-semibold text-slate-700 w-44 truncate" title={key}>{cfg.label}</span>
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], visible: !prev[key].visible}}))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${cfg.visible ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-600'}`}>
-                                {cfg.visible ? 'Visible' : 'Hidden'}
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], requiredInAudit: !prev[key].requiredInAudit}}))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${cfg.requiredInAudit ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-400'}`}>
-                                {cfg.requiredInAudit ? 'Required' : 'Optional'}
-                              </button>
-                            </div>
-                            <select value={cfg.requiredAtStatus || "always"} onChange={e => setFieldConfig(prev => ({...prev, [key]: {...prev[key], requiredAtStatus: e.target.value}}))} className="text-[10px] border border-slate-200 rounded px-1.5 py-0.5 text-slate-600 bg-white">
-                              {AUDIT_STATUS_GATES.map(g => <option key={g} value={g}>{g === "always" ? "Always" : g === "never" ? "Never" : g}</option>)}
-                            </select>
-                            {cfg.selectType && (
-                              <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], selectType: prev[key].selectType === "multi" ? "single" : "multi"}}))} className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${cfg.selectType === "multi" ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-400'}`}>
-                                {cfg.selectType === "multi" ? "Multi" : "Single"}
-                              </button>
-                            )}
-                            {cfg.condition && <span className="text-[9px] text-slate-400 truncate" title={JSON.stringify(cfg.condition)}>Conditional</span>}
-                            <button onClick={() => setFieldConfig(prev => ({...prev, [key]: {...prev[key], _coachingOpen: !prev[key]._coachingOpen}}))} className={`text-[10px] ${cfg.coaching ? 'text-violet-500' : 'text-slate-300'} hover:text-violet-600`} title={cfg.coaching || "Add coaching text"}>🎓</button>
-                            <div className="flex-1" />
-                            <span className="text-[9px] text-slate-300 font-mono">{key}</span>
-                          </div>
-                          {cfg._coachingOpen && (
-                            <div className="px-4 pb-2 flex items-start gap-2">
-                              <span className="text-[10px] text-violet-500 shrink-0 pt-1">🎓</span>
-                              <input
-                                value={cfg.coaching || ""}
-                                onChange={e => setFieldConfig(prev => ({...prev, [key]: {...prev[key], coaching: e.target.value}}))}
-                                placeholder="Enter coaching guidance for this field..."
-                                className="flex-1 rounded border border-violet-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-violet-400 bg-violet-50/30"
-                              />
-                            </div>
-                          )}
-                        </React.Fragment>);
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+              <FieldConfigGrid
+                sections={FIELD_CONFIG_SECTIONS}
+                fieldConfig={fieldConfig}
+                setFieldConfig={setFieldConfig}
+                selectedKeys={configSelectedKeys}
+                setSelectedKeys={setConfigSelectedKeys}
+                search={configSearch}
+              />
               {/* Blocker Rules */}
               <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
                 <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">

@@ -68,3 +68,4 @@ export { SaveSummaryActions } from "./SaveSummaryActions";
 export { CoachingConfigCard } from "./CoachingConfigCard";
 export { LoadingListConfigCard } from "./LoadingListConfigCard";
 export { InterviewActionsConfigCard } from "./InterviewActionsConfigCard";
+export { FieldConfigGrid } from "./FieldConfigGrid";
