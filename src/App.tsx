@@ -290,6 +290,7 @@ import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } fro
 import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
 import { downloadOrderIcs } from './utils/icsExport';
 import { renderAlertMessageContent, renderAlertDetailContent } from './utils/alertContent';
+import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
 import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
 import { loadJsonFromStorage, loadMergedRecordFromStorage, saveJsonToStorage } from './utils/localStorageState';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
@@ -13901,69 +13902,7 @@ export default function App(){
               documentType="approval"
               orderNarrative={orderNarrative}
               orderNarrativeProse={(data as any).orderNarrativeProseOverride || buildNarrativeProse(orderNarrative, data)}
-              rushGuideTimeline={(() => {
-                const repairMap: Record<string,string> = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
-                const livingMap: Record<string,string> = { "Staying in home": "home", "Hotel": "hotel", "Temp": "temp", "Moving": "moving" };
-                const firstRepair = (data.repairsSummary || "").split(", ").filter(Boolean)[0] || "";
-                const repairId = repairMap[firstRepair];
-                const repairInfo = RUSH_REPAIR_TIMELINES.find(r => r.id === repairId);
-                const orderSit = livingMap[data.livingStatus] || "";
-                if (!repairInfo && !orderSit) return null;
-                const now = new Date();
-                // Sync storage duration with repair timeline — use the longer of the two
-                const storageDays = data.storageMonths ? Number(data.storageMonths) * 30 : 0;
-                const repairDays = repairInfo ? repairInfo.days : 0;
-                const effectiveDays = Math.max(repairDays, storageDays);
-                const returnDate = effectiveDays > 0 ? rushAddDays(now, effectiveDays) : null;
-                const storageRepairConflict = storageDays > 0 && repairDays > 0 && Math.abs(storageDays - repairDays) > 30;
-                const allAddr = data.addresses || [];
-                const primAddr = allAddr.find((a: any) => a.isPrimary) || allAddr[0] || {};
-                const primAddrStr = [primAddr.street, primAddr.city, primAddr.state, primAddr.zip].filter(Boolean).join(", ");
-                const tmpAddr = allAddr.find((a: any) => /temp|hotel|rental/i.test(a.type || "")) || {};
-                const tmpAddrStr = [tmpAddr.street, tmpAddr.city, tmpAddr.state, tmpAddr.zip].filter(Boolean).join(", ");
-                const rushAddr = (orderSit === "hotel" || orderSit === "temp") && tmpAddrStr ? tmpAddrStr : primAddrStr;
-
-                // Build Rush items
-                const household = data.household || [];
-                const pets = household.filter((m: any) => m.category === "pet");
-                const babies = household.filter((m: any) => /infant|baby/i.test(m.type)).length;
-                const kids = household.filter((m: any) => /child/i.test(m.type)).length;
-                const elderly = household.filter((m: any) => /elderly/i.test(m.type)).length;
-                const totalPeople = Math.max(1, (data.customers || []).length) + kids + babies;
-                const rItems: string[] = [];
-                rItems.push(`Clothing & undergarments for ${totalPeople} people`);
-                rItems.push("Daily footwear, sneakers, and belts");
-                if (orderSit === "hotel" || orderSit === "temp") rItems.push("Suitcases and overnight bags");
-                if (babies > 0) rItems.push("Strollers, diaper bags, crib bedding");
-                if (kids > 0) rItems.push("Favorite comfort toys");
-                // Note: medications/medical devices are not group items — customer should set these aside
-                if (pets.length > 0) rItems.push("Pet beds, leashes, and crates");
-                const stItems: string[] = [];
-                if (orderSit === "home") { stItems.push("Temporary window shades, throw rugs, daily bedding"); }
-
-                const timeline: any[] = [];
-                timeline.push({ group: "Rush Delivery", timeframe: "24-72 hours", desc: rItems.slice(0, 3).join("; "), items: rItems, address: rushAddr });
-                if (stItems.length > 0) timeline.push({ group: "Short-Term Home", timeframe: "1-4 weeks", desc: stItems.join("; "), items: stItems, address: primAddrStr });
-                if (returnDate) {
-                  const seasons = rushGetSeasons(now, returnDate);
-                  if (seasons.length > 1) timeline.push({ group: "Seasonal Wardrobes", timeframe: "2-8 weeks", desc: `Transition clothing for ${seasons.map(s => s.name).join(", ")}`, address: primAddrStr });
-                }
-                // Event deliveries
-                (data.upcomingEvents || []).forEach((evt: any) => {
-                  if (!evt.date) return;
-                  const ed = new Date(evt.date);
-                  if (returnDate && ed > returnDate) return;
-                  const eItems: string[] = [];
-                  if (evt.type === "vacation_beach") { eItems.push("Swimwear, resort wear, sandals, luggage"); }
-                  else if (evt.type === "vacation_ski") { eItems.push("Ski gear, thermal layers, boots, luggage"); }
-                  else if (evt.type === "wedding") { eItems.push("Formal attire, dress shoes, accessories"); }
-                  else if (evt.type === "business") { eItems.push("Business attire, briefcase, garment bags"); }
-                  else if (evt.type === "sports") { eItems.push("Uniforms, cleats, gear"); }
-                  if (eItems.length > 0) timeline.push({ group: evt.name || "Event", timeframe: rushFormatDate(ed), desc: eItems.join("; "), items: eItems, address: "" });
-                });
-                if (returnDate) timeline.push({ group: "Final Delivery", timeframe: `${effectiveDays} days (${rushFormatDate(returnDate)})`, desc: "All remaining items after repairs complete", address: primAddrStr, warning: storageRepairConflict ? `Storage (${data.storageMonths} mo) and repair estimate (${repairDays} days) differ — please reconcile` : undefined });
-                return timeline;
-              })()}
+              rushGuideTimeline={buildRushGuideTimeline(data)}
               onClose={() => setShowSdsPreview(false)}
               onPhotoNoteChange={(photoId: string, note: string) => {
                 if (photoId.startsWith("scope-")) {
