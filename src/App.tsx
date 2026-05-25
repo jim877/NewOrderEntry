@@ -143,6 +143,7 @@ import {
   ReminderModal,
   EditContactModal,
   LivingAddressPrompt,
+  GroupLinkModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14700,137 +14701,20 @@ export default function App(){
       )}
 
       {groupLinkModal.open && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Link Group to Address</h3>
-            <div className="text-sm text-slate-500 mb-4">{groupLinkModal.group}</div>
-            <div className="grid gap-4">
-              <Field label="Address">
-                <Select
-                  value={getGroupLink(groupLinkModal.group).addressId || ""}
-                  onChange={(e) => setGroupLink(groupLinkModal.group, { addressId: e.target.value })}
-                >
-                  <option value="">Select address...</option>
-                  {(() => {
-                    const list = data.addresses || [];
-                    const primary = list.find(a => a.isPrimary) || list[0];
-                    return list.map(a => {
-                      const label = a.id === primary?.id
-                        ? `Primary — ${a.type || "Address"}`
-                        : `${a.type || "Address"}`;
-                      return (
-                        <option key={a.id} value={a.id}>
-                          {label} — {summarizeAddress(a)}
-                        </option>
-                      );
-                    });
-                  })()}
-                </Select>
-              </Field>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Address Actions</div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setGroupLinkAddressMode("select")}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-bold ${groupLinkAddressMode === "select" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
-                  >
-                    Use Existing
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGroupLinkAddressMode("placeholder")}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-bold ${groupLinkAddressMode === "placeholder" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
-                  >
-                    Add Placeholder
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGroupLinkAddressMode("full")}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-bold ${groupLinkAddressMode === "full" ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}
-                  >
-                    Add Full Address
-                  </button>
-                </div>
-                {groupLinkAddressMode === "placeholder" && (
-                  <div className="mt-3 space-y-2">
-                    <Input
-                      value={groupLinkAddressDraft.type}
-                      onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, type: e.target.value }))}
-                      placeholder="Label (e.g., RD Drop, Hotel, Neighbor)"
-                    />
-                    <button
-                      type="button"
-                      onClick={addPlaceholderAddressToGroup}
-                      className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
-                    >
-                      Add Placeholder Address
-                    </button>
-                  </div>
-                )}
-                {groupLinkAddressMode === "full" && (
-                  <div className="mt-3 grid gap-2">
-                    <Input
-                      value={groupLinkAddressDraft.type}
-                      onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, type: e.target.value }))}
-                      placeholder="Address Type (optional)"
-                    />
-                    <Input
-                      value={groupLinkAddressDraft.street}
-                      onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, street: e.target.value }))}
-                      placeholder="Street"
-                    />
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input
-                        value={groupLinkAddressDraft.city}
-                        onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, city: e.target.value }))}
-                        placeholder="City"
-                      />
-                      <Input
-                        value={groupLinkAddressDraft.state}
-                        onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, state: e.target.value }))}
-                        placeholder="State"
-                      />
-                      <Input
-                        value={groupLinkAddressDraft.zip}
-                        onChange={(e) => setGroupLinkAddressDraft(prev => ({ ...prev, zip: e.target.value }))}
-                        placeholder="Zip"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addFullAddressToGroup}
-                      className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
-                    >
-                      Add Full Address
-                    </button>
-                  </div>
-                )}
-              </div>
-              <Field label="Target Date">
-                <Input
-                  type="date"
-                  value={getGroupLink(groupLinkModal.group).date || ""}
-                  onChange={(e) => setGroupLink(groupLinkModal.group, { date: e.target.value })}
-                />
-              </Field>
-            </div>
-            <div className="flex justify-between items-center mt-6">
-              <button
-                onClick={() => { clearGroupLink(groupLinkModal.group); closeGroupLinkModal(); }}
-                className="text-xs font-bold text-slate-400 hover:text-slate-600"
-              >
-                Clear
-              </button>
-              <button
-                onClick={closeGroupLinkModal}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-600"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
+        <GroupLinkModal
+          group={groupLinkModal.group}
+          addresses={data.addresses || []}
+          getGroupLink={getGroupLink}
+          setGroupLink={setGroupLink}
+          clearGroupLink={clearGroupLink}
+          mode={groupLinkAddressMode}
+          setMode={setGroupLinkAddressMode}
+          draft={groupLinkAddressDraft}
+          setDraft={setGroupLinkAddressDraft}
+          addPlaceholderAddress={addPlaceholderAddressToGroup}
+          addFullAddress={addFullAddressToGroup}
+          onClose={closeGroupLinkModal}
+        />
       )}
 
       {reminderModalOpen && (
