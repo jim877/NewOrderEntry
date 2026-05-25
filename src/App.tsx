@@ -331,6 +331,7 @@ import {
   addContactToCompanyReducer,
   removeAdditionalCompanyTypeReducer,
   findMatchingAdditionalCompanyType,
+  removeAdditionalCompanyReducer,
 } from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { mapAuditMissingToTargets } from './utils/auditTargets';
@@ -7058,25 +7059,7 @@ export default function App(){
   };
 
   const removeAdditionalCompany = (type) => {
-    setData(prev => {
-      const entry = prev.additionalCompanies?.[type];
-      const nextTypes = (prev.additionalCompanyTypes || []).filter(t => t !== type);
-      const nextCompanies = { ...(prev.additionalCompanies || {}) };
-      delete nextCompanies[type];
-      const next = { ...prev, additionalCompanyTypes: nextTypes, additionalCompanies: nextCompanies };
-      if (entry?.company && prev.referringCompany === entry.company) {
-        next.referringCompany = "";
-        if (entry.contact && prev.referrer === entry.contact) next.referrer = "";
-      }
-      if (entry?.company && prev.billingCompany === entry.company) {
-        next.billingCompany = "";
-        if (entry.contact && prev.billingContact === entry.contact) next.billingContact = "";
-      }
-      if (entry?.contact && prev.insuranceAdjuster === entry.contact) {
-        next.insuranceAdjuster = "";
-      }
-      return next;
-    });
+    setData(prev => removeAdditionalCompanyReducer(prev, type));
   };
 
   const registerContactCompany = (contact, company) => {

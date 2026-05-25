@@ -43,6 +43,32 @@ export type CompanyRoleAssignment = CompanyRoleDef & {
   contacts: { name: string }[];
 };
 
+// removeAdditionalCompanyReducer — pure reducer that drops a company
+// type from the order and, as a side, clears the role-specific fields
+// (referrer/referringCompany, billingContact/billingCompany,
+// insuranceAdjuster) when they reference the same entity. The clear
+// happens only when the matching field's value matches the entry
+// being removed.
+export const removeAdditionalCompanyReducer = (prev: any, type: string) => {
+  const entry = prev.additionalCompanies?.[type];
+  const nextTypes = (prev.additionalCompanyTypes || []).filter((t: string) => t !== type);
+  const nextCompanies = { ...(prev.additionalCompanies || {}) };
+  delete nextCompanies[type];
+  const next = { ...prev, additionalCompanyTypes: nextTypes, additionalCompanies: nextCompanies };
+  if (entry?.company && prev.referringCompany === entry.company) {
+    next.referringCompany = "";
+    if (entry.contact && prev.referrer === entry.contact) next.referrer = "";
+  }
+  if (entry?.company && prev.billingCompany === entry.company) {
+    next.billingCompany = "";
+    if (entry.contact && prev.billingContact === entry.contact) next.billingContact = "";
+  }
+  if (entry?.contact && prev.insuranceAdjuster === entry.contact) {
+    next.insuranceAdjuster = "";
+  }
+  return next;
+};
+
 // findMatchingAdditionalCompanyType — search the additionalCompanies
 // map for an entry that matches the given (company, contact) pair
 // by either company name, single contact, or membership in the
