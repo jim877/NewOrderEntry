@@ -10429,21 +10429,33 @@ export default function App(){
                   </div>;
                 })()}
 
-                {/* Rush Delivery Needed? (NEW Q14) */}
+                {/* Rush Delivery Needed? (Q14) */}
                 {isFieldVisible("rushDeliveryNeeded") && matchesInterviewSearch("rush delivery needed urgent ASAP", "rush immediate", data.rushDeliveryNeeded === "Y" ? "Rush yes" : data.rushDeliveryNeeded === "N" ? "Rush no" : "", (data as any).rushDeclinedNote) && (() => {
                   const log = (data.interviewLog || {}).rushDelivery;
                   const hasAnswers = !!data.rushDeliveryNeeded;
-                  const answered = hasAnswers;
                   const expanded = !!interviewSearch.trim() || interviewExpanded.rushDelivery === true;
                   const summary = data.rushDeliveryNeeded === "Y" ? "Yes — Rush group added" : data.rushDeliveryNeeded === "N" ? "No" : "";
-                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, rushDelivery: !p.rushDelivery}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">14</span>{highlightSearch(expanded ? "Does the customer need a rush delivery?" : "Rush")}</div>
-                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold ml-2">{summary}</span>}
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      {showCoaching && !dismissedCoaching.has("c-rush") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.rush")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-rush"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button></div>}
+                  const logNow = () => setData(p => ({ ...p, interviewLog: { ...(p.interviewLog || {}), rushDelivery: { user: p.currentUser || "Unknown", at: formatShortTimestamp() } } }));
+                  return (
+                    <InterviewQuestionCard
+                      number={14}
+                      title="Does the customer need a rush delivery?"
+                      collapsedLabel="Rush"
+                      summary={summary}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      showAnsweredTint={false}
+                      accent="teal"
+                      onToggle={() => setInterviewExpanded(p => ({ ...p, rushDelivery: !p.rushDelivery }))}
+                    >
+                      {showCoaching && !dismissedCoaching.has("c-rush") && (
+                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
+                          <span className="flex-1">{coaching("section.rush")}</span>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-rush"]))} className="text-violet-400 hover:text-violet-600 text-sm font-bold shrink-0 ml-1">×</button>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-2">
                         <button type="button" onClick={() => {
                           update("rushDeliveryNeeded", data.rushDeliveryNeeded === "Y" ? "" : "Y");
@@ -10456,14 +10468,11 @@ export default function App(){
                               update("deliveryGroupDetails", { ...details, RD: { ...(details.RD || {}), addressType: firstStay.type, address: firstStay.address } });
                             }
                           }
-                          setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), rushDelivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
+                          logNow();
                         }} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.rushDeliveryNeeded === "Y" ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>
                           Yes, rush needed
                         </button>
-                        <button type="button" onClick={() => {
-                          update("rushDeliveryNeeded", data.rushDeliveryNeeded === "N" ? "" : "N");
-                          setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), rushDelivery: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
-                        }} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.rushDeliveryNeeded === "N" ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>
+                        <button type="button" onClick={() => { update("rushDeliveryNeeded", data.rushDeliveryNeeded === "N" ? "" : "N"); logNow(); }} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.rushDeliveryNeeded === "N" ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>
                           No rush needed
                         </button>
                       </div>
@@ -10478,89 +10487,107 @@ export default function App(){
                           <textarea value={(data as any).rushDeclinedNote || ""} onChange={e => update("rushDeclinedNote", e.target.value)} placeholder="Reason or additional context..." className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] outline-none focus:border-sky-300 resize-none" rows={2} />
                         </div>
                       )}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, rushDelivery: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
-                    </div>}
-                  </div>;
+                      <CollapseInterviewRow log={log} onCollapse={() => setInterviewExpanded(p => ({ ...p, rushDelivery: false }))} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
+                  );
                 })()}
 
-
-                {/* Activities & Interests */}
+                {/* Activities & Interests (Q15) */}
                 {(() => {
                   const log = (data.interviewLog || {}).interests;
                   const hasAnswers = (data.rushInterests || []).length > 0;
-                  const answered = hasAnswers;
                   const summary = (data.rushInterests || []).map(id => RUSH_INTERESTS.find(i => i.id === id)?.label || id).join(", ") || (!!log && !hasAnswers ? "None" : "");
                   const expanded = !!interviewSearch.trim() || interviewExpanded.interests === true;
-                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: !expanded}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">15</span>{highlightSearch("Activities & interests")}</div>
-                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-  
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
+                  return (
+                    <InterviewQuestionCard
+                      number={15}
+                      title="Activities & interests"
+                      summary={summary}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      showAnsweredTint={false}
+                      accent="teal"
+                      onToggle={() => setInterviewExpanded(p => ({ ...p, interests: !p.interests }))}
+                    >
                       <div className="flex flex-wrap gap-1.5">
                         {RUSH_INTERESTS.map(i => {
                           const active = (data.rushInterests || []).includes(i.id);
-                          return <button key={i.id} type="button" onClick={() => { update("rushInterests", active ? (data.rushInterests||[]).filter(x=>x!==i.id) : [...(data.rushInterests||[]), i.id]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), interests: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${active ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`} title={i.desc}>
-                            {i.label}
-                          </button>;
+                          return (
+                            <button key={i.id} type="button" onClick={() => {
+                              update("rushInterests", active ? (data.rushInterests || []).filter(x => x !== i.id) : [...(data.rushInterests || []), i.id]);
+                              setData(p => ({ ...p, interviewLog: { ...(p.interviewLog || {}), interests: { user: p.currentUser || "Unknown", at: formatShortTimestamp() } } }));
+                            }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${active ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`} title={i.desc}>
+                              {i.label}
+                            </button>
+                          );
                         })}
                       </div>
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, interests: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
-                    </div>}
-                  </div>;
+                      <CollapseInterviewRow log={log} onCollapse={() => setInterviewExpanded(p => ({ ...p, interests: false }))} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
+                  );
                 })()}
 
-                {/* Upcoming Events */}
+                {/* Upcoming Events (Q16) */}
                 {(() => {
                   const log = (data.interviewLog || {}).events;
                   const hasAnswers = (data.upcomingEvents || []).length > 0;
-                  const answered = hasAnswers;
                   const summary = (data.upcomingEvents || []).map(e => e.name || "Event").join(", ") || (!!log && !hasAnswers ? "None" : "");
                   const expanded = !!interviewSearch.trim() || interviewExpanded.events === true;
-                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: !p.events}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">16</span>{highlightSearch("Trips / Events")}</div>
-                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-  
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
-                      {showCoaching && !dismissedCoaching.has("c-events") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1"><span className="flex-1">{coaching("section.events")}</span><button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-events"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button></div>}
+                  const logNow = () => setData(p => ({ ...p, interviewLog: { ...(p.interviewLog || {}), events: { user: p.currentUser || "Unknown", at: formatShortTimestamp() } } }));
+                  return (
+                    <InterviewQuestionCard
+                      number={16}
+                      title="Trips / Events"
+                      summary={summary}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      showAnsweredTint={false}
+                      accent="teal"
+                      onToggle={() => setInterviewExpanded(p => ({ ...p, events: !p.events }))}
+                    >
+                      {showCoaching && !dismissedCoaching.has("c-events") && (
+                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
+                          <span className="flex-1">{coaching("section.events")}</span>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-events"]))} className="text-violet-400 hover:text-violet-600 text-[10px] font-bold shrink-0">×</button>
+                        </div>
+                      )}
                       {(data.upcomingEvents || []).map(evt => (
                         <div key={evt.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2 relative">
-                          <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents||[]).filter(e => e.id !== evt.id))} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 text-sm font-bold">×</button>
+                          <button type="button" onClick={() => update("upcomingEvents", (data.upcomingEvents || []).filter(e => e.id !== evt.id))} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 text-sm font-bold">×</button>
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${evt.type === "trip" ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"}`}>{evt.type === "trip" ? "Trip" : "Event"}</span>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Name</div>
-                              <input value={evt.name||""} onChange={e => update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, name: e.target.value} : ev))} className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px]" placeholder={evt.type === "trip" ? "e.g. Florida Vacation" : "e.g. Wedding"} />
+                              <input value={evt.name || ""} onChange={e => update("upcomingEvents", (data.upcomingEvents || []).map(ev => ev.id === evt.id ? { ...ev, name: e.target.value } : ev))} className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px]" placeholder={evt.type === "trip" ? "e.g. Florida Vacation" : "e.g. Wedding"} />
                             </div>
                             <div>
                               <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Date</div>
-                              <input type="date" value={evt.date||""} min={new Date().toISOString().split("T")[0]} onChange={e => {
+                              <input type="date" value={evt.date || ""} min={new Date().toISOString().split("T")[0]} onChange={e => {
                                 let val = e.target.value;
                                 if (val) {
-                                  const today = new Date(); today.setHours(0,0,0,0);
+                                  const today = new Date(); today.setHours(0, 0, 0, 0);
                                   let d = new Date(val + "T00:00:00");
                                   if (d < today) { d.setFullYear(today.getFullYear() + 1); val = d.toISOString().split("T")[0]; }
                                 }
-                                update("upcomingEvents", (data.upcomingEvents||[]).map(ev => ev.id === evt.id ? {...ev, date: val} : ev));
+                                update("upcomingEvents", (data.upcomingEvents || []).map(ev => ev.id === evt.id ? { ...ev, date: val } : ev));
                               }} className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px]" />
                             </div>
                           </div>
                         </div>
                       ))}
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "trip", date: "", name: "Trip"}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="flex-1 p-2 border-2 border-dashed border-slate-300 rounded-lg text-[11px] font-bold text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Add Trip</button>
-                        <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents||[]), {id: safeUid(), type: "event", date: "", name: "Event"}]); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), events: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="flex-1 p-2 border-2 border-dashed border-slate-300 rounded-lg text-[11px] font-bold text-slate-500 hover:border-amber-400 hover:text-amber-600">+ Add Event</button>
+                        <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents || []), { id: safeUid(), type: "trip", date: "", name: "Trip" }]); logNow(); }} className="flex-1 p-2 border-2 border-dashed border-slate-300 rounded-lg text-[11px] font-bold text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Add Trip</button>
+                        <button type="button" onClick={() => { update("upcomingEvents", [...(data.upcomingEvents || []), { id: safeUid(), type: "event", date: "", name: "Event" }]); logNow(); }} className="flex-1 p-2 border-2 border-dashed border-slate-300 rounded-lg text-[11px] font-bold text-slate-500 hover:border-amber-400 hover:text-amber-600">+ Add Event</button>
                       </div>
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, events: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
-                    </div>}
-                  </div>;
+                      <CollapseInterviewRow log={log} onCollapse={() => setInterviewExpanded(p => ({ ...p, events: false }))} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
+                  );
                 })()}
                 {/* Delivery Group Builder */}
                 {matchesInterviewSearch("delivery group builder final suggested", "RD RFD STD STFD LTD LTFD Inhome TLI Test Dispose Storage Only final months date", data.suggestedGroups, data.estimatedReturnDate, data.storageMonths) && (() => {

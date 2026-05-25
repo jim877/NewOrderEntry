@@ -21,7 +21,9 @@ type Props = {
    *  collapsed (e.g. "Conditions" instead of "Is anything still wet
    *  or damaged?"). Defaults to `title` when omitted. */
   collapsedLabel?: string;
-  summary: string;
+  /** Either a plain string (most cards) or a ReactNode (the living
+   *  card renders a chained "Type → Type → Type" chip strip). */
+  summary: React.ReactNode;
   log: Log | undefined;
   answered: boolean;
   expanded: boolean;
@@ -34,6 +36,10 @@ type Props = {
    *  follows hasAnswers; the repairs card always uses the plain
    *  border). */
   showAnsweredTint?: boolean;
+  /** Optional left-border accent + matching header hover tint. "teal"
+   *  matches the Delivery Timeline section cards (Living, Rush,
+   *  Interests, Events, Delivery Planner). Default: no accent. */
+  accent?: "teal";
   children?: React.ReactNode;
 };
 
@@ -48,22 +54,22 @@ export const InterviewQuestionCard: React.FC<Props> = ({
   onToggle,
   highlightSearch,
   showAnsweredTint,
+  accent,
   children,
 }) => {
   const tinted = showAnsweredTint !== undefined ? showAnsweredTint : answered;
   const headerLabel = expanded ? title : (collapsedLabel || title);
   const renderedLabel = highlightSearch ? highlightSearch(headerLabel) : headerLabel;
+  const baseBorder = tinted ? "border-sky-200 bg-sky-50/30" : "border-slate-200 bg-white";
+  const accentBorder = accent === "teal" ? " border-l-4 border-l-teal-400" : "";
+  const hoverClass = accent === "teal" ? "hover:bg-teal-50/50" : "hover:bg-slate-50";
 
   return (
-    <div
-      className={`noe-iq rounded-xl border ${
-        tinted ? "border-sky-200 bg-sky-50/30" : "border-slate-200 bg-white"
-      } overflow-hidden`}
-    >
+    <div className={`noe-iq rounded-xl border ${baseBorder}${accentBorder} overflow-hidden`}>
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50"
+        className={`w-full flex items-center justify-between px-3 py-1.5 text-left ${hoverClass}`}
       >
         <div className="text-[13px] font-bold text-sky-600 flex items-center gap-2">
           <span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">
@@ -72,7 +78,9 @@ export const InterviewQuestionCard: React.FC<Props> = ({
           {renderedLabel}
         </div>
         {answered && !expanded && (
-          <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>
+          typeof summary === "string"
+            ? <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>
+            : <div className="ml-2">{summary}</div>
         )}
       </button>
       {answered && !expanded && log && (
