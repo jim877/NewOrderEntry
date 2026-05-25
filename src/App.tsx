@@ -168,6 +168,8 @@ import {
   RushGuideSetupPanel,
   RushGuideDeliveryCards,
   RushGuideGanttTimeline,
+  InterviewQuestionCard,
+  CollapseInterviewRow,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -9768,44 +9770,47 @@ export default function App(){
                 {isFieldVisible("damageWasWet") && matchesInterviewSearch("Is anything still wet or damaged", "Still Wet Visible Mold Structural Damage No Electricity No Heat Boarded Up", [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural Damage" : "", data.noLights ? "No Electricity" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""]) && (() => {
                   const log = (data.interviewLog || {}).conditions;
                   const hasAnswers = data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp;
-                  const answered = hasAnswers;
                   const summary = [data.damageWasWet === "Y" || data.damageWasWet === true ? "Still Wet" : "", data.damageMoldMildew ? "Visible Mold" : "", data.structuralElectricDamage === "Y" ? "Structural" : "", data.noLights ? "No Power" : "", data.noHeat ? "No Heat" : "", data.boardedUp ? "Boarded Up" : ""].filter(Boolean).join(", ") || (!!log && !hasAnswers ? "None" : "");
                   const expanded = !!interviewSearch.trim() || interviewExpanded.conditions === true;
-                  return <div className={`noe-iq rounded-xl border ${answered ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                  <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, conditions: !p.conditions})); if (!log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), conditions: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                    <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">1</span>{highlightSearch(expanded ? "Is anything still wet or damaged?" : "Conditions")}</div>
-                    {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-
-                  </button>
-                  {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-                  {expanded && <div className="px-3 pb-3 space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: "wet", label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true, onToggle: () => updateSmart("damageWasWet", (data.damageWasWet === "Y" || data.damageWasWet === true) ? "N" : "Y") },
-                      { id: "mold", label: "Visible Mold", active: !!data.damageMoldMildew, onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew) },
-                      { id: "structural", label: "Structural Damage", active: data.structuralElectricDamage === "Y", onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y") },
-                      { id: "lights", label: "No Electricity", active: !!data.noLights, onToggle: () => updateSmart("noLights", !data.noLights) },
-                      { id: "heat", label: "No Heat", active: !!data.noHeat, onToggle: () => updateSmart("noHeat", !data.noHeat) },
-                      { id: "boarded", label: "Boarded Up", active: !!data.boardedUp, onToggle: () => updateSmart("boardedUp", !data.boardedUp) },
-                    ].map(item => (
-                      <ToggleMulti key={item.id} label={item.label} checked={item.active} onChange={() => { item.onToggle(); executeInterviewActions(item.label, !item.active); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(item.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
-                    ))}
-                  </div>
-                  {showCoaching && [
-                    { label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true },
-                    { label: "Visible Mold", active: !!data.damageMoldMildew },
-                    { label: "Structural Damage", active: data.structuralElectricDamage === "Y" },
-                    { label: "No Electricity", active: !!data.noLights },
-                    { label: "Boarded Up", active: !!data.boardedUp },
-                  ].filter(i => i.active && interviewActions[i.label]?.coaching && !dismissedCoaching.has(`c-${i.label}`)).map(i => (
-                    <div key={i.label} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
-                      <div className="flex-1">🎓 <span className="font-bold">{i.label}:</span> {interviewActions[i.label].coaching}</div>
-                      <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${i.label}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
-                    </div>
-                  ))}
-                  {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, conditions: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
-                  </div>}
-                </div>;
+                  const toggleItems = [
+                    { id: "wet", label: "Still Wet", active: data.damageWasWet === "Y" || data.damageWasWet === true, onToggle: () => updateSmart("damageWasWet", (data.damageWasWet === "Y" || data.damageWasWet === true) ? "N" : "Y") },
+                    { id: "mold", label: "Visible Mold", active: !!data.damageMoldMildew, onToggle: () => updateSmart("damageMoldMildew", !data.damageMoldMildew) },
+                    { id: "structural", label: "Structural Damage", active: data.structuralElectricDamage === "Y", onToggle: () => update("structuralElectricDamage", data.structuralElectricDamage === "Y" ? "N" : "Y") },
+                    { id: "lights", label: "No Electricity", active: !!data.noLights, onToggle: () => updateSmart("noLights", !data.noLights) },
+                    { id: "heat", label: "No Heat", active: !!data.noHeat, onToggle: () => updateSmart("noHeat", !data.noHeat) },
+                    { id: "boarded", label: "Boarded Up", active: !!data.boardedUp, onToggle: () => updateSmart("boardedUp", !data.boardedUp) },
+                  ];
+                  return (
+                    <InterviewQuestionCard
+                      number={1}
+                      title="Is anything still wet or damaged?"
+                      collapsedLabel="Conditions"
+                      summary={summary}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      onToggle={() => {
+                        setInterviewExpanded(p => ({ ...p, conditions: !p.conditions }));
+                        if (!log) setData(p => ({ ...p, interviewLog: { ...(p.interviewLog || {}), conditions: { user: p.currentUser || "Unknown", at: formatShortTimestamp() } } }));
+                      }}
+                    >
+                      <div className="flex flex-wrap gap-2">
+                        {toggleItems.map(item => (
+                          <ToggleMulti key={item.id} label={item.label} checked={item.active} onChange={() => { item.onToggle(); executeInterviewActions(item.label, !item.active); }} className={`!px-2 !py-1 !text-xs ${isSearchMatch(item.label) ? "!ring-2 !ring-yellow-400" : ""}`} />
+                        ))}
+                      </div>
+                      {showCoaching && toggleItems
+                        .filter(i => i.active && interviewActions[i.label]?.coaching && !dismissedCoaching.has(`c-${i.label}`))
+                        .map(i => (
+                          <div key={i.label} className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
+                            <div className="flex-1">🎓 <span className="font-bold">{i.label}:</span> {interviewActions[i.label].coaching}</div>
+                            <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, `c-${i.label}`]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
+                          </div>
+                        ))}
+                      <CollapseInterviewRow log={log} onCollapse={() => setInterviewExpanded(p => ({ ...p, conditions: false }))} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
+                  );
                 })()}
 
                 {/* Repairs (Q2) */}
