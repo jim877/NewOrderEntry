@@ -318,7 +318,7 @@ import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './util
 import { computeSectionAuditStatus, computeAuditRequiredCount as computeAuditRequiredCountFor } from './utils/auditStatus';
 import { buildOrderNarrative } from './utils/orderNarrative';
 import { computeAuditMissing as computeAuditMissingFor } from './utils/auditMissing';
-import { buildCompanyRoleAssignments } from './utils/companyRoles';
+import { buildCompanyRoleAssignments, dedupeAdditionalCompanyEntries } from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { mapAuditMissingToTargets } from './utils/auditTargets';
 import {
@@ -7314,50 +7314,11 @@ export default function App(){
   }, [data.additionalCompanies, data.referringCompany]);
 
   useEffect(() => {
-    const entries = data.additionalCompanies || {};
-    const seen = new Map();
-    let changed = false;
-    const cleaned = { ...entries };
-    Object.entries(entries).forEach(([type, entry]) => {
-      const normalizedCurrent = syncCompanyEntryPlaceholders(cleaned[type] || entry);
-      if (JSON.stringify(normalizedCurrent) !== JSON.stringify(cleaned[type] || entry)) {
-        cleaned[type] = normalizedCurrent;
-        changed = true;
-      }
-      const key = `${normalizedCurrent?.company ? normalizeCompany(normalizedCurrent.company) : ""}`;
-      if (!key) return;
-      if (seen.has(key)) {
-        const keepType = seen.get(key);
-        const keepEntry = syncCompanyEntryPlaceholders(cleaned[keepType] || {});
-        const keepContacts = keepEntry.contacts && keepEntry.contacts.length
-          ? keepEntry.contacts
-          : (keepEntry.contact ? [{ name: keepEntry.contact, inactive: false }] : []);
-        const entryContacts = normalizedCurrent.contacts && normalizedCurrent.contacts.length
-          ? normalizedCurrent.contacts
-          : (normalizedCurrent.contact ? [{ name: normalizedCurrent.contact, inactive: false }] : []);
-        const merged = [...keepContacts];
-        entryContacts.forEach(c => {
-          if (!c?.name) return;
-          if (!merged.find(x => normalizeContact(x.name) === normalizeContact(c.name))) {
-            merged.push({ name: c.name, inactive: !!c.inactive, placeholder: c.placeholder || null });
-          }
-        });
-        cleaned[keepType] = syncCompanyEntryPlaceholders({
-          ...keepEntry,
-          ...normalizedCurrent,
-          contacts: merged,
-          contact: merged[0]?.name || keepEntry.contact || normalizedCurrent.contact || "",
-          placeholder: keepEntry.placeholder || normalizedCurrent.placeholder || null,
-          contactPlaceholder: keepEntry.contactPlaceholder || normalizedCurrent.contactPlaceholder || null
-        });
-        delete cleaned[type];
-        changed = true;
-        return;
-      }
-      seen.set(key, type);
-    });
+    const { cleaned, nextTypes, changed } = dedupeAdditionalCompanyEntries(
+      data.additionalCompanies || {},
+      data.additionalCompanyTypes || [],
+    );
     if (changed) {
-      const nextTypes = (data.additionalCompanyTypes || []).filter(t => cleaned[t]);
       setData(prev => ({ ...prev, additionalCompanies: cleaned, additionalCompanyTypes: nextTypes }));
     }
   }, [data.additionalCompanies]);

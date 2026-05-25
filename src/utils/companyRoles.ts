@@ -42,6 +42,68 @@ export type CompanyRoleAssignment = CompanyRoleDef & {
   contacts: { name: string }[];
 };
 
+// dedupeAdditionalCompanyEntries — pure folding pass over the
+// additionalCompanies map that:
+//   1. Re-runs syncCompanyEntryPlaceholders on every entry so the
+//      placeholder flags stay in sync with the company/contact fields.
+//   2. Merges any two entries whose normalized company name matches,
+//      keeping the first-seen type and accumulating contacts from
+//      both sides.
+//   3. Drops the now-orphaned type key from additionalCompanyTypes.
+// Returns { cleaned, nextTypes, changed } — call site applies via
+// setData when changed is true.
+export const dedupeAdditionalCompanyEntries = (
+  entries: Record<string, any>,
+  additionalCompanyTypes: string[],
+): { cleaned: Record<string, any>; nextTypes: string[]; changed: boolean } => {
+  const seen = new Map<string, string>();
+  let changed = false;
+  const cleaned = { ...(entries || {}) };
+
+  Object.entries(entries || {}).forEach(([type, entry]: [string, any]) => {
+    const normalizedCurrent = syncCompanyEntryPlaceholders(cleaned[type] || entry);
+    if (JSON.stringify(normalizedCurrent) !== JSON.stringify(cleaned[type] || entry)) {
+      cleaned[type] = normalizedCurrent;
+      changed = true;
+    }
+    const key = normalizedCurrent?.company ? normalizeCompany(normalizedCurrent.company) : "";
+    if (!key) return;
+
+    if (seen.has(key)) {
+      const keepType = seen.get(key)!;
+      const keepEntry = syncCompanyEntryPlaceholders(cleaned[keepType] || {});
+      const keepContacts = keepEntry.contacts && keepEntry.contacts.length
+        ? keepEntry.contacts
+        : (keepEntry.contact ? [{ name: keepEntry.contact, inactive: false }] : []);
+      const entryContacts = normalizedCurrent.contacts && normalizedCurrent.contacts.length
+        ? normalizedCurrent.contacts
+        : (normalizedCurrent.contact ? [{ name: normalizedCurrent.contact, inactive: false }] : []);
+      const merged = [...keepContacts];
+      entryContacts.forEach((c: any) => {
+        if (!c?.name) return;
+        if (!merged.find((x: any) => normalizeContact(x.name) === normalizeContact(c.name))) {
+          merged.push({ name: c.name, inactive: !!c.inactive, placeholder: c.placeholder || null });
+        }
+      });
+      cleaned[keepType] = syncCompanyEntryPlaceholders({
+        ...keepEntry,
+        ...normalizedCurrent,
+        contacts: merged,
+        contact: merged[0]?.name || keepEntry.contact || normalizedCurrent.contact || "",
+        placeholder: keepEntry.placeholder || normalizedCurrent.placeholder || null,
+        contactPlaceholder: keepEntry.contactPlaceholder || normalizedCurrent.contactPlaceholder || null,
+      });
+      delete cleaned[type];
+      changed = true;
+      return;
+    }
+    seen.set(key, type);
+  });
+
+  const nextTypes = (additionalCompanyTypes || []).filter((t) => cleaned[t]);
+  return { cleaned, nextTypes, changed };
+};
+
 // buildCompanyRoleAssignments — emit one assignment row per role def.
 // `globalDirectoryByCompany` is a Map<normalizedCompanyName, contacts[]>
 // built upstream from the saved address book; we use it to suggest
