@@ -46,3 +46,33 @@ export const animateNavigationFocus = (el: unknown): void => {
   void el.offsetWidth;
   el.classList.add("animate-nav-focus");
 };
+
+// focusSearchLabel — find an interactive field by a human label (search result
+// click target), scroll it into view, pulse a brief outline, and focus it.
+// Falls back to data-search-key / data-audit-key attributes when no <label>
+// text matches. Retries up to N times with a 150ms gap so newly-mounted
+// sections (e.g. just-opened SubSections) have time to render their labels.
+const normalizeLabel = (s: unknown): string =>
+  (s || "").toString().toLowerCase().replace(/\s+/g, " ").trim();
+export const focusSearchLabel = (label: string, retries = 5): void => {
+  if (!label) return;
+  const target = normalizeLabel(label);
+  const tryFind = (remaining: number): void => {
+    const labels = Array.from(document.querySelectorAll("label"));
+    let match: Element | null = labels.find((l) => normalizeLabel(l.textContent).includes(target)) || null;
+    if (!match) {
+      const el = document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
+      match = el ? (el.closest("label") || el) : null;
+    }
+    const el = match || document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("audit-pulse");
+      setTimeout(() => el.classList.remove("audit-pulse"), 2400);
+      if ((el as HTMLElement).focus) (el as HTMLElement).focus();
+      return;
+    }
+    if (remaining > 0) setTimeout(() => tryFind(remaining - 1), 150);
+  };
+  tryFind(retries);
+};

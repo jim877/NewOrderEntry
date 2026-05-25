@@ -262,7 +262,7 @@ import { relevantScopeInstructionTypes } from './utils/serviceMapping';
 import { interviewAnswersFromOrderData, orderUpdatesFromInterviewAnswers } from './utils/interviewMapping';
 import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
 import { buildFullExportLines, copyLinesToClipboard, downloadLinesAsFile } from './utils/dataExport';
-import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, animateNavigationFocus } from './utils/domNav';
+import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, animateNavigationFocus, focusSearchLabel } from './utils/domNav';
 import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } from './utils/deliveryGroup';
 import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
 import { downloadOrderIcs } from './utils/icsExport';
@@ -5851,31 +5851,7 @@ export default function App(){
     });
   }, [jumpToSection, openSearchSubsection, scrollToSubsection]);
 
-  const focusSearchLabel = (label, retries = 5) => {
-    if (!label) return;
-    const normalize = (s) => (s || "").toString().toLowerCase().replace(/\s+/g, " ").trim();
-    const target = normalize(label);
-    const tryFind = (remaining) => {
-      const labels = Array.from(document.querySelectorAll("label"));
-      let match = labels.find(l => normalize(l.textContent).includes(target));
-      if (!match) {
-        const el = document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
-        match = el ? el.closest("label") || el : null;
-      }
-      const el = match || document.querySelector(`[data-search-key="${target}"], [data-audit-key="${target}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.classList.add("audit-pulse");
-        setTimeout(() => el.classList.remove("audit-pulse"), 2400);
-        if (el.focus) el.focus();
-        return;
-      }
-      if (remaining > 0) {
-        setTimeout(() => tryFind(remaining - 1), 150);
-      }
-    };
-    tryFind(retries);
-  };
+  // focusSearchLabel — imported from ./utils/domNav
 
   const handleSearchNavigate = (item) => {
     if (!item) return;
