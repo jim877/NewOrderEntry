@@ -264,6 +264,7 @@ import { ACTION_ITEM_GROUPS, groupActionItems } from './utils/actionItems';
 import { buildFullExportLines, copyLinesToClipboard, downloadLinesAsFile } from './utils/dataExport';
 import { focusFirstFieldInSection, focusLastFieldInSection, scrollToSection, animateNavigationFocus } from './utils/domNav';
 import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } from './utils/deliveryGroup';
+import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
 import {
   DURATION_DAYS, BAND_COLORS, DELIVERY_COLORS, STAY_TYPE_COLORS,
@@ -5276,38 +5277,15 @@ export default function App(){
   };
   
   const toggleSeverity = (code) => {
-    setData(prev => {
-        const current = prev.severityCodes || [];
-        const type = code.split('-')[0]; 
-        const others = current.filter(c => !c.startsWith(type + '-'));
-        const isActive = current.includes(code);
-        return { ...prev, severityCodes: isActive ? others : [...others, code] };
-    });
+    setData(prev => ({ ...prev, severityCodes: toggleSeverityCode(prev.severityCodes || [], code) }));
   };
 
   const updateLossDetail = (type, field, value) => {
-      setData(prev => {
-          const details = prev.lossDetails || {};
-          const typeDetails = details[type] || { causes: [], origins: [] };
-          let newValue;
-          if (Array.isArray(typeDetails[field])) {
-              // single-select for causes/origins
-              newValue = typeDetails[field].includes(value) ? [] : [value];
-          } else { newValue = value; }
-          const nextTypeDetails = { ...typeDetails, [field]: newValue };
-          return { ...prev, lossDetails: { ...details, [type]: nextTypeDetails } };
-      });
-      setLastLossDetailTouched({ type, ts: Date.now() });
+    setData(prev => ({ ...prev, lossDetails: updateLossDetailField(prev.lossDetails, type, field, value) }));
+    setLastLossDetailTouched({ type, ts: Date.now() });
   };
 
-  const getLossSummary = (type) => {
-      const d = (data.lossDetails || {})[type];
-      if (!d) return "No details selected";
-      const parts = [];
-      if (d.causes && d.causes.length) parts.push(d.causes.join(", "));
-      if (d.origins && d.origins.length) parts.push(d.origins.join(", "));
-      return parts.join("; ");
-  };
+  const getLossSummary = (type) => getLossSummaryFor(data.lossDetails, type);
 
   const toggleMinimizeLoss = (type) => {
       setMinimizedLossTypes(prev => ({ ...prev, [type]: !prev[type] }));
