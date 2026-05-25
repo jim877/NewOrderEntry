@@ -137,6 +137,7 @@ import {
   AddNewSystemModal,
   OrderInstructionModal,
   AlertModal,
+  SmartConfirmModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14052,41 +14053,7 @@ export default function App(){
         </div>
       )}
       {smartConfirm.isOpen && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="bg-sky-500 px-6 py-4">
-              <h3 className="text-xl font-bold text-white">{smartConfirm.title || "Confirm Smart Update"}</h3>
-            </div>
-            <div className="p-6 space-y-3">
-              {smartConfirm.message && (
-                <p className="text-sm text-slate-700">{smartConfirm.message}</p>
-              )}
-              {smartConfirm.details?.length > 0 && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                  <ul className="space-y-1 text-sm text-slate-700">
-                    {smartConfirm.details.map((detail, index) => (
-                      <li key={`${detail}-${index}`}>• {detail}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
-              <button
-                className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                onClick={() => resolveSmartConfirm(false)}
-              >
-                {smartConfirm.cancelLabel || "Keep"}
-              </button>
-              <button
-                className="rounded-lg bg-orange-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-orange-600"
-                onClick={() => resolveSmartConfirm(true)}
-              >
-                {smartConfirm.confirmLabel || "Remove"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SmartConfirmModal state={smartConfirm} onResolve={resolveSmartConfirm} />
       )}
       {roleAssignModal.isOpen && (
         <div data-suggested-roles-modal="true" className="fixed inset-0 z-[131] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-12 sm:pt-20"
