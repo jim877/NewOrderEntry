@@ -7,7 +7,12 @@
 // from computeAuditMissing() at the call site.
 
 import { isPlaceholderFlagActive, isAddressPlaceholder } from "./order";
-import { isCompanyPlaceholder, isContactPlaceholder, syncCompanyEntryPlaceholders } from "./companyEntry";
+import {
+  isCompanyPlaceholder,
+  isContactPlaceholder,
+  syncCompanyEntryPlaceholders,
+  companyTypeRequiresContact,
+} from "./companyEntry";
 import { isNonRestorationSelected } from "./orderType";
 
 type AuditMissingItem = { key?: string; section?: string; id?: string; [k: string]: any };
@@ -19,6 +24,59 @@ type SectionStatus = { required: number; missing: number; complete: boolean };
 // section reads as "complete" only when its required count is > 0 AND
 // nothing is currently missing (so a section with no requirements doesn't
 // flash green falsely).
+// computeAuditRequiredCount — total count of fields/placeholders that
+// must be filled in for a 100% audit score. Mirrors the section-by-
+// section bumps in computeSectionAuditStatus but returns a single
+// scalar used to drive the audit progress %.
+export const computeAuditRequiredCount = (
+  data: any,
+  severityGroups: string[],
+): number => {
+  let total = 0;
+  total += 1; // orderName
+  total += 1; // orderTypes
+  if (isNonRestorationSelected(data.orderTypes || [])) total += 1;
+  total += 1; // lead source category
+  if (data.leadSourceCategory === "Referral") total += 2;
+  if (data.leadSourceCategory === "Marketing" || data.leadSourceCategory === "Internal") total += 1;
+  total += 1; // billingPayer
+  total += 4; // customer fields
+  total += 6; // address fields
+  if ((data.orderTypes || []).includes("Mold")) total += 1;
+  if (data.rentOrOwn === "Rent") total += 1;
+
+  const needsPickupAudit = ["Pickup Complete", "Ready to Bill"].includes(data.orderStatus);
+  const needsFinanceAudit = ["Intake Complete", "Ready to Bill"].includes(data.orderStatus);
+  if (needsPickupAudit) {
+    const severityGroupsNeeded = (data.orderTypes || []).reduce((acc: Set<string>, t: string) => {
+      const group = t === "Dust/Debris" ? "Dust" : t;
+      if (severityGroups.includes(group)) acc.add(group);
+      return acc;
+    }, new Set<string>());
+    total += severityGroupsNeeded.size;
+    total += 2; // interview + codes
+  }
+  if (needsFinanceAudit) total += 4;
+
+  total += (data.addresses || []).filter((addr: any) => isAddressPlaceholder(addr)).length;
+  total += (data.customers || []).filter(
+    (customer: any) => isPlaceholderFlagActive(customer?.placeholder)
+  ).length;
+  total += Object.entries(data.additionalCompanies || {}).reduce(
+    (acc: number, [type, rawEntry]: [string, any]) => {
+      const entry = syncCompanyEntryPlaceholders(rawEntry || {});
+      let count = acc;
+      const companyPending = isCompanyPlaceholder(entry);
+      if (companyPending) count += 1;
+      if (!companyPending && companyTypeRequiresContact(type) && isContactPlaceholder(entry)) count += 1;
+      return count;
+    },
+    0
+  );
+
+  return total;
+};
+
 export const computeSectionAuditStatus = (
   data: any,
   missing: AuditMissingItem[],

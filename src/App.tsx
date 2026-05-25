@@ -301,7 +301,7 @@ import { renderAlertMessageContent, renderAlertDetailContent } from './utils/ale
 import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
 import { getOrderCompanyNames, getOrderContactNames, getEstimateRequesterQuickOptions, resolveOrderPoc } from './utils/orderEntities';
 import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
-import { computeSectionAuditStatus } from './utils/auditStatus';
+import { computeSectionAuditStatus, computeAuditRequiredCount as computeAuditRequiredCountFor } from './utils/auditStatus';
 import { buildOrderNarrative } from './utils/orderNarrative';
 import { computeAuditMissing as computeAuditMissingFor } from './utils/auditMissing';
 import { buildCompanyRoleAssignments } from './utils/companyRoles';
@@ -6278,47 +6278,7 @@ export default function App(){
 
   const computeAuditMissing = () => computeAuditMissingFor(data, fieldConfig, ORDER_STATUSES, SEVERITY_GROUPS);
 
-  const computeAuditRequiredCount = () => {
-    let total = 0;
-    const primaryCustomer = (data.customers || [])[0] || {};
-    const primaryAddress = (data.addresses || [])[0] || {};
-    total += 1; // orderName
-    total += 1; // orderTypes
-    if (isNonRestorationSelected(data.orderTypes || [])) total += 1; // nonRestorationSubtype
-    total += 1; // lead source category
-    if (data.leadSourceCategory === "Referral") total += 2;
-    if (data.leadSourceCategory === "Marketing" || data.leadSourceCategory === "Internal") total += 1;
-    total += 1; // billingPayer
-    total += 4; // customer fields
-    total += 6; // address fields
-    if ((data.orderTypes || []).includes("Mold")) total += 1;
-    if (data.rentOrOwn === "Rent") total += 1;
-    const needsPickupAudit = ["Pickup Complete","Ready to Bill"].includes(data.orderStatus);
-    const needsFinanceAudit = ["Intake Complete","Ready to Bill"].includes(data.orderStatus);
-    if (needsPickupAudit) {
-      const severityGroupsNeeded = (data.orderTypes || []).reduce((acc, t) => {
-        const group = t === "Dust/Debris" ? "Dust" : t;
-        if (SEVERITY_GROUPS.includes(group)) acc.add(group);
-        return acc;
-      }, new Set());
-      total += severityGroupsNeeded.size;
-      total += 2; // interview + codes sections
-    }
-    if (needsFinanceAudit) {
-      total += 4; // pricePlatform, priceList, multiplier, estimateRequested
-    }
-    total += (data.addresses || []).filter(addr => isAddressPlaceholder(addr)).length;
-    total += (data.customers || []).filter((customer) => isPlaceholderFlagActive(customer?.placeholder)).length;
-    total += Object.entries(data.additionalCompanies || {}).reduce((acc, [type, rawEntry]) => {
-      const entry = syncCompanyEntryPlaceholders(rawEntry || {});
-      let count = acc;
-      const companyPending = isCompanyPlaceholder(entry);
-      if (companyPending) count += 1;
-      if (!companyPending && companyTypeRequiresContact(type) && isContactPlaceholder(entry)) count += 1;
-      return count;
-    }, 0);
-    return total;
-  };
+  const computeAuditRequiredCount = () => computeAuditRequiredCountFor(data, SEVERITY_GROUPS);
 
   const getCompanyProfile = useCallback(
     (companyName = "") => resolveCompanyProfile(companyName, sampleContacts),
