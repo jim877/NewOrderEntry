@@ -158,6 +158,7 @@ import {
   InterviewActionsConfigCard,
   FieldConfigGrid,
   BlockerRulesCard,
+  FieldConfigToolbar,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -11954,29 +11955,16 @@ export default function App(){
         {/* Field Configuration Page */}
         {showFieldConfig && (
           <div className="fixed inset-0 z-[200] bg-white flex flex-col" onKeyDown={e => { if (e.key === "Escape") setShowFieldConfig(false); }} tabIndex={-1} ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = "true"; el.focus(); } }}>
-            <div className="flex-shrink-0 flex items-center gap-3 bg-white border-b border-slate-200 px-4 py-2 shadow-sm z-10">
-              <span className="text-sm font-bold text-slate-700">Field Configuration</span>
-              <input
-                value={configSearch}
-                onChange={e => setConfigSearch(e.target.value)}
-                placeholder="Search fields..."
-                className="ml-3 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-sky-400 w-48"
-              />
-              <span className="text-xs text-slate-400">{Object.keys(fieldConfig).length} fields</span>
-              <div className="flex-1" />
-              {configSelectedKeys.size > 0 && (
-                <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-lg px-3 py-1.5">
-                  <span className="text-xs font-bold text-sky-700">{configSelectedKeys.size} selected</span>
-                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], requiredInAudit: true}; }); return next; }); }} className="rounded-full border border-sky-300 bg-white px-2 py-0.5 text-[10px] font-bold text-sky-700 hover:bg-sky-50">Required: On</button>
-                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], requiredInAudit: false}; }); return next; }); }} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:bg-slate-50">Required: Off</button>
-                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], visible: true}; }); return next; }); }} className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">Show</button>
-                  <button onClick={() => { setFieldConfig(prev => { const next = {...prev}; configSelectedKeys.forEach(k => { if (next[k]) next[k] = {...next[k], visible: false}; }); return next; }); }} className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-bold text-rose-600 hover:bg-rose-50">Hide</button>
-                  <button onClick={() => setConfigSelectedKeys(new Set())} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
-                </div>
-              )}
-              <button onClick={() => { setFieldConfig({...DEFAULT_FIELD_CONFIG}); setBlockerRules([...DEFAULT_BLOCKER_RULES]); setToast("Reset to defaults"); }} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200">Reset Defaults</button>
-              <button onClick={() => setShowFieldConfig(false)} className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">Close</button>
-            </div>
+            <FieldConfigToolbar
+              fieldConfig={fieldConfig}
+              setFieldConfig={setFieldConfig}
+              selectedKeys={configSelectedKeys}
+              setSelectedKeys={setConfigSelectedKeys}
+              search={configSearch}
+              setSearch={setConfigSearch}
+              onResetDefaults={() => { setFieldConfig({ ...DEFAULT_FIELD_CONFIG }); setBlockerRules([...DEFAULT_BLOCKER_RULES]); setToast("Reset to defaults"); }}
+              onClose={() => setShowFieldConfig(false)}
+            />
             <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto w-full space-y-6">
               <FieldConfigGrid
                 sections={FIELD_CONFIG_SECTIONS}
