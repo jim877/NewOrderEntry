@@ -313,6 +313,7 @@ import {
   applyOrderPocReducer,
   applyContactPocReducer,
   isPocContact as isPocContactFor,
+  applyPrimaryPolicyHolderReducer,
 } from './utils/orderEntities';
 import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
 import { computeSectionAuditStatus, computeAuditRequiredCount as computeAuditRequiredCountFor } from './utils/auditStatus';
@@ -5986,21 +5987,7 @@ export default function App(){
 
   useEffect(() => {
     const insuranceRelated = data.involvesInsurance === "Yes" && hasRestorationOrderType(data.orderTypes || []);
-    if (!insuranceRelated) {
-      setData(prev => ({
-        ...prev,
-        customers: (prev.customers || []).map((c, idx) => idx === 0 ? { ...c, policyHolder: false, type: c.type === "Policyholder" ? "" : c.type } : c)
-      }));
-      return;
-    }
-    setData(prev => {
-      const customers = prev.customers || [];
-      if (!customers.length) return prev;
-      const first = customers[0];
-      if (first.policyHolder && first.type === "Policyholder") return prev;
-      const updated = customers.map((c, idx) => idx === 0 ? { ...c, policyHolder: true, type: "Policyholder" } : c);
-      return { ...prev, customers: updated };
-    });
+    setData(prev => applyPrimaryPolicyHolderReducer(prev, insuranceRelated));
   }, [data.involvesInsurance, data.orderTypes]);
 
   useEffect(() => {

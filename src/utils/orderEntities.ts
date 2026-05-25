@@ -87,6 +87,32 @@ export const resolveOrderPoc = (data: any): OrderPoc | null => {
   return null;
 };
 
+// applyPrimaryPolicyHolderReducer — pure reducer that flips the
+// primary customer's policyHolder flag + type based on whether the
+// order is currently insurance-related. When insurance-related, marks
+// the primary customer as Policyholder; when not, clears the flag and
+// "Policyholder" type. Returns prev when no change needed.
+export const applyPrimaryPolicyHolderReducer = (prev: any, insuranceRelated: boolean) => {
+  const customers = prev.customers || [];
+  if (!customers.length) return prev;
+  if (!insuranceRelated) {
+    return {
+      ...prev,
+      customers: customers.map((c: any, idx: number) =>
+        idx === 0 ? { ...c, policyHolder: false, type: c.type === "Policyholder" ? "" : c.type } : c
+      ),
+    };
+  }
+  const first = customers[0];
+  if (first.policyHolder && first.type === "Policyholder") return prev;
+  return {
+    ...prev,
+    customers: customers.map((c: any, idx: number) =>
+      idx === 0 ? { ...c, policyHolder: true, type: "Policyholder" } : c
+    ),
+  };
+};
+
 // applyOrderPocReducer — pure reducer that walks customers + vendors
 // and flips isPoc exclusively to the target. Pass null to clear all
 // POC flags. Customer rows hold POC for customer-flagged entries;
