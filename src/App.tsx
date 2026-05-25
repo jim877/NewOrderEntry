@@ -303,6 +303,7 @@ import { getOrderCompanyNames, getOrderContactNames, getEstimateRequesterQuickOp
 import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
 import { computeSectionAuditStatus } from './utils/auditStatus';
 import { buildOrderNarrative } from './utils/orderNarrative';
+import { computeAuditMissing as computeAuditMissingFor } from './utils/auditMissing';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6271,105 +6272,7 @@ export default function App(){
     setPreviewOpen(true);
   };
 
-  const computeAuditMissing = () => {
-    const missing = [];
-    const primaryCustomer = (data.customers || [])[0] || {};
-    const primaryAddress = (data.addresses || [])[0] || {};
-    const statusIndex = ORDER_STATUSES.indexOf(data.orderStatus);
-
-    // Named check functions for complex validations
-    const checkFns = {
-      hasPrimaryOrderTypeDecision: () => hasPrimaryOrderTypeDecision(data.orderTypes || []),
-      hasRequiredNonRestorationSubtype: () => hasRequiredNonRestorationSubtype(data.orderTypes || []),
-      interviewCompleted: () => !!(data.livingStatus || data.processType || data.repairsSummary || (data.packoutSummary||[]).length || data.damageWasWet || data.damageMoldMildew || data.structuralElectricDamage === "Y" || data.noLights || data.noHeat || data.boardedUp),
-      codesCompleted: () => !!((data.severityCodes||[]).length || data.qualityCode || (data.handlingCodes||[]).length),
-    };
-
-    // Resolve value from key or dataPath
-    const resolveValue = (key, cfg) => {
-      if (cfg.dataPath) {
-        if (cfg.dataPath.startsWith("customers[0].")) return primaryCustomer[cfg.dataPath.split(".")[1]];
-        if (cfg.dataPath.startsWith("addresses[0].")) return primaryAddress[cfg.dataPath.split(".")[1]];
-      }
-      return data[key];
-    };
-
-    // Evaluate condition guard
-    const conditionMet = (cond) => {
-      if (!cond) return true;
-      if (cond.equals) return data[cond.field] === cond.equals;
-      if (cond.oneOf) return (cond.oneOf || []).includes(data[cond.field]);
-      if (cond.includes) return (data[cond.field] || []).includes(cond.includes);
-      return true;
-    };
-
-    // Check status gate
-    const statusGateMet = (requiredAtStatus) => {
-      if (!requiredAtStatus || requiredAtStatus === "always") return true;
-      if (requiredAtStatus === "never") return false;
-      const gateIndex = ORDER_STATUSES.indexOf(requiredAtStatus);
-      return gateIndex >= 0 && statusIndex >= gateIndex;
-    };
-
-    // Config-driven field checks
-    Object.entries(fieldConfig).forEach(([key, cfg]) => {
-      if (!cfg.requiredInAudit) return;
-      if (!statusGateMet(cfg.requiredAtStatus)) return;
-      if (!conditionMet(cfg.condition)) return;
-
-      let isEmpty;
-      if (cfg.checkFn && checkFns[cfg.checkFn]) {
-        isEmpty = !checkFns[cfg.checkFn]();
-      } else {
-        isEmpty = !resolveValue(key, cfg);
-      }
-
-      if (isEmpty) {
-        missing.push({ id: cfg.section, label: cfg.label, section: cfg.section, key });
-      }
-    });
-
-    // Dynamic severity checks (special case — keys depend on order types)
-    if (["Pickup Complete","Ready to Bill"].includes(data.orderStatus)) {
-      const severityGroupsNeeded = (data.orderTypes || []).reduce((acc, t) => {
-        const group = t === "Dust/Debris" ? "Dust" : t;
-        if (SEVERITY_GROUPS.includes(group)) acc.add(group);
-        return acc;
-      }, new Set());
-      severityGroupsNeeded.forEach(group => {
-        const hasCode = (data.severityCodes || []).some(c => c.startsWith(group + "-"));
-        if (!hasCode) missing.push({ id: "sec1", label: `${group} Severity`, section: "sec1", key: `severity-${group.toLowerCase()}` });
-      });
-    }
-
-    // Structural placeholder checks (not field-config driven)
-    (data.customers || []).forEach((customer, idx) => {
-      if (!isPlaceholderFlagActive(customer?.placeholder)) return;
-      const customerLabel = [customer?.first, customer?.last].filter(hasMeaningfulValue).join(" ").trim() || `Customer ${idx + 1}`;
-      missing.push({ id: "sec2", label: `Resolve Placeholder: ${customerLabel}`, section: "sec2", key: `placeholder-customer-${customer?.id || idx}`, category: "placeholders" });
-    });
-    (data.vendors || []).forEach((v, idx) => {
-      if (v.incomplete) {
-        missing.push({ id: "sec4", label: `Incomplete: ${v.contact || v.company || `Company ${idx + 1}`}`, section: "sec4", key: `placeholder-vendor-${v.id || idx}`, category: "placeholders", vendorIdx: idx });
-      }
-    });
-    (data.addresses || []).forEach((addr, idx) => {
-      if (!isAddressPlaceholder(addr)) return;
-      const addrLabel = addr?.type || (idx === 0 ? "Primary Address" : `Address ${idx + 1}`);
-      const addrContext = addr?.linkedContext ? ` (${addr.linkedContext})` : "";
-      missing.push({ id: "sec3", label: `Resolve Placeholder: ${addrLabel}${addrContext}`, section: "sec3", key: `placeholder-address-${addr.id}`, category: "placeholders" });
-    });
-    Object.entries(data.additionalCompanies || {}).forEach(([type, rawEntry]) => {
-      const entry = syncCompanyEntryPlaceholders(rawEntry || {});
-      if (isCompanyPlaceholder(entry)) {
-        missing.push({ id: "sec4", label: `Resolve Placeholder: ${type} company`, section: "sec4", key: `placeholder-company-${normalizePlaceholderKeyPart(type)}`, category: "placeholders" });
-      } else if (companyTypeRequiresContact(type) && isContactPlaceholder(entry)) {
-        missing.push({ id: "sec4", label: `Resolve Placeholder: ${type} contact`, section: "sec4", key: `placeholder-contact-${normalizePlaceholderKeyPart(type)}`, category: "placeholders" });
-      }
-    });
-
-    return missing;
-  };
+  const computeAuditMissing = () => computeAuditMissingFor(data, fieldConfig, ORDER_STATUSES, SEVERITY_GROUPS);
 
   const computeAuditRequiredCount = () => {
     let total = 0;
