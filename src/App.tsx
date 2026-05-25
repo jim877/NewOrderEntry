@@ -10304,24 +10304,31 @@ export default function App(){
                   };
                   const DURATION_OPTIONS = INTERVIEW_DURATION_OPTIONS;
 
-                  return <div className={`noe-iq rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 border-l-teal-400`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: !p.living}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-teal-50/50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">13</span>{highlightSearch("Staying in Home")}</div>
-                      {answered && !expanded && <div className="flex items-center gap-1 ml-2">
-                        {timeline.length > 0 ? timeline.map((s, i) => (
-                          <span key={s.id} className="text-[10px] text-emerald-600">{i > 0 && " → "}{s.type}{s.duration ? ` (${s.duration})` : ""}</span>
-                        )) : <span className="text-[10px] text-emerald-600">{summary}</span>}
-                      </div>}
-  
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-	                    {expanded && <div className="px-3 pb-3 space-y-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          <button type="button" onClick={() => setCanStayHome(true)} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Staying in home" ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600 hover:border-indigo-300"}`}>Yes, staying home</button>
-                          <button type="button" onClick={() => setCanStayHome(false)} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Not staying in home" || timeline.some(s => s.type !== "Staying in home") ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>No, staying elsewhere</button>
-                        </div>
+                  const summaryNode = timeline.length > 0 ? (
+                    <div className="flex items-center gap-1">
+                      {timeline.map((s, i) => (
+                        <span key={s.id} className="text-[10px] text-emerald-600">{i > 0 && " → "}{s.type}{s.duration ? ` (${s.duration})` : ""}</span>
+                      ))}
+                    </div>
+                  ) : <span className="text-[10px] text-emerald-600">{summary}</span>;
+                  return (
+                    <InterviewQuestionCard
+                      number={13}
+                      title="Staying in Home"
+                      summary={summaryNode}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      showAnsweredTint={false}
+                      accent="teal"
+                      onToggle={() => setInterviewExpanded(p => ({ ...p, living: !p.living }))}
+                    >
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => setCanStayHome(true)} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Staying in home" ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600 hover:border-indigo-300"}`}>Yes, staying home</button>
+                        <button type="button" onClick={() => setCanStayHome(false)} className={`rounded-xl border-2 px-4 py-3 text-[13px] font-bold transition-all ${data.livingStatus === "Not staying in home" || timeline.some(s => s.type !== "Staying in home") ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300"}`}>No, staying elsewhere</button>
+                      </div>
 
-                      {/* Staying in home — coaching */}
                       {data.livingStatus === "Staying in home" && showCoaching && !dismissedCoaching.has("c-stayHome") && (
                         <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[11px] text-violet-700 flex items-start gap-1">
                           <span className="flex-1">{coaching("section.stayingHome")}</span>
@@ -10424,9 +10431,9 @@ export default function App(){
                         </div>
                       </div>}
 
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, living: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
-                    </div>}
-                  </div>;
+                      <CollapseInterviewRow log={log} onCollapse={() => setInterviewExpanded(p => ({ ...p, living: false }))} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
+                  );
                 })()}
 
                 {/* Rush Delivery Needed? (Q14) */}
