@@ -341,6 +341,7 @@ import {
   findSampleContact,
 } from './utils/contactOptions';
 import { computeSuggestedReferrerRoles } from './utils/referrerRoles';
+import { buildActionItemPlaceholders, buildBillToBlockers } from './utils/actionItemsData';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -11063,26 +11064,10 @@ export default function App(){
         {/* Action Items Panel */}
         {actionItemsOpen && (() => {
           const missing = computeAuditMissing();
-          const coreBlockers = (scopeBridgeState.pendingIssues || []).filter(Boolean);
-          // Add bill-to progress blockers when order is past intake
-          const billToBlockers: string[] = [];
-          if (data.pickupDate && !data.eventCustomerContacted) billToBlockers.push("Customer/POC not yet contacted");
-          if (data.pickupDate && !data.eventBillToContacted && (data as any).billToPaymentDirection !== "self-pay") billToBlockers.push("Bill To not yet contacted");
-          if (data.pickupDate && !(data as any).billToPaymentDirection) billToBlockers.push("Direction of Payment not confirmed");
-          if (data.pickupDate && !(data as any).billToApprovalStatus) billToBlockers.push("Scope approval pending");
-          const formalBlockers = coreBlockers;
-          const softBlockers = billToBlockers;
+          const formalBlockers = (scopeBridgeState.pendingIssues || []).filter(Boolean);
+          const softBlockers = buildBillToBlockers(data);
           const blockers = [...formalBlockers, ...softBlockers];
-          const placeholders = [
-            ...(data.customers || []).filter(c => {
-              if (isPlaceholderFlagActive(c?.placeholder)) return true;
-              const hasName = hasMeaningfulValue(c?.first) && hasMeaningfulValue(c?.last);
-              const hasContact = hasMeaningfulValue(c?.phone) || hasMeaningfulValue(c?.email);
-              return !hasName || (hasMeaningfulValue(c?.first) && !hasContact);
-            }).map(c => ({ label: [c.first, c.last].filter(Boolean).join(" ") || "Customer", section: "sec2", type: "customer" })),
-            ...(data.addresses || []).filter(a => !a.inactive && isAddressPlaceholder(a)).map(a => ({ label: (a.type && a.type !== "Address" && a.type !== "Primary" ? `${a.type} Address` : "") || a.purpose || a.name || a.placeholder?.reason || "Address needed", section: "sec3", type: "address" })),
-            ...(data.vendors || []).filter(v => v.incomplete).map(v => ({ label: v.contact || v.company || "Company", section: "sec4", type: "company" })),
-          ];
+          const placeholders = buildActionItemPlaceholders(data);
           return (
             <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] z-[110] bg-white shadow-2xl flex flex-col border-l border-slate-200">
                 <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-amber-50 shrink-0">
