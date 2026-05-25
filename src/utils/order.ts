@@ -56,6 +56,25 @@ export const formatOrderAddressChoiceLabel = (addr: any = {}, idx = 0) => {
   return `${type} — ${line || "TBD"}`;
 };
 
+// appendAddressAndLinkToGroupReducer — pure reducer used by the
+// "add address from group-link modal" flows. Appends `newAddress`
+// to the order's address list and writes/updates the link so the
+// given group points at it.
+export const appendAddressAndLinkToGroupReducer = (
+  prev: any,
+  group: string,
+  newAddress: any,
+) => {
+  const links = { ...(prev.groupAddressLinks || {}) };
+  const current = links[group] || {};
+  links[group] = { ...current, addressId: newAddress.id };
+  return {
+    ...prev,
+    addresses: [...(prev.addresses || []), newAddress],
+    groupAddressLinks: links,
+  };
+};
+
 // tryAppendAddressType — pure pseudo-reducer used by ensureAddressType.
 // If no active address of the given type exists, returns the patch
 // to append one (a placeholder when `placeholder=true`, otherwise an

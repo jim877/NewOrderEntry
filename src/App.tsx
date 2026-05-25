@@ -249,6 +249,7 @@ import {
   resolveAddressChoicePayload,
   resolveAddressChoiceValue,
   tryAppendAddressType,
+  appendAddressAndLinkToGroupReducer,
 } from './utils/order';
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
@@ -5547,16 +5548,7 @@ export default function App(){
       street: "TBD",
       placeholder: createPlaceholderFlag("address", `${group} placeholder`)
     });
-    setData(prev => {
-      const links = { ...(prev.groupAddressLinks || {}) };
-      const current = links[group] || {};
-      links[group] = { ...current, addressId: newAddress.id };
-      return {
-        ...prev,
-        addresses: [...(prev.addresses || []), newAddress],
-        groupAddressLinks: links
-      };
-    });
+    setData(prev => appendAddressAndLinkToGroupReducer(prev, group, newAddress));
     setToast("Placeholder address added and linked.");
     setGroupLinkAddressMode("select");
     setGroupLinkAddressDraft({ type: "", street: "", city: "", state: "", zip: "" });
@@ -5581,16 +5573,7 @@ export default function App(){
       isLossSite: false,
       placeholder: null
     });
-    setData(prev => {
-      const links = { ...(prev.groupAddressLinks || {}) };
-      const current = links[group] || {};
-      links[group] = { ...current, addressId: newAddress.id };
-      return {
-        ...prev,
-        addresses: [...(prev.addresses || []), newAddress],
-        groupAddressLinks: links
-      };
-    });
+    setData(prev => appendAddressAndLinkToGroupReducer(prev, group, newAddress));
     setToast("Address added and linked.");
     setGroupLinkAddressMode("select");
     setGroupLinkAddressDraft({ type: "", street: "", city: "", state: "", zip: "" });
