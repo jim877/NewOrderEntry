@@ -305,6 +305,7 @@ import { computeSectionAuditStatus } from './utils/auditStatus';
 import { buildOrderNarrative } from './utils/orderNarrative';
 import { computeAuditMissing as computeAuditMissingFor } from './utils/auditMissing';
 import { buildCompanyRoleAssignments } from './utils/companyRoles';
+import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6745,35 +6746,22 @@ export default function App(){
       }
     }));
   }, [patchScopeBridge]);
-  const autoBridgeIssues = useMemo(() => {
-    const auto = [];
-    const milestones = scopeBridgeState.milestones || {};
-    const authorizationOnFile = !!milestones.authorizationOnFile;
-    const proceedWithoutApproval = !!milestones.proceedWithoutApproval;
-    const estimateApproved = proceedWithoutApproval || !!milestones.estimateApproved || hasMeaningfulValue(data.estimateApprovedAt);
-    const estimateRequestedBy = (data.estimateRequestedBy || "").toString().trim().toLowerCase();
-    const estimateRequestedByInsurance = /\b(adjuster|insurance|carrier|public adjuster|pa|tpa)\b/.test(estimateRequestedBy);
-
-    if (!authorizationOnFile) auto.push("Won't Sign Authorization");
-    if (!!data.estimateRequested && !estimateApproved) {
-      auto.push(estimateRequestedByInsurance ? "Adjuster Wants Estimate" : "Customer Wants Estimate");
-    }
-    if (currentOrderSpecialDocs.length > 0) {
-      auto.push(SPECIAL_PAPERWORK_BLOCKER);
-    }
-    if (normalizeCompany(data.insuranceCompany || "") === normalizeCompany("Not Yet Known")) {
-      auto.push(UNKNOWN_INSURANCE_BLOCKER);
-    }
-
-    return Array.from(new Set(auto));
-  }, [
-    scopeBridgeState.milestones,
-    data.estimateRequested,
-    data.estimateRequestedBy,
-    data.estimateApprovedAt,
-    data.insuranceCompany,
-    currentOrderSpecialDocs,
-  ]);
+  const autoBridgeIssues = useMemo(
+    () => computeAutoBridgeIssues(
+      data,
+      scopeBridgeState.milestones || {},
+      currentOrderSpecialDocs,
+      { specialPaperwork: SPECIAL_PAPERWORK_BLOCKER, unknownInsurance: UNKNOWN_INSURANCE_BLOCKER },
+    ),
+    [
+      scopeBridgeState.milestones,
+      data.estimateRequested,
+      data.estimateRequestedBy,
+      data.estimateApprovedAt,
+      data.insuranceCompany,
+      currentOrderSpecialDocs,
+    ]
+  );
   const autoManagedBridgeBlockerSet = useMemo(
     () => new Set(BRIDGE_AUTO_MANAGED_BLOCKERS),
     []
