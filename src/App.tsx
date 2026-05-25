@@ -330,6 +330,7 @@ import {
   getContactOptionsForCompany as getContactOptionsForCompanyFor,
   findSampleContact,
 } from './utils/contactOptions';
+import { computeSuggestedReferrerRoles } from './utils/referrerRoles';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -7224,21 +7225,10 @@ export default function App(){
     }
   }, [data.referringCompany, data.referrer]);
 
-  const suggestedReferrerRoles = useMemo(() => {
-    const roles = [];
-    const company = data.referringCompany || "";
-    const contact = data.referrer || "";
-    if (contact) roles.push("adjuster");
-    const isCarrier = NATIONAL_CARRIERS.some(c => normalizeCompany(c) === normalizeCompany(company));
-    if (isCarrier) roles.push("insurance", "billing", "national");
-    return roles.filter(r => {
-      if (r === "adjuster") return !data.insuranceAdjuster || data.insuranceAdjuster === contact;
-      if (r === "billing") return !data.billingCompany || data.billingCompany === company;
-      if (r === "insurance") return !data.insuranceCompany || data.insuranceCompany === company;
-      if (r === "national") return !data.nationalCarrier || data.nationalCarrier === company;
-      return true;
-    });
-  }, [data.referringCompany, data.referrer]);
+  const suggestedReferrerRoles = useMemo(
+    () => computeSuggestedReferrerRoles(data, NATIONAL_CARRIERS),
+    [data.referringCompany, data.referrer]
+  );
 
   const updateAdditionalCompanyType = (type) => {
     const next = toggleMulti(data.additionalCompanyTypes || [], type);
