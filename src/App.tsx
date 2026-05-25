@@ -166,6 +166,7 @@ import {
   RushGuideOptionalDeliveries,
   RushGuideOutputActions,
   RushGuideSetupPanel,
+  RushGuideDeliveryCards,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -11648,136 +11649,27 @@ export default function App(){
                             </div>
                           )}
 
-                          {/* Delivery group cards with merged sublists */}
-                          <div className="px-4 pb-4 space-y-3">
-                            {deliveryGroups.map((dg, i) => {
-                              // Find seasonal/event items assigned to this delivery group
-                              const mergedSeasons = seasonalWardrobes.filter(sw => {
-                                const ovr = (rushGuideData as any).seasonOverrides?.[sw.id] || {};
-                                return (ovr.group || sw.assignedGroup) === dg.id;
-                              });
-                              const mergedEvents = (data.upcomingEvents || []).filter((evt: any) => {
-                                const ovr = (rushGuideData as any).eventOverrides?.[evt.id] || {};
-                                return ovr.group === dg.id;
-                              });
-                              return (
-                              <div key={dg.id} id={`delivery-card-${dg.id}`} className="rounded-2xl border border-slate-200 overflow-hidden transition-all duration-300">
-	                                <div className={`${dg.color} px-4 py-3 text-white flex items-center gap-3`}>
-	                                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0 shadow-sm ring-2 ring-white/20">
-	                                    <span className="text-xl font-bold leading-none">{i + 1}</span>
-	                                  </div>
-	                                  <div className="flex-1 min-w-0">
-	                                    <div className="font-bold text-sm">{dg.icon} {dg.label}</div>
-	                                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
-	                                      <label className="min-w-[170px] flex-1 sm:flex-none">
-	                                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-white/65">Date</span>
-	                                        <input type="date" defaultValue={formatDateInputValue(dg.date)} key={`date-${dg.id}-v${deliveryDateVersion}`} onChange={e => {
-	                                          const val = e.target.value;
-	                                          if (!val) return;
-	                                          if (dg.id.startsWith("custom_")) {
-	                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, dateStr: val } : cd) }));
-	                                          } else {
-	                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), dateStr: val } } }));
-	                                          }
-	                                        }} className="h-9 w-full rounded-lg border border-white/30 bg-white/95 px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-white focus:ring-2 focus:ring-white/40" />
-	                                      </label>
-	                                      <label className="min-w-0 flex-[2]">
-	                                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-white/65">Address</span>
-		                                        <select value={addressChoiceValue(dg)} onChange={e => {
-		                                          const payload = addressPayloadFromChoice(e.target.value);
-		                                          if (dg.id.startsWith("custom_")) {
-		                                            setRushGuideData((p: any) => ({ ...p, customDeliveries: (p.customDeliveries || []).map(cd => cd.id === dg.id ? { ...cd, ...payload } : cd) }));
-		                                          } else {
-		                                            setRushGuideData((p: any) => ({ ...p, groupOverrides: { ...(p.groupOverrides || {}), [dg.id]: { ...((p.groupOverrides || {})[dg.id] || {}), ...payload } } }));
-		                                          }
-		                                        }} className="h-9 w-full rounded-lg border border-white/30 bg-white/95 px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-white focus:ring-2 focus:ring-white/40">
-		                                          <option value="">{dg.address || `${dg.location || "Delivery"} address...`}</option>
-		                                          {orderAddressChoices.known.length > 0 && <optgroup label="★ EXISTING ADDRESSES ON THIS ORDER ★">
-		                                            {orderAddressChoices.known.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-		                                          </optgroup>}
-		                                          <optgroup label="＋ ADD PLACEHOLDER (address TBD)">
-		                                            {orderAddressChoices.placeholders.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-		                                          </optgroup>
-		                                        </select>
-		                                      </label>
-	                                    </div>
-	                                  </div>
-                                  {(() => { const GROUP_MAP: Record<string,string[]> = { rush: ["RD","RFD"], rental: ["STD","STFD"], "short-term": ["STD","STFD"], final: ["LTD","LTFD","RFD","STFD","LTFD"] }; const matched = (GROUP_MAP[dg.id] || []).filter(g => interviewGroups.includes(g)); const tip = matched.map(g => `${g}: ${SUGGESTED_GROUP_HELP[g] || g}`).join("\n"); return matched.length > 0 ? <span title={tip} className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold cursor-help">{matched.join("/")}</span> : null; })()}
-                                  {(mergedSeasons.length > 0 || mergedEvents.length > 0) && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold">+{mergedSeasons.length + mergedEvents.length} added</span>}
-                                  {dg.id.startsWith("custom_") && <button type="button" onClick={() => removeCustomDelivery(dg.id)} className="rounded-full bg-white/20 hover:bg-white/30 px-2 py-0.5 text-[9px] font-bold text-white" title="Delete this delivery group">Delete</button>}
-                                </div>
-	                                <div className="bg-white p-4 space-y-2">
-	                                  {/* Core items */}
-                                  {dg.items.map((item, j) => (
-                                    <div key={j} className="flex items-start gap-2">
-                                      <span className="w-4 h-4 rounded border-2 border-slate-300 shrink-0 mt-0.5" />
-                                      <span className="text-sm text-slate-700">{item}</span>
-                                    </div>
-                                  ))}
-                                  {dg.householdTags && dg.householdTags.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 pt-1">
-                                      {dg.householdTags.map((tag, j) => <span key={j} className="rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold">{tag}</span>)}
-                                    </div>
-                                  )}
-                                  {/* Merged seasonal sublists — color-coded with remove button */}
-                                  {mergedSeasons.map(sw => {
-                                    const removeFromGroup = () => setRushGuideData((p: any) => ({...p, seasonOverrides: {...(p.seasonOverrides || {}), [sw.id]: {...((p.seasonOverrides || {})[sw.id] || {}), group: "unassigned"}}}));
-                                    return (
-                                    <div key={sw.id} className="mt-2 rounded-lg border-l-4 border-violet-400 bg-violet-50/40 px-3 py-2">
-                                      <div className="flex items-center justify-between mb-1">
-                                        <div className="text-[10px] font-bold text-violet-700">{sw.season} — {sw.date}</div>
-                                        <button type="button" onClick={removeFromGroup} className="rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[9px] font-bold text-violet-500 hover:bg-violet-50 hover:text-violet-700 transition-all" title="Remove from this delivery">Remove</button>
-                                      </div>
-                                      {sw.items.map((item, j) => (
-                                        <div key={j} className="flex items-start gap-2">
-                                          <span className="w-3 h-3 rounded border border-violet-300 shrink-0 mt-0.5" />
-                                          <span className="text-xs text-slate-600">{item}</span>
-                                        </div>
-                                      ))}
-                                    </div>);
-                                  })}
-                                  {/* Delivery group notes */}
-                                  <textarea
-                                    value={(rushGuideData as any).deliveryNotes?.[dg.id] || ""}
-                                    onChange={e => setRushGuideData((p: any) => ({ ...p, deliveryNotes: { ...(p.deliveryNotes || {}), [dg.id]: e.target.value } }))}
-                                    placeholder="Notes for this delivery group..."
-                                    rows={2}
-                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-blue-400 resize-none mt-2"
-                                  />
-                                  {/* Merged event sublists — color-coded with remove button */}
-                                  {mergedEvents.map((evt: any) => {
-                                    const evtItems: string[] = [];
-                                    if (evt.type === "vacation_beach") { evtItems.push("Swimwear, resort wear, sandals", "Beach bags, sunglasses, luggage"); }
-                                    else if (evt.type === "vacation_ski") { evtItems.push("Ski gear, thermal layers, boots, luggage"); }
-                                    else if (evt.type === "wedding") { evtItems.push("Formal attire, dress shoes, accessories"); }
-                                    else if (evt.type === "business") { evtItems.push("Business attire, briefcase, garment bags"); }
-                                    else if (evt.type === "sports") { evtItems.push("Uniforms, cleats, gear"); }
-                                    const removeFromGroup = () => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), group: "unassigned"}}}));
-                                    return (
-                                      <div key={evt.id} className="mt-2 rounded-lg border-l-4 border-indigo-400 bg-indigo-50/40 px-3 py-2">
-                                        <div className="flex items-center justify-between mb-1">
-                                          <div className="text-[10px] font-bold text-indigo-700">{evt.name || "Event"} — {evt.date ? rushFormatDate(new Date(evt.date)) : ""}</div>
-                                          <button type="button" onClick={removeFromGroup} className="rounded-full border border-indigo-200 bg-white px-2 py-0.5 text-[9px] font-bold text-indigo-500 hover:bg-indigo-50 hover:text-indigo-700 transition-all" title="Remove from this delivery">Remove</button>
-                                        </div>
-                                        {evtItems.map((item, j) => (
-                                          <div key={j} className="flex items-start gap-2">
-                                            <span className="w-3 h-3 rounded border border-indigo-300 shrink-0 mt-0.5" />
-                                            <span className="text-xs text-slate-600">{item}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>);
-                            })}
-                            <RushGuideShareButtons
+                          <RushGuideDeliveryCards
+                            deliveryGroups={deliveryGroups}
+                            seasonalWardrobes={seasonalWardrobes}
+                            upcomingEvents={data.upcomingEvents || []}
+                            interviewGroups={interviewGroups}
+                            seasonOverrides={(rushGuideData as any).seasonOverrides || {}}
+                            eventOverrides={(rushGuideData as any).eventOverrides || {}}
+                            deliveryNotes={(rushGuideData as any).deliveryNotes || {}}
+                            setRushGuideData={setRushGuideData}
+                            addressChoiceValue={addressChoiceValue}
+                            addressPayloadFromChoice={addressPayloadFromChoice}
+                            orderAddressChoices={orderAddressChoices}
+                            removeCustomDelivery={removeCustomDelivery}
+                            deliveryDateVersion={deliveryDateVersion}
+                          />
+                          <RushGuideShareButtons
                               deliveryGroups={deliveryGroups}
                               orderName={data.orderName || ""}
                               deliveryNotes={(rushGuideData as any).deliveryNotes || {}}
                               onCopyToast={setToast}
                             />
-                          </div>
                         </div>
                       );
                     })()}
