@@ -299,7 +299,7 @@ import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSum
 import { downloadOrderIcs } from './utils/icsExport';
 import { renderAlertMessageContent, renderAlertDetailContent } from './utils/alertContent';
 import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
-import { getOrderCompanyNames, getOrderContactNames, getEstimateRequesterQuickOptions } from './utils/orderEntities';
+import { getOrderCompanyNames, getOrderContactNames, getEstimateRequesterQuickOptions, resolveOrderPoc } from './utils/orderEntities';
 import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
 import { computeSectionAuditStatus } from './utils/auditStatus';
 import { buildOrderNarrative } from './utils/orderNarrative';
@@ -4787,31 +4787,8 @@ export default function App(){
   })), []);
 
   // --- Order POC (Point of Contact) ---
-  // Resolves the single POC for this order, searching customers first, then vendors.
-  // Exactly one entity (across both lists) carries isPoc:true at any time.
-  const orderPoc = useMemo(() => {
-    const pocCust = (data.customers || []).find(c => c.isPoc);
-    if (pocCust) {
-      return {
-        kind: "customer", id: pocCust.id,
-        name: [pocCust.first, pocCust.last].filter(Boolean).join(" ") || "(unnamed)",
-        company: "",
-        phone: pocCust.phone || "",
-        role: pocCust.type || "",
-      };
-    }
-    const pocVend = (data.vendors || []).find(v => v.isPoc);
-    if (pocVend) {
-      return {
-        kind: "vendor", id: pocVend.id,
-        name: pocVend.contact || "",
-        company: pocVend.company || "",
-        phone: pocVend.phone || "",
-        role: pocVend.type || "",
-      };
-    }
-    return null;
-  }, [data.customers, data.vendors]);
+  // Resolves the single POC for this order — see utils/orderEntities.
+  const orderPoc = useMemo(() => resolveOrderPoc(data), [data.customers, data.vendors]);
 
   // setOrderPoc — exclusive: clears every existing isPoc flag, then sets the chosen one.
   // Pass null to clear without setting a new POC. When changing from one POC to a

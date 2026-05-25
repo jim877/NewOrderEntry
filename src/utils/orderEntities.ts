@@ -54,6 +54,39 @@ export const getOrderContactNames = (data: any): string[] => {
   return Array.from(names.values());
 };
 
+export type OrderPoc =
+  | { kind: "customer"; id: string; name: string; company: string; phone: string; role: string }
+  | { kind: "vendor"; id: string; name: string; company: string; phone: string; role: string };
+
+// resolveOrderPoc — find the single entity carrying isPoc:true on the order.
+// Customers are checked first (the customer-record path is the primary way
+// the user marks a POC). Returns null when no entity has the flag.
+export const resolveOrderPoc = (data: any): OrderPoc | null => {
+  const pocCust = (data.customers || []).find((c: any) => c.isPoc);
+  if (pocCust) {
+    return {
+      kind: "customer",
+      id: pocCust.id,
+      name: [pocCust.first, pocCust.last].filter(Boolean).join(" ") || "(unnamed)",
+      company: "",
+      phone: pocCust.phone || "",
+      role: pocCust.type || "",
+    };
+  }
+  const pocVend = (data.vendors || []).find((v: any) => v.isPoc);
+  if (pocVend) {
+    return {
+      kind: "vendor",
+      id: pocVend.id,
+      name: pocVend.contact || "",
+      company: pocVend.company || "",
+      phone: pocVend.phone || "",
+      role: pocVend.type || "",
+    };
+  }
+  return null;
+};
+
 // getEstimateRequesterQuickOptions — flat list of "Name (Role)" labels for
 // the Estimate Requester picker. Pulls primary customer + every named role
 // holder on the order, de-duped case-insensitively. Empty names skipped.
