@@ -56,6 +56,39 @@ export const formatOrderAddressChoiceLabel = (addr: any = {}, idx = 0) => {
   return `${type} — ${line || "TBD"}`;
 };
 
+// tryAppendAddressType — pure pseudo-reducer used by ensureAddressType.
+// If no active address of the given type exists, returns the patch
+// to append one (a placeholder when `placeholder=true`, otherwise an
+// empty record). Returns null when nothing should change.
+//
+// initAddress and createPlaceholderFlag are passed in as args because
+// they live alongside this module — keeping them as parameters lets
+// the helper avoid a circular import.
+export const tryAppendAddressType = (
+  prev: any,
+  type: string,
+  placeholder: boolean,
+  initAddress: (patch: any) => any,
+  createPlaceholderFlag: (kind: string, reason: string) => any,
+): { addresses: any[] } | null => {
+  const exists = (prev.addresses || []).some(
+    (a: any) => (a.type || "").toLowerCase() === type.toLowerCase()
+  );
+  if (exists) return null;
+  return {
+    addresses: [
+      ...(prev.addresses || []),
+      initAddress({
+        type,
+        isPrimary: false,
+        isLossSite: false,
+        street: placeholder ? "TBD" : "",
+        placeholder: placeholder ? createPlaceholderFlag("address", `${type} placeholder`) : null,
+      }),
+    ],
+  };
+};
+
 // resolveAddressChoicePayload — parse an address-choice value (the
 // strings emitted by buildOrderAddressChoices) back into the
 // { addressType, address, addressId } shape Action Items records

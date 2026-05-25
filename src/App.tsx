@@ -248,6 +248,7 @@ import {
   buildOrderAddressChoices,
   resolveAddressChoicePayload,
   resolveAddressChoiceValue,
+  tryAppendAddressType,
 } from './utils/order';
 import { formatPhoneNumber, formatCurrencyInput, getStaticMapUrl } from './utils/format';
 import { safeUid } from './utils/uid';
@@ -5396,22 +5397,10 @@ export default function App(){
     if (!type) return false;
     let created = false;
     setData(prev => {
-      const exists = (prev.addresses || []).some(a => (a.type || "").toLowerCase() === type.toLowerCase());
-      if (exists) return prev;
+      const patch = tryAppendAddressType(prev, type, placeholder, initAddress, createPlaceholderFlag);
+      if (!patch) return prev;
       created = true;
-      return {
-        ...prev,
-        addresses: [
-          ...(prev.addresses || []),
-          initAddress({
-            type,
-            isPrimary: false,
-            isLossSite: false,
-            street: placeholder ? "TBD" : "",
-            placeholder: placeholder ? createPlaceholderFlag("address", `${type} placeholder`) : null
-          })
-        ]
-      };
+      return { ...prev, ...patch };
     });
     return created;
   };
