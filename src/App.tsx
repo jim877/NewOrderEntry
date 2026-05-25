@@ -10049,53 +10049,57 @@ export default function App(){
                   const pets = (data.household || []).filter(m => m.category === "pet");
                   const log = (data.interviewLog || {}).pets;
                   const hasAnswers = pets.length > 0;
-                  const answered = hasAnswers;
                   const summary = pets.map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ") || (!!log && !hasAnswers ? "None" : "");
                   const expanded = !!interviewSearch.trim() || interviewExpanded.pets === true;
                   const petTypes = ["Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster", "Other"];
-                  return <div className={`noe-iq rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                    <button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: !p.pets}))} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                      <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">7</span>{highlightSearch(expanded ? "Pets in home?" : "Pets")}</div>
-                      {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{summary}</span>}
-                    </button>
-                    {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-                    {expanded && <div className="px-3 pb-3 space-y-2">
+                  const petStrOf = (members: any[]) => members.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                  return (
+                    <InterviewQuestionCard
+                      number={7}
+                      title="Pets in home?"
+                      collapsedLabel="Pets"
+                      summary={summary}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      showAnsweredTint={hasAnswers && !expanded}
+                      onToggle={() => setInterviewExpanded(p => ({ ...p, pets: !p.pets }))}
+                    >
                       <div className="flex flex-wrap gap-2">
                         {petTypes.map(type => {
                           const hasPet = pets.some(p => p.type === type);
-                          return <button key={type} type="button" onClick={() => {
-                            const members = data.household || [];
-                            let next;
-                            if (hasPet) {
-                              next = members.filter(m => !(m.category === "pet" && m.type === type));
-                            } else {
-                              next = [...members, { id: safeUid(), category: "pet", type, name: "" }];
-                            }
-                            update("household", next);
-                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
-                            update("householdAnimals", petStr);
-                            const sdsC = data.sdsConsiderations || [];
-                            if (petStr && !sdsC.includes("Pets")) update("sdsConsiderations", [...sdsC, "Pets"]);
-                            if (!petStr && sdsC.includes("Pets")) update("sdsConsiderations", sdsC.filter(s => s !== "Pets"));
-                            if (!(data.sdsObservations || []).includes("Pets") && petStr) { update("sdsObservations", [...(data.sdsObservations || []), "Pets"]); executeInterviewActions("Pets", true); }
-                            if (!petStr && (data.sdsObservations || []).includes("Pets")) update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
-                            setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), pets: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}}));
-                          }} className={`rounded-full border px-3 py-1.5 text-[12px] font-bold ${hasPet ? 'border-sky-400 bg-sky-50 text-sky-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{type}</button>;
+                          return (
+                            <button key={type} type="button" onClick={() => {
+                              const members = data.household || [];
+                              const next = hasPet
+                                ? members.filter(m => !(m.category === "pet" && m.type === type))
+                                : [...members, { id: safeUid(), category: "pet", type, name: "" }];
+                              update("household", next);
+                              const petStr = petStrOf(next);
+                              update("householdAnimals", petStr);
+                              const sdsC = data.sdsConsiderations || [];
+                              if (petStr && !sdsC.includes("Pets")) update("sdsConsiderations", [...sdsC, "Pets"]);
+                              if (!petStr && sdsC.includes("Pets")) update("sdsConsiderations", sdsC.filter(s => s !== "Pets"));
+                              if (!(data.sdsObservations || []).includes("Pets") && petStr) { update("sdsObservations", [...(data.sdsObservations || []), "Pets"]); executeInterviewActions("Pets", true); }
+                              if (!petStr && (data.sdsObservations || []).includes("Pets")) update("sdsObservations", (data.sdsObservations || []).filter(s => s !== "Pets"));
+                              setData(p => ({ ...p, interviewLog: { ...(p.interviewLog || {}), pets: { user: p.currentUser || "Unknown", at: formatShortTimestamp() } } }));
+                            }} className={`rounded-full border px-3 py-1.5 text-[12px] font-bold ${hasPet ? 'border-sky-400 bg-sky-50 text-sky-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{type}</button>
+                          );
                         })}
                       </div>
                       {pets.map(pet => (
                         <div key={pet.id} className="flex items-center gap-2 bg-sky-50/50 rounded-lg border border-sky-100 px-3 py-1.5">
                           <span className="text-[12px] font-bold text-sky-700">{pet.type}</span>
                           <input value={pet.name || ""} onChange={e => {
-                            const next = (data.household || []).map(m => m.id === pet.id ? {...m, name: e.target.value} : m);
+                            const next = (data.household || []).map(m => m.id === pet.id ? { ...m, name: e.target.value } : m);
                             update("household", next);
-                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
-                            update("householdAnimals", petStr);
+                            update("householdAnimals", petStrOf(next));
                           }} placeholder="Pet name" className="flex-1 rounded border border-sky-200 px-2 py-0.5 text-[12px] text-slate-700 bg-white outline-none focus:border-sky-400" />
                           <button type="button" onClick={() => {
                             const next = (data.household || []).filter(m => m.id !== pet.id);
                             update("household", next);
-                            const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
+                            const petStr = petStrOf(next);
                             update("householdAnimals", petStr);
                             if (!petStr) {
                               update("sdsConsiderations", (data.sdsConsiderations || []).filter(s => s !== "Pets"));
@@ -10110,19 +10114,20 @@ export default function App(){
                             <button key={type} type="button" onClick={() => {
                               const next = [...(data.household || []), { id: safeUid(), category: "pet", type, name: "" }];
                               update("household", next);
-                              const petStr = next.filter(m => m.category === "pet").map(p => [p.type, p.name].filter(Boolean).join(" ")).filter(Boolean).join(", ");
-                              update("householdAnimals", petStr);
+                              update("householdAnimals", petStrOf(next));
                             }} className="rounded-full border border-dashed border-sky-300 px-2 py-0.5 text-[13px] font-bold text-sky-600 hover:bg-sky-50">+ {type}</button>
                           ))}
                         </div>
                       )}
-                      {showCoaching && answered && !dismissedCoaching.has("c-Pets") && <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
-                        <div className="flex-1">🎓 <span className="font-bold">Pets:</span> {interviewActions["Pets"]?.coaching || "Please make sure your pets are secured in a safe room."}</div>
-                        <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-Pets"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
-                      </div>}
-                      {<div className="flex items-center justify-between mt-1">{log && <span className="text-[10px] text-slate-400">{log.user} · {log.at}</span>}<button type="button" onClick={() => setInterviewExpanded(p => ({...p, pets: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"}`}>Collapse</button></div>}
-                    </div>}
-                  </div>;
+                      {showCoaching && hasAnswers && !dismissedCoaching.has("c-Pets") && (
+                        <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-[13px] text-violet-700 flex items-start gap-1">
+                          <div className="flex-1">🎓 <span className="font-bold">Pets:</span> {interviewActions["Pets"]?.coaching || "Please make sure your pets are secured in a safe room."}</div>
+                          <button type="button" onClick={() => setDismissedCoaching(p => new Set([...p, "c-Pets"]))} className="text-violet-400 hover:text-violet-600 text-[12px] font-bold shrink-0">×</button>
+                        </div>
+                      )}
+                      <CollapseInterviewRow log={log} onCollapse={() => setInterviewExpanded(p => ({ ...p, pets: false }))} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
+                  );
                 })()}
 
                 {/* Customer Preferences — individual Y/N questions */}
