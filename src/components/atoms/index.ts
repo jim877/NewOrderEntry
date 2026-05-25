@@ -75,3 +75,4 @@ export { RushGuideFamilyStep } from "./RushGuideFamilyStep";
 export { RushGuideEventsStep } from "./RushGuideEventsStep";
 export { RushGuideReminders } from "./RushGuideReminders";
 export { RushGuideShareButtons } from "./RushGuideShareButtons";
+export { RushGuideOptionalDeliveries } from "./RushGuideOptionalDeliveries";

@@ -163,6 +163,7 @@ import {
   RushGuideEventsStep,
   RushGuideReminders,
   RushGuideShareButtons,
+  RushGuideOptionalDeliveries,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -11783,119 +11784,17 @@ export default function App(){
 
                     {/* (Delivery cards integrated into Gantt timeline below) */}
 
-                    {/* Season Changes — optional deliveries to consider */}
-                    {(() => {
-                      const unassignedSeasons = seasonalWardrobes.filter(sw => {
-                        const ovr = (rushGuideData as any).seasonOverrides?.[sw.id] || {};
-                        const grp = ovr.group || sw.assignedGroup;
-                        return !deliveryGroups.some(dg => dg.id === grp);
-                      });
-                      const unassignedEvents = eventDeliveries.filter((evt: any) => {
-                        const ovr = (rushGuideData as any).eventOverrides?.[evt.id] || {};
-                        const grp = ovr.group || "event";
-                        return !deliveryGroups.some(dg => dg.id === grp);
-                      });
-                      return (unassignedSeasons.length > 0 || unassignedEvents.length > 0) ? <>
-                      {unassignedSeasons.length > 0 && <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <div className="text-lg font-bold text-slate-900">Optional Deliveries to Consider</div>
-                          <div className="text-xs text-slate-500">{hasRental
-                            ? "These seasonal items can be delivered to the rental, or included in Rush/Final."
-                            : "If repairs run long, you may need these items. Include in Rush for now, or keep as a separate delivery to the hotel if/when needed. If they return home in time, these go in the Final Delivery."}</div>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        {unassignedSeasons.map(sw => {
-                          const setGrp = (g: string) => setRushGuideData((p: any) => ({...p, seasonOverrides: {...(p.seasonOverrides || {}), [sw.id]: {...((p.seasonOverrides || {})[sw.id] || {}), group: g}}}));
-                          return (
-                            <div key={sw.id} className="rounded-xl border border-slate-200 overflow-hidden">
-                              <div className="px-4 py-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div>
-                                    <div className="font-bold text-sm text-slate-800">{sw.season}</div>
-                                    <div className="text-[10px] text-slate-500">{sw.date}{sw.events.length > 0 ? ` — ${sw.events.join(", ")}` : ""}</div>
-                                  </div>
-                                </div>
-                                <div className="space-y-1 mb-3">
-                                  {sw.items.map((item, j) => <div key={j} className="flex items-start gap-2"><span className="w-3 h-3 rounded-full bg-slate-200 shrink-0 mt-1" /><span className="text-xs text-slate-700">{item}</span></div>)}
-                                </div>
-                                {(
-                                  <div className="flex gap-2">
-                                    <div className="flex-1">
-                                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Add to existing delivery</div>
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {deliveryGroups.map((dg, di) => (
-                                          <button key={dg.id} type="button" onClick={() => setGrp(dg.id)} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-[10px] font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all bg-white">
-                                            #{di + 1} {dg.label}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    <div className="border-l border-slate-200 pl-2">
-                                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Or</div>
-	                                      <button type="button" onClick={() => createCustomDelivery(`${sw.season} Delivery`, formatDateInputValue(sw.rawDate), sw.id)} className="rounded-lg border-2 border-dashed border-violet-300 px-3 py-1.5 text-[10px] font-bold text-violet-600 hover:border-violet-400 hover:bg-violet-50 transition-all bg-white">
-                                        + Create New Delivery
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>}
-
-                    {/* Trip/Event Deliveries — only unassigned */}
-                    {unassignedEvents.length > 0 && <div>
-                      <div className="text-lg font-bold text-slate-900 mb-3">Trip & Event Deliveries</div>
-                      <div className="space-y-3">
-                        {unassignedEvents.map((evt: any) => {
-                          const ovr = (rushGuideData as any).eventOverrides?.[evt.id] || {};
-                          const evtGrp = ovr.group || "event";
-                          const setEvtGrp = (g: string) => setRushGuideData((p: any) => ({...p, eventOverrides: {...(p.eventOverrides || {}), [evt.id]: {...((p.eventOverrides || {})[evt.id] || {}), group: g}}}));
-                          const assignedTarget = deliveryGroups.find(dg => dg.id === evtGrp);
-                          const isAssigned = !!assignedTarget;
-                          return (
-                          <div key={evt.id} className="rounded-xl border border-slate-200 overflow-hidden">
-                            <div className="px-4 py-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <div>
-                                  <div className="font-bold text-sm text-slate-800">{evt.name}</div>
-                                  <div className="text-[10px] text-slate-500">{evt.date}</div>
-                                </div>
-                              </div>
-                              <div className="space-y-1 mb-3">
-                                {evt.items.map((item: string, j: number) => <div key={j} className="flex items-start gap-2"><span className="w-3 h-3 rounded-full bg-slate-200 shrink-0 mt-1" /><span className="text-xs text-slate-700">{item}</span></div>)}
-                              </div>
-                              {(
-                                <div className="flex gap-2">
-                                  <div className="flex-1">
-                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Add to existing delivery</div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {deliveryGroups.map((dg, di) => (
-                                        <button key={dg.id} type="button" onClick={() => setEvtGrp(dg.id)} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-[10px] font-bold text-slate-600 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all bg-white">
-                                          #{di + 1} {dg.label}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div className="border-l border-slate-200 pl-2">
-                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Or</div>
-                                    <button type="button" onClick={() => { if (evt.date) createCustomDeliveryForEvent(evt.name || "Event Delivery", evt.date, evt.id); else setEvtGrp("event"); }} className="rounded-lg border-2 border-dashed border-indigo-300 px-3 py-1.5 text-[10px] font-bold text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-all bg-white">
-                                      + Create New Delivery
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>);
-                        })}
-                      </div>
-                    </div>}
-                    </> : null;
-                    })()}
+                    <RushGuideOptionalDeliveries
+                      seasonalWardrobes={seasonalWardrobes}
+                      eventDeliveries={eventDeliveries}
+                      deliveryGroups={deliveryGroups}
+                      hasRental={hasRental}
+                      seasonOverrides={(rushGuideData as any).seasonOverrides || {}}
+                      eventOverrides={(rushGuideData as any).eventOverrides || {}}
+                      setRushGuideData={setRushGuideData}
+                      createCustomDelivery={createCustomDelivery}
+                      createCustomDeliveryForEvent={createCustomDeliveryForEvent}
+                    />
 
                     {/* (Final delivery card integrated into Gantt timeline) */}
 
