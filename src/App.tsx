@@ -316,6 +316,7 @@ import {
   applyPrimaryPolicyHolderReducer,
   appendCustomerPlaceholderReducer,
   appendAddressPlaceholderReducer,
+  togglePlanStepReducer,
 } from './utils/orderEntities';
 import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
 import { computeSectionAuditStatus, computeAuditRequiredCount as computeAuditRequiredCountFor } from './utils/auditStatus';
@@ -5998,19 +5999,7 @@ export default function App(){
   }, [newPlanStep, planAssignee]);
 
   const togglePlanStep = useCallback((id) => {
-    setData(p => ({ 
-      ...p, 
-      planSteps: (p.planSteps || []).map(s => {
-        if (s.id !== id) return s;
-        const nextDone = !s.done;
-        return {
-          ...s,
-          done: nextDone,
-          doneAt: nextDone ? new Date().toISOString() : "",
-          doneBy: nextDone ? (p.currentUser || s.assignee || "Unknown") : ""
-        };
-      }) 
-    }));
+    setData(p => togglePlanStepReducer(p, id));
   }, []);
 
   const removePlanStep = useCallback((id) => {

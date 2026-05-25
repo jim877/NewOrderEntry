@@ -123,6 +123,25 @@ export const appendAddressPlaceholderReducer = (prev: any, newAddress: any) => {
   };
 };
 
+// togglePlanStepReducer — pure reducer for the Plan-of-Action step
+// completion toggle. Flips the `done` flag on the matching step and
+// stamps doneAt + doneBy (current user, falling back to assignee or
+// "Unknown") when transitioning to done; clears those fields when
+// un-checking.
+export const togglePlanStepReducer = (prev: any, id: string) => ({
+  ...prev,
+  planSteps: (prev.planSteps || []).map((s: any) => {
+    if (s.id !== id) return s;
+    const nextDone = !s.done;
+    return {
+      ...s,
+      done: nextDone,
+      doneAt: nextDone ? new Date().toISOString() : "",
+      doneBy: nextDone ? (prev.currentUser || s.assignee || "Unknown") : "",
+    };
+  }),
+});
+
 // applyPrimaryPolicyHolderReducer — pure reducer that flips the
 // primary customer's policyHolder flag + type based on whether the
 // order is currently insurance-related. When insurance-related, marks
