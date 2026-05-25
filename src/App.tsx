@@ -291,6 +291,7 @@ import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSum
 import { downloadOrderIcs } from './utils/icsExport';
 import { renderAlertMessageContent, renderAlertDetailContent } from './utils/alertContent';
 import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
+import { getOrderCompanyNames, getOrderContactNames } from './utils/orderEntities';
 import { loadTestPresetsFromStorage, saveTestPresetsToStorage, upsertTestPresetByName } from './utils/testPresets';
 import { loadJsonFromStorage, loadMergedRecordFromStorage, saveJsonToStorage } from './utils/localStorageState';
 import { SUBSECTION_TO_SECTION, DEFAULT_SUBSECTION_BY_SECTION, SUBSECTION_DOM_ID } from './utils/sectionNav';
@@ -6455,23 +6456,7 @@ export default function App(){
     [sampleContacts]
   );
 
-  const orderCompanyNames = useMemo(() => {
-    const names = new Map();
-    const add = (value) => {
-      const trimmed = (value || "").toString().trim();
-      if (!trimmed) return;
-      const key = normalizeCompany(trimmed);
-      if (!names.has(key)) names.set(key, trimmed);
-    };
-    add(data.referringCompany);
-    add(data.billingCompany);
-    add(data.insuranceCompany);
-    add(data.publicAdjustingCompany);
-    add(data.independentAdjustingCo);
-    add(data.tpaCompany);
-    Object.values(data.additionalCompanies || {}).forEach((entry) => add(entry?.company));
-    return Array.from(names.values());
-  }, [
+  const orderCompanyNames = useMemo(() => getOrderCompanyNames(data), [
     data.referringCompany,
     data.billingCompany,
     data.insuranceCompany,
@@ -6481,25 +6466,7 @@ export default function App(){
     data.additionalCompanies,
   ]);
 
-  const orderContactNames = useMemo(() => {
-    const names = new Map();
-    const add = (value) => {
-      const trimmed = (value || "").toString().trim();
-      if (!trimmed) return;
-      const key = normalizeContact(trimmed);
-      if (!names.has(key)) names.set(key, trimmed);
-    };
-    add(data.referrer);
-    add(data.billingContact);
-    add(data.insuranceAdjuster);
-    add(data.publicAdjuster);
-    add(data.independentAdjuster);
-    add(data.tpaContact);
-    Object.values(data.additionalCompanies || {}).forEach((entry) => {
-      entryContactList(entry || {}).forEach((contact) => add(contact?.name));
-    });
-    return Array.from(names.values());
-  }, [
+  const orderContactNames = useMemo(() => getOrderContactNames(data), [
     data.referrer,
     data.billingContact,
     data.insuranceAdjuster,
