@@ -64,3 +64,4 @@ export { GlobalDirectoryModal } from "./GlobalDirectoryModal";
 export { ConfirmAppointmentModal } from "./ConfirmAppointmentModal";
 export { OutboundActionsPanel } from "./OutboundActionsPanel";
 export { SaveSummaryGates } from "./SaveSummaryGates";
+export { SaveSummaryActions } from "./SaveSummaryActions";

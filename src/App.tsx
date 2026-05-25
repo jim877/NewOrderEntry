@@ -152,6 +152,7 @@ import {
   ConfirmAppointmentModal,
   OutboundActionsPanel,
   SaveSummaryGates,
+  SaveSummaryActions,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14031,44 +14032,24 @@ export default function App(){
                 previewView={previewView as any}
                 setPreviewView={setPreviewView}
               />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100"
-                  onClick={() => {
-                    const nlt = (data.orderName ? `NLT: ${data.orderName}\n\n` : "") + orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
-                    copyLines(nlt.split("\n"));
-                  }}
-                >
-                  Copy as NLT
-                </button>
-                <button
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => {
-                    const prose = buildNarrativeProse(orderNarrative, data).join("\n\n");
-                    copyLines(prose.split("\n"));
-                  }}
-                >
-                  Copy Narrative
-                </button>
-                <button
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => downloadLinesAsFile(saveSummaryLines, "order-summary.txt")}
-                >
-                  Download Summary
-                </button>
-                <button
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 hover:border-sky-300 hover:text-sky-700"
-                  onClick={() => {
-                    const narrative = orderNarrative.map(l => `${l.section}: ${l.text}`).join("\n");
-                    const existing = stripEventSystemLines(data.eventInstructions || "").trim();
-                    const combined = existing ? `${existing}\n\n--- Order Summary ---\n${narrative}` : `--- Order Summary ---\n${narrative}`;
-                    update("eventInstructions", composeEventInstructions(combined, data, conditionSummary));
-                    setToast("Narrative added to Event Instructions");
-                  }}
-                >
-                  Send to Event Instructions
-                </button>
-              </div>
+              <SaveSummaryActions
+                onCopyNlt={() => {
+                  const nlt = (data.orderName ? `NLT: ${data.orderName}\n\n` : "") + orderNarrative.map((l) => `${l.section}: ${l.text}`).join("\n");
+                  copyLines(nlt.split("\n"));
+                }}
+                onCopyNarrative={() => {
+                  const prose = buildNarrativeProse(orderNarrative, data).join("\n\n");
+                  copyLines(prose.split("\n"));
+                }}
+                onDownloadSummary={() => downloadLinesAsFile(saveSummaryLines, "order-summary.txt")}
+                onSendToEventInstructions={() => {
+                  const narrative = orderNarrative.map((l) => `${l.section}: ${l.text}`).join("\n");
+                  const existing = stripEventSystemLines(data.eventInstructions || "").trim();
+                  const combined = existing ? `${existing}\n\n--- Order Summary ---\n${narrative}` : `--- Order Summary ---\n${narrative}`;
+                  update("eventInstructions", composeEventInstructions(combined, data, conditionSummary));
+                  setToast("Narrative added to Event Instructions");
+                }}
+              />
               <OutboundActionsPanel
                 customers={data.customers || []}
                 eventCustomerContacted={data.eventCustomerContacted}
