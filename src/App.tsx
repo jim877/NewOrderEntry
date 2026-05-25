@@ -144,6 +144,7 @@ import {
   EditContactModal,
   LivingAddressPrompt,
   GroupLinkModal,
+  CrmLogModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14887,113 +14888,32 @@ export default function App(){
       )}
 
       {crmModal.isOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden flex flex-col">
-            <div className="bg-sky-500 px-6 py-3 flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="text-lg font-bold text-white">Add CRM Log</h3>
-                <div className="text-xs text-sky-100">Capture outreach and follow-up actions.</div>
-              </div>
-              <button className="text-white/80 hover:text-white text-2xl font-bold leading-none" onClick={() => setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" })}>×</button>
-            </div>
-            <div className="p-5 space-y-4 overflow-y-auto custom-scroll flex-1">
-              <Field label="Type">
-                <Select value={crmModal.method} onChange={e=>setCrmModal(m=>({...m, method: e.target.value}))}>
-                  {CONTACT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                </Select>
-              </Field>
-              <Field label="Owner">
-                <Input value={crmModal.owner} onChange={e=>setCrmModal(m=>({...m, owner: e.target.value}))} placeholder="Sales Rep" />
-              </Field>
-              <Field label="Subject">
-                <Input value={crmModal.subject} onChange={e=>setCrmModal(m=>({...m, subject: e.target.value}))} placeholder="New Lead/Order" />
-              </Field>
-              <Field label="Order Link">
-                <Input value={crmModal.orderLink} onChange={e=>setCrmModal(m=>({...m, orderLink: e.target.value}))} placeholder="Order link" />
-              </Field>
-              <Field label="Notes">
-                <Textarea value={crmModal.notes} onChange={e=>setCrmModal(m=>({...m, notes: e.target.value}))} placeholder="Additional notes..." />
-              </Field>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                <div className="text-sm font-semibold text-slate-700">Follow-up Reminder</div>
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                  <input type="checkbox" checked={crmModal.followUpEnabled} onChange={(e)=>setCrmModal(m=>({...m, followUpEnabled: e.target.checked}))} />
-                  Create follow-up reminder for referrer
-                </label>
-                {crmModal.followUpEnabled && (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div><div className="text-[11px] font-bold text-slate-500 mb-1">Date</div><Input type="date" value={crmModal.followUpDate} onChange={e=>setCrmModal(m=>({...m, followUpDate: e.target.value}))} /></div>
-                    <div><div className="text-[11px] font-bold text-slate-500 mb-1">Time</div><Input type="time" value={crmModal.followUpTime} onChange={e=>setCrmModal(m=>({...m, followUpTime: e.target.value}))} /></div>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                <div className="text-sm font-semibold text-slate-700">Notify Team</div>
-                <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-600">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={crmModal.notifySalesRep} onChange={(e)=>setCrmModal(m=>({...m, notifySalesRep: e.target.checked}))} />
-                    Sales Rep
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={crmModal.notifyOrderLead} onChange={(e)=>setCrmModal(m=>({...m, notifyOrderLead: e.target.checked}))} />
-                    Order Lead (Assignee)
-                  </label>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap gap-1">
-                    {TECHS.filter(t => t !== "Unassigned").map(name => {
-                      const isOn = (crmModal.notifyOthers || "").includes(name);
-                      return <button key={name} type="button" onClick={() => setCrmModal(m => ({ ...m, notifyOthers: isOn ? m.notifyOthers.replace(name, "").replace(/,\s*,/g, ",").replace(/^,\s*|,\s*$/g, "").trim() : (m.notifyOthers ? `${m.notifyOthers}, ${name}` : name) }))} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${isOn ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{name}</button>;
-                    })}
-                  </div>
-                  <Input
-                    value={crmModal.notifyOthers}
-                    onChange={e=>setCrmModal(m=>({...m, notifyOthers: e.target.value}))}
-                    placeholder="Or type names (comma separated)"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-200 shrink-0">
-              <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" })}>Cancel</button>
-              <button
-                className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600"
-                onClick={() => {
-                  const entry = {
-                    id: safeUid(),
-                    method: crmModal.method,
-                    owner: crmModal.owner,
-                    subject: crmModal.subject,
-                    orderLink: crmModal.orderLink,
-                    notes: crmModal.notes,
-                    followUp: crmModal.followUpEnabled ? { date: crmModal.followUpDate, time: crmModal.followUpTime } : null,
-                    notify: {
-                      salesRep: crmModal.notifySalesRep,
-                      orderLead: crmModal.notifyOrderLead,
-                      others: crmModal.notifyOthers
-                        .split(",")
-                        .map(v => v.trim())
-                        .filter(Boolean)
-                    }
-                  };
-                  setData(prev => ({ ...prev, crmLogs: [...(prev.crmLogs || []), entry] }));
-                  if (crmModal.followUpEnabled) {
-                    setToast("CRM log submitted + follow-up reminder created");
-                  } else {
-                    setToast("CRM log submitted");
-                  }
-                  setCrmModal({ isOpen:false, method:"", owner:"", subject:"", orderLink:"", notes:"", followUpEnabled:false, followUpDate:"", followUpTime:"", notifySalesRep:true, notifyOrderLead:true, notifyOthers:"" });
-                  // Restore scroll position
-                  setTimeout(() => { const scroller = document.querySelector("[data-noe-scroll]") as HTMLElement; if (scroller) scroller.scrollTop = crmScrollRef.current; }, 50);
-                }}
-              >
-                Submit
-              </button>
-            </div>
-          </div>
-        </div>
+        <CrmLogModal
+          state={crmModal}
+          setState={setCrmModal}
+          techs={TECHS.filter((t) => t !== "Unassigned")}
+          onClose={() => setCrmModal({ isOpen: false, method: "", owner: "", subject: "", orderLink: "", notes: "", followUpEnabled: false, followUpDate: "", followUpTime: "", notifySalesRep: true, notifyOrderLead: true, notifyOthers: "" })}
+          onSubmit={() => {
+            const entry = {
+              id: safeUid(),
+              method: crmModal.method,
+              owner: crmModal.owner,
+              subject: crmModal.subject,
+              orderLink: crmModal.orderLink,
+              notes: crmModal.notes,
+              followUp: crmModal.followUpEnabled ? { date: crmModal.followUpDate, time: crmModal.followUpTime } : null,
+              notify: {
+                salesRep: crmModal.notifySalesRep,
+                orderLead: crmModal.notifyOrderLead,
+                others: (crmModal.notifyOthers || "").split(",").map((v) => v.trim()).filter(Boolean),
+              },
+            };
+            setData((prev) => ({ ...prev, crmLogs: [...(prev.crmLogs || []), entry] }));
+            setToast(crmModal.followUpEnabled ? "CRM log submitted + follow-up reminder created" : "CRM log submitted");
+            setCrmModal({ isOpen: false, method: "", owner: "", subject: "", orderLink: "", notes: "", followUpEnabled: false, followUpDate: "", followUpTime: "", notifySalesRep: true, notifyOrderLead: true, notifyOthers: "" });
+            setTimeout(() => { const scroller = document.querySelector("[data-noe-scroll]") as HTMLElement; if (scroller) scroller.scrollTop = crmScrollRef.current; }, 50);
+          }}
+        />
       )}
 
       {planModalOpen && (

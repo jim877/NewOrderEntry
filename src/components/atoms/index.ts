@@ -56,3 +56,4 @@ export { ReminderModal } from "./ReminderModal";
 export { EditContactModal } from "./EditContactModal";
 export { LivingAddressPrompt } from "./LivingAddressPrompt";
 export { GroupLinkModal } from "./GroupLinkModal";
+export { CrmLogModal } from "./CrmLogModal";
