@@ -60,3 +60,4 @@ export { CrmLogModal } from "./CrmLogModal";
 export { PlanOfActionModal } from "./PlanOfActionModal";
 export { WelcomeMessageModal } from "./WelcomeMessageModal";
 export { SdsQuestionnaireModal } from "./SdsQuestionnaireModal";
+export { GlobalDirectoryModal } from "./GlobalDirectoryModal";
