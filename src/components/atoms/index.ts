@@ -62,3 +62,4 @@ export { WelcomeMessageModal } from "./WelcomeMessageModal";
 export { SdsQuestionnaireModal } from "./SdsQuestionnaireModal";
 export { GlobalDirectoryModal } from "./GlobalDirectoryModal";
 export { ConfirmAppointmentModal } from "./ConfirmAppointmentModal";
+export { OutboundActionsPanel } from "./OutboundActionsPanel";

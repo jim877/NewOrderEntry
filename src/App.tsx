@@ -150,6 +150,7 @@ import {
   SdsQuestionnaireModal,
   GlobalDirectoryModal,
   ConfirmAppointmentModal,
+  OutboundActionsPanel,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14089,52 +14090,15 @@ export default function App(){
                   Send to Event Instructions
                 </button>
               </div>
-              {/* Outbound Actions — queue messages for send on save */}
-              <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Outbound Actions</div>
-                  <span className="text-[9px] text-teal-500">Queued for send on save</span>
-                </div>
-                <div className="space-y-2">
-                  {(() => {
-                    const autoQueued: Record<string, string> = {};
-                    if ((data.customers || []).some(c => c.sendWelcomeText)) autoQueued["sendWelcomeText"] = "Welcome text was toggled on a customer";
-                    if ((data.customers || []).some(c => c.sendRushGuide)) autoQueued["sendRushGuide"] = "Rush Guide was toggled on a customer";
-                    if (data.eventCustomerContacted) autoQueued["sendConfirmation"] = "Customer was marked as contacted";
-                    if (data.pickupDate) autoQueued["sendConfirmation"] = "Appointment scheduled";
-                    const dismissed = (data as any).dismissedOutbound || [];
-                    return OUTBOUND_ACTIONS.map(action => {
-                      const isQueued = (data.queuedOutbound || []).includes(action.key);
-                      const isDismissed = dismissed.includes(action.key);
-                      const wasAutoQueued = !isDismissed && autoQueued[action.key];
-                      const isActive = isQueued || !!wasAutoQueued;
-                    return (
-                      <button key={action.key} type="button" onClick={() => {
-                        if (isQueued) {
-                          update("queuedOutbound", (data.queuedOutbound || []).filter(k => k !== action.key));
-                        } else if (wasAutoQueued) {
-                          update("dismissedOutbound", [...dismissed, action.key]);
-                        } else {
-                          update("queuedOutbound", [...(data.queuedOutbound || []), action.key]);
-                          update("dismissedOutbound", dismissed.filter(k => k !== action.key));
-                        }
-                      }} className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all ${isActive ? "border-teal-400 bg-teal-100/60" : "border-slate-200 bg-white hover:border-teal-300"}`}>
-                        <span className="text-base shrink-0">{action.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-xs font-bold ${isActive ? "text-teal-800" : "text-slate-700"}`}>{action.label}</div>
-                          <div className="text-[10px] text-slate-500">{action.desc}</div>
-                          {wasAutoQueued && <div className="text-[9px] text-teal-600 mt-0.5">{wasAutoQueued}</div>}
-                        </div>
-                        {isActive && <span className="rounded-full bg-teal-500 text-white px-2 py-0.5 text-[9px] font-bold shrink-0">{isQueued ? "Queued" : "Suggested"}</span>}
-                      </button>
-                    );
-                  });
-                  })()}
-                </div>
-                {(data.queuedOutbound || []).length > 0 && (
-                  <div className="text-[10px] text-teal-600 font-semibold">{(data.queuedOutbound || []).length} action(s) will execute on save</div>
-                )}
-              </div>
+              <OutboundActionsPanel
+                customers={data.customers || []}
+                eventCustomerContacted={data.eventCustomerContacted}
+                pickupDate={data.pickupDate}
+                queuedOutbound={data.queuedOutbound || []}
+                dismissedOutbound={(data as any).dismissedOutbound || []}
+                setQueuedOutbound={(next) => update("queuedOutbound", next)}
+                setDismissedOutbound={(next) => update("dismissedOutbound", next)}
+              />
             </div>
             <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 shrink-0">
               <button className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700" onClick={() => setPreviewOpen(false)}>Close</button>
