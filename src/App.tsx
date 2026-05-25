@@ -300,6 +300,7 @@ import { downloadOrderIcs } from './utils/icsExport';
 import { renderAlertMessageContent, renderAlertDetailContent } from './utils/alertContent';
 import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
 import { getOrderCompanyNames, getOrderContactNames, getEstimateRequesterQuickOptions } from './utils/orderEntities';
+import { buildBillingAssignmentCues, buildInsuranceAssignmentCues } from './utils/assignmentCues';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6495,18 +6496,7 @@ export default function App(){
     [data.insuranceCompany, sampleContacts]
   );
   const billingAssignmentCues = useMemo(
-    () => buildAssignmentCueItems([
-      {
-        label: "Referrer",
-        companyMatch: sameNormalizedCompany(data.billingCompany, data.referringCompany),
-        contactMatch: sameNormalizedContact(data.billingContact, data.referrer),
-      },
-      {
-        label: "Insurance",
-        companyMatch: sameNormalizedCompany(data.billingCompany, data.insuranceCompany),
-        contactMatch: sameNormalizedContact(data.billingContact, data.insuranceAdjuster),
-      },
-    ]),
+    () => buildBillingAssignmentCues(data, buildAssignmentCueItems),
     [
       data.billingCompany,
       data.referringCompany,
@@ -6515,23 +6505,12 @@ export default function App(){
       data.insuranceCompany,
       data.insuranceAdjuster,
       buildAssignmentCueItems,
-    ]
+    ],
   );
   const billingAssignmentLinked =
     billingAssignmentCues.length > 0 && !!(data.billingCompany || data.billingContact);
   const insuranceAssignmentCues = useMemo(
-    () => buildAssignmentCueItems([
-      {
-        label: "Referrer",
-        companyMatch: sameNormalizedCompany(data.insuranceCompany, data.referringCompany),
-        contactMatch: sameNormalizedContact(data.insuranceAdjuster, data.referrer),
-      },
-      {
-        label: "Bill To",
-        companyMatch: sameNormalizedCompany(data.insuranceCompany, data.billingCompany),
-        contactMatch: sameNormalizedContact(data.insuranceAdjuster, data.billingContact),
-      },
-    ]),
+    () => buildInsuranceAssignmentCues(data, buildAssignmentCueItems),
     [
       data.insuranceCompany,
       data.referringCompany,
@@ -6540,7 +6519,7 @@ export default function App(){
       data.billingCompany,
       data.billingContact,
       buildAssignmentCueItems,
-    ]
+    ],
   );
   const insuranceAssignmentLinked =
     insuranceAssignmentCues.length > 0 &&
