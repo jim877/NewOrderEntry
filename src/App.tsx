@@ -138,6 +138,7 @@ import {
   OrderInstructionModal,
   AlertModal,
   SmartConfirmModal,
+  RoleAssignModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -14056,85 +14057,15 @@ export default function App(){
         <SmartConfirmModal state={smartConfirm} onResolve={resolveSmartConfirm} />
       )}
       {roleAssignModal.isOpen && (
-        <div data-suggested-roles-modal="true" className="fixed inset-0 z-[131] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm p-4 pt-12 sm:pt-20"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); applySelectedRoleAssignments(); }
-            if (e.key === "Escape") { e.preventDefault(); setRoleAssignModal(prev => ({ ...prev, isOpen: false })); }
-          }}
-        >
-          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden" tabIndex={-1} ref={el => el?.focus()}>
-            <div className="bg-sky-500 px-6 py-4">
-              <h3 className="text-xl font-bold text-white">Assign Company/Contact Roles</h3>
-              <div className="mt-1 text-base text-sky-100">Apply badges for this company/contact now.</div>
-            </div>
-            <div className="p-6 space-y-5">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-5 py-4">
-                <div className="space-y-2 text-base leading-7 text-slate-700">
-                {roleAssignModal.company ? (
-                    <div className="grid grid-cols-[132px_1fr] items-start gap-x-3">
-                      <span className="font-semibold text-slate-900">Company</span>
-                      <span>{roleAssignModal.company}</span>
-                    </div>
-                ) : null}
-                {roleAssignModal.company ? (
-                    <div className="grid grid-cols-[132px_1fr] items-start gap-x-3">
-                      <span className="font-semibold text-slate-900">Company Type</span>
-                      <span>{getCompanyTypeForRoles(roleAssignModal.company) || "Unknown"}</span>
-                    </div>
-                ) : null}
-                {roleAssignModal.contact ? (
-                    <div className="grid grid-cols-[132px_1fr] items-start gap-x-3">
-                      <span className="font-semibold text-slate-900">Contact</span>
-                      <span>{roleAssignModal.contact}</span>
-                    </div>
-                ) : null}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-bold uppercase tracking-widest text-slate-500">Available Badges</div>
-                <div className="flex flex-wrap gap-2">
-                  {roleAssignModal.options.map(role => {
-                    const active = roleAssignModal.selected.includes(role.id);
-                    return (
-                      <button
-                        key={`role-assign-${role.id}`}
-                        type="button"
-                        onClick={() => toggleRoleAssignmentSelection(role.id)}
-                        className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${active ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"}`}
-                      >
-                        <span className="mr-1 inline-flex"><RoleIcon role={role} className="h-4 w-4" /></span>
-                        {role.title}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="bg-slate-50 px-6 py-4 flex items-center justify-between gap-3 border-t border-slate-200">
-              <button
-                className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                onClick={goBackFromRoleAssignmentPrompt}
-              >
-                Go Back
-              </button>
-              <div className="flex items-center gap-3">
-                <button
-                  className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                  onClick={closeRoleAssignmentPrompt}
-                >
-                  Skip
-                </button>
-                <button
-                  className="rounded-lg bg-sky-500 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-600 disabled:bg-slate-300 disabled:cursor-not-allowed"
-                  onClick={applySelectedRoleAssignments}
-                  disabled={!roleAssignModal.selected.length}
-                >
-                  Apply Roles
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <RoleAssignModal
+          state={roleAssignModal}
+          getCompanyTypeForRoles={getCompanyTypeForRoles}
+          toggleSelection={toggleRoleAssignmentSelection}
+          onApply={applySelectedRoleAssignments}
+          onSkip={closeRoleAssignmentPrompt}
+          onGoBack={goBackFromRoleAssignmentPrompt}
+          onClose={() => setRoleAssignModal(prev => ({ ...prev, isOpen: false }))}
+        />
       )}
 
       {previewOpen && (

@@ -50,3 +50,4 @@ export { AddNewSystemModal } from "./AddNewSystemModal";
 export { OrderInstructionModal } from "./OrderInstructionModal";
 export { AlertModal } from "./AlertModal";
 export { SmartConfirmModal } from "./SmartConfirmModal";
+export { RoleAssignModal } from "./RoleAssignModal";
