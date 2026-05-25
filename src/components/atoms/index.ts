@@ -59,3 +59,4 @@ export { GroupLinkModal } from "./GroupLinkModal";
 export { CrmLogModal } from "./CrmLogModal";
 export { PlanOfActionModal } from "./PlanOfActionModal";
 export { WelcomeMessageModal } from "./WelcomeMessageModal";
+export { SdsQuestionnaireModal } from "./SdsQuestionnaireModal";

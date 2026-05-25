@@ -147,6 +147,7 @@ import {
   CrmLogModal,
   PlanOfActionModal,
   WelcomeMessageModal,
+  SdsQuestionnaireModal,
 } from './components/atoms';
 import { getInitials, splitName, getRepInitials } from './utils/names';
 import { getOptionText, getBestMatch } from './utils/search';
@@ -13865,61 +13866,14 @@ export default function App(){
       {smartNotification && <SmartNotification message={smartNotification.message} onReject={rejectSmartAction} onClose={()=>setSmartNotification(null)} panelOffset={(interviewPanelOpen || actionItemsOpen) ? 480 : 0} />}
       {/* SDS Pre-Generation Questionnaire */}
       {showSdsQuestionnaire && (
-        <div className="fixed inset-0 z-[195] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
-            <div className="bg-sky-600 px-5 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Before Generating SDS</h3>
-              <button onClick={() => setShowSdsQuestionnaire(false)} className="text-white/70 hover:text-white text-lg font-bold">×</button>
-            </div>
-            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div className="text-sm text-slate-500">Confirm scope details to include in the document.</div>
-              {/* Q1: Picking up? */}
-              <div className="rounded-xl border border-slate-200 p-3 space-y-2">
-                <div className="text-xs font-bold text-slate-700">Will we be picking anything up?</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {SERVICE_OFFERINGS.filter(s => ["Contents", "Furniture", "Rugs", "Textiles", "Art", "Appliance", "Hand Clean"].includes(s)).map(s => {
-                    const isOn = (data.serviceOfferings || []).includes(s);
-                    return <button key={s} type="button" onClick={() => update("serviceOfferings", isOn ? (data.serviceOfferings || []).filter(x => x !== s) : [...(data.serviceOfferings || []), s])} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${isOn ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{s}</button>;
-                  })}
-                </div>
-              </div>
-              {/* Q2: Cleaning in home? */}
-              <div className="rounded-xl border border-slate-200 p-3 space-y-2">
-                <div className="text-xs font-bold text-slate-700">Will we be cleaning anything in the home?</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {["Consulting", "Expert Stain Removal", "Hand Clean"].map(s => {
-                    const isOn = (data.serviceOfferings || []).includes(s);
-                    return <button key={s} type="button" onClick={() => update("serviceOfferings", isOn ? (data.serviceOfferings || []).filter(x => x !== s) : [...(data.serviceOfferings || []), s])} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${isOn ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{s}</button>;
-                  })}
-                </div>
-              </div>
-              {/* Q3: Total loss? */}
-              <div className="rounded-xl border border-slate-200 p-3 space-y-2">
-                <div className="text-xs font-bold text-slate-700">Are there any total loss items?</div>
-                <div className="flex gap-2">
-                  {[{ id: "tli-writing", label: "Yes — We Are Writing" }, { id: "tli-not-writing", label: "Yes — We Are Not Writing" }, { id: "tli-no", label: "No" }].map(opt => {
-                    const isOn = (data as any).tliScope === opt.id;
-                    return <button key={opt.id} type="button" onClick={() => { update("tliScope", isOn ? "" : opt.id); if (opt.id !== "tli-no" && !isOn && !(data.serviceOfferings || []).includes("TLI")) update("serviceOfferings", [...(data.serviceOfferings || []), "TLI"]); }} className={`rounded-full border px-3 py-1.5 text-[10px] font-bold flex-1 ${isOn ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{opt.label}</button>;
-                  })}
-                </div>
-              </div>
-              {/* Q4: Special services */}
-              <div className="rounded-xl border border-slate-200 p-3 space-y-2">
-                <div className="text-xs font-bold text-slate-700">Any special services required?</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {SERVICE_OFFERINGS.map(s => {
-                    const isOn = (data.serviceOfferings || []).includes(s);
-                    return <button key={s} type="button" onClick={() => update("serviceOfferings", isOn ? (data.serviceOfferings || []).filter(x => x !== s) : [...(data.serviceOfferings || []), s])} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${isOn ? "border-sky-400 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{s}</button>;
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="bg-slate-50 px-5 py-4 flex justify-end gap-3 border-t border-slate-200">
-              <button onClick={() => setShowSdsQuestionnaire(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700">Cancel</button>
-              <button onClick={() => { setShowSdsQuestionnaire(false); setShowSdsPreview(true); }} className="rounded-lg bg-sky-600 px-6 py-2 text-sm font-bold text-white shadow hover:bg-sky-700">Generate SDS</button>
-            </div>
-          </div>
-        </div>
+        <SdsQuestionnaireModal
+          serviceOfferings={data.serviceOfferings || []}
+          tliScope={(data as any).tliScope || ""}
+          setServiceOfferings={(next) => update("serviceOfferings", next)}
+          setTliScope={(next) => update("tliScope", next)}
+          onCancel={() => setShowSdsQuestionnaire(false)}
+          onGenerate={() => { setShowSdsQuestionnaire(false); setShowSdsPreview(true); }}
+        />
       )}
 
       {showSdsPreview && (
