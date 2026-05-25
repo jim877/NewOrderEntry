@@ -306,6 +306,7 @@ import { buildOrderNarrative } from './utils/orderNarrative';
 import { computeAuditMissing as computeAuditMissingFor } from './utils/auditMissing';
 import { buildCompanyRoleAssignments } from './utils/companyRoles';
 import { computeAutoBridgeIssues } from './utils/autoBridgeIssues';
+import { mapAuditMissingToTargets } from './utils/auditTargets';
 import { updateSdsPhotoNote } from './utils/sdsPhotoEdit';
 import { mergeSdsPhotos } from './utils/sdsPhotos';
 import { bridgeStatusClass, bridgeSectionClass, deriveScopeBridgeStatus } from './utils/bridgeStatus';
@@ -6570,27 +6571,12 @@ export default function App(){
     const missingKeys = new Set(missing.map(m => m.key));
     setData(p => {
       const highlight = {};
-      // Set all missing keys to true, clear previously-flagged keys that are now resolved
       Object.keys(p.highlightMissing || {}).forEach(k => { highlight[k] = missingKeys.has(k); });
       missingKeys.forEach(k => { highlight[k] = true; });
       return { ...p, highlightMissing: highlight };
     });
-    const sections = new Set(missing.map(m => m.section));
-    const subsections = new Set();
-    missing.forEach(m => {
-      if (["leadSourceCategory","referringCompany","referrer","leadSourceDetail"].includes(m.key)) subsections.add("source");
-    if (["billingPayer"].includes(m.key)) subsections.add("billing");
-    if (["orderName","orderTypes","nonRestorationSubtype","moldCoverageConfirm"].includes(m.key)) subsections.add("order");
-      if (["insuranceClaim","insuranceCompany","insuranceAdjuster","claimNumber","dateOfLoss","nationalCarrier","directionOfPayment","contentsCoverageLimit","moldLimit"].includes(m.key)) subsections.add("insurance");
-      if (["moldCoverageConfirm","orderTypes","nonRestorationSubtype"].includes(m.key)) subsections.add("order");
-      if (["rentCoverageLimit"].includes(m.key)) subsections.add("address");
-      if (["pricePlatform","priceList","multiplier","estimateRequested"].includes(m.key)) subsections.add("finance");
-      if ((m.key || "").startsWith("placeholder-customer-")) subsections.add("customer");
-      if ((m.key || "").startsWith("placeholder-company-") || (m.key || "").startsWith("placeholder-contact-")) subsections.add("companies");
-      if ((m.key || "").startsWith("placeholder-address-")) subsections.add("address");
-      if (m.key === "interview") subsections.add("interview");
-      if (m.key === "codes") { subsections.add("codes"); setOpenCodes(true); }
-    });
+    const { sections, subsections, codesNeedsOpen } = mapAuditMissingToTargets(missing);
+    if (codesNeedsOpen) setOpenCodes(true);
     setAuditTargets({ sections, subsections });
     const total = computeAuditRequiredCount();
     const pct = total ? Math.round(((total - missing.length) / total) * 100) : 100;
