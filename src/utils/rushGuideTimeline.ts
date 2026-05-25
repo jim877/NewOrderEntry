@@ -4,6 +4,71 @@
 // from the order shape. Returns null when neither a repair type nor a living
 // situation has been set (the doc just omits the Rush Guide section).
 
+// LIVING_SITUATION_MAP — maps the interview livingStatus answer to
+// the rush-guide internal "situation" key. Stays in sync with the
+// repair-type map below.
+export const LIVING_SITUATION_MAP: Record<string, string> = {
+  "Staying in home": "home",
+  Hotel: "hotel",
+  Temp: "temp",
+  Moving: "moving",
+};
+
+// REPAIR_TYPE_MAP — maps the first selected repairsSummary entry to
+// a rush-guide repair-type key used to look up timelines + advice.
+export const REPAIR_TYPE_MAP: Record<string, string> = {
+  "Just Cleaning": "cleaning",
+  Paint: "paint",
+  "Refinish Floors": "refinish_floors",
+  "Replace Floors": "replace_floors",
+  "Cosmetic Damage": "cosmetic",
+  "Major Structural Damage": "structural",
+  "Complete Rebuild": "rebuild",
+};
+
+export type HouseholdComposition = {
+  babies: number;
+  kids: number;
+  elderly: number;
+  adults: number;
+  totalPeople: number;
+  petCount: number;
+  petNames: string;
+};
+
+// buildHouseholdComposition — pure derivation of the "who lives here"
+// composition the Rush Guide needs. Age + type heuristics: 0-2 or
+// /infant|baby/ -> baby; 3-17 or /child/ -> kid; 65+ or /elderly/ ->
+// elderly. Adults default to customer count (min 1). Pet names format
+// "Type Name" (whichever exists).
+export const buildHouseholdComposition = (data: any): HouseholdComposition => {
+  const household = data.household || [];
+  const people = household.filter((m: any) => m.category === "person");
+  const pets = household.filter((m: any) => m.category === "pet");
+  const babies = people.filter((p: any) => {
+    const age = parseInt(p.age);
+    return /infant|baby/i.test(p.type) || (age >= 0 && age <= 2);
+  }).length;
+  const kids = people.filter((p: any) => {
+    const age = parseInt(p.age);
+    return /child/i.test(p.type) || (age > 2 && age <= 17);
+  }).length;
+  const elderly = people.filter((p: any) => {
+    const age = parseInt(p.age);
+    return /elderly/i.test(p.type) || age >= 65;
+  }).length;
+  const adults = Math.max(1, (data.customers || []).length);
+  return {
+    babies,
+    kids,
+    elderly,
+    adults,
+    totalPeople: adults + kids + babies,
+    petCount: pets.length,
+    petNames: pets.map((p: any) => [p.type, p.name].filter(Boolean).join(" ")).join(", "),
+  };
+};
+
 import { rushAddDays, rushFormatDate, rushGetSeasons } from "./dateTime";
 import { RUSH_REPAIR_TIMELINES } from "../config";
 

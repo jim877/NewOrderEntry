@@ -304,7 +304,12 @@ import { pickAutoAddressForDeliveryGroup, deliveryAddressTypeToProcessType } fro
 import { toggleSeverityCode, updateLossDetailField, getLossSummary as getLossSummaryFor } from './utils/lossDetails';
 import { downloadOrderIcs } from './utils/icsExport';
 import { renderAlertMessageContent, renderAlertDetailContent } from './utils/alertContent';
-import { buildRushGuideTimeline } from './utils/rushGuideTimeline';
+import {
+  buildRushGuideTimeline,
+  LIVING_SITUATION_MAP,
+  REPAIR_TYPE_MAP,
+  buildHouseholdComposition,
+} from './utils/rushGuideTimeline';
 import {
   getOrderCompanyNames,
   getOrderContactNames,
@@ -10920,11 +10925,9 @@ export default function App(){
 
         {/* Rush Guide — Auto-generated from order + interview data */}
         {rushGuideOpen && (() => {
-          const livingMap = { "Staying in home": "home", "Hotel": "hotel", "Temp": "temp", "Moving": "moving" };
-          const repairMap = { "Just Cleaning": "cleaning", "Paint": "paint", "Refinish Floors": "refinish_floors", "Replace Floors": "replace_floors", "Cosmetic Damage": "cosmetic", "Major Structural Damage": "structural", "Complete Rebuild": "rebuild" };
-          const orderSituation = livingMap[data.livingStatus] || "";
+          const orderSituation = LIVING_SITUATION_MAP[data.livingStatus] || "";
           const firstRepair = (data.repairsSummary || "").split(", ").filter(Boolean)[0] || "";
-          const orderRepairType = repairMap[firstRepair] || "";
+          const orderRepairType = REPAIR_TYPE_MAP[firstRepair] || "";
           const household = data.household || [];
           const people = household.filter(m => m.category === "person");
           const pets = household.filter(m => m.category === "pet");
@@ -10935,14 +10938,7 @@ export default function App(){
           const primaryAddrStr = [primaryAddress.street, primaryAddress.city, primaryAddress.state, primaryAddress.zip].filter(Boolean).join(", ");
           const tempAddress = allAddresses.find(a => /temp|hotel|rental/i.test(a.type || "")) || {};
           const tempAddrStr = [tempAddress.street, tempAddress.city, tempAddress.state, tempAddress.zip].filter(Boolean).join(", ");
-          // Age-aware family composition
-          const babies = people.filter(p => { const age = parseInt(p.age); return /infant|baby/i.test(p.type) || (age >= 0 && age <= 2); }).length;
-          const kids = people.filter(p => { const age = parseInt(p.age); return /child/i.test(p.type) || (age > 2 && age <= 17); }).length;
-          const elderly = people.filter(p => { const age = parseInt(p.age); return /elderly/i.test(p.type) || age >= 65; }).length;
-          const adults = Math.max(1, (data.customers || []).length);
-          const totalPeople = adults + kids + babies;
-          const petCount = pets.length;
-          const petNames = pets.map(p => [p.type, p.name].filter(Boolean).join(" ")).join(", ");
+          const { babies, kids, elderly, adults, totalPeople, petCount, petNames } = buildHouseholdComposition(data);
           const considerations = data.sdsConsiderations || [];
           const packoutItems = data.packoutSummary || [];
           const interests = data.rushInterests || [];
