@@ -10138,48 +10138,65 @@ export default function App(){
                   { key: "dryCleaner", configKey: "useDryCleaner", title: "Dry Cleaner", searchTerms: "dry cleaner dry cleaning", isAnswered: () => !!data.useDryCleaner, summary: () => data.useDryCleaner || "" },
                   { key: "laundry", configKey: "howDryLaundry", title: "Drying Preference", searchTerms: "air dry low heat dryer machine", isAnswered: () => !!data.howDryLaundry, summary: () => data.howDryLaundry || "" },
                 ].filter(q => isFieldVisible(q.configKey) && matchesInterviewSearch(q.title, q.searchTerms || "")).map((q, qi) => {
-                  const log = (data.interviewLog || {})[q.key]; const hasAnswers = q.isAnswered(); const answered = hasAnswers;
-                  const needsFollowUp = (q.key === "medical" && data.familyMedicalIssues === "Y") || (q.key === "allergies" && data.soapFragAllergies === "Y") || (q.key === "selfClean" && data.selfCleaning === "Y");
-                  const userPref = interviewExpanded[q.key];
-                  const expanded = !!interviewSearch.trim() || userPref === true;
+                  const log = (data.interviewLog || {})[q.key];
+                  const hasAnswers = q.isAnswered();
+                  const expanded = !!interviewSearch.trim() || interviewExpanded[q.key] === true;
+                  const logNow = (key: string) => setData(p => ({ ...p, interviewLog: { ...(p.interviewLog || {}), [key]: { user: p.currentUser || "Unknown", at: formatShortTimestamp() } } }));
                   return (
-                    <div key={q.key} className={`noe-iq rounded-xl border ${answered && !expanded ? 'border-sky-200 bg-sky-50/30' : 'border-slate-200 bg-white'} overflow-hidden`}>
-                      <button type="button" onClick={() => { setInterviewExpanded(p => ({...p, [q.key]: !p[q.key]})); if (answered && !log) setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), [q.key]: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50">
-                        <div className={`text-[13px] font-bold text-sky-600 flex items-center gap-2`}><span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[13px] font-bold shrink-0">{8 + qi}</span>{highlightSearch(q.title)}</div>
-                        {answered && !expanded && <span className="text-[12px] text-sky-600 font-semibold truncate ml-2">{q.summary()}</span>}
-                      </button>
-                      {answered && !expanded && log && <div className="px-3 pb-1 text-[10px] text-slate-400">{log.user} · {log.at}</div>}
-                      {expanded && <div className="px-3 pb-3">
-                        {q.key === "medical" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.familyMedicalIssues || ""} onChange={v => { update("familyMedicalIssues", v); if (v === "Y") executeInterviewActions("Medical Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), medical: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                    <InterviewQuestionCard
+                      key={q.key}
+                      number={8 + qi}
+                      title={q.title}
+                      summary={q.summary()}
+                      log={log}
+                      answered={!!hasAnswers}
+                      expanded={expanded}
+                      highlightSearch={highlightSearch}
+                      showAnsweredTint={hasAnswers && !expanded}
+                      onToggle={() => {
+                        setInterviewExpanded(p => ({ ...p, [q.key]: !p[q.key] }));
+                        if (hasAnswers && !log) logNow(q.key);
+                      }}
+                    >
+                      {q.key === "medical" && (
+                        <>
+                          <ToggleGroup options={["Y", "N"]} value={data.familyMedicalIssues || ""} onChange={v => { update("familyMedicalIssues", v); if (v === "Y") executeInterviewActions("Medical Yes", true); logNow("medical"); }} />
                           {data.familyMedicalIssues === "Y" && <Input value={data.familyMedicalNote || ""} onChange={e => update("familyMedicalNote", e.target.value)} placeholder="What medical issues?" className="!text-xs mt-2" />}
-                        </>}
-                        {q.key === "allergies" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.soapFragAllergies || ""} onChange={v => { update("soapFragAllergies", v); if (v === "Y") executeInterviewActions("Allergies Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), allergies: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
+                        </>
+                      )}
+                      {q.key === "allergies" && (
+                        <>
+                          <ToggleGroup options={["Y", "N"]} value={data.soapFragAllergies || ""} onChange={v => { update("soapFragAllergies", v); if (v === "Y") executeInterviewActions("Allergies Yes", true); logNow("allergies"); }} />
                           {data.soapFragAllergies === "Y" && <Input value={data.soapFragNote || ""} onChange={e => update("soapFragNote", e.target.value)} placeholder="What allergies?" className="!text-xs mt-2" />}
-                        </>}
-                        {q.key === "selfClean" && <>
-                          <ToggleGroup options={["Y","N"]} value={data.selfCleaning || ""} onChange={v => { update("selfCleaning", v); if (v === "Y") executeInterviewActions("SelfClean Yes", true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), selfClean: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
-                          {data.selfCleaning === "Y" && <div className="mt-2 space-y-1.5">
-                            <div className="flex flex-wrap gap-1.5">
-                              {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
-                                const active = (data.selfCleaningNote || "").toLowerCase().includes(item.toLowerCase());
-                                return <button key={item} type="button" onClick={() => { const note = data.selfCleaningNote || ""; if (active) update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", ")); else update("selfCleaningNote", note ? `${note}, ${item}` : item); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{item}</button>;
-                              })}
+                        </>
+                      )}
+                      {q.key === "selfClean" && (
+                        <>
+                          <ToggleGroup options={["Y", "N"]} value={data.selfCleaning || ""} onChange={v => { update("selfCleaning", v); if (v === "Y") executeInterviewActions("SelfClean Yes", true); logNow("selfClean"); }} />
+                          {data.selfCleaning === "Y" && (
+                            <div className="mt-2 space-y-1.5">
+                              <div className="flex flex-wrap gap-1.5">
+                                {["Drawers", "Undergarments", "Linens", "Towels", "Baby Items"].map(item => {
+                                  const active = (data.selfCleaningNote || "").toLowerCase().includes(item.toLowerCase());
+                                  return <button key={item} type="button" onClick={() => { const note = data.selfCleaningNote || ""; if (active) update("selfCleaningNote", note.split(/,\s*/).filter(s => s.toLowerCase() !== item.toLowerCase()).join(", ")); else update("selfCleaningNote", note ? `${note}, ${item}` : item); }} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-sky-300 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-500"}`}>{item}</button>;
+                                })}
+                              </div>
+                              <Input value={data.selfCleaningNote || ""} onChange={e => update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
                             </div>
-                            <Input value={data.selfCleaningNote || ""} onChange={e => update("selfCleaningNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
-                          </div>}
-                        </>}
-                        {q.key === "dryCleaner" && <ToggleGroup options={["Yes","No","Rarely"]} value={data.useDryCleaner || ""} onChange={v => { update("useDryCleaner", v); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), dryCleaner: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />}
-                        {q.key === "laundry" && <>
-                          <ToggleGroup options={["Air-Dry","Low Heat","Dryer"]} value={data.howDryLaundry || ""} onChange={v => { updateHowDry(v); executeInterviewActions(v, true); setData(p => ({...p, interviewLog: {...(p.interviewLog||{}), laundry: {user: p.currentUser || "Unknown", at: formatShortTimestamp()}}})); }} />
-                          {data.howDryLaundry && <div className="mt-2">
-                            <Input value={data.howDryNote || ""} onChange={e => update("howDryNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" />
-                          </div>}
-                        </>}
-                        <button type="button" onClick={() => setInterviewExpanded(p => ({...p, [q.key]: false}))} className={`ml-auto rounded-full border px-3 py-1 text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 transition-all ${hasAnswers ? "border-sky-300 text-sky-700" : "border-slate-300 text-slate-500"} block`}>Collapse</button>
-                      </div>}
-                    </div>
+                          )}
+                        </>
+                      )}
+                      {q.key === "dryCleaner" && (
+                        <ToggleGroup options={["Yes", "No", "Rarely"]} value={data.useDryCleaner || ""} onChange={v => { update("useDryCleaner", v); logNow("dryCleaner"); }} />
+                      )}
+                      {q.key === "laundry" && (
+                        <>
+                          <ToggleGroup options={["Air-Dry", "Low Heat", "Dryer"]} value={data.howDryLaundry || ""} onChange={v => { updateHowDry(v); executeInterviewActions(v, true); logNow("laundry"); }} />
+                          {data.howDryLaundry && <div className="mt-2"><Input value={data.howDryNote || ""} onChange={e => update("howDryNote", e.target.value)} placeholder="Additional notes..." className="!text-xs" /></div>}
+                        </>
+                      )}
+                      <CollapseInterviewRow log={log} onCollapse={() => setInterviewExpanded(p => ({ ...p, [q.key]: false }))} tinted={!!hasAnswers} />
+                    </InterviewQuestionCard>
                   );
                 })}
 
