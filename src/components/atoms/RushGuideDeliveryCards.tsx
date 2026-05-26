@@ -62,6 +62,8 @@ type AddressChoice = {
   label: string;
 };
 
+type Member = { id: string; label: string; kind: "adult" | "child" | "baby" | "pet" };
+
 type Props = {
   deliveryGroups: DeliveryGroup[];
   seasonalWardrobes: Wardrobe[];
@@ -76,7 +78,12 @@ type Props = {
   orderAddressChoices: { known: AddressChoice[]; placeholders: AddressChoice[] };
   removeCustomDelivery: (id: string) => void;
   deliveryDateVersion: number;
+  membersForDelivery?: (dgId: string) => Member[];
+  anyAssignmentSet?: boolean;
 };
+
+const memberKindIcon = (k: Member["kind"]) =>
+  k === "adult" ? "👤" : k === "child" ? "🧒" : k === "baby" ? "👶" : "🐾";
 
 export const RushGuideDeliveryCards: React.FC<Props> = ({
   deliveryGroups,
@@ -92,6 +99,8 @@ export const RushGuideDeliveryCards: React.FC<Props> = ({
   orderAddressChoices,
   removeCustomDelivery,
   deliveryDateVersion,
+  membersForDelivery,
+  anyAssignmentSet,
 }) => {
   const removeSeasonFromGroup = (swId: string) =>
     setRushGuideData((p: any) => ({
@@ -257,6 +266,35 @@ export const RushGuideDeliveryCards: React.FC<Props> = ({
               )}
             </div>
             <div className="bg-white p-4 space-y-2">
+              {/* Per-person manifest — pulled from the Timeline Builder matrix.
+                  Default state (no boxes touched) shows everyone with a muted chip. */}
+              {membersForDelivery && (() => {
+                const assignedMembers = membersForDelivery(dg.id);
+                if (assignedMembers.length === 0) {
+                  return (
+                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide shrink-0">For:</span>
+                      <span className="text-[11px] text-slate-400 italic">No members assigned — use the Timeline Builder above to assign.</span>
+                    </div>
+                  );
+                }
+                const implicit = !anyAssignmentSet;
+                return (
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100 flex-wrap">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide shrink-0">For:</span>
+                    {assignedMembers.map((m) => (
+                      <span
+                        key={m.id}
+                        title={implicit ? "Included by default (matrix above is untouched)" : "Assigned in the Timeline Builder matrix above"}
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${implicit ? "bg-slate-50 text-slate-500 border border-slate-200" : "bg-indigo-50 text-indigo-700 border border-indigo-200"}`}
+                      >
+                        <span>{memberKindIcon(m.kind)}</span>
+                        <span>{m.label}</span>
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
               {/* Core items */}
               {dg.items.map((item, j) => (
                 <div key={j} className="flex items-start gap-2">

@@ -5874,6 +5874,31 @@ export default function App(){
 
                     // Delivery groups — computed at outer scope so seasonal/event sections can reference them
                     const hasHouseholdItems = packoutItems.some(p => ["Rugs", "Window Treatments", "Furniture", "Art", "Appliances"].includes(p));
+                    // Family roster — adults from customers + kids/babies/pets from
+                    // household. Used by the Timeline Builder matrix AND the per-card
+                    // "For:" chip row, so it lives at the outer Rush Guide scope.
+                    type Member = { id: string; label: string; kind: "adult" | "child" | "baby" | "pet" };
+                    const members: Member[] = [];
+                    (data.customers || []).forEach((c: any, i: number) => {
+                      const name = [c.first, c.last].filter(Boolean).join(" ") || `Adult ${i + 1}`;
+                      members.push({ id: `cust_${i}`, label: name, kind: "adult" });
+                    });
+                    (data.household || []).forEach((m: any) => {
+                      if (m.category === "pet") {
+                        members.push({ id: `pet_${m.id || m.name || Math.random()}`, label: [m.type, m.name].filter(Boolean).join(" ") || "Pet", kind: "pet" });
+                      } else if (m.category === "person") {
+                        const age = parseInt(m.age);
+                        const kind: Member["kind"] = (/infant|baby/i.test(m.type) || (age >= 0 && age <= 2)) ? "baby" : (/child/i.test(m.type) || (age > 2 && age <= 17)) ? "child" : "adult";
+                        const label = [m.type || (kind === "adult" ? "Adult" : kind === "child" ? "Child" : kind === "baby" ? "Baby" : "Pet"), m.name].filter(Boolean).join(" ");
+                        members.push({ id: `hh_${m.id || m.name || Math.random()}`, label, kind });
+                      }
+                    });
+                    const familyAssignments: Record<string, Record<string, boolean>> = (rushGuideData as any).familyAssignments || {};
+                    // Virgin matrix (no member touched) defaults to "everyone on every delivery".
+                    // Once the user checks any box, explicit assignments take over.
+                    const anyAssignmentSet = Object.values(familyAssignments).some((row: any) => row && Object.values(row).some(Boolean));
+                    const membersForDelivery = (dgId: string): Member[] => members.filter(m => anyAssignmentSet ? !!(familyAssignments[m.id] || {})[dgId] : true);
+
                     const deliveryGroups = buildRushGuideDeliveryGroups({
                       rushItems,
                       shortTermItems,
@@ -5949,18 +5974,22 @@ export default function App(){
                       });
                     };
                     // Build text for different output modes
+                    const memberLine = (dgId: string) => {
+                      const mlist = membersForDelivery(dgId).map(m => m.label).filter(Boolean);
+                      return mlist.length ? `   For: ${mlist.join(", ")}\n` : "";
+                    };
                     const buildFullText = () => {
                       let t = `RUSH GUIDE — ${data.orderName || "Order"}\nFor: ${[primaryCustomer.first, primaryCustomer.last].filter(Boolean).join(" ")}\n`;
                       if (primaryAddrStr) t += `Home: ${primaryAddrStr}\n`;
                       if (hasHotel && hotelAddrStr) t += `Hotel: ${hotelAddrStr}\n`;
                       if (hasRental && rentalDeliverTo) t += `Rental: ${rentalDeliverTo}\n`;
                       t += `\n━━━ DELIVERY TIMELINE ━━━\n\n`;
-                      t += `1. RUSH DELIVERY (24-72 hrs) → ${rushDeliverTo || "TBD"}\n${rushItems.map(i => `   • ${i}`).join("\n")}\n\n`;
-                      if (shortTermItems.length) t += `2. SHORT-TERM (1-4 wks) → ${primaryAddrStr || "TBD"}\n${shortTermItems.map(i => `   • ${i}`).join("\n")}\n\n`;
+                      t += `1. RUSH DELIVERY (24-72 hrs) → ${rushDeliverTo || "TBD"}\n${memberLine("rush")}${rushItems.map(i => `   • ${i}`).join("\n")}\n\n`;
+                      if (shortTermItems.length) t += `2. SHORT-TERM (1-4 wks) → ${primaryAddrStr || "TBD"}\n${memberLine("short-term")}${shortTermItems.map(i => `   • ${i}`).join("\n")}\n\n`;
                       if (rentalSeasonalItems.length) { t += `3. RENTAL DELIVERY → ${rentalDeliverTo || "TBD"}\n   All seasonal wardrobe items for:\n`; rentalSeasonalItems.forEach(sw => { t += `   ${sw.season} (${sw.date}):\n${sw.items.map(i => `      • ${i}`).join("\n")}\n`; }); t += "\n"; }
                       separateSeasonals.forEach(sw => { t += `SEASONAL: ${sw.season} (${sw.date})\n${sw.items.map(i => `   • ${i}`).join("\n")}\n\n`; });
                       eventDeliveries.forEach(e => { t += `EVENT: ${e.name} (${e.date})${e.address ? ` → ${e.address}` : ""}\n${e.items.map(i => `   • ${i}`).join("\n")}\n\n`; });
-                      t += `FINAL DELIVERY → ${finalDeliverTo || "TBD"}${estimatedReturn ? ` (est. ${rushFormatDate(estimatedReturn)})` : ""}\nAll remaining items after repairs complete.\n\n`;
+                      t += `FINAL DELIVERY → ${finalDeliverTo || "TBD"}${estimatedReturn ? ` (est. ${rushFormatDate(estimatedReturn)})` : ""}\n${memberLine("final")}All remaining items after repairs complete.\n\n`;
                       t += `REMINDERS:\n${reminders.map(r => `• ${r}`).join("\n")}`;
                       return t;
                     };
@@ -6023,24 +6052,6 @@ export default function App(){
                     {(() => {
                       const builderOpen = (rushGuideData as any).builderOpen !== false;
                       const toggleBuilder = () => setRushGuideData((p: any) => ({ ...p, builderOpen: !((p as any).builderOpen !== false) }));
-                      // Build family member list — adults from customers, kids/babies from household, pets too
-                      type Member = { id: string; label: string; kind: "adult" | "child" | "baby" | "pet" };
-                      const members: Member[] = [];
-                      (data.customers || []).forEach((c: any, i: number) => {
-                        const name = [c.first, c.last].filter(Boolean).join(" ") || `Adult ${i + 1}`;
-                        members.push({ id: `cust_${i}`, label: name, kind: "adult" });
-                      });
-                      (data.household || []).forEach((m: any) => {
-                        if (m.category === "pet") {
-                          members.push({ id: `pet_${m.id || m.name || Math.random()}`, label: [m.type, m.name].filter(Boolean).join(" ") || "Pet", kind: "pet" });
-                        } else if (m.category === "person") {
-                          const age = parseInt(m.age);
-                          const kind: Member["kind"] = (/infant|baby/i.test(m.type) || (age >= 0 && age <= 2)) ? "baby" : (/child/i.test(m.type) || (age > 2 && age <= 17)) ? "child" : "adult";
-                          const label = [m.type || (kind === "adult" ? "Adult" : kind === "child" ? "Child" : kind === "baby" ? "Baby" : "Pet"), m.name].filter(Boolean).join(" ");
-                          members.push({ id: `hh_${m.id || m.name || Math.random()}`, label, kind });
-                        }
-                      });
-                      const assignments: Record<string, Record<string, boolean>> = (rushGuideData as any).familyAssignments || {};
                       const toggleAssign = (memberId: string, groupId: string) => {
                         setRushGuideData((p: any) => {
                           const next = { ...(p.familyAssignments || {}) };
@@ -6049,7 +6060,7 @@ export default function App(){
                           return { ...p, familyAssignments: next };
                         });
                       };
-                      const kindIcon = (k: Member["kind"]) => k === "adult" ? "👤" : k === "child" ? "🧒" : k === "baby" ? "👶" : "🐾";
+                      const kindIcon = (k: any) => k === "adult" ? "👤" : k === "child" ? "🧒" : k === "baby" ? "👶" : "🐾";
 
                       // Quick add: interest, event, custom delivery
                       const addInterestQuick = (label: string) => {
@@ -6085,7 +6096,11 @@ export default function App(){
                                   <div className="text-[11px] text-slate-500 italic">No delivery groups yet — add a final delivery date or repair type to generate them.</div>
                                 ) : (
                                   <div className="overflow-x-auto">
-                                    <table className="text-[11px] w-full border-collapse">
+                                    <table className="text-[11px] w-full border-collapse table-fixed">
+                                      <colgroup>
+                                        <col />
+                                        {deliveryGroups.map(dg => <col key={dg.id} style={{ width: "110px" }} />)}
+                                      </colgroup>
                                       <thead>
                                         <tr>
                                           <th className="text-left px-2 py-1.5 font-bold text-slate-500 border-b border-slate-200 sticky left-0 bg-white">Member</th>
@@ -6107,10 +6122,16 @@ export default function App(){
                                               <span className="font-semibold text-slate-700">{m.label}</span>
                                             </td>
                                             {deliveryGroups.map(dg => {
-                                              const on = !!(assignments[m.id] || {})[dg.id];
+                                              const on = anyAssignmentSet ? !!(familyAssignments[m.id] || {})[dg.id] : true;
+                                              const implicit = !anyAssignmentSet;
                                               return (
-                                                <td key={dg.id} className="px-2 py-1.5 border-b border-slate-100 text-center">
-                                                  <button type="button" onClick={() => toggleAssign(m.id, dg.id)} className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${on ? "border-indigo-500 bg-indigo-500 text-white" : "border-slate-200 bg-white hover:border-indigo-300"}`}>
+                                                <td key={dg.id} className="px-2 py-1.5 border-b border-slate-100 text-center align-middle">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => toggleAssign(m.id, dg.id)}
+                                                    title={implicit ? "All members included by default — check any box to start customizing" : (on ? "Click to remove from this delivery" : "Click to add to this delivery")}
+                                                    className={`mx-auto w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${on ? (implicit ? "border-indigo-200 bg-indigo-100 text-indigo-500" : "border-indigo-500 bg-indigo-500 text-white") : "border-slate-200 bg-white hover:border-indigo-300"}`}
+                                                  >
                                                     {on && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                                                   </button>
                                                 </td>
@@ -6120,6 +6141,9 @@ export default function App(){
                                         ))}
                                       </tbody>
                                     </table>
+                                    {!anyAssignmentSet && (
+                                      <div className="mt-1.5 text-[10px] text-slate-400 italic">All members are included on every delivery by default. Check any box to start customizing per-person manifests.</div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -6317,6 +6341,8 @@ export default function App(){
                             orderAddressChoices={orderAddressChoices}
                             removeCustomDelivery={removeCustomDelivery}
                             deliveryDateVersion={deliveryDateVersion}
+                            membersForDelivery={membersForDelivery}
+                            anyAssignmentSet={anyAssignmentSet}
                           />
                           <RushGuideShareButtons
                               deliveryGroups={deliveryGroups}
