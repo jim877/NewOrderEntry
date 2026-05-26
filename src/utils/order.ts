@@ -1,0 +1,236 @@
+// @ts-nocheck
+// Lightweight order-shape helpers: presence checks, placeholder flags, header-toggle DOM helper.
+// Pure (modulo `Element` for DOM matching). No React, no setState.
+
+// summarizeConditions — comma-joined list of currently-active condition flags from the order data.
+// Used as the "Conditions: ..." line in event instructions and as a small badge elsewhere.
+export const summarizeConditions = (data: any) => {
+  const items: string[] = [];
+  if (data?.damageWasWet === "Y" || data?.damageWasWet === true) items.push("Still Wet");
+  if (data?.damageMoldMildew) items.push("Visible Mold");
+  if (data?.structuralElectricDamage === "Y") items.push("Structural Damage");
+  if (data?.noLights) items.push("No Electricity");
+  if (data?.noHeat) items.push("No Heat");
+  if (data?.boardedUp) items.push("Boarded Up");
+  return items.join(", ");
+};
+
+// createPlaceholderFlag — construct a fresh placeholder marker { active, kind, reason, createdAt }.
+export const createPlaceholderFlag = (kind: string, reason = "") => ({
+  active: true,
+  kind,
+  reason,
+  createdAt: new Date().toISOString(),
+});
+
+export const isPlaceholderFlagActive = (flag: any) => !!flag && flag.active !== false;
+
+export const hasMeaningfulValue = (value: any) => !!(value || "").toString().trim();
+
+export const hasCustomerDetails = (customer: any = {}) =>
+  [customer.first, customer.last, customer.phone, customer.email, customer.type].some(hasMeaningfulValue);
+
+// isHeaderToggleIgnoredTarget — when a click bubbles up to a section header that
+// also acts as a toggle, ignore the toggle if the click originated on an interactive
+// child (button, input, etc.) or anything marked with data-header-toggle-ignore.
+export const isHeaderToggleIgnoredTarget = (target: any) => {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest('button, input, select, textarea, a, [role="button"], [data-header-toggle-ignore="true"]');
+};
+
+// summarizeAddress — one-line "street, city, state zip" string or "No address yet".
+export const summarizeAddress = (addr: any = {}) => {
+  const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
+  return parts.length ? parts.join(", ") : "No address yet";
+};
+
+// formatOrderAddressLine — same idea but includes `apt`. Returns "" (not "No address yet")
+// when nothing's filled in — callers expect to test for truthiness.
+export const formatOrderAddressLine = (addr: any = {}) =>
+  [addr.street, addr.apt, addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
+
+// formatOrderAddressChoiceLabel — "Primary — 123 Main St, ...". Falls back to "TBD" when blank.
+export const formatOrderAddressChoiceLabel = (addr: any = {}, idx = 0) => {
+  const type = addr.type || `Address ${idx + 1}`;
+  const line = formatOrderAddressLine(addr);
+  return `${type} — ${line || "TBD"}`;
+};
+
+// appendAddressAndLinkToGroupReducer — pure reducer used by the
+// "add address from group-link modal" flows. Appends `newAddress`
+// to the order's address list and writes/updates the link so the
+// given group points at it.
+export const appendAddressAndLinkToGroupReducer = (
+  prev: any,
+  group: string,
+  newAddress: any,
+) => {
+  const links = { ...(prev.groupAddressLinks || {}) };
+  const current = links[group] || {};
+  links[group] = { ...current, addressId: newAddress.id };
+  return {
+    ...prev,
+    addresses: [...(prev.addresses || []), newAddress],
+    groupAddressLinks: links,
+  };
+};
+
+// tryAppendAddressType — pure pseudo-reducer used by ensureAddressType.
+// If no active address of the given type exists, returns the patch
+// to append one (a placeholder when `placeholder=true`, otherwise an
+// empty record). Returns null when nothing should change.
+//
+// initAddress and createPlaceholderFlag are passed in as args because
+// they live alongside this module — keeping them as parameters lets
+// the helper avoid a circular import.
+export const tryAppendAddressType = (
+  prev: any,
+  type: string,
+  placeholder: boolean,
+  initAddress: (patch: any) => any,
+  createPlaceholderFlag: (kind: string, reason: string) => any,
+): { addresses: any[] } | null => {
+  const exists = (prev.addresses || []).some(
+    (a: any) => (a.type || "").toLowerCase() === type.toLowerCase()
+  );
+  if (exists) return null;
+  return {
+    addresses: [
+      ...(prev.addresses || []),
+      initAddress({
+        type,
+        isPrimary: false,
+        isLossSite: false,
+        street: placeholder ? "TBD" : "",
+        placeholder: placeholder ? createPlaceholderFlag("address", `${type} placeholder`) : null,
+      }),
+    ],
+  };
+};
+
+// resolveAddressChoicePayload — parse an address-choice value (the
+// strings emitted by buildOrderAddressChoices) back into the
+// { addressType, address, addressId } shape Action Items records
+// store. Returns an extra `needsPlaceholder` field with the type
+// name when the caller needs to side-effect an ensureAddressType
+// call (e.g. user picked a "type:..." option but no address of that
+// type exists yet).
+export const resolveAddressChoicePayload = (
+  choiceValue: string,
+  addresses: any[],
+  formatLine: (addr: any) => string,
+): { addressType: string; address: string; addressId: string; needsPlaceholder: string | null } => {
+  if (!choiceValue) return { addressType: "", address: "", addressId: "", needsPlaceholder: null };
+  if (choiceValue.startsWith("addr:")) {
+    const addressId = choiceValue.slice(5);
+    const addr = (addresses || []).find((a: any) => a.id === addressId);
+    if (!addr) return { addressType: "", address: "", addressId: "", needsPlaceholder: null };
+    const type = addr.type || "Address";
+    return {
+      addressType: type,
+      address: formatLine(addr) || `${type} address TBD`,
+      addressId,
+      needsPlaceholder: null,
+    };
+  }
+  if (choiceValue.startsWith("type:")) {
+    const type = choiceValue.slice(5);
+    const existing = (addresses || []).find(
+      (a: any) => (a.type || "").toLowerCase() === type.toLowerCase() && !a.inactive
+    );
+    return {
+      addressType: type,
+      address: existing ? (formatLine(existing) || `${type} address TBD`) : `${type} address TBD`,
+      addressId: existing?.id || "",
+      needsPlaceholder: existing ? null : type,
+    };
+  }
+  return { addressType: "", address: choiceValue, addressId: "", needsPlaceholder: null };
+};
+
+// resolveAddressChoiceValue — inverse: given an Action Items record,
+// derive the choice string that selects the matching option. Tries
+// the explicit addressId first, then addressType, then a fuzzy
+// location-name match against ORDER_ADDRESS_TYPES, then a final
+// address-line equality match against the order's saved addresses.
+export const resolveAddressChoiceValue = (
+  record: any,
+  addresses: any[],
+  orderAddressTypes: string[],
+  formatLine: (addr: any) => string,
+): string => {
+  const r = record || {};
+  if (r.addressId) return `addr:${r.addressId}`;
+  if (r.addressType) return `type:${r.addressType}`;
+  if (
+    r.location &&
+    (orderAddressTypes || []).some((type) => type.toLowerCase() === String(r.location).toLowerCase())
+  ) {
+    return `type:${r.location}`;
+  }
+  if (r.address) {
+    const match = (addresses || []).find((addr: any) => formatLine(addr) === r.address);
+    if (match) return `addr:${match.id}`;
+  }
+  return "";
+};
+
+// buildOrderAddressChoices — turn the order's address list into the picker
+// shape used by Living Address / Delivery Group / Reminder modals. Returns
+// { known, placeholders, all } so callers can render the two groups
+// separately or combine them. `known` entries reference real address ids;
+// `placeholders` are typed slots ("type:Hotel") used when a record doesn't
+// exist yet.
+export const buildOrderAddressChoices = (
+  addresses: any[] = [],
+  orderAddressTypes: string[] = [],
+  livingStatusAddressTypes: string[] = [],
+) => {
+  const activeAddresses = (addresses || []).filter((addr: any) => !addr.inactive);
+  const known = activeAddresses.map((addr: any, idx: number) => ({
+    kind: "known",
+    value: `addr:${addr.id}`,
+    type: addr.type || `Address ${idx + 1}`,
+    label: formatOrderAddressChoiceLabel(addr, idx) + (addr.linkedContext ? ` (${addr.linkedContext})` : ""),
+    address: formatOrderAddressLine(addr) || `${addr.type || `Address ${idx + 1}`} address TBD`,
+    addressId: addr.id,
+  }));
+  const types = Array.from(new Set([
+    ...orderAddressTypes,
+    ...livingStatusAddressTypes,
+    ...activeAddresses.map((addr: any) => addr.type).filter(Boolean),
+  ]));
+  const placeholders = types.map((type: string) => ({
+    kind: "type",
+    value: `type:${type}`,
+    type,
+    label: `${type} — TBD`,
+    address: `${type} address TBD`,
+    addressId: "",
+  }));
+  return { known, placeholders, all: [...known, ...placeholders] };
+};
+
+// isAddressPlaceholder — address is a placeholder if its placeholder flag is on,
+// street is empty, street says "TBD", or type contains "placeholder".
+export const isAddressPlaceholder = (addr: any = {}) => {
+  if (isPlaceholderFlagActive(addr?.placeholder)) return true;
+  const street = (addr?.street || "").trim();
+  const type = (addr?.type || "").trim().toLowerCase();
+  if (!street) return true;
+  return street.toUpperCase() === "TBD" || type.includes("placeholder");
+};
+
+// useCurrentLocation — geolocation lookup. Not a hook (despite the name); call directly
+// with onResult/onError callbacks. Kept as a function for backwards compatibility.
+export const useCurrentLocation = (
+  onResult: (coords: { lat: number; lng: number }) => void,
+  onError?: (msg: string) => void,
+) => {
+  if (!navigator.geolocation) { onError?.("Geolocation not supported"); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => onResult({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    (err) => onError?.(err.message || "Location unavailable"),
+    { enableHighAccuracy: true, timeout: 10000 },
+  );
+};

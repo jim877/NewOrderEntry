@@ -4,6 +4,25 @@ Reusable patterns established in the NOE prototype. Reference these when buildin
 
 ---
 
+## Component Size Caps (Two-Tier)
+
+Every control / form / widget lives in its own file under `src/components/`.
+
+- **Soft cap: 150 LOC** — crossing this is a *signal*, not a failure. Ask: is there a sub-component, data array, or helper to extract? If yes, do that. If no (legitimate hook + JSX complexity), proceed.
+- **Hard cap: 200 LOC** — must split. No exceptions.
+
+**Why two tiers:** a single hard limit either gets gamed (cosmetic compression to squeak under) or rejected as unrealistic. The soft/hard pattern catches real growth while not punishing already-clean files at the boundary.
+
+**When to split a component over the soft cap, in order of preference:**
+1. Extract its static data to `config.json` (lists, labels, keywords, icon maps)
+2. Extract sub-components that are independently usable
+3. Extract pure helpers to `src/utils/`
+4. As a last resort, split the JSX tree itself
+
+**When NOT to compress:** if your file is 162 LOC because it has 8 hooks and a real form layout, leave it. Tightening prettier's multi-line useEffects is fine; collapsing readable branches into ternaries to hit a number is not.
+
+---
+
 ## Centralized Coaching / Help Text
 
 Inline guidance shown next to fields and sections, sourced from a single config object.
@@ -157,3 +176,34 @@ Ordered sequence of stays with drag-to-reorder, address linking, and duration tr
 - Reorder via up/down buttons
 
 **When to use:** Any scenario modeling a sequence of locations or phases over time.
+
+---
+
+## Rule-Driven Config (Triggered Suggestions)
+
+Config-driven lists where each item declares the conditions under which it should auto-suggest.
+
+Example: `DEFAULT_LOAD_TARGETS` (what to bring on a job)
+
+- Each item: `{id, label, category, triggers: LoadTrigger[]}`
+- Triggers are tagged unions: `condition` (flag in data.conditions), `loss` (loss type), `packout` (packout item), `service` (service offering), `interview` (interview answer label)
+- A `matchXxx(data, items)` helper walks triggers and returns matched labels
+- Auto-suggested items render with a distinct ring/badge (e.g. amber ✦) in the question UI
+- Settings panel exposes an editor: add/remove items, change category, add/remove triggers
+- User customizations persist to localStorage under a stable key
+
+**When to use:** Any picker where a backing dataset should evolve over time AND the system can reasonably predict which items the user wants based on prior answers. Avoid hardcoding both the list and the matching rules in disparate places — keep them together so they evolve together.
+
+---
+
+## Family × Group Assignment Matrix
+
+A two-axis checkbox grid where rows are household/family members and columns are delivery groups (or any phase/stage). Used in the Timeline Builder to capture per-person delivery commitments.
+
+- Rows derived from existing data (customers + household), with icons by kind (adult/child/baby/pet)
+- Columns are computed delivery groups with date + label
+- Cells store a boolean in `rushGuideData.familyAssignments[memberId][groupId]`
+- Sticky first column so member names stay visible while scrolling columns
+- Empty-state messaging when household or groups are missing
+
+**When to use:** Any scenario where multiple entities (people, items, vehicles) need to be assigned to one or more phases, and the assignment is best visualized as a quick scan rather than per-row dropdowns.
