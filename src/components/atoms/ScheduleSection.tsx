@@ -16,6 +16,7 @@ import {
   TimePicker,
   SearchSelect,
   Select,
+  AutoGrowTextarea,
 } from "./index";
 import {
   BRIDGE_CUSTOMER_BLOCKERS,
@@ -27,11 +28,19 @@ import {
   BRIDGE_BLOCKER_GROUPS,
 } from "../../config";
 import { bridgeStageToneClass } from "../../utils/bridge";
-import { stripEventSystemLines, composeEventInstructions } from "../../utils/eventInstructions";
+import { stripEventSystemLines, composeEventInstructions, buildEventSystemEntries } from "../../utils/eventInstructions";
 import { toggleMulti } from "../../utils/strings";
 import { safeUid } from "../../utils/uid";
 import { formatShortTimestamp } from "../../utils/dateTime";
-import { QUICK_INSTRUCTION_NOTES as QIN_FALLBACK, SDS_ICON_CLASS_OVERRIDES } from "../../config";
+import {
+  QUICK_INSTRUCTION_NOTES as QIN_FALLBACK,
+  SDS_ICON_CLASS_OVERRIDES,
+  LOAD_ITEMS,
+  SDS_CONSIDERATIONS,
+  SDS_OBSERVATIONS,
+  SDS_SERVICES,
+  SDS_ICON_MAP,
+} from "../../config";
 
 const getSdsIconImageClass = (item: string) =>
   SDS_ICON_CLASS_OVERRIDES[item] || "h-full w-full object-contain object-center";
@@ -96,6 +105,8 @@ export const ScheduleSection: React.FC<any> = (props) => {
     toggleProceedWithoutApproval,
     toggleScopeBridgeMilestone,
     updateScopeBridgeMilestone,
+    activeBridgeIssues,
+    scopeBridgeSnippet,
     matchLoadTargets,
     DEFAULT_LOAD_TARGETS,
     QUICK_INSTRUCTION_NOTES,

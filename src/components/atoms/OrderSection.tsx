@@ -45,6 +45,8 @@ import {
   ORDER_STATUSES,
   SUGGESTED_GROUPS,
   SUGGESTED_GROUP_HELP,
+  LOSS_TYPE_COACHING,
+  ORDER_INSTRUCTION_PRESETS,
 } from "../../config";
 import { getNonRestorationSubtype } from "../../utils/orderType";
 import { toggleMulti } from "../../utils/strings";
@@ -117,6 +119,13 @@ export const OrderSection: React.FC<any> = (props) => {
     toggleOrderInstructionPreset,
     toggleHandling,
     getInstructionIdentity,
+    expectedSeverityGroups,
+    orderPoc,
+    flagContactAsPoc,
+    suggestQ1,
+    openAddOrderInstructionModal,
+    orderLevelInstructions,
+    orderInstructionSelectionSet,
     updateLossDetail,
     getLossSummary,
     toggleMinimizeLoss,
