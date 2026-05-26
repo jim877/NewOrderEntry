@@ -3917,7 +3917,6 @@ export default function App(){
     const primaryAddr = (data.addresses || []).find(a => a.isPrimary) || (data.addresses || [])[0] || {};
     const addressLabel = [primaryAddr.street, primaryAddr.city, primaryAddr.state].filter(Boolean).join(", ");
     return (
-      <ScopeBoundary onBack={() => setEntryMode('detailed')}>
       <SameDayScope
         onExit={() => setEntryMode('start')}
         onNavigateToNoe={() => setEntryMode('detailed')}
@@ -3963,7 +3962,6 @@ export default function App(){
         sdsDisagreementNote={data.sdsDisagreementNote}
         onSdsDisagreementNoteChange={(value) => update("sdsDisagreementNote", value)}
       />
-      </ScopeBoundary>
     );
   }
 
@@ -4089,6 +4087,13 @@ export default function App(){
                       toggleOrderInstructionPreset={toggleOrderInstructionPreset}
                       toggleHandling={toggleHandling}
                       getInstructionIdentity={getInstructionIdentity}
+                      expectedSeverityGroups={expectedSeverityGroups}
+                      orderPoc={orderPoc}
+                      flagContactAsPoc={flagContactAsPoc}
+                      suggestQ1={suggestQ1}
+                      openAddOrderInstructionModal={openAddOrderInstructionModal}
+                      orderLevelInstructions={orderLevelInstructions}
+                      orderInstructionSelectionSet={orderInstructionSelectionSet}
                       updateLossDetail={updateLossDetail}
                       getLossSummary={getLossSummary}
                       toggleMinimizeLoss={toggleMinimizeLoss}
@@ -4250,6 +4255,7 @@ export default function App(){
                       attentionMold={attentionMold}
                       setModal={setModal}
                       openPrimaryCustomerText={openPrimaryCustomerText}
+                      showInsuranceShortcutOptions={showInsuranceShortcutOptions}
                       orderLevelInstructions={orderLevelInstructions}
                       orderInstructionSelectionSet={orderInstructionSelectionSet}
                       markInstructionKeysSeen={markInstructionKeysSeen}
@@ -4314,6 +4320,8 @@ export default function App(){
                       addEventNote={addEventNote}
                       toggleScopeBridgeMilestone={toggleScopeBridgeMilestone}
                       updateScopeBridgeMilestone={updateScopeBridgeMilestone}
+                      activeBridgeIssues={activeBridgeIssues}
+                      scopeBridgeSnippet={scopeBridgeSnippet}
                       downloadIcs={downloadIcs}
                       eventSystemLines={eventSystemLines}
                       eventSystemEntries={eventSystemEntries}
@@ -5780,6 +5788,8 @@ export default function App(){
           const people = household.filter(m => m.category === "person");
           const pets = household.filter(m => m.category === "pet");
           const primaryCustomer = (data.customers || [])[0] || {};
+          const familyDefaults = { adults: Math.max(1, (data.customers || []).length), kids: people.filter(p => /child|infant/i.test(p.type)).length, babies: people.filter(p => /infant|baby/i.test(p.type)).length, pets: pets.length };
+          const family = { ...familyDefaults, ...((rushGuideData as any).family || {}) };
           const { allAddresses, primaryAddress, primaryAddrStr, tempAddress, tempAddrStr, hotelAddress, hotelAddrStr, rentalAddress, rentalAddrStr } = buildRushGuideAddresses(data);
           const { babies, kids, elderly, adults, totalPeople, petCount, petNames } = buildHouseholdComposition(data);
           const considerations = data.sdsConsiderations || [];
@@ -5904,7 +5914,13 @@ export default function App(){
 	                      setTimeout(() => setPendingDeliveryDateChange(null), 50);
 	                    };
 
-	                    // Helper to create a new custom delivery
+	                    // Resolve which address applies on a given date, based on the timelineBands.
+                    const resolveAddressAtDate = (d: Date) => {
+                      for (const b of timelineBands) { if (d >= b.startDate && d < b.endDate) return { location: b.type, address: b.address }; }
+                      if (timelineBands.length) { const last = timelineBands[timelineBands.length - 1]; return { location: last.type, address: last.address }; }
+                      return { location: hasHotel ? "Hotel" : "Home", address: primaryAddrStr };
+                    };
+                    // Helper to create a new custom delivery
                     const createCustomDelivery = (label: string, dateStr: string, sourceId: string) => {
                       const loc = resolveAddressAtDate(new Date(dateStr));
                       const newId = `custom_${safeUid()}`;
@@ -6291,7 +6307,7 @@ export default function App(){
                             deliveryGroups={deliveryGroups}
                             seasonalWardrobes={seasonalWardrobes}
                             upcomingEvents={data.upcomingEvents || []}
-                            interviewGroups={interviewGroups}
+                            interviewGroups={data.suggestedGroups || []}
                             seasonOverrides={(rushGuideData as any).seasonOverrides || {}}
                             eventOverrides={(rushGuideData as any).eventOverrides || {}}
                             deliveryNotes={(rushGuideData as any).deliveryNotes || {}}
