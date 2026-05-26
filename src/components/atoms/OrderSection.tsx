@@ -37,6 +37,7 @@ import {
   SERVICE_OFFERING_HELP,
   DAMAGE_TYPES,
   NON_RESTORATION_SUBTYPES,
+  NON_RESTORATION_PRIMARY,
   LEAD_SOURCES,
   LEAD_SOURCE_HELP,
   MARKETING_SOURCES,
@@ -45,6 +46,8 @@ import {
   SUGGESTED_GROUPS,
   SUGGESTED_GROUP_HELP,
 } from "../../config";
+import { getNonRestorationSubtype } from "../../utils/orderType";
+import { toggleMulti } from "../../utils/strings";
 
 export const OrderSection: React.FC<any> = (props) => {
   const {
@@ -99,8 +102,11 @@ export const OrderSection: React.FC<any> = (props) => {
     toggleNonRestorationPrimary,
     toggleRestorationType,
     selectNonRestorationSubtype,
-    selectPrimaryLossType,
     toggleLossType,
+    dismissedTips,
+    attentionWater,
+    attentionMold,
+    setModal,
     updateLossDetail,
     getLossSummary,
     toggleMinimizeLoss,

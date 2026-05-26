@@ -17,6 +17,22 @@ import {
   SearchSelect,
   Select,
 } from "./index";
+import {
+  BRIDGE_CUSTOMER_BLOCKERS,
+  BRIDGE_INSURANCE_BLOCKERS,
+  BRIDGE_PICKUP_STEP_OPTIONS,
+  BRIDGE_PROCESS_STEP_OPTIONS,
+  BRIDGE_DELIVERY_STEP_OPTIONS,
+  BRIDGE_MILESTONE_FIELDS,
+  BRIDGE_BLOCKER_GROUPS,
+} from "../../config";
+import { bridgeStageToneClass } from "../../utils/bridge";
+import { stripEventSystemLines, composeEventInstructions } from "../../utils/eventInstructions";
+import { toggleMulti } from "../../utils/strings";
+import { QUICK_INSTRUCTION_NOTES as QIN_FALLBACK, SDS_ICON_CLASS_OVERRIDES } from "../../config";
+
+const getSdsIconImageClass = (item: string) =>
+  SDS_ICON_CLASS_OVERRIDES[item] || "h-full w-full object-contain object-center";
 
 export const ScheduleSection: React.FC<any> = (props) => {
   const {
@@ -69,6 +85,13 @@ export const ScheduleSection: React.FC<any> = (props) => {
     eventSystemEntries,
     hasEventInstructions,
     scopeBridgeState,
+    knownPeople,
+    bridgeSectionClassNames,
+    bridgeStatusClassNames,
+    conditionSummary,
+    eventNoteInputRef,
+    openReminderModal,
+    toggleProceedWithoutApproval,
     matchLoadTargets,
     DEFAULT_LOAD_TARGETS,
     QUICK_INSTRUCTION_NOTES,
