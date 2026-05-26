@@ -29,6 +29,8 @@ import {
 import { bridgeStageToneClass } from "../../utils/bridge";
 import { stripEventSystemLines, composeEventInstructions } from "../../utils/eventInstructions";
 import { toggleMulti } from "../../utils/strings";
+import { safeUid } from "../../utils/uid";
+import { formatShortTimestamp } from "../../utils/dateTime";
 import { QUICK_INSTRUCTION_NOTES as QIN_FALLBACK, SDS_ICON_CLASS_OVERRIDES } from "../../config";
 
 const getSdsIconImageClass = (item: string) =>
@@ -92,6 +94,8 @@ export const ScheduleSection: React.FC<any> = (props) => {
     eventNoteInputRef,
     openReminderModal,
     toggleProceedWithoutApproval,
+    toggleScopeBridgeMilestone,
+    updateScopeBridgeMilestone,
     matchLoadTargets,
     DEFAULT_LOAD_TARGETS,
     QUICK_INSTRUCTION_NOTES,

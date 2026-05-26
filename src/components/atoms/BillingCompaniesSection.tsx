@@ -45,7 +45,8 @@ import {
   SUGGESTED_GROUPS,
   SUGGESTED_GROUP_HELP,
 } from "../../config";
-import { INSURANCE_COMPANY_SHORTCUTS, NATIONAL_CARRIER_LINKS } from "../../utils/companyProfiles";
+import { INSURANCE_COMPANY_SHORTCUTS, NATIONAL_CARRIER_LINKS, isInsuranceShortcutCompany } from "../../utils/companyProfiles";
+import { formatShortTimestamp } from "../../utils/dateTime";
 import { safeUid } from "../../utils/uid";
 
 export const BillingCompaniesSection: React.FC<any> = (props) => {

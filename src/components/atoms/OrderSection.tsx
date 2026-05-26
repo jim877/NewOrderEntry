@@ -48,6 +48,9 @@ import {
 } from "../../config";
 import { getNonRestorationSubtype } from "../../utils/orderType";
 import { toggleMulti } from "../../utils/strings";
+import { formatCurrencyInput } from "../../utils/format";
+import { initLossSeverity } from "../../utils/orderFactories";
+import { getInstructionTypeTextKey } from "../../utils/instructions";
 
 export const OrderSection: React.FC<any> = (props) => {
   const {
@@ -107,6 +110,13 @@ export const OrderSection: React.FC<any> = (props) => {
     attentionWater,
     attentionMold,
     setModal,
+    setInterviewPanelOpen,
+    jumpToSectionAndSubsection,
+    openEditOrderInstructionModal,
+    removeOrderInstruction,
+    toggleOrderInstructionPreset,
+    toggleHandling,
+    getInstructionIdentity,
     updateLossDetail,
     getLossSummary,
     toggleMinimizeLoss,

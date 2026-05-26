@@ -4082,6 +4082,13 @@ export default function App(){
                       attentionWater={attentionWater}
                       attentionMold={attentionMold}
                       setModal={setModal}
+                      setInterviewPanelOpen={setInterviewPanelOpen}
+                      jumpToSectionAndSubsection={jumpToSectionAndSubsection}
+                      openEditOrderInstructionModal={openEditOrderInstructionModal}
+                      removeOrderInstruction={removeOrderInstruction}
+                      toggleOrderInstructionPreset={toggleOrderInstructionPreset}
+                      toggleHandling={toggleHandling}
+                      getInstructionIdentity={getInstructionIdentity}
                       updateLossDetail={updateLossDetail}
                       getLossSummary={getLossSummary}
                       toggleMinimizeLoss={toggleMinimizeLoss}
@@ -4252,7 +4259,7 @@ export default function App(){
                       currentOrderCustomerForms={currentOrderCustomerForms}
                       recordWord={recordWord}
                       estimateRequesterQuickOptions={estimateRequesterQuickOptions}
-                      interviewGroups={interviewGroups}
+                      interviewGroups={data.suggestedGroups || []}
                       triggerAutoFlash={triggerAutoFlash}
                       getFlashClass={getFlashClass}
                       setEditContactModal={setEditContactModal}
@@ -4305,7 +4312,8 @@ export default function App(){
                       dateCloseTick={dateCloseTick}
                       timeCloseTick={timeCloseTick}
                       addEventNote={addEventNote}
-                      deleteEventNote={deleteEventNote}
+                      toggleScopeBridgeMilestone={toggleScopeBridgeMilestone}
+                      updateScopeBridgeMilestone={updateScopeBridgeMilestone}
                       downloadIcs={downloadIcs}
                       eventSystemLines={eventSystemLines}
                       eventSystemEntries={eventSystemEntries}
